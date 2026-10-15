@@ -1,0 +1,31 @@
+# Config of record of scripts/make_bmvc2026_intro.jl: fig:teaser.
+
+[experiment]
+generator = "intro"
+tiers = ["bb_absolute_pose_inputs", "bb_assets"]
+
+[inputs]
+image = "absolute_pose_experiments/teaser/DSC04596.png"  # data_root()-relative
+boards_dir = "evaluation/blobboards_original"
+gallery = "board_features.jld2"                          # a CACHE: results_root()/galleries/<gallery>
+network = "bmvc2026_260527.toml"                         # configs/-relative run config naming the descriptor network ("package" = the package default)
+
+[find_boards]
+# Detector settings differ from the run config of record, deliberately:
+detector_exception = "uncalibrated montage teaser (no single camera): the homography path with min_inliers 6, not the calibrated evaluation config"
+geometry = "homography"
+min_inliers = 6                          # 6, not 5: the count gate became inclusive (2026-08-11)
+polarity = "dark"
+peak_threshold = 0.02
+edge_threshold = 5.0
+nms_cutoff = "default"
+
+[render]
+figure_width = 1600
+px_per_unit = 2                          # RASTER: the vector PDF is ~48 MB
+background = "white"                     # "transparent" for the project site
+outline_width = 2.0
+blob_width = 1.0
+
+[output]
+name = "intro_overlay.png"               # under papers/images

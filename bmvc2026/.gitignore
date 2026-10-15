@@ -1,0 +1,12 @@
+
+# Generated figure rasters/vectors: regenerable, and large enough that
+# committing them inflates .git permanently (the four adapted panels alone are
+# ~93 MB). Rebuild with:
+#   pixi run julia --project=bmvc2026 bmvc2026/scripts/make_adapted_panels.jl
+#   pixi run julia --project=bmvc2026 bmvc2026/scripts/make_bmvc2026_intro.jl
+# Both resolve their inputs through data_root(), so they need the dataset.
+# The rendered panels ARE tracked so the paper builds from a clean clone
+# (bmvc2026/papers is exported to its own repo by `git subtree split`).
+# Only the 23MB-each vector masters stay out: they encode the photograph
+# as one path per pixel, so the PNG at 2x native loses nothing visible.
+papers/images/adapted/*.pdf

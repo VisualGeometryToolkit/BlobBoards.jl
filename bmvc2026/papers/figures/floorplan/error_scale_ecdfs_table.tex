@@ -1,0 +1,21 @@
+% error_scale_ecdfs_table.tex — generated assembly; edit freely
+\centering
+\setlength{\tabcolsep}{2pt}
+\providecolor{bbGreen}{HTML}{009E73}
+\providecolor{bbBlue}{HTML}{0072B2}
+\providecolor{bbOrange}{HTML}{E69F00}
+\begin{tabular}{@{}ccc@{}}
+{\small Small (4\,cm)} & {\small Medium (6\,cm)} & {\small Large (12\,cm)} \\[1pt]
+\input{figures/floorplan/hist_trans_small} & \input{figures/floorplan/hist_trans_medium} & \input{figures/floorplan/hist_trans_large} \\
+\multicolumn{3}{c}{(a) Translation error} \\[6pt]
+\input{figures/floorplan/hist_rot_small} & \input{figures/floorplan/hist_rot_medium} & \input{figures/floorplan/hist_rot_large} \\
+\multicolumn{3}{c}{(b) Rotation error} \\
+\end{tabular}\\[4pt]
+\begin{tikzpicture}[baseline]
+\draw[bbBlue, line width=1.2pt] (0.0cm,0) -- (0.6cm,0);
+\node[anchor=west, font=\small] at (0.7cm,0) {BlobBoards};
+\draw[bbOrange, line width=1.2pt] (3.0cm,0) -- (3.6cm,0);
+\node[anchor=west, font=\small] at (3.7cm,0) {AprilTag};
+\draw[bbGreen, line width=1.2pt] (6.0cm,0) -- (6.6cm,0);
+\node[anchor=west, font=\small] at (6.7cm,0) {ArUco};
+\end{tikzpicture}

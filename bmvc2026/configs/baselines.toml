@@ -1,0 +1,76 @@
+# Config of record of the AprilTag and ArUco baselines of the BMVC 2026
+# evaluation: scripts/detect_baselines.jl (the stage: results_root()/baselines-<key>)
+# runs scripts/baselines/detect_markers.py (pixi environment `baselines`,
+# bmvc2026/pixi.toml), a faithful port of
+# BlobBoards-Evaluation 88bca9f (evaluation_pipe/pose_extractor.py and
+# evaluation_pipe/pose_estimators.py; the snapshot is the code-provenance
+# archive BlobBoards-Evaluation-main.zip in the input tier). Every value below
+# is the value that code ran with; none is tuned here.
+
+[experiment]
+generator = "baselines"
+dataset = "260527"
+port_of = "BlobBoards-Evaluation 88bca9f: evaluation_pipe/pose_extractor.py (extract_pose, packing_poses, validate_image), evaluation_pipe/pose_estimators.py (estimate_apriltag_pose, estimate_aruco_pose_opencv, estimate_pose_from_corners)"
+
+[camera]
+# The upstream reader (pose_estimators/calibrate_camera.py read_calibrated_camera)
+# took K and the distortion vector as float32; the fit was cv2.calibrateCamera
+# with CALIB_RATIONAL_MODEL | CALIB_FIX_K3..K6 (flags 30848), and the upstream
+# export stores OpenCV's full fourteen-coefficient vector (k1 k2 p1 p2 k3 k4 k5
+# k6 s1 s2 s3 s4 tilt_x tilt_y; all but k1 k2 p1 p2 zero), which the reader
+# handed to cv2.undistort unchanged.
+dtype = "float32"
+distortion = ["k1", "k2", "p1", "p2", "k3", "k4", "k5", "k6", "s1", "s2", "s3", "s4", "tilt_x", "tilt_y"]
+# Undistortion: cv2.undistort(image, K, dist, None, K) -- the new camera matrix
+# IS the camera matrix, so the PnP and the stored undist_K are K itself.
+
+[subsets]
+# system => image subset (images/<subset>), the calibration subset, the board
+# definitions (boards/<dir>), as IMAGE_DIR_MAPPING and boards_dir named them.
+apriltags = { images = "apr", calibration = "calibration_apr", boards = "apriltags" }
+aruco = { images = "uco", calibration = "calibration_uco", boards = "aruco" }
+image_extensions = [".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"]
+
+[occlusion]
+# The synthetic occlusion levels (inputs, occlusion/<LL>/images/<subset>); the
+# upstream loop ran the non-calibration subsets only for them.
+levels = ["00", "10", "20", "30", "40", "50", "60", "70", "80", "90"]
+
+[apriltags]
+# dt_apriltags.Detector(...), estimate_tag_pose = false (the pose is PnP below)
+families = "tagStandard41h12"
+nthreads = 1
+quad_decimate = 2.0
+quad_sigma = 0.0
+refine_edges = 1
+decode_sharpening = 0.25
+debug = 0
+# Corner order taken as the detector returns it (result.corners[0..3]).
+# The estimated rotation is re-expressed so that x is right, y up, z into the
+# scene: R ← R · Rz(90°) · (Rz(180°) · Ry(180°) · Rz(90°)), as pose_extractor did.
+align = true
+
+[aruco]
+# cv2.aruco.ArucoDetector(getPredefinedDictionary(DICT_ARUCO_MIP_36h12), params)
+# with OpenCV's default DetectorParameters except:
+dictionary = "DICT_ARUCO_MIP_36h12"
+use_aruco3_detection = true
+
+[pnp]
+# Per tag: cv2.solvePnP(obj, corners, K, None, flags = SOLVEPNP_IPPE_SQUARE) on
+# the undistorted image; obj = the tag square of side size_mm, corners
+# (−s/2, s/2), (s/2, s/2), (s/2, −s/2), (−s/2, −s/2). size_mm =
+# round(detectable_pattern_resolution px at print_density dpi, 4 decimals),
+# from each board definition; a decoded id with no board definition is dropped.
+flags = "SOLVEPNP_IPPE_SQUARE"
+size_digits = 4
+
+[timing]
+# elapsed_time_ms = the detector call (perf_counter around detect /
+# detectMarkers, after grayscale for AprilTag) + the PnP loop.
+clock = "perf_counter"
+
+[val]
+# validate_image: each pose's axes (half the tag side) projected with K onto the
+# undistorted image; X red, Y green, Z blue, 3 px; the id in white.
+axis_fraction = 0.5

@@ -1,0 +1,188 @@
+# =============================================================================
+# The configuration of record for the BMVC 2026 absolute-pose experiments.
+# =============================================================================
+#
+# POLICY: configuration is TOML, data is JSON (cau-tooling EVAL-CONVENTIONS.md).
+#
+# This file is the SINGLE source of truth for a run. Before it, a run's
+# configuration came from four unrelated mechanisms — a DEFAULT_DESCRIPTOR_MODEL
+# constant inside the BlobBoards package, a LocalPreferences key, an env var,
+# and per-driver BB_* env vars — with the descriptor network reachable three
+# different ways and the gallery chosen independently of it. Nothing recorded
+# what was used, so "which network produced these poses?" was unanswerable
+# after the fact, and a stale BB_LIMIT=40 in a shell truncated a 56-image
+# sweep to 40 while looking completely clean.
+#
+# Load with `read_run_config(path)`; `FindBoardsConfig(path; camera)` reads the
+# [find_boards] table. Drivers write a copy of this file beside their output,
+# so every artifact carries the configuration that produced it.
+#
+# The network path is data_root()-relative (an input, the assets tier); WHICH
+# network to use is a property of the experiment, so it lives here.
+
+[experiment]
+dataset = "260527"
+subsets = ["bb", "calibration_bb"]
+# The synthetic occlusion levels the occlusion sweep (go_bmvc2026_occlusion.jl)
+# runs over: inputs, occlusion/<LL>/images/bb.
+occlusion_levels = ["00", "10", "20", "30", "40", "50", "60", "70", "80", "90"]
+
+[descriptor]
+# The log-polar s96 tracking network, `_cuda` variant: identical weights to
+# track_logpolar_circ_s96.onnx, with the ten circular/edge Pad nodes rewritten
+# as Slice+Concat so ORT's CUDA EP takes the whole graph. Descriptors are
+# bit-identical (max |Δ| = 0 over 256 real patches) and it is ~14× faster —
+# the CUDA EP has no kernel for Pad in wrap/edge mode, so the original fell
+# back to the CPU for every Pad and shredded the graph with 16 Memcpy nodes.
+# Regenerate with experiments/onnx_depad.py; see
+# bmvc2026/_research/findings/descriptor_inference_speedup.md.
+# RealFourthIteration export (2026-08-10): the network of the promoted
+# snapshot. THIS BASE CONFIG NOW NAMES IT TOO (2026-08-14) — go_bmvc2026.jl
+# defaults to this file, and the base/iter4 network split is exactly how a
+# full-sweep "engine regression" turned out to be a descriptor confound
+# (10 lost 2–3 m detections, all network). `bmvc2026_260527_iter4.toml` was
+# DELETED 2026-08-17: it had become value-identical to this file (comments
+# were the only diff), was read by nothing, and — since run keys hash the
+# EFFECTIVE config — could not even produce a distinct run key. Old runs'
+# `_provenance.toml` sidecars that name it as config_source still restore:
+# they carry the effective `_config.toml` beside the poses.
+model = "models/track_logpolar_circ_s96_iter4.onnx"
+
+[gallery]
+# Cache of (board set × descriptor model). Safe to share and safe to delete:
+# the cache key includes the model hash, the network-declared patch size, the
+# outer extent, and each board's own cutoff, so a wrong-model entry can never
+# be returned — a model change simply recomputes rather than silently matching
+# stale descriptors.
+path = "board_features_logpolar_s96.jld2"   # a cache: results_root()/galleries/<path> (src/runs.jl gallery_path)
+
+[find_boards]
+# COMPLETENESS IS THE POINT. Every parameter `FindBoardsConfig` accepts is
+# stated here, including ones sitting at the library default, because a
+# defaulted knob is not recorded — and a default that changes in a later
+# BlobBoards silently reinterprets this file (max_trials already moved
+# 10_000 -> 2_000 once). test/test_config_toml.jl asserts this file names
+# every key `config_dict` emits, so the completeness cannot rot.
+#
+# The exceptions are deliberate and are NOT defaults: `polarity` and
+# `adapt.cutoff` come from each board's bundle, `patch_size` from the ONNX
+# graph. Those are recorded in the boards and the checkpoint respectively.
+min_similarity = 0.6
+# Appearance verification (mandatory since 2026-08-13): fraction of inliers
+# whose gallery/image descriptors must agree. Replaced
+# geometry.min_inlier_fraction — the fraction gate was a geometric proxy for
+# the same fabricated-board attack, and appearance separates it with zero
+# measured overlap. 0.6, calibrated DOWN twice (2026-08-14): distant real
+# boards' median sims dip to 0.66-0.71 at THIS dataset's 2-3 m frontier
+# (0.8 rejected 8 GT-real boards on the slice; 0.7 gated 13 more real pairs
+# on the full corpus) while false boards sit at median 0.07-0.37 — the
+# separation stays total at 0.6.
+verify_similarity = 0.6
+min_appearance_support = 0.5
+max_detections = "unbounded"    # response-rank cap; applied per polarity subset
+# Base seed for the per-fit RANSAC streams (Xoshiro(seed XOR board uid)):
+# the fit stage is bit-reproducible given features. Sweep only to MEASURE
+# fit-stage RNG sensitivity — decisions were seed-stable on the 260527 A/B.
+ransac_seed = 0x0b10b5eed
+
+[find_boards.detect]
+# CROSS-VALIDATED jointly with the half-width and min_similarity (see
+# [find_boards.geometry] outlier_halfwidth): the record kept this incumbent.
+peak_threshold = 0.01
+edge_threshold = 5.0
+# 2x upsample before the scale space (pyramid starts at octave -1).
+# Recovers small blobs at distance; the shipped 260527 poses were
+# produced with it on, which is what poses/bb.upsample was named for.
+upsample = true
+tilts = []   # empty = the IMAS-25 schedule
+# The ONE cutoff still configured, and a DIFFERENT quantity from the board's:
+# the Mahalanobis radius of each detection's elliptical footprint, used for
+# cross-warp duplicate suppression inside the shared detection stage. It cannot
+# be board-derived - NMS runs before any board is known. Larger => bigger
+# footprints => more suppression. VGF's default is 3.0; 2.0 keeps more.
+# band_octaves / band_reach FORCE the scale-banded rule (VGF 0.6.2): a feature
+# can only be suppressed by one whose geometric-mean scale band
+# (floor(log2 sqrt(det S) / band_octaves)) is within band_reach of its own.
+# 1 octave +-1 => scale ratio < 4. Without it, board-sized DoG extrema and the
+# tilted warps' merged-blob streaks erased the small blobs inside them: on the
+# DSC04574 board panel the whole-pool rule (band_octaves = 0) keeps 276 blobs
+# in the panel vs 642 banded. Set explicitly so the config, not a struct
+# default, pins the detector's behaviour.
+nms = { type = "ellipse", cutoff = 2.0, band_octaves = 1.0, band_reach = 1 }
+
+[find_boards.adapt]
+# NB no `cutoff` here: it is the printed board's, supplied from the gallery
+# (`_shared_image_cutoff`) so the scan window, the clip test and the
+# canonicalization extent cannot disagree. Use `scan_padding` to over- or
+# undersize the window.
+min_intensity = 1.0e-6
+scan_padding = 1.0
+max_irls_iter = 20                     # quality knob, not just a convergence cap
+spatial_weighting = true
+rtol = 1.0e-6
+# sigma cap as a FRACTION of the image's sqrt(area): sigma > f*sqrt(W*H) is
+# skipped. A resource guard - a blob's fitted support is ~(2*cutoff*sigma)^2,
+# so an unbounded sigma is an OOM - expressed relatively because the same
+# pixel count means different things on different sensors.
+#
+# 0.1 => ~347 px on these 4240x2832 frames (sqrt(area) = 3465.21). This
+# SUPERSEDES the 200 px cap the earlier poses/bb were produced under; the
+# sweep is re-run against this value, so the artifact and the file agree
+# again. (The old cap corresponded to a fraction of 0.0577.)
+max_scale_fraction = 0.1
+max_scale_ratio = 4.0                  # dimensionless
+max_clip_ratio = 0.2                   # dimensionless
+max_aspect_ratio = 10.0                # dimensionless
+
+[find_boards.track]
+# Board tracking across frames (`track_boards`) — every keyword of that
+# function defaults from here and overrides per call.
+iou_threshold = 0.2         # predicted↔detected ellipse IoU gate per blob
+support_fraction = 0.3      # fraction of predicted blobs that must associate
+patience = 5                # failed frames before a track stops being re-targeted
+keyframe_every = 30         # discovery cadence for untracked boards; 0 disables
+
+[find_boards.geometry]
+type = "pose"            # calibrated P3P; "homography" is the uncalibrated path
+# Where the pose is measured. "global" undistorts the whole image and detects
+# on it — what every promoted run used, and why this file states it; "none"
+# (the package default since the raw-pixel pose arm) detects on the raw image
+# and verifies through the FULL camera, so the residual is in the pixels the
+# detector produced.
+undistortion = "global"
+local_optimization = { type = "student_t_uniform" }   # posterior-weight IRLS LO on every arm
+# 9, not 8: the count gate became INCLUSIVE (>= min_inliers, 2026-08-11), so
+# the authored value moves up one to keep the tuned effective threshold. This
+# changes config_dict and therefore the run key — a fresh run directory.
+min_inliers = 9
+# Reprojection inlier half-width, PIXELS — the support of the uniform outlier
+# component of the Student-t + uniform scorer and LO, and the guided-association
+# band. CROSS-VALIDATED, jointly with [find_boards.detect] peak_threshold and
+# [find_boards] min_similarity: the record of configs/detection_cv.toml,
+# results_root()/tuning/detection_cv-f5a385376eda453e/detection.jld2 (run key
+# f5a385376eda453e), kept this operating point as its incumbent — the joint
+# selection's mAA gain (+0.0018) was not resolved by the paired frame bootstrap
+# (P(gain > 0) = 0.825 < 0.95). The value itself was signed off 2026-10-09 from
+# the one-axis half-width CV (run key 3a346460b90dc25d); it was 5.0.
+# test/operating_points_tests.jl holds all three equal to the record's
+# deployed setting (deployed_setting).
+outlier_halfwidth = 0.9646329181191862
+# Planar pose ambiguity: a coplanar target admits two pose basins (the normal
+# mirrored about the viewing ray, a PROPER rotation - Schweighofer & Pinz
+# 2006), and they tie on position consensus, so RANSAC's winner is a coin flip
+# in the ambiguous regime. ON: the symmetric-LRT selector moves the 3 m ring's
+# rotation p90 from 25.6 deg to 10.3 deg, correcting ten flips and creating
+# none, with medians untouched (bmvc2026/_research/findings/flip_disambiguation.md). NB the earlier
+# scale-RSS selector WAS a measured negative result - a coin at 52.6% - and
+# this comment used to cite it; it now survives only as telemetry.
+#
+# CALIBRATED ONLY. Meaningless under type = "homography", and rejected there:
+# the plane-induced H is a unique 8-DOF map, and the two-fold ambiguity is a
+# property of DECOMPOSING it into (R, t, n) given K, not of H itself. With no
+# camera there is no second branch to select.
+resolve_pose_ambiguity = true
+
+[find_boards.ransac]
+min_trials = 100
+max_trials = 2000
+success_prob = 0.99      # RANSAC confidence level

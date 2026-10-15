@@ -1,0 +1,19 @@
+% unocc_trans_dist.tex — generated (unoccluded marginals), edit freely
+\providecolor{bbGreen}{HTML}{009E73}
+\providecolor{bbBlue}{HTML}{0072B2}
+\providecolor{bbOrange}{HTML}{E69F00}
+\begin{tikzpicture}[baseline=(current bounding box.center)]
+\begin{axis}[width=5.6cm, height=4.0cm,
+  xlabel={camera distance}, ylabel={translation error (mm)},
+  ymode=log, log ticks with fixed point, ytick={2,5,10,25,50,100},
+             xtick={1000,2000,3000}, xticklabels={{1\,m},{2\,m},{3\,m}},
+  label style={font=\scriptsize}, tick label style={font=\scriptsize},
+  ]
+\addplot[draw=none, fill=bbBlue, fill opacity=0.15, forget plot] coordinates {(1000,2.474) (2000,3.124) (3000,3.561) (3000,8.377) (2000,5.297) (1000,3.722)} \closedcycle;
+\addplot[draw=bbBlue, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbBlue, draw=bbBlue}] coordinates {(1000,3.039) (2000,4.075) (3000,5.947)};
+\addplot[draw=none, fill=bbOrange, fill opacity=0.15, forget plot] coordinates {(1000,4.398) (2000,21.48) (3000,43.8) (3000,81.55) (2000,40.72) (1000,7.29)} \closedcycle;
+\addplot[draw=bbOrange, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbOrange, draw=bbOrange}] coordinates {(1000,6.156) (2000,31.89) (3000,66.29)};
+\addplot[draw=none, fill=bbGreen, fill opacity=0.15, forget plot] coordinates {(1000,6.328) (2000,30.35) (3000,48.29) (3000,93.06) (2000,55.98) (1000,10.64)} \closedcycle;
+\addplot[draw=bbGreen, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbGreen, draw=bbGreen}] coordinates {(1000,8.277) (2000,41.25) (3000,65.38)};
+\end{axis}
+\end{tikzpicture}

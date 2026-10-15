@@ -1,0 +1,127 @@
+[bb_absolute_pose_images_260527]
+git-tree-sha1 = "9ae6024781c861faa5ba22944fcf9f83c3cd2a01"
+lazy = true
+
+    [[bb_absolute_pose_images_260527.download]]
+    sha256 = "1b6adb31acf390dbfa764b7476e9bfa0ebb8a800bf8e8cc9dedc69ec9e46579d"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_images_260527.tar.gz?download=1"
+
+[bb_absolute_pose_inputs]
+git-tree-sha1 = "2557303545952186ce8d24b95a2aa77c908b8568"
+lazy = true
+
+    [[bb_absolute_pose_inputs.download]]
+    sha256 = "3dc8bf4eed976ddc10ce70a902a2f4f24c22b3a66ed445799d9f7ce71257a1ec"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_inputs.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_00_260527]
+git-tree-sha1 = "330154b1f2dffc3203e401b4cd8b730766f52091"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_00_260527.download]]
+    sha256 = "e474f7cbcb18ff1707f372e2d14989dc862bb10f504a09a7a38139a4aa7d3218"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_00_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_10_260527]
+git-tree-sha1 = "189e335d25fb9f51a92efb4bd569ee75ee4a57a5"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_10_260527.download]]
+    sha256 = "e2695c77b0b7a6211a452c7d88fd00e2a1ea6c79aa40b6b6e33d5bd9d72aea55"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_10_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_20_260527]
+git-tree-sha1 = "5bd039df9c07bb4164d451cc26d0034c18bb3308"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_20_260527.download]]
+    sha256 = "e28392ed6e2462a0feac79bef112a259af72feaebf48f4dc4699a562dc9d29c1"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_20_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_30_260527]
+git-tree-sha1 = "451f8ab5bf4f8b7e73ce2aa485a5f9792bf2927a"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_30_260527.download]]
+    sha256 = "c25a009c7fffa6a225b3417e25c1211f21eaee7a32e8cd76d327f5da66891abb"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_30_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_40_260527]
+git-tree-sha1 = "649e4f9165ca48ccd583f166d35fb1c3a96442b8"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_40_260527.download]]
+    sha256 = "5ac4a2bd4bce5f8074d903c620aa3cd6872695d71ccd9db5555b2635808d0ff0"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_40_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_50_260527]
+git-tree-sha1 = "5d5c742e04f677e23cb72fc82a820dd4607aa90d"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_50_260527.download]]
+    sha256 = "51df745b42b7a2d71e626f59709129391a1fb45f3ce0f284a748686bc10153e7"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_50_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_60_260527]
+git-tree-sha1 = "695956c5294ade5942c04e6cacd544c64243f7f5"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_60_260527.download]]
+    sha256 = "f67f267c1aa7527bbeac7015d888fac343c3d82339dbc4a488874c79f00e8b5f"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_60_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_70_260527]
+git-tree-sha1 = "dc676ecccb18a29de5e17ca36ed63ecc78b02207"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_70_260527.download]]
+    sha256 = "964ceb93e6c309f56df07709bd987a02ebe7feba8e1df886b9f52a2cbc4d8a60"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_70_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_80_260527]
+git-tree-sha1 = "021733f7b3161775e43956c02568df3bdeb8bc12"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_80_260527.download]]
+    sha256 = "3b1c80938adc1e972d2c80c5c0ae787755bbbb8e84fa70adb3d0319a4aa63807"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_80_260527.tar.gz?download=1"
+
+[bb_absolute_pose_occlusion_90_260527]
+git-tree-sha1 = "c7c16a159beff7ca9b7b2469629f4c19bba6258a"
+lazy = true
+
+    [[bb_absolute_pose_occlusion_90_260527.download]]
+    sha256 = "f40cacaa950eacce3cee0a9bdcbc19cdbc906f38ea80f10065a41fb92133b8b0"
+    url = "https://zenodo.org/records/23243553/files/bb_absolute_pose_occlusion_90_260527.tar.gz?download=1"
+
+[bb_assets]
+git-tree-sha1 = "77cc06f028d7a54e929b2df777ee665756a6d8f1"
+lazy = true
+
+    [[bb_assets.download]]
+    sha256 = "adfd27ef889f6b63138e1dd28048734b3f4653bf2ac42ee104b76048cf338583"
+    url = "https://zenodo.org/records/23243553/files/bb_assets.tar.gz?download=1"
+
+[bb_descriptor_training_metadata]
+git-tree-sha1 = "47bb95988177f2b2e2cfabb7a75eaff2be99ac8f"
+lazy = true
+
+    [[bb_descriptor_training_metadata.download]]
+    sha256 = "14ff0356735a7942a1c3dbf7e8743c711943d865ead8f52e45ddc838677acc94"
+    url = "https://zenodo.org/records/23243553/files/bb_descriptor_training_metadata.tar.gz?download=1"
+
+[bb_descriptor_training_sources]
+git-tree-sha1 = "cd4eea8afcf66b642100462aa10d81418aca2c2f"
+lazy = true
+
+    [[bb_descriptor_training_sources.download]]
+    sha256 = "1e5608977b147cb48177394ce717b080b403e6362de9f61142828b0323a3384b"
+    url = "https://zenodo.org/records/23243553/files/bb_descriptor_training_sources.tar.gz?download=1"
+
+[bb_pipeline_figure]
+git-tree-sha1 = "036ca16c90250fc921cf5033d453049d8b140a3f"
+lazy = true
+
+    [[bb_pipeline_figure.download]]
+    sha256 = "587da5dc505c4e1343ce1e0004c501bbd8a3132303b26eeb4cec70db6e66d31d"
+    url = "https://zenodo.org/records/23243553/files/bb_pipeline_figure.tar.gz?download=1"

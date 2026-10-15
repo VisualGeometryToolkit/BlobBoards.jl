@@ -1,0 +1,89 @@
+# Config of record of scripts/make_param_variations.jl: fig:params, the
+# pattern-parameter ablation (a baseline and two variations of each of cutoff,
+# alpha, max diameter fraction and minimum blob scale).
+
+[experiment]
+generator = "param_variations"
+tiers = []                               # no dataset: patterns are generated
+
+[pattern]
+# The originals' seeds were drawn from RandomDevice and are lost; ONE fixed
+# seed for all panels (the panels of a row then differ only by the varied
+# parameter). Everything else was recovered from the submitted images.
+seed = "0x0000000020260821"
+resolution_px = 1890                     # 40 mm at 1200 dpi
+dpi = 1200
+scales_per_octave = 3
+max_trials = 5000
+pixel_type = "gray8"
+polarity = "dark"
+raster_aligned = true
+
+[output]
+dir = "blob_variations_squared"          # under papers/images
+sidecars = "param_variations"            # under plotsdir(): the regenerated configs + blobs (JSON)
+
+# cutoff, alpha, max_diameter_fraction, min_scale_mm => the paper's file name
+# (its <uid>_<hash5> is the historical identity of the lost original).
+[[panels]]
+cutoff = 1.5
+alpha = 1.2
+max_diameter_fraction = 0.4
+min_scale_mm = 0.2
+name = "blob_pattern_259_e8a21_co1.5_a1.2_df0.4_s0.2.png"   # baseline
+
+[[panels]]
+cutoff = 1.8
+alpha = 1.2
+max_diameter_fraction = 0.4
+min_scale_mm = 0.2
+name = "blob_pattern_00d_01603_co1.8_a1.2_df0.4_s0.2.png"
+
+[[panels]]
+cutoff = 2.0
+alpha = 1.2
+max_diameter_fraction = 0.4
+min_scale_mm = 0.2
+name = "blob_pattern_3af_2509f_co2.0_a1.2_df0.4_s0.2.png"
+
+[[panels]]
+cutoff = 1.5
+alpha = 1.6
+max_diameter_fraction = 0.4
+min_scale_mm = 0.2
+name = "blob_pattern_028_1251d_co1.5_a1.6_df0.4_s0.2.png"
+
+[[panels]]
+cutoff = 1.5
+alpha = 2.4
+max_diameter_fraction = 0.4
+min_scale_mm = 0.2
+name = "blob_pattern_4a3_79c86_co1.5_a2.4_df0.4_s0.2.png"
+
+[[panels]]
+cutoff = 1.5
+alpha = 1.2
+max_diameter_fraction = 0.5
+min_scale_mm = 0.2
+name = "blob_pattern_d2d_1c2c0_co1.5_a1.2_df0.5_s0.2.png"
+
+[[panels]]
+cutoff = 1.5
+alpha = 1.2
+max_diameter_fraction = 0.7
+min_scale_mm = 0.2
+name = "blob_pattern_714_d3d26_co1.5_a1.2_df0.7_s0.2.png"
+
+[[panels]]
+cutoff = 1.5
+alpha = 1.2
+max_diameter_fraction = 0.4
+min_scale_mm = 0.7
+name = "blob_pattern_76a_dc19e_co1.5_a1.2_df0.4_s0.7.png"
+
+[[panels]]
+cutoff = 1.5
+alpha = 1.2
+max_diameter_fraction = 0.4
+min_scale_mm = 1.7
+name = "blob_pattern_09f_028f0_co1.5_a1.2_df0.4_s1.7.png"

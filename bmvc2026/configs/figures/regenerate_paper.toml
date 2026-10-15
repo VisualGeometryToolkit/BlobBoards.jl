@@ -1,0 +1,17 @@
+# Config of record of scripts/regenerate_paper.jl: the stage runner over every
+# stage that produces a result (from the inputs alone) and every generator of
+# the paper's assets. Each reads its own config of record: the result stages
+# configs/*.toml, the evaluation drivers configs/figures/evaluation.toml (whose
+# [runs] name the result stages' configs), each figure generator
+# configs/figures/<generator>.toml.
+
+[experiment]
+generator = "regenerate_paper"
+tiers = ["bb_absolute_pose_inputs", "bb_absolute_pose_images_260527", "bb_absolute_pose_occlusion_*_260527", "bb_assets", "bb_pipeline_figure"]
+
+[pose_results]
+force = true                             # BB_FORCE for make_pose_results.jl: a code change is never served a stale cell
+
+[copy]
+# Driver .tex never copied into papers/figures (compilable previews).
+exclude_suffixes = ["_standalone.tex"]

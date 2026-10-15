@@ -1,0 +1,78 @@
+# GPU environment for interactive work and the example/SLURM CLIs.
+#
+# CUDA and cuDNN are [weakdeps] of BlobBoards — they have to be, or
+# BlobBoardsCUDAExt could not be an extension — and Julia refuses to load a
+# package's own weakdeps from that package's project env:
+#
+#   julia --project=. -e 'using CUDA'
+#   ERROR: ArgumentError: Package CUDA not found in current path.
+#
+# With neither loaded, `BlobBoards.default_device()` stays on `KA.CPU()` and
+# ONNXRunTime's CUDA execution provider is unavailable, so DescriptorNetwork
+# warns and falls back to the CPU EP (correct, ~2x slower on the SupCon net).
+#
+# This env dev's the checkout and adds CUDA + cuDNN as ordinary deps, which
+# activates BlobBoardsCUDAExt *and* ONNXRunTime's CUDAExt:
+#
+#   julia --project=gpu                                   # GPU REPL
+#   julia --project=gpu -t auto examples/training/build_tracks.jl VIDEOS BOARDS MODEL.onnx
+#
+# `--project=.` remains the right env for everything CPU-only (tests use their
+# own target env, which already lists CUDA + cuDNN).
+#
+# The CUDA_Runtime_jll pin at the bottom lives here rather than in a
+# LocalPreferences.toml because .gitignore excludes those — same reason the root
+# Project.toml carries its own copy. ORT's CUDA provider takes a runtime >= 12.0
+# and < 13.0; the machine default is newer, and without the pin
+# `load_inference(...; execution_provider = :cuda)` errors into the CPU fallback.
+
+# The example CLIs under examples/pipeline/ and examples/training/ run here, so
+# their imports are deps too: FileIO + ImageIO/JpegTurbo (JPEG frames), Colors,
+# CairoMakie (the Makie plots), StaticArrays, GeometryBasics and CoordinateTransformations
+# (find_boards.jl's overlay), and the stdlibs the drivers `using`.
+#
+# GLMakie is here for interactive inspection: examples/pipeline/find_boards.jl
+# opens its overlay windows with it when a display is present (and saves PNGs
+# through CairoMakie when not). Nothing headless imports it — the SLURM and
+# track-building drivers stay on CairoMakie.
+
+[deps]
+BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+JpegTurbo = "b835a17e-a41a-41e7-81f0-2f016b05efe0"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+RobustVisualGeometry = "48970fad-9a21-401c-bf6c-679fa4f2bd7f"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+VisualGeometryCore = "297d53b8-c8d7-4cd7-a9af-68e656508a81"
+VisualGeometryFeatures = "9e05951d-65eb-41d6-b120-50dff4d82817"
+VisualGeometryIo = "d0441031-17df-4f07-bc88-8d8f5a818e7b"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
+
+[sources]
+BlobBoards = {path = ".."}
+
+[compat]
+# No VisualGeometryIo entry: BlobBoards' own [compat] (dev'd via [sources])
+# already bounds it. A second copy here can only agree or break the resolve —
+# it broke it twice (a 0.7 cap, 80dfe97; a 0.10 cap under the root's 0.11).
+CUDA = "5.11.0"
+CUDA_Runtime_jll = "0.21"
+GLMakie = "0.13"
+cuDNN = "1.4.7"
+julia = "1.12"
+
+[preferences.CUDA_Runtime_jll]
+version = "12.9"
+__clear__ = ["local"]

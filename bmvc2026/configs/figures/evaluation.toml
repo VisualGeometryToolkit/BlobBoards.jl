@@ -1,0 +1,43 @@
+# Config of record of the evaluation drivers that turn the detection runs into
+# the paper's tables, macros and pgfplots panels: make_hand_eye.jl,
+# make_pose_results.jl, scripts/plots/error_distributions.jl, flip_table.jl,
+# make_detection_stats.jl, make_hand_eye_table.jl, make_supp_tables.jl
+# (regenerate_paper.jl runs them in this order).
+
+[experiment]
+generator = "evaluation"
+dataset = "260527"
+tiers = ["bb_absolute_pose_inputs", "bb_absolute_pose_images_260527"]
+
+[runs]
+# The config of record of every upstream stage (configs/-relative). Each run
+# is found through its run key (src/runs.jl `eval_sources`), never by a
+# hand-named directory: a changed config is a new run, read under its own key.
+records = "convert_formats.toml"           # the motion-capture records (scripts/convert_formats.jl)
+bb = "bmvc2026_260527.toml"                # BlobBoards (scripts/go_bmvc2026.jl, go_bmvc2026_occlusion.jl)
+bb_noflip = "bmvc2026_260527_noflip.toml"  # BlobBoards without disambiguation (the flip table's base)
+baselines = "baselines.toml"               # AprilTag + ArUco (scripts/detect_baselines.jl)
+
+[drivers]
+tex_prefix = "figures/floorplan/"        # the \input prefix the panels are written with
+occlusion_levels = "10,50,70"            # the per-level floor plans the supplement shows
+flip_base = "bb_noflip"                  # the no-disambiguation comparison series ([runs] bb_noflip)
+flip_deg = 10                            # a flip is a rotation error above this (deg)
+collapse_pod = 0.01                      # PoD below which a system has "failed catastrophically"
+
+[error_distributions]
+# The rig stations the floor plans show: azimuth (deg). ±90° is edge-on (no
+# system can detect a plane presenting zero area) and is not a station.
+station_angles = { start = -80.0, spacing = 10.0, stop = 80.0 }
+# The occlusion levels whose numbers the prose cites (bb_occ_stats.tex).
+macro_levels = ["10", "50", "70"]
+# Colour-bar ticks of the floor plans (Makie preview and pgfplots), per metric.
+trans_ticks = [2, 5, 10, 25, 60, 120]
+trans_tick_labels = ["2", "5", "10", "25", "60", "120"]
+rot_ticks = [0.2, 0.5, 1, 2, 5, 15, 50]
+rot_tick_labels = ["0.2", "0.5", "1", "2", "5", "15", "50"]
+det_ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
+det_tick_labels = ["0", ".25", ".5", ".75", "1"]
+# The two floor-plan assemblies: rows (metric keys) of each.
+full_table_rows = ["det", "trans", "rot"]
+ab_table_rows = ["det", "trans"]

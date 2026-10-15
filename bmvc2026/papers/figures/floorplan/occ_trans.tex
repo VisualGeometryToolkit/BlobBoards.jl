@@ -1,0 +1,16 @@
+% occ_trans.tex — generated (occlusion sweep), edit freely
+\providecolor{bbGreen}{HTML}{009E73}
+\providecolor{bbBlue}{HTML}{0072B2}
+\providecolor{bbOrange}{HTML}{E69F00}
+\begin{tikzpicture}[baseline=(current bounding box.center)]
+\begin{axis}[width=4.05cm, height=3.4cm, xmin=-5, xmax=95,
+  ylabel={median error (mm)}, xlabel={occlusion level},
+  xtick={0,30,60,90}, xticklabels={{0\%},{30\%},{60\%},{90\%}},
+  ymode=log, log ticks with fixed point, ytick={5,10,25,50,100},
+  label style={font=\scriptsize}, tick label style={font=\scriptsize},
+  ]
+\addplot[draw=bbBlue, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbBlue, draw=bbBlue}] coordinates {(0,3.757) (10,3.854) (20,3.872) (30,3.905) (40,3.991) (50,3.946) (60,3.776) (70,3.591) (80,3.569) (90,3.661)};
+\addplot[draw=bbOrange, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbOrange, draw=bbOrange}] coordinates {(0,25.62) (10,33.0)};
+\addplot[draw=bbGreen, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbGreen, draw=bbGreen}] coordinates {(0,19.04) (10,91.21) (20,107.6)};
+\end{axis}
+\end{tikzpicture}

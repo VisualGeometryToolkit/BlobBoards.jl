@@ -1,0 +1,91 @@
+# Model checkpoints and binary artifacts
+*.onnx
+*.onnx.data
+*.pt
+examples/training/checkpoints/
+
+# Per-user preferences and the PACKAGE Manifest (regenerable; BB resolves
+# against its compat ranges instead of pinning one).
+# Root-anchored: bmvc2026/Manifest.toml is TRACKED (2026-08-18) — the
+# research project pins its environment the canonical DrWatson way, with
+# BlobBoards dev'd by RELATIVE path (".."), so git checkout + Pkg.instantiate
+# reproduces it on any machine.
+LocalPreferences.toml
+/Manifest.toml
+/Manifest-v1.*.toml
+/docs/Manifest.toml
+/src/Manifest.toml
+/gpu/Manifest.toml
+/examples/Manifest.toml
+/authoring/Manifest.toml
+# Negation: the user-global gitignore also ignores Manifest.toml everywhere;
+# this re-includes the ONE tracked research-project Manifest.
+!bmvc2026/Manifest.toml
+
+# Claude Code per-machine state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+**/.claude/settings.local.json
+
+# PythonCall / pixi / Python pip-package runtime
+.CondaPkg/
+.pixi/
+.venv/
+python/*.egg-info/
+**/__pycache__/
+
+# Legacy submodule remnants
+deps/
+
+# Example-pipeline outputs at repo root
+blob_board_*.json
+blob_board_*.pdf
+blob_board_*.png
+blob_board_*.tiff
+blob_pattern_*.json
+blob_pattern_*.png
+# ...but the nine variation panels in Figure 2 are paper figures, not
+# generated scratch output, and must survive the subtree export.
+!bmvc2026/papers/images/blob_variations_squared/blob_pattern_*.png
+tracking_*.mp4
+detected_*.png
+simple_warp_test.png
+
+# Output directories from running pipelines
+/out/
+/data/
+/patterns/
+/boards/
+
+# SLURM logs from examples/training/slurm/
+bb-annot*.log
+bb-train*.log
+slurm-*.out
+
+# Editor backups
+*.jl~
+\#*\#
+.#*
+
+dev/traces/
+# Parked, unreproducible run records (see dev/archive/README.md)
+dev/archive/
+# SLURM job logs (sbatch --output=logs/...)
+logs/
+
+# --- bmvc2026/ subproject (DrWatson) ---------------------------------------
+# data/ is two symlinks: exp_raw (immutable inputs) and exp_pro (add-only
+# outputs). Both point outside the repo; neither is ever committed.
+bmvc2026/data/
+bmvc2026/plots/
+bmvc2026/_research/traces/
+
+# bmvc2026 composed artifact view + consumer results (generated)
+bmvc2026/output/
+
+# bmvc2026 sweep shell logs (scratch, machine-local)
+bmvc2026/sweep_*.log
+
+# The paper is linked from arXiv, never shipped with the docs.
+docs/**/*.pdf

@@ -1,0 +1,36 @@
+# Companion environment: the checkout, dev'd, with the packages it can use but
+# not load from its own project env (Julia never loads a package's own
+# weakdeps there: `julia --project=. -e 'using CairoMakie'` is an ArgumentError).
+#
+# Board authoring (`blob_board`, `rebuild_board`, `render_board`, PDF/TIFF/PNG)
+# is part of BlobBoards since 2026-10-14 and needs nothing from here. This env
+# is for:
+#   - PythonCall: BlobBoardsPythonExt, the Python wrappers (python/blobboards
+#     activates this env);
+#   - CairoMakie: BlobBoardsMakieExt's plots (board overlays, inspection);
+#   - Revise, for interactive work.
+#
+#   julia --project=authoring
+[deps]
+BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+VisualGeometryCore = "297d53b8-c8d7-4cd7-a9af-68e656508a81"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
+
+[sources]
+BlobBoards = { path = ".." }
+
+[compat]
+CUDA = "5.11.0"
+CUDA_Runtime_jll = "0.21"
+CairoMakie = "0.15"
+PythonCall = "=0.9.35"   # = the pixi lock's juliacall: the two must be the same release, or PythonCall does not start
+cuDNN = "1.4.7"
+julia = "1.12"
+
+[preferences.CUDA_Runtime_jll]
+version = "12.9"

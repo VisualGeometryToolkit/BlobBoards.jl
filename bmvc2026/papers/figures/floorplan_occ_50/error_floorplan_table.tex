@@ -1,0 +1,16 @@
+% error_floorplan_table.tex — generated assembly; edit freely
+% class-agnostic: manual (a)/(b)/(c) caption lines, NO subcaption
+% (bmvc2k's caption machinery mis-numbers subcaption subfigures)
+% requires: \usepackage{graphicx,pgfplots} \pgfplotsset{compat=1.18}
+\providecommand{\fpscale}{1}\renewcommand{\fpscale}{0.42}   % fan geometry scale (fonts unaffected)
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{tabular}{@{}ccc l@{}}
+\textbf{BlobBoards} & \textbf{AprilTag} & \textbf{ArUco} & \\[2pt]
+\input{figures/floorplan_occ_50/floorplan_blob_det} & \input{figures/floorplan_occ_50/floorplan_april_det} & \input{figures/floorplan_occ_50/floorplan_aruco_det} & \input{figures/floorplan_occ_50/floorplan_cbar_det} \\[2pt]
+\multicolumn{3}{c}{(a) Probability of Detection} & \\[8pt]
+\input{figures/floorplan_occ_50/floorplan_blob_trans} & \input{figures/floorplan_occ_50/floorplan_april_trans} & \input{figures/floorplan_occ_50/floorplan_aruco_trans} & \input{figures/floorplan_occ_50/floorplan_cbar_trans} \\[2pt]
+\multicolumn{3}{c}{(b) Median Translation Error [mm]} & \\[8pt]
+\input{figures/floorplan_occ_50/floorplan_blob_rot} & \input{figures/floorplan_occ_50/floorplan_april_rot} & \input{figures/floorplan_occ_50/floorplan_aruco_rot} & \input{figures/floorplan_occ_50/floorplan_cbar_rot} \\[2pt]
+\multicolumn{3}{c}{(c) Median Rotation Error [$^\circ$]} & \\
+\end{tabular}

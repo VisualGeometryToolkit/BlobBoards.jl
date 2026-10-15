@@ -1,0 +1,42 @@
+# Config of record of scripts/copy_val_overlays.jl: the detection-overlay
+# panels of fig:evaluation_setup_results and fig:supp:setup, cropped from the
+# detection runs' val/ overlays (the runs of the evaluation's sources).
+
+[experiment]
+generator = "val_overlays"
+dataset = "260527"
+evaluation = "figures/evaluation.toml"   # configs/-relative: whose [runs] name the detection runs
+
+[output]
+dir = "experiment"                       # under papers/images (paper_images_dir)
+width = 1500                             # px; a third of \textwidth at ~300 dpi with margin
+
+# One table per paper subdirectory: the series whose overlays it reads and its frames, in
+# figure order (the first is the main paper's panel). A crop is
+# [row0, col0, rows, cols] in the overlay's own pixels (1500:1002 aspect),
+# recovered 2026-10-08 by normalised cross-correlation of the submitted panels
+# against the overlays. DSC04563 matched no crop of the current overlay (its
+# submitted panel came from an earlier run's render) and takes its siblings'.
+[systems.bb]
+series = "bb"
+frames = [
+    { frame = "DSC04563", crop = [139, 363, 1653, 2475] },
+    { frame = "DSC04544", crop = [145, 343, 1653, 2475] },
+    { frame = "DSC04530", crop = [132, 383, 1653, 2475] },
+]
+
+[systems.apr]
+series = "apriltags"
+frames = [
+    { frame = "DSC04465", crop = [488, 898, 1653, 2475] },
+    { frame = "DSC04443", crop = [515, 871, 1653, 2475] },
+    { frame = "DSC04433", crop = [554, 911, 1653, 2475] },
+]
+
+[systems.aru]
+series = "aruco"
+frames = [
+    { frame = "DSC04375", crop = [488, 871, 1653, 2475] },
+    { frame = "DSC04355", crop = [502, 911, 1653, 2475] },
+    { frame = "DSC04343", crop = [554, 858, 1653, 2475] },
+]

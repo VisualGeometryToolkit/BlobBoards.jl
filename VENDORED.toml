@@ -1,0 +1,27 @@
+# Third-party provenance, declared for VisualGeometryCore.check_naming (see
+# `naming_scope`): a [[vendored]] tree is upstream code and out of the stack's
+# naming scope.
+
+# The QR encoder of QRCoders.jl, release 1.4.5 (source tree
+# b3e5fcc7a7ade2d43f0ffd178c299b7a264c268a), Copyright (c) 2019 Jérémie Gillet
+# and contributors; its LICENSE is kept in the tree. Loaded only by
+# BlobBoards.Authoring (the board QR corner). Local changes: the encoder only
+# (no image/GIF/SVG/UnicodePlots export, so no ImageCore, FileIO, StatsBase or
+# UnicodePlots), files flattened into one directory under the module name
+# QREncode (QREncode.jl replaces src/QRCoders.jl), qrcode.jl holds the two
+# `qrcode` methods of src/export.jl verbatim, and types.jl drops
+# `Base.show(io, ::QRCode)`. Encoding code unchanged: matrices are identical.
+[[vendored]]
+path = "src/authoring/qrencode"
+upstream = "https://github.com/JuliaImages/QRCoders.jl (v1.4.5)"
+license = "MIT"
+
+# The sheet font, TeX Gyre Heros as renamed and adjusted by Makie.jl
+# (assets/fonts/TeXGyreHerosMakie-Regular.otf of Makie 0.24), byte for byte: the
+# one typeface a board's text is set in, embedded whole in every print master.
+# Shipped here so making a board needs no Makie. GUST Font License (LPPL 1.3c);
+# its text is kept beside the font.
+[[vendored]]
+path = "assets/fonts"
+upstream = "https://github.com/MakieOrg/Makie.jl (assets/fonts, v0.24)"
+license = "GUST Font License (LPPL 1.3c)"

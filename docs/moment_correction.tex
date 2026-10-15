@@ -1,0 +1,286 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\mat}[1]{\mathbf{#1}}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+
+\title{Exact Bias Correction for Intensity-Weighted Moments\\of Pedestal-Removed Gaussian Blobs}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Blob Rendering Model}
+
+A dark blob on a white background is rendered as
+\begin{equation}\label{eq:render}
+  v(\vect{x}) = \frac{1 - G(\vect{x})}{1 - c}, \qquad
+  G(\vect{x}) = \exp\!\Bigl(-\tfrac{1}{2}\,\vect{x}^\top \mat{\Sigma}^{-1}\vect{x}\Bigr),
+\end{equation}
+for $\|\vect{x}\|_{\mat{\Sigma}^{-1}} \le k$ (Mahalanobis radius), where
+$c = e^{-k^2/2}$ is the Gaussian value at the measurement boundary and $k$ is
+the \texttt{sigma\_cutoff} parameter. The denominator $1-c$ normalizes the
+rendered intensity to $[0,1]$.
+
+At the blob center $v = 0$ (dark); at the boundary $v = 1$ (white background).
+
+\section{Inverted Intensity Profile}
+
+The moment estimator uses the \emph{inverted} intensity
+$f(\vect{x}) = B - v(\vect{x})$, where $B$ is the local background (maximum
+pixel value in the measurement region, $B \approx 1$). This gives
+\begin{equation}\label{eq:f}
+  f(\vect{x}) = \frac{G(\vect{x}) - c}{1 - c},
+\end{equation}
+a pedestal-removed Gaussian that equals 1 at the center and vanishes at the
+measurement boundary $r = k\sigma$.
+
+\section{Measured Covariance}
+
+The intensity-weighted second moment matrix is
+\begin{equation}
+  \mat{M} = \frac{\int_{D_k} \vect{x}\,\vect{x}^\top\, w(\vect{x})\,dA}
+                  {\int_{D_k} w(\vect{x})\,dA},
+\end{equation}
+where $D_k = \{\vect{x} : \|\vect{x}\|_{\mat{\Sigma}^{-1}} \le k\}$ is the
+measurement disc and $w(\vect{x})$ is the per-pixel weight function.
+
+We consider two weight functions:
+\begin{enumerate}
+  \item \textbf{Non-spatial}: $w = f(\vect{x})$
+  \item \textbf{Spatial Gaussian}: $w = f(\vect{x}) \cdot G(\vect{x})$
+\end{enumerate}
+
+In the isotropic case $\mat{\Sigma} = \sigma^2\mat{I}$, both reduce to 1D
+integrals in polar coordinates. We derive
+$\mat{M} = \alpha\,\sigma^2\,\mat{I}$ where $\alpha < 1$ is the bias factor,
+and the correction is $\mat{\Sigma}_\text{true} = \alpha^{-1}\,\mat{M}$.
+
+\subsection{Non-spatial case}
+
+The weight $w = f = (G - c)/(1-c)$ decomposes into a Gaussian term and a
+constant pedestal:
+\begin{align}
+  M_0 &= \int_{D_k} (G - c)\,dA = 2\pi\sigma^2(1-c) - c\pi k^2\sigma^2
+       = \pi\sigma^2\bigl[2(1-c) - ck^2\bigr], \\[4pt]
+  M_{xx} &= \int_{D_k} x^2(G - c)\,dA.
+\end{align}
+
+For the Gaussian term, using the substitution $u = r^2/(2\sigma^2)$:
+\begin{equation}
+  \int_{D_k} x^2\,G\,dA
+    = \pi\!\int_0^{k\sigma}\!r^3 e^{-r^2/(2\sigma^2)}dr
+    = 2\pi\sigma^4\bigl[1 - (1 + \tfrac{k^2}{2})\,c\bigr].
+\end{equation}
+
+For the constant pedestal over the disc:
+\begin{equation}
+  \int_{D_k} x^2\cdot c\,dA
+    = c\pi\!\int_0^{k\sigma}\!r^3\,dr
+    = \frac{c\pi k^4\sigma^4}{4}.
+\end{equation}
+
+The measured variance is therefore
+\begin{equation}\label{eq:nonspatial}
+  \boxed{
+  \frac{\sigma^2_\text{meas}}{\sigma^2}
+  = \frac{M_{xx}}{M_0\,\sigma^2}
+  = \frac{2\bigl[1-(1+\frac{k^2}{2})c\bigr] - \frac{ck^4}{4}}
+         {2(1-c) - ck^2}.
+  }
+\end{equation}
+
+\subsection{Spatial Gaussian case}
+
+With spatial weight $G(\vect{x})$, the total weight is
+\begin{equation}
+  w = f \cdot G = \frac{G^2 - cG}{1-c}.
+\end{equation}
+
+$G^2 = \exp(-r^2/\sigma^2)$ is an unnormalized Gaussian with effective
+parameter $\sigma/\sqrt{2}$; $cG$ is $c$ times the original Gaussian with
+parameter~$\sigma$. The truncated integrals over $D_k$ evaluate to:
+\begin{align}
+  M_0^{(G^2)} &= \pi\sigma^2\bigl(1 - e^{-k^2}\bigr), &
+  M_{xx}^{(G^2)} &= \frac{\pi\sigma^4}{2}\bigl[1 - (1+k^2)e^{-k^2}\bigr], \\[4pt]
+  M_0^{(cG)} &= 2c\pi\sigma^2(1 - c), &
+  M_{xx}^{(cG)} &= 2c\pi\sigma^4\bigl[1 - (1+\tfrac{k^2}{2})c\bigr].
+\end{align}
+
+The measured variance is
+\begin{equation}\label{eq:spatial}
+  \boxed{
+  \frac{\sigma^2_\text{meas}}{\sigma^2}
+  = \frac{\frac{1}{2}[1-(1+k^2)e^{-k^2}] - 2c[1-(1+\frac{k^2}{2})c]}
+         {[1-e^{-k^2}] - 2c(1-c)}.
+  }
+\end{equation}
+
+\subsection{Correction factors}
+
+The correction multiplier applied to the measured covariance is
+$\gamma = \sigma^2/\sigma^2_\text{meas}$, the reciprocal of the bias factor.
+
+\begin{table}[h]
+\centering
+\caption{Exact correction factors $\gamma$ vs.\ prior approximate formulas.}
+\label{tab:corrections}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+$k$ & Non-spatial (exact) & Non-spatial (old) & Spatial (exact) & Spatial (old) \\
+\midrule
+2.0 & 1.837 & 1.456 & 2.548 & 2.161 \\
+2.5 & 1.355 & 1.168 & 2.171 & 2.024 \\
+3.0 & 1.136 & 1.053 & 2.044 & 2.002 \\
+3.5 & 1.044 & 1.014 & 2.009 & 2.000 \\
+4.0 & 1.011 & 1.003 & 2.001 & 2.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The old non-spatial formula was the standard Gaussian truncation correction
+\begin{equation}
+  \gamma_\text{old} = \frac{1 - e^{-k^2/2}}{1 - (1+\tfrac{k^2}{2})e^{-k^2/2}},
+\end{equation}
+which ignores the constant pedestal term. The old spatial formula was
+$2 \times \gamma_\text{old}(k\sqrt{2})$, which treats the weight as a pure
+$G^2$ without the $cG$ pedestal correction.
+
+\section{Iterative Correction Placement}
+
+\subsection{The catastrophic shrinkage bug}
+
+The iterative moment estimator refines the measurement region from circular to
+elliptical over multiple iterations. At each iteration, the estimated
+$\mat{\Sigma}$ defines the Mahalanobis boundary for the next measurement.
+
+If the bias correction $\gamma$ is applied only \emph{after} all iterations
+(post-hoc), the raw biased $\mat{\Sigma}_\text{meas}$ is used to define
+increasingly smaller measurement regions:
+\begin{equation}
+  \mat{\Sigma}_\text{meas}^{(t)} \approx \gamma^{-1}\,\mat{\Sigma}_\text{true}
+  \implies \text{measurement region shrinks by } \gamma^{-1/2} \text{ per iteration.}
+\end{equation}
+
+For the spatial case at $k = 3$, $\gamma \approx 2.04$, so the raw measured
+$\sigma$ is $\approx 0.70\,\sigma_\text{true}$. Each iteration compounds this
+error, and after 5 iterations:
+\begin{equation}
+  \frac{\hat\sigma}{\sigma_\text{true}} \approx 0.47 \quad
+  \text{(catastrophic collapse)}.
+\end{equation}
+
+For the non-spatial case ($\gamma \approx 1.14$ at $k=3$), the effect is
+milder: the ratio degrades from $0.96$ (1 iteration) to $0.94$ (5 iterations).
+
+\subsection{Fix: correct inside each iteration}
+
+The correction must be applied to $\mat{\Sigma}_\text{meas}$ \emph{before}
+constructing the next iteration's measurement ellipse:
+\begin{equation}
+  \mat{\Sigma}^{(t)}_\text{corrected} = \gamma\,\mat{\Sigma}^{(t)}_\text{meas},
+  \qquad
+  \mat{A}^{(t+1)} = k\,\bigl(\mat{\Sigma}^{(t)}_\text{corrected}\bigr)^{1/2}.
+\end{equation}
+
+This ensures the measurement region remains correctly sized across iterations.
+
+\section{Experimental Validation}
+
+\subsection{Isotropic synthetic blob}
+
+A single isotropic blob with $\sigma_\text{true} = 10$ was rendered using the
+pedestal-removed Gaussian model~\eqref{eq:render} and fitted with
+\texttt{fit\_moments}.
+
+\begin{table}[h]
+\centering
+\caption{Scale ratio $\hat\sigma/\sigma_\text{true}$ on isotropic synthetic blob.}
+\label{tab:isotropic}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Configuration & 1 iteration & 5 iterations (old) & 5 iterations (exact) \\
+\midrule
+Non-spatial & 0.964 & 0.945 & \textbf{1.001} \\
+Spatial     & 0.996 & 0.467 & \textbf{1.009} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Anisotropic synthetic blob}
+
+An anisotropic blob with $\sigma_a = 12$, $\sigma_b = 7$, $\theta = 30°$
+(aspect ratio 1.714) was rendered and fitted.
+
+\begin{table}[h]
+\centering
+\caption{Anisotropic blob recovery (5 iterations, exact correction).}
+\label{tab:aniso}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Method & $\hat\sigma_\text{eq}/\sigma_\text{eq}$ & Aspect ratio & $\hat\theta$ \\
+\midrule
+Non-spatial & 1.002 & 1.714 (exact) & $30.0°$ \\
+Spatial     & 1.005 & 1.690 ($-1.4\%$) & $30.0°$ \\
+Gradient tensor & 1.000$^*$ & 2.054 ($+20\%$) & $30.1°$ \\
+\bottomrule
+\multicolumn{4}{l}{\footnotesize $^*$Forced by $\det(\mat{\Sigma})=\sigma^4$ normalization.}
+\end{tabular}
+\end{table}
+
+The gradient tensor overestimates anisotropy because the isotropic spatial
+kernel $G_\sigma$ does not match the anisotropic blob shape, causing
+directionally-dependent weighting of the gradient outer products.
+
+\subsection{Rendered pattern (116 blobs)}
+
+A $400\times400$ pattern was generated with blob scales $\sigma \in [3, 9.5]$.
+
+\begin{table}[h]
+\centering
+\caption{Scale ratio statistics on rendered pattern (116 blobs, $k=3$).}
+\label{tab:pattern}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Method & Median $\hat\sigma/\sigma_\text{true}$ & Std \\
+\midrule
+Non-spatial & 0.988 & 0.001 \\
+Spatial     & 0.996 & 0.004 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both methods recover aspect ratios very close to 1.0 (median 1.0006 and
+1.0003 respectively) on the isotropic rendered blobs.
+
+\section{Conclusions}
+
+\begin{enumerate}
+  \item The pedestal-removed Gaussian rendering model introduces a
+        scale-dependent bias in intensity-weighted moments. The exact
+        correction~\eqref{eq:nonspatial}--\eqref{eq:spatial} eliminates this
+        bias for both spatial and non-spatial weighting.
+
+  \item The truncation correction \emph{must} be applied inside each iteration
+        of the Baumberg-style iterative refinement. Post-hoc correction causes
+        catastrophic measurement region shrinkage, especially with spatial
+        Gaussian weighting ($\gamma \approx 2$ at $k=3$).
+
+  \item Spatial Gaussian weighting provides better contamination rejection from
+        neighboring blobs and is the recommended mode for dense blob patterns.
+        It achieves 0.4\% median scale error on rendered patterns.
+
+  \item The gradient tensor (structure tensor) overestimates blob anisotropy by
+        ${\sim}20\%$ when using an isotropic spatial kernel on anisotropic blobs.
+        Intensity moments are the preferred shape estimator.
+\end{enumerate}
+
+\end{document}

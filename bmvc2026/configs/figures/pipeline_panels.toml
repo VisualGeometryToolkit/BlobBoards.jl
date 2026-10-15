@@ -1,0 +1,43 @@
+# Config of record of scripts/make_pipeline_panels.jl: fig:pipeline — the four
+# stages (detect, adapt, log-polar canonicalization, registration) on one board
+# of one still, under the evaluation's run config of record (by reference);
+# this file holds only the figure's own choices: frame, camera, board, crop, render.
+
+[experiment]
+generator = "pipeline_panels"
+# DSC02800 and its session camera ship in bb_pipeline_figure; the board
+# definitions and the descriptor network in bb_assets.
+tiers = ["bb_assets", "bb_pipeline_figure"]
+
+[inputs]
+# The submitted panels' photo (identified 2026-10-08): DSC02800 of the Sony FX3 +
+# Tamron 20 mm f/8 corridor session, one of the descriptor-training stills —
+# the blob board hanging below the framed random-dot board on the left wall.
+source = "data_root"                     # "data_root" (a still under data_root()) | "dataset" (a frame of <dataset>/images/bb)
+image = "blobboard_training/images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG"   # data_root()-relative
+camera = "blobboard_training/images/dataset_sonyfx3_tamron20mm_f8_cameras.json" # the session's camera (vgio/cameras/v3, from its OpenCV calibration); the panels show the image undistorted with it
+boards_dir = "evaluation/blobboards_original" # data_root()-relative: the 50-board gallery (the same definitions as blobboard_training/boards)
+board = "6b0"                            # uid of the board shown; "" = the accepted board with the most inliers
+run_config = "bmvc2026_260527.toml"      # configs/-relative: the EVALUATION's run config of record — detection, adaptation,
+                                         # matching, verification and the descriptor network are read from it (FindBoardsConfig), never restated here
+gallery = ""                             # "" = a tempdir() cache; a CACHE (rebuilt from boards + network)
+
+[render]
+panel_size = [450, 600]                  # Makie units
+pt_per_unit = 1.0                        # -> a 450 x 600 pt PDF page (CairoMakie defaults to 0.75)
+figure_padding = 12                      # white margin around the photo panels (measured on the submitted PDFs: 12 pt each side)
+logpolar_padding = 8                     # margin of the 4 x 3 log-polar patch grid
+crop_pad = 0.30                          # outline bbox grown by this per side, then to 3:4 (when `crop` is empty)
+# [row0, col0, rows, cols] of the undistorted image; [] = the padded window.
+# Recovered 2026-10-08 by registering board 6b0 in the submitted adapt panel
+# (rasterized at 300 dpi; 115 inliers, median residual 2.2 px) and in the
+# undistorted DSC02800 (197 inliers, 0.33 px): panel -> image is a similarity,
+# scale 0.1998 / 0.1987, skew -0.013, perspective terms ~2e-6.
+crop = [612, 126, 500, 375]
+n_highlight = 12                         # the largest inliers highlighted (adapt) and canonicalized (logpolar)
+highlight_match_px = 3.0                 # an inlier's projected reference blob pairs with the adapted frame within this (px)
+patch = 64
+palette = "Paired_12"
+
+[output]
+names = ["bb_pipe_detect.pdf", "bb_pipe_adapt.pdf", "bb_pipe_logpolar.pdf", "bb_pipe_register.pdf"]

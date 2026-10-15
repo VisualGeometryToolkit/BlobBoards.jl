@@ -1,0 +1,14 @@
+# The manuscript's sources and the images it references are tracked, so the
+# paper builds from a fresh clone (`make`); everything latexmk regenerates is
+# not. Root-anchored: the figure PDFs under images/ are sources.
+/*.pdf
+/*.aux
+/*.bbl
+/*.blg
+/*.brf
+/*.fdb_latexmk
+/*.fls
+/*.log
+/*.out
+/*.synctex.gz
+/*.toc

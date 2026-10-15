@@ -1,0 +1,52 @@
+# Recorded baselines for the two dev.jl targets that are gates-by-hand rather
+# than suite gates (package-cleanup Phase 6). Both are RATCHETS: a coverage
+# floor only rises, the invalidation ceiling only falls. Update them in the
+# commit that earns the improvement. Populated by the 2026-09-07 audit run.
+invalidation_trees_max = 276   # `dev.jl invalidations`, 2026-09-07: dominated by upstream StaticArrays `any`/`convert` trees
+
+[coverage_floor]
+# Per-file floor = floor(measured %) on 2026-09-07 (suite: 941 succeeded, 1 env error).
+# Files at 0 are the ones NO test reaches: the Lux/Training extensions never
+# load under Pkg.test (see Project.toml), and the Makie viewers have no tests.
+"src/annotate.jl" = 0
+"src/inspect.jl" = 0
+"src/training.jl" = 0
+"ext/BlobBoardsLuxExt.jl" = 0
+"ext/BlobBoardsMakieExt.jl" = 0
+"ext/makie/board_overlay_recipe.jl" = 0
+"ext/makie/plot_annotations.jl" = 0
+"ext/makie/view_angle_profile.jl" = 0
+"ext/training/data.jl" = 0
+"ext/training/eval.jl" = 0
+"ext/training/loss.jl" = 0
+"ext/training/model.jl" = 0
+"ext/training/train.jl" = 0
+"src/detect.jl" = 28
+"ext/BlobBoardsPythonExt.jl" = 39
+"src/authoring/io_save.jl" = 48
+"src/adapt_ka.jl" = 49
+"src/media.jl" = 51
+"src/verify.jl" = 51
+"src/gallery.jl" = 57
+"src/canonicalize.jl" = 60
+"src/pipeline.jl" = 61
+"src/coordinates.jl" = 62
+"src/track_trace.jl" = 65
+"src/adapt_utils.jl" = 66
+"src/io.jl" = 76
+"ext/BlobBoardsCUDAExt.jl" = 79
+"src/types.jl" = 80
+"src/BlobBoards.jl" = 87
+"src/descriptor.jl" = 87
+"src/authoring/board.jl" = 90
+"src/adapt.jl" = 91
+"src/detect_config.jl" = 91
+"src/pattern.jl" = 92
+"src/config_toml.jl" = 93
+"src/track.jl" = 95
+"src/api.jl" = 100
+"src/authoring_stubs.jl" = 100
+"src/config_defaults.jl" = 100
+"src/device.jl" = 100
+"src/authoring/Authoring.jl" = 100
+"ext/BlobBoardsTrainingExt.jl" = 100

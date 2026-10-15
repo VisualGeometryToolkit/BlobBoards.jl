@@ -1,0 +1,579 @@
+% bmvc_supp.tex — supplementary material for the BMVC 2026 submission.
+%
+% Builds with `make supp`. Shares figures/ and the generated stat macros with
+% the main paper, so a number cited here cannot drift from the same number in
+% blob_boards_bmvc.tex: both \input the SAME bb_stats.tex / bb_occ_stats.tex,
+% which `make floorplan` regenerates from the collected results frame.
+\documentclass{bmvc2k}
+
+\usepackage{cleveref}
+\usepackage[section]{placeins}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{pgfplots}
+% S-prefixed counters so the main paper's cross-references (via xr-hyper)
+% read as Section S3 / Figure S2 and cannot be confused with its own.
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\thealgorithm}{S\arabic{algorithm}}
+\pgfplotsset{compat=1.18}
+\newcommand{\fpscale}{1}
+\newcommand{\vtheta}{\bm{\theta}}
+\newcommand{\va}{\bm{a}}
+
+% Generated evaluation numbers — do not edit by hand; see
+% bmvc2026/scripts/plots/error_distributions.jl.
+\input{figures/floorplan/bb_stats.tex}
+\input{figures/floorplan/bb_occ_stats.tex}
+\input{figures/floorplan/handeye_stats.tex}
+\input{figures/floorplan/det_stats.tex}
+\input{figures/floorplan/timing_stats.tex}
+\input{figures/floorplan/board_params.tex}
+\input{figures/floorplan/run_settings.tex}
+
+% Title card: same author/institution layout as the main paper, so the two
+% documents present identically. Kept in sync by hand with
+% blob_boards_bmvc.tex.
+% --- compact title card ---------------------------------------------------
+% bmvc2k stacks one author per line in a 0.49\textwidth column, plus an empty
+% e-mail line under each (all seven \addauthor entries pass an empty mail), so
+% seven authors cost ~14 lines. Flow the names into two columns instead and
+% give the single institution the rest of the width. Two columns (not three)
+% because a full-width address such as jpr@informatik.uni-kiel.de overruns a
+% third-width cell: the name/mail boxes are pre-packed \hbox es, so the
+% overrun laps the neighbouring cell silently instead of reporting an
+% overfull box. \addauthor and
+% \addinstitution stay the source of truth; only the layout is overridden.
+\makeatletter
+% Record whether each author was given a mail argument, so the card can drop
+% the second line for authors who have none instead of leaving a blank line.
+\let\bmv@origaddauthor\addauthor
+\def\addauthor#1#2#3{%
+  \bmv@origaddauthor{#1}{#2}{#3}%
+  \def\bmv@tmpmail{#2}%
+  \expandafter\xdef\csname bmv@hasmail\the\bmv@nauthors\endcsname
+    {\ifx\bmv@tmpmail\@empty 0\else 1\fi}}
+\def\bmv@RenderInst#1{%
+  \begin{minipage}[t]{0.28\textwidth}
+    \sffamily
+    \begin{raggedright}#1\end{raggedright}
+  \end{minipage}}
+\newcount\bmv@authcol
+% The LAST author is set under the institution rather than alone on a short
+% final row: with an odd author count the two-up grid otherwise leaves a
+% half-empty row beside an equally empty institution column.
+\newcount\bmv@gridauthors
+\AtBeginDocument{\bmv@gridauthors=\bmv@nauthors \advance\bmv@gridauthors-1}
+\def\bmv@authorcell#1{%
+  \bmv@usebox{authname#1}%
+  \ifnum\csname bmv@hasmail#1\endcsname=1
+    \\ \bmv@usebox{authmail#1}%
+  \fi}
+\def\bmv@RenderAuthInstTwoColumn{%
+  \begin{minipage}[t]{0.70\textwidth}
+    \raggedright
+    \bmv@authcol=0
+    \def\bmv@action##1{%
+      \ifnum##1>\bmv@gridauthors\else
+        \begin{minipage}[t]{0.5\linewidth}%
+          \raggedright
+          \bmv@authorcell{##1}%
+        \end{minipage}%
+        \global\advance\bmv@authcol1
+        \ifnum\bmv@authcol=2
+          \global\bmv@authcol=0
+          \ifnum##1<\bmv@gridauthors \\[3pt] \fi
+        \fi
+      \fi}%
+    \def\bmv@between{}%
+    \expandafter\bmv@maplistaux\bmv@auths\bmv@endstop
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.28\textwidth}
+    \raggedright
+    \def\bmv@action##1{\bmv@unhbox{inst##1}}%
+    \def\bmv@between{\\[4pt]}%
+    \expandafter\bmv@maplistaux\bmv@insts\bmv@endstop
+    \\[\dimexpr2\baselineskip+3pt\relax]
+    \bmv@authorcell{\the\bmv@nauthors}%
+  \end{minipage}}
+\makeatother
+
+\addauthor{James Pritts}{jpr@informatik.uni-kiel.de}{1}
+\addauthor{Till Sittart}{till.sittart@till-s.de}{1}
+\addauthor{Hendrik Sauer}{hendrik-sauer@mailbox.org}{1}
+\addauthor{Silja Jan\ss{}en}{sja@informatik.uni-kiel.de}{1}
+\addauthor{Felix Seegr\"aber}{fse@informatik.uni-kiel.de}{1}
+\addauthor{David Nakath}{dna@cs.uni-kiel.de}{1}
+\addauthor{Kevin K\"oser}{kk@informatik.uni-kiel.de}{1}
+
+\addinstitution{
+ Marine Data Science\\
+ Kiel University
+}
+
+\title{BlobBoards: {\large Supplementary Material}}
+\runninghead{Pritts \bmvaEtAl}{BlobBoards Supplementary Material}
+
+\begin{document}
+\setlength{\emergencystretch}{3pt}% absorb sub-3pt overfulls (typeset polish)
+\maketitle
+
+\section{Board Generation}
+\label{sec:supp:generation}
+
+\Cref{alg:gen} states the placement procedure. Blobs are placed largest-first
+by rejection sampling with disjoint supports; the coarse-to-fine order matters,
+because placing small blobs first leaves no room for large ones and yields a
+substantially sparser board.
+
+
+\begin{algorithm}[!ht]
+	\caption{Greedy coarse-to-fine board generation: blobs are placed
+		largest-first by rejection sampling with disjoint supports, then
+		rasterised in a single pass.}
+	\label{alg:gen}
+	\begin{algorithmic}[1]
+		\Require board size $W\!\times\!H$; scale schedule
+		$\sigma_1>\sigma_2>\dots>\sigma_n$ with target counts $m_i$; seed
+		\Ensure pattern image $P$; blob set $\mathcal{B}=\{(\mathbf{c}_j,\sigma_j)\}$
+		\State $\mathcal{T}\gets$ empty R-tree of placed supports;\ \ $\mathcal{B}\gets\varnothing$
+		\For{$i=1,\dots,n$ \textbf{(coarse-to-fine)} and $k=1,\dots,m_i$}
+		\Comment{largest blobs first}
+		\Repeat
+		\State sample centre $\mathbf{c}$ uniformly within the inset board
+		\If{support disc of $(\mathbf{c},\sigma_i)$ overlaps no blob in $\mathcal{T}$}
+		\State insert $(\mathbf{c},\sigma_i)$ into $\mathcal{T}$ and $\mathcal{B}$
+		\EndIf
+		\Until{placed \textbf{or} trial budget exhausted}
+		\Comment{skip if no free spot found}
+		\EndFor
+		\State $P\gets\mathbf{1}_{H\times W}$
+		\Comment{white background: the $\|\mathbf{x}\|\!\to\!c\sigma$ limit of the blob profile}
+		\State rasterise every blob in $\mathcal{B}$ over its support
+		\Comment{disjoint supports $\Rightarrow$ single pass}
+		\State \Return $P,\ \mathcal{B}$
+	\end{algorithmic}
+\end{algorithm}
+
+\section{Board Generation Settings}
+\label{sec:supp:params}
+
+\Cref{tab:supp:params} lists the pattern parameters used to generate every
+BlobBoard in the evaluation. All three physical sizes share one parameter set;
+only the pattern extent differs, so the number of blobs a board carries grows
+with its area. A tag of the same physical size contributes four corners at
+every size.
+
+\begin{table}[!h]
+	\centering\small
+	\begin{tabular}{@{}lccc@{}}
+		\toprule
+		                                   & small     & medium   & large    \\
+		\midrule
+		pattern extent (mm)                & $\bbExtentMMSmall$      & $\bbExtentMMMedium$     & $\bbExtentMMLarge$    \\
+		blobs per board (median)           & $\bbBlobsMedSmall$     & $\bbBlobsMedMedium$    & $\bbBlobsMedLarge$   \\
+		\midrule
+		\multicolumn{4}{@{}l}{\emph{shared across all sizes}}                \\
+		minimum blob scale $s_{\min}$      & \multicolumn{3}{c}{$\bbPatMinScaleMM$\,mm}   \\
+		maximum diameter fraction $d_f$    & \multicolumn{3}{c}{$\bbPatMaxDiamFrac$}       \\
+		support cutoff $c$          & \multicolumn{3}{c}{$\bbPatCutoff$}         \\
+		scale-sampling distribution $\alpha$       & \multicolumn{3}{c}{$\bbPatAlpha$}       \\
+		scales per octave                  & \multicolumn{3}{c}{$\bbPatScalesPerOctave$}         \\
+		print density                      & \multicolumn{3}{c}{$\bbPatDPI$\,dpi} \\
+		polarity                           & \multicolumn{3}{c}{\bbPatPolarity}        \\
+		\bottomrule
+	\end{tabular}
+	\caption{Pattern-generation settings for the evaluation boards ($\bbBoardsSmall$ small,
+		$\bbBoardsMedium$ medium, $\bbBoardsLarge$ large). Each board is generated from its own random
+		seed, so blob counts vary slightly within a size class; the ranges are
+		$\bbBlobsMinSmall$--$\bbBlobsMaxSmall$, $\bbBlobsMinMedium$--$\bbBlobsMaxMedium$, and $\bbBlobsMinLarge$--$\bbBlobsMaxLarge$.}
+	\label{tab:supp:params}
+\end{table}
+
+\section{Finite-Support Scale Correction}
+\label{sec:supp:scalecorr}
+
+Truncating the Gaussian at $c$ and removing the pedestal
+$p=e^{-c^2/2}$ perturbs the scale-space response. Writing
+$\rho=\sigma/\sigma_0$, $\kappa=c^2(1+\rho^2)/2\rho^2$ and
+$q=e^{-\kappa}$, the centre response of the truncated profile is
+\begin{equation}
+	R(\mathbf{0},\sigma)
+	\;=\; \frac{A}{1-p}\left[
+		\frac{2\bigl(1-(1+\kappa)q\bigr)}{(1+\rho^2)^2}
+		\;-\; \frac{2(1-q)}{1+\rho^2}
+		\;+\; \frac{c^2\,q}{\rho^2}
+		\right],
+	\label{eq:supp:truncresponse}
+\end{equation}
+which recovers the ideal Laplacian-of-Gaussian response
+$-2A\sigma_0^2\sigma^2/(\sigma_0^2+\sigma^2)^2$ as $c\to\infty$. Its
+extremum lies at $\beta(c)\,\sigma_0$, where $\beta(c)$ is the pedestal
+scale bias of the main paper,
+$\beta(c)=\arg\max_{\rho}|R(\mathbf{0},\rho\sigma_0)|$. Because $\beta$
+depends only on $c$, the truncated response is still scale-covariant
+with a peak magnitude independent of $\sigma_0$, so dividing each detected
+scale by $\beta(c)$ recovers $\sigma_0$ exactly under this continuous
+model.
+
+\section{Descriptor Training: Reference and Observation Patches}
+\label{sec:supp:training}
+
+At test time a query patch cropped from an image is matched against a
+descriptor computed from the reference pattern, so the training objective
+must contain that pairing explicitly. It does. For every board, reference
+patches are rendered from the reference pattern and the known blob geometry, and are
+written into the same patch tensor as the real observations, keyed by the same
+$(\text{board hash},\,\text{blob index})$ identity. A reference patch is
+therefore an ordinary member of its supervised-contrastive class: it serves as
+an anchor whose positives are the real observations of that blob, and as a
+positive when a real observation is the anchor.
+
+The batch sampler ensures that reference patches are available for real patches by concatenating the patches for all tracks sharing a blob id including the reference patch and treating them as a unit. Unmatched detections enter each batch as confusers with unique singleton labels: they never act as anchors and never supply positives, appearing only in other anchors' negative denominators.  A batch is made up of \(1/2\) continuous sequences, and \(1/2\) confusers.
+
+\section{Detection, Matching and Verification Settings}
+\label{sec:supp:settings}
+
+\Cref{tab:supp:settings} lists every operational parameter of the pipeline as
+run for the results in this paper. These are transcribed from the run
+configuration shipped with the released dataset record, which each driver
+copies beside its output, so a run's artifacts always carry the configuration
+that produced them.
+
+\begin{table}[!ht]
+	\centering\small
+	\begin{tabular}{@{}llp{0.42\linewidth}@{}}
+		\toprule
+		stage                    & parameter                       & value                                                                       \\
+		\midrule
+		detect                   & affine warps                    & IMAS-$\bbSetWarps$: identity, plus tilt $\bbSetTiltOne$ at $\bbSetTiltAnglesOne$ angles $\pi k/8$ and tilt $\bbSetTiltTwo$ at $\bbSetTiltAnglesTwo$ angles $\pi k/16$ \\
+		                         & pre-upsampling                  & $2\times$ (scale space starts at octave $-1$)                               \\
+		                         & DoG peak threshold              & $\bbSetPeakThreshold$                                                                      \\
+		                         & DoG edge threshold              & $\bbSetEdgeThreshold$                                                                       \\
+		                         & cross-warp NMS                  & elliptical, Mahalanobis cutoff $\bbSetNmsCutoff$                                        \\
+		                         & detections kept                 & unbounded (no response-rank cap)                                            \\
+		\midrule
+		adapt                    & scan window                     & $\bbSetScanWindow\,\sigma$                                                               \\
+		                         & max IRLS iterations             & $\bbSetMaxIrls$                                                                        \\
+		                         & convergence tolerance           & $\bbSetRtol$ relative                                                          \\
+		                         & storage / accumulation          & \texttt{Float32} / \texttt{Float64}                                         \\
+		                         & validity guards                 & scale $\le\bbSetMaxScaleFraction\sqrt{WH}$, scale ratio $\le\bbSetMaxScaleRatio$, clip ratio $\le\bbSetMaxClipRatio$, aspect $\le\bbSetMaxAspectRatio$ \\
+		\midrule
+		canonicalize             & log-polar grid                  & $64\times64$                                                                \\
+		                         & inner radius                    & $c = \bbSetInnerRadius$                                                            \\
+		                         & outer radius $c_{\mathrm{out}}$ & $96$ (in units of $\sigma$)                                                                \\
+		\midrule
+		match                    & descriptor similarity threshold & $\bbSetMinSimilarity$ (cosine)                                                              \\
+		                         & first pass                      & mutual nearest neighbour                                                    \\
+		                         & second pass                     & $k$-nearest neighbour, $k=3$                                                \\
+		\midrule
+		verify                   & geometric model                 & P3P (calibrated)                                                            \\
+		                         & $N_{\mathrm{min}}$ inliers      & $\bbSetMinInliers$ (inclusive)                                                             \\
+		                         & inlier half-width $a$           & $\bbSetHalfwidthPx$ px                                                                      \\
+		                         & RANSAC iterations               & $\bbSetRansacMin$ minimum, $\bbSetRansacMax$ maximum                                            \\
+		                         & RANSAC confidence               & $\bbSetConfidence$                                                                      \\
+		                         & local optimization              & Student-$t$/uniform IRLS, seeded per board                                   \\
+		                         & appearance certification        & $\ge\bbSetAppearanceSupportPct\%$ of inliers at cosine similarity $\ge\bbSetVerifySimilarity$                           \\
+		                         & mirror branch test              & enabled (sign of the score difference only)                                 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Operational settings for the reported runs. The RANSAC seed is
+		fixed and each board's stream is derived from it, so the fit stage is
+		bit-reproducible given the extracted features.}
+	\label{tab:supp:settings}
+\end{table}
+
+\section{Pipeline}
+\label{sec:supp:pipeline}
+
+The pipeline of the main paper in full, in the order the stages run.
+Stages (1)--(4) are computed once per image and shared across all
+candidate boards; (5)--(8) run per board and compete for the same
+detections.
+
+\begin{algorithm}[!ht]
+	\caption{Detection, identification and pose for a gallery of boards.
+		Stages (1)--(4) run once per image; (5)--(8) run per board and
+		compete for the same detections, so committing a board claims its
+		detections before the next fit.}
+	\label{alg:pipeline}
+	\begin{algorithmic}[1]
+		\Require image $I$; gallery $\mathcal{G}$ of boards with reference
+		descriptors and geometry $\mathcal{B}$; camera (optional)
+		\Ensure accepted $(\text{board id},\,\text{pose})$ pairs
+		\State $\mathcal{F}\gets$ \Call{DetectAdaptDescribe}{$I$}
+		\Comment{(1)--(4), once per image}
+		\State $C\gets\varnothing$
+		\Comment{claimed detections}
+		\ForAll{$(\text{strategy},s_{\min})\in\{(\text{mutual\,NN},\,s),\ (k\text{NN},\,s')\}$}
+		\Comment{(5) strict, then permissive}
+		\State $M\gets$ \Call{Match}{$\mathcal{G},\ \mathcal{F}\setminus C,\ \text{strategy},\ s_{\min}$}
+		\While{$\mathcal{G}\neq\varnothing$}
+		\State $A\gets\varnothing$
+		\Comment{this round's admissible candidates}
+		\ForAll{$g\in\mathcal{G}$}
+		\State $M_g\gets$ \Call{ResolveOneToOne}{$M_g\setminus C$}
+		\Comment{re-resolved against the current claims}
+		\State \textbf{if} $|M_g|<N_{\min}$ \textbf{then continue}
+		\Comment{match floor}
+		\State $(\vtheta,I_g)\gets$ \Call{LoRansac}{$M_g$}
+		\Comment{(6) spatial verification}
+		\State $\vtheta\gets$ \Call{ResolveMirror}{$\vtheta,I_g$}
+		\Comment{planar pose ambiguity}
+		\State \textbf{if} $|I_g|<N_{\min}$ \textbf{then continue}
+		\State \textbf{if} \Call{AppearanceSupport}{$I_g$} $<\tfrac12$ \textbf{then continue}
+		\Comment{(7) certification}
+		\State $A\gets A\cup\{(g,\vtheta,I_g)\}$
+		\EndFor
+		\State \textbf{if} $A=\varnothing$ \textbf{then break}
+		\State $(g,\vtheta,I_g)\gets\arg\max_{A}\,(|I_g|,\ \text{score})$
+		\Comment{commit the best-supported board}
+		\State $C\gets C\cup\{$detections inside the quad of $g$ under $\vtheta\}$
+		\Comment{(8) claim}
+		\State accept $(g,\vtheta)$;\ \ $\mathcal{G}\gets\mathcal{G}\setminus\{g\}$
+		\EndWhile
+		\EndFor
+		\State \Return accepted pairs
+	\end{algorithmic}
+\end{algorithm}
+
+\section{Experimental Setup}
+\label{sec:supp:setup}
+
+\Cref{fig:supp:setup} shows three further captures per marker type, beyond
+the single capture per type in the main paper. All three panels
+carry $\bbGalleryBoards$ markers at three physical scales and are observed from the same
+stations, so the rows are directly comparable; estimated board frames are
+overlaid, and for BlobBoards the reference pattern is additionally projected
+under the recovered pose.
+
+\begin{figure}[!ht]
+	\centering
+	% Row 1 # BB
+	\begin{minipage}[c]{0.025\textwidth}
+		\centering\rotatebox{90}{\small BlobBoards}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/bb/DSC04563_val.png}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/bb/DSC04544_val.png}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/bb/DSC04530_val.png}
+	\end{minipage}
+
+	\vspace{0.4em}
+
+	% Row 2 # april
+	\begin{minipage}[c]{0.025\textwidth}
+		\centering\rotatebox{90}{\small AprilTag}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/apr/DSC04465_val.png}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/apr/DSC04443_val.png}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/apr/DSC04433_val.png}
+	\end{minipage}
+
+	\vspace{0.4em}
+
+	% Row 3 # aruco
+	\begin{minipage}[c]{0.025\textwidth}
+		\centering\rotatebox{90}{\small ArUco}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/aru/DSC04375_val.png}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/aru/DSC04355_val.png}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.29\textwidth}
+		\includegraphics[width=\textwidth]{images/experiment/aru/DSC04343_val.png}
+	\end{minipage}
+
+	\vspace{0.4em}
+
+	\caption{Experimental setup. BlobBoards, AprilTag, and ArUco are mounted
+		on matched rigid panels containing $\bbGalleryBoards$ markers at three physical
+		scales: $\bbBoardsSmall$ small, $\bbBoardsMedium$ medium, and $\bbBoardsLarge$ large. The panel is observed
+		at varying distances and obliquities while its $6$-DoF pose is tracked
+		by motion capture. Estimated board coordinate frames are overlaid; for
+		BlobBoards, the reference pattern is additionally projected under the
+		recovered pose.}
+	\label{fig:supp:setup}
+\end{figure}
+
+\section{Hand--Eye Calibration Diagnostics}
+\label{sec:supp:handeye}
+
+\begin{table}[!ht]
+	\centering\small
+	\input{figures/floorplan/handeye_table.tex}
+	\caption{Hand--eye calibration diagnostics, one fit per marker system over all $\bbHeMarkers$ boards. \emph{Residual} is the noise scale of the pose residual the staged linear fit reports, in millimetres and degrees; \emph{recovered} counts calibration frames whose untracked camera pose was substituted. The camera is static; its rig was untracked in $\bbHeRecovered$ of the $\bbHeFrames$ BlobBoard calibration frames, which use a substituted constant camera pose admitted only under an explicit constancy gate on the motion-capture reconstruction and the image background.}
+	\label{tab:handeye}
+\end{table}
+
+\noindent\textbf{Independence of the ground truth.}~ Exactly two observation
+streams enter the calibration: the motion-capture rig poses $\mathbf{A}_i$
+and the board poses $\hat{\mathbf{B}}_{im}$ reported by the marker system
+under test (notation of the main paper). Three properties bound what the
+fitted mounts can absorb. First, an explicit calibration set is used,
+disjoint from every evaluation frame ($\bbHeFrames$, $\aprHeFrames$ and $\ucoHeFrames$ usable calibration
+frames for BlobBoards, AprilTag and ArUco, against $\bbTimeN$, $\aprTimeN$ and $\ucoTimeN$
+evaluation frames), so no evaluation frame contributes to the transforms it
+is later scored against. Second, the calibration is fitted once per marker
+system, from that system's own detections, and then held fixed: every system
+is scored against ground truth from its own detector and never a
+competitor's, and since the three panels are physically distinct objects a
+shared set of mounts does not exist in any case. Third, the fit is heavily
+overdetermined and spans the same distances and obliquities as the
+evaluation (\cref{sec:supp:derivations}), so a rigid mount can absorb only
+an error that is constant over that span. A constant per-system bias is
+absorbed for each system alike; scale-, distance- and obliquity-dependent
+degradation survives into the numbers the main paper reports. The residual noise scale of the BlobBoard fit is $\bbHeResidTransMM$\,mm and $\bbHeResidRotDeg^\circ$, well below the pose differences the evaluation must resolve (\cref{tab:handeye}).
+
+\section{Hand--Eye Estimator}
+\label{sec:supp:derivations}
+
+\noindent\textbf{Conditioning of the fit.}~ The calibration is heavily overdetermined: up to $\bbGalleryBoards$ boards observed in each
+of $\ucoHeFrames$--$\bbHeFrames$ calibration frames constrain $6+6\times30$ parameters, and each
+board is seen over the same span of distances and obliquities as in the
+evaluation. Only a detector error that is constant over that span is
+indistinguishable from a rigid mount error and therefore absorbable; any
+scale-, distance- or obliquity-dependent component is not.
+
+\noindent\textbf{Staged hand--eye solve.}~ Each of the three stages of the main
+paper is in closed form: the shared rotation of $\mathbf{X}$ by Kabsch
+alignment of the rotation axes of the relative motions pooled over all
+markers, each mount rotation as the chordal mean of its per-frame estimates,
+and all translations by one joint least-squares solve. The estimator is
+deliberately linear: a pose-residual nonlinear refinement was implemented and
+discarded, because it reduced in-sample cost by the amount its own quadratic
+model predicts yet extrapolated worse across the evaluation range, the
+signature of model misspecification absorbing an unmodelled systematic along a
+weakly constrained direction.
+
+\section{Pooled Error Distributions}
+\label{sec:supp:pooled}
+
+The main paper breaks recall down by marker size, because that is where the
+methods separate. Pooling the three sizes gives the aggregate view below, in
+which the tag curves flatten early where the two-fold planar pose ambiguity
+takes over.
+
+\begin{figure}[!t]
+	\centering
+	\input{figures/floorplan/error_histograms_table.tex}
+	\caption{Recall as a function of the translation and rotation error
+		threshold, pooled over all marker sizes. Every visible board
+		constitutes an attempt; a missed detection never enters the numerator,
+		so each curve saturates at the corresponding probability of detection.
+		Dashed lines mark recall $0.5$.} % reproduce: literal-ok (a recall level, not a measured value)
+	\label{fig:supp:pod_trans}
+\end{figure}
+
+\section{Unoccluded Performance by Angle and Distance}
+\label{sec:supp:unoccluded}
+
+The floor-plan figure of the main paper reports the unoccluded result over the capture floor
+plan, with distance and viewing angle on the two axes of a single plan and the
+per-station median as colour. The figure below is the same measurements viewed
+as marginals: each quantity against obliquity, and translation additionally
+against camera distance. It adds what a per-station median colour cannot show
+--- the interquartile band, and so the spread of the error at each station, not
+only its centre.
+
+\begin{figure}[!t]
+	\centering
+	\input{figures/floorplan/unoccluded_table.tex}
+	\caption{Unoccluded performance binned by obliquity and camera distance.
+		Curves are per-bin medians, bands the interquartile range. Bins with
+		fewer than five detections are omitted.}
+	\label{fig:supp:unoccluded}
+\end{figure}
+
+\section{Occlusion Examples}
+\label{sec:supp:occexamples}
+
+The synthetic occluder is one deterministic region per marker, constructed in
+the pattern's own coordinate frame and warped into the image through the
+ground-truth pose, so the same area fraction $f$ is hidden on every marker type
+at every scale and viewpoint. Its boundary is a single $45^\circ$ line anchored
+at the lower-left corner of the pattern. For $f\le\tfrac12$ the masked region
+is the right triangle with legs $\sqrt{2f}$ of the pattern side; a triangle
+cannot exceed half of a square, so for $f>\tfrac12$ the masked region is
+instead the complement of the right triangle of area $(1-f)$ at the opposite
+corner. Either way the boundary crosses two edges of the marker, which is what
+breaks a quad-based detector. The realized covered fraction matches the target
+exactly at every level of the sweep. We use this one placement rather than
+averaging over occluder positions.
+
+\section{Occlusion by Floor-Plan Level}
+\label{sec:supp:occlevels}
+
+The main paper quotes the $50\%$ level in prose and plots the sweep over
+all ten levels. The plans below repeat the unoccluded floor plan's
+encoding at $10\%$, $50\%$ and $70\%$, so the loss of coverage can be read
+per station rather than only in aggregate. The $10\%$ level locates where
+the two designs part: an occluder crossing the marker border breaks the
+single quad AprilTag and ArUco depend on, while BlobBoards lose only the
+blobs the occluder covers. By $50\%$ neither tag baseline returns poses
+anywhere on the floor, and BlobBoard coverage is not confined to the near,
+frontal stations where the boards are largest.
+
+\begin{figure*}[h]
+	\centering
+	\input{figures/floorplan_occ_10/error_floorplan_table.tex}
+	\caption{Pose accuracy over the capture floor plan at $10\%$ occlusion, in
+		the same layout and encoding as the floor-plan figure of the main paper.
+		Rings are tripod distance, wedges are $10^\circ$ rig stations; colour is
+		(a) the fraction of the $\bbGalleryBoards$ boards detected, and the per-station
+		median over detected boards of (b) translation and (c) rotation error.
+		\textbf{Gray wedges are stations with zero detections.} At this level
+		the AprilTag and ArUco plans are already largely gray while the
+		BlobBoards plan is intact --- the separation between the two designs is
+		established well before the heavier levels shown below.}
+	\label{fig:supp:occlusion10}
+\end{figure*}
+
+\begin{figure*}[h]
+	\centering
+	\input{figures/floorplan_occ_50/error_floorplan_table.tex}
+	\caption{Pose accuracy over the capture floor plan at $50\%$ occlusion, in
+		the same layout and encoding as the floor-plan figure of the main paper. Rings are
+		tripod distance, wedges are $10^\circ$ rig stations; colour is (a) the
+		fraction of the $\bbGalleryBoards$ boards detected, and the per-station median over
+		detected boards of (b) translation and (c) rotation error.
+		\textbf{Gray wedges are stations with zero detections.} Both tag plans
+		are uniformly gray; the BlobBoards plan retains coverage across the
+		capture floor at per-station errors in the range it holds unoccluded.}
+	\label{fig:supp:occlusion50}
+\end{figure*}
+
+\begin{figure*}[h]
+	\centering
+	\input{figures/floorplan_occ_70/error_floorplan_table.tex}
+	\caption{Pose accuracy over the capture floor plan at $70\%$ occlusion, in
+		the same layout and encoding as the floor-plan figure of the main paper.
+		Rings are tripod distance, wedges are $10^\circ$ rig stations; colour is
+		(a) the fraction of the $\bbGalleryBoards$ boards detected, and the per-station
+		median over detected boards of (b) translation and (c) rotation error.
+		\textbf{Gray wedges are stations with zero detections.} The AprilTag
+		and ArUco plans are gray everywhere: at this level neither returns a
+		pose anywhere on the capture floor. BlobBoards retain coverage over a
+		reduced but still substantial set of stations, at per-station errors in
+		the same range as the unoccluded case.}
+	\label{fig:supp:occlusion70}
+\end{figure*}
+\end{document}

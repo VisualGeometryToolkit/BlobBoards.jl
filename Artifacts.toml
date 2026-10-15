@@ -1,0 +1,61 @@
+# =============================================================================
+# Package artifact catalog — the descriptor networks and the example data, one
+# lazy entry each, all hosted in the BlobBoards Zenodo record
+# (concept doi:10.5281/zenodo.21998310).
+# =============================================================================
+#
+# This catalog CHOOSES nothing: which network a run uses is named by its config
+# (`[descriptor] model = { artifact = "<entry>" }`, resolved in
+# src/config_toml.jl). Entries are immutable by construction — a tarball
+# sha256 plus a git-tree-sha1 — so a config always means the same bytes.
+# Publishing newer weights = upload the tarball to a new version of the Zenodo
+# record and ADD an entry here; never repoint an existing one.
+#
+# URLs name a Zenodo record VERSION (`records/<id>`, the stack's
+# DataArtifacts.zenodo_url form): a published version's files are immutable,
+# and the sha256 below verifies the download regardless.
+#
+# Record 23243553 is the version-1.1.0 draft of the BlobBoards record; its
+# files resolve at these URLs once that version is published.
+
+[track_logpolar_circ_s96_iter4]
+git-tree-sha1 = "4018efc39186b1f7c287771d69da99817d73afd5"
+lazy = true
+
+    [[track_logpolar_circ_s96_iter4.download]]
+    sha256 = "f92e3566ea747941f7efbd96ca0d5b322fdb74d2fcf5fdf7c8d582282aeaac67"
+    url = "https://zenodo.org/records/23243553/files/track_logpolar_circ_s96_iter4.tar.gz?download=1"
+
+# Example data — what the pipeline examples run on, resolved via
+# BlobBoards.example_data(:boards | :still | :video). Same rules as the
+# networks: hash-pinned, add-only.
+#
+# The 50 example boards as blobboards/board/v3: the same files as bb_assets'
+# evaluation gallery (bmvc2026, record 23243553), byte for byte.
+[bb_example_boards_v3]
+git-tree-sha1 = "82718353ba0d6b2ce9ac10ea00b47c8276e42f6a"
+lazy = true
+
+    [[bb_example_boards_v3.download]]
+    sha256 = "ada6578daf576c926c7982afa7e7bd4e162c389a55a18d778d98fbc600cd4806"
+    url = "https://zenodo.org/records/23243553/files/bb_example_boards_v3.tar.gz?download=1"
+
+# The still and the clip with their cameras.json in vgio/cameras/v3 (the lens
+# families' lens records), produced by VisualGeometryIo's one-shot lens
+# migration (migrate/v3, run 5be29639b85ec047), each lens proven to compute the
+# same function; media unchanged.
+[bb_example_still_v3]
+git-tree-sha1 = "cae769ecde30a49e2d4dd7472758711319062b66"
+lazy = true
+
+    [[bb_example_still_v3.download]]
+    sha256 = "8d7855ebb2585e85ed06847348c90f4f4c99d6f791f887a15c555fd4297d11eb"
+    url = "https://zenodo.org/records/23243553/files/bb_example_still_v3.tar.gz?download=1"
+
+[bb_example_video_v3]
+git-tree-sha1 = "16947ea06b3a5b7ee7be1642014b8dc8b4481d26"
+lazy = true
+
+    [[bb_example_video_v3.download]]
+    sha256 = "71d30e195c2d2927a6d14d1110d4ac22bd26a14ca25ef31e75398f9b55f4d244"
+    url = "https://zenodo.org/records/23243553/files/bb_example_video_v3.tar.gz?download=1"

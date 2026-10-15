@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blobboards"
+version = "0.1.0"
+description = "Generate multi-scale blob calibration targets for computer vision"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+keywords = ["computer-vision", "calibration", "blob-detection", "julia"]
+dependencies = [
+    "juliacall>=0.9.20",
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.urls]
+Homepage = "https://blobboards.github.io"
+Documentation = "https://blobboards.github.io"
+Repository = "https://github.com/VisualGeometryToolkit/BlobBoards.jl"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+# juliapkg.json: constraints on juliacall's own Julia environment (see the
+# comment in blobboards/__init__.py `_init`).
+blobboards = ["juliapkg.json"]

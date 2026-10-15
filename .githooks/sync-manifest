@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Keep the Julia Manifest legal after git moves Project.toml.
+#
+# Why: the package Manifest is untracked — it is regenerable from Project.toml
+# plus the registries, which is exactly what makes it disposable. But it is not
+# self-regenerating: a pull that raises a [compat] lower bound leaves the local
+# Manifest illegal, and every targeted Pkg operation then dies with
+#   "empty intersection between X@old and project compatibility new".
+# Nothing in git or Pkg runs the regenerate. This hook does.
+#
+# Installed as post-merge, post-checkout and post-rewrite (symlinks to this
+# file). Activate ONCE PER CLONE:
+#
+#     git config core.hooksPath .githooks
+#
+# Behaviour: when Project.toml differs between the old and new HEAD, run a
+# resolve-only Pkg.update() — precompilation is deferred to the first `using` —
+# in the root env and in every subdirectory env that already carries an
+# UNTRACKED Manifest. A tracked root Manifest came with the pull and is only
+# instantiated (download, no resolve); tracked subproject Manifests are left
+# alone. Never fails the git command; on error it says what to run by hand.
+#
+# Manual form:  .githooks/sync-manifest [<old-rev> [<new-rev>]]
+
+set -u
+set -o pipefail
+repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$repo" || exit 0
+hook=$(basename "$0")
+
+case "$hook" in
+  post-merge)    old=ORIG_HEAD; new=HEAD ;;
+  post-rewrite)  [ "${1:-}" = rebase ] || exit 0; old=ORIG_HEAD; new=HEAD ;;
+  post-checkout) [ "${3:-0}" = 1 ] || exit 0; old=$1; new=$2 ;;
+  *)             old=${1:-ORIG_HEAD}; new=${2:-HEAD} ;;
+esac
+
+log() { printf '[sync-manifest] %s\n' "$*" >&2; }
+
+# Nothing to do unless Project.toml moved (deps, compat and version live there).
+if git rev-parse --verify -q "$old^{commit}" >/dev/null 2>&1; then
+  git diff --quiet "$old" "$new" -- Project.toml && exit 0
+fi
+
+if command -v julia >/dev/null 2>&1; then
+  JULIA=(julia)
+elif [ -f pixi.toml ] && command -v pixi >/dev/null 2>&1; then
+  JULIA=(pixi run julia)
+else
+  log "Project.toml changed but no julia on PATH — run: julia --project=. -e 'using Pkg; Pkg.update()'"
+  exit 0
+fi
+
+TIMEOUT=(); command -v timeout >/dev/null 2>&1 && TIMEOUT=(timeout 900)
+
+root_tracked=$(git ls-files -- Manifest.toml 'Manifest-v*.toml')
+
+# Root env, plus subdirectory envs that already have an untracked Manifest.
+envs=(.)
+for p in */Project.toml; do
+  [ -f "$p" ] || continue
+  d=${p%/Project.toml}
+  ls "$d"/Manifest.toml "$d"/Manifest-v*.toml >/dev/null 2>&1 || continue
+  [ -n "$(git ls-files -- "$d/Manifest.toml" "$d/Manifest-v*.toml")" ] && continue
+  envs+=("$d")
+done
+
+range="$(git rev-parse --short "$old" 2>/dev/null || echo '?')..$(git rev-parse --short "$new" 2>/dev/null || echo HEAD)"
+for d in "${envs[@]}"; do
+  if [ "$d" = . ] && [ -n "$root_tracked" ]; then mode=instantiate; else mode=update; fi
+  log "Project.toml changed in $range — Pkg.$mode() in $d/ (precompile deferred)"
+  if JULIA_PKG_PRECOMPILE_AUTO=0 "${TIMEOUT[@]}" "${JULIA[@]}" --startup-file=no --project="$d" \
+       "$repo/.githooks/sync-manifest.jl" "$mode" 2>&1 | sed 's/^/[sync-manifest]   /' >&2
+  then :
+  else
+    log "FAILED in $d/ — the Manifest may still be illegal; run: julia --startup-file=no --project=$d -e 'using Pkg; Pkg.update()'"
+  fi
+done
+exit 0

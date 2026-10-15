@@ -1,0 +1,115 @@
+# =============================================================================
+# detection_cv — the config of record of the JOINT cross-validation of the
+# detection operating point (scripts/detection_cv.jl).
+#
+# THREE scalars, tuned jointly on the pose arm (the configs of record's
+# `find_boards`):
+#
+#   outlier_halfwidth  [find_boards.geometry] — the support of the uniform
+#                      outlier component of the self-scaling Student-t +
+#                      uniform model of the RANSAC scorer and the local
+#                      optimization, and the guided-association band (px)
+#   peak_threshold     [find_boards.detect] — the blob detector's peak
+#                      threshold (a DETECTION parameter: each value costs one
+#                      detection run over the validation frames)
+#   min_similarity     [find_boards] — the descriptor gate on the RANSAC seed
+#                      matches (post-detection)
+#
+# Everything else is the run config of record (`inputs.run_config`), read,
+# never restated. The search is VisualGeometryEval's coarse-fine search
+# (`joint_coarse_fine`, Evaluation `coarse_fine_search`): the coarse product
+# grid, each axis extended while the joint argmin lies within `edge_margin`
+# points of its face, then the product of each axis's fine bracket about the
+# joint argmin and its free argmin. `peak_threshold` is `expensive`: the
+# search asks for one value at a time and the driver runs one detection run
+# per value, reused by every (half-width, similarity) cell. Absent keys
+# inherit VisualGeometryEval configs/tuning.toml; unknown keys are refused.
+#
+# It replaces the factorial detection-threshold grid
+# (detection_thresholds_cv.jl) and the separate half-width CV
+# (outlier_halfwidth_cv.jl), which tuned these axes one at a time.
+#
+# The criterion is the INTER-BOARD INVARIANCE mAA (VisualGeometryEval
+# `rigid_invariance_errors` under `eligible_maa`): in every frame the
+# relative pose T_m⁻¹ T_n of two boards is a constant of the rigid panel, so
+# its deviation from the leave-one-out reference over the other frames is pure
+# estimation error. The statistic is the continuous mAA@10 mm of the
+# TRANSLATION of that relative pose over every (frame, board pair); a pair not
+# detected in a frame is a failure, so the criterion prices detection rate and
+# accuracy in one number.
+#
+# Data: the validation scene of the registered scene split
+# `blobboards_cross_session` (VisualGeometryEval configs/splits.toml) —
+# 260521/bb, a separate capture session (f/9.0 against 260527's f/22); the
+# reported session 260527 is the test side and is never read here.
+# =============================================================================
+
+[experiment]
+generator = "detection_cv"
+
+[inputs]
+# configs/-relative: the EVALUATION's run config of record — detection,
+# adaptation, matching, verification, the network and the pose arm's geometry
+# are read from it (FindBoardsConfig); the search overrides only its axes.
+run_config = "bmvc2026_260527.toml"
+# data_root()-relative. The validation session's camera as a vgio/cameras/v3
+# record (converted exactly from the session's OpenCV calibration).
+camera = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
+# The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids
+# and definition hashes); the metadata tier's 260527 definitions are read.
+boards_dir = "absolute_pose_experiments/260527/boards/blobboards"
+gallery = "cache/board_features_260521.jld2"   # results_root()-relative: the gallery cache (keyed by the network inside)
+n_boards = 30         # boards on the panel: C(30,2) pairs per frame is the criterion's denominator
+min_obs = 3           # frames a board pair needs before it has a leave-one-out reference
+
+[tuning.detection]
+type = "joint_coarse_fine"
+edge_margin = 1
+criterion = { type = "mean_average_accuracy", max_error = 10.0 }   # mm, translation of the inter-board relative pose
+
+[tuning.detection.cross_validation]
+scene_split = { type = "registered", name = "blobboards_cross_session" }
+validation = { type = "exhaustive" }
+
+# Pixels, log-spaced at 6 per decade over [0.5, 16] (10 points); the fine
+# stage puts 7 log-spaced points over the coarse argmin's two neighbours.
+[tuning.detection.axes.outlier_halfwidth]
+coarse = { type = "spaced", window = { type = "fixed", lo = 0.5, hi = 16.0 }, spacing = { type = "log_per_decade", per_decade = 6 } }
+extension = { npts = 3, max_rounds = 2 }
+fine = { type = "log_count", n = 7 }
+
+# Half-octave ladder over [0.005, 0.02] (5 points, 0.01 in the middle); the
+# fine stage adds the two quarter-octave values beside the coarse argmin.
+[tuning.detection.axes.peak_threshold]
+coarse = { type = "spaced", window = { type = "fixed", lo = 0.005, hi = 0.02 }, spacing = { type = "log_per_octave", per_octave = 2 } }
+extension = { npts = 2, max_rounds = 2 }
+fine = { type = "log_count", n = 5 }
+expensive = true
+
+# Cosine similarity, linear in steps of 0.1 over [0.3, 0.8]; fine steps of 0.05.
+[tuning.detection.axes.min_similarity]
+coarse = { type = "spaced", window = { type = "fixed", lo = 0.3, hi = 0.8 }, spacing = { type = "linear_count", n = 6 } }
+extension = { npts = 2, max_rounds = 2 }
+fine = { type = "linear_count", n = 5 }
+
+# The operating point in force (the configs of record, signed off 2026-10-09
+# and kept 2026-10-14): the search's selection replaces it only when the
+# paired frame bootstrap puts its mAA above the incumbent's with probability
+# ≥ `confidence` (VisualGeometryEval `fine_search`).
+[tuning.detection.incumbent]
+values = { outlier_halfwidth = 0.9646329181191862, peak_threshold = 0.01, min_similarity = 0.6 }
+confidence = 0.95
+
+[uncertainty]
+# Frame bootstrap of the joint selection: resample the 80 validation frames
+# with replacement and re-take the argmin over every evaluated cell
+# (VisualGeometryEval bootstrap_argmin over the cells' unit statistics); the
+# interval of each axis is the quantile of its coordinate.
+n_resamples = 1000
+seed = 20261009
+interval = 0.9
+
+[tables]
+# The curve of each axis and the surface of each pair of axes through the
+# coarse argmin (VisualGeometryEval emit_tuning_table), supplementary tables.
+labels = { outlier_halfwidth = "half-width [px]", peak_threshold = "peak threshold", min_similarity = "min.\\ similarity" }

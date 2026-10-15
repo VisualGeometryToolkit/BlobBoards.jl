@@ -1,0 +1,44 @@
+# Config of record of scripts/import_cameras.jl: the ONE-TIME port of each
+# session's upstream intrinsic calibration (BlobBoards-Evaluation
+# pose_estimators/calibrate_camera.py `calibrate_pinhole`: OpenCV
+# calibrateCamera on a chessboard, exported as `pinhole_radtan` JSON) into
+# VisualGeometryIo's native vgio/cameras/v3, with the v3 calibration block
+# filled from the export. The native file is the camera of record published in
+# the inputs tier (<session>/calibration/<file>); the upstream export is
+# published beside the BlobBoards-Evaluation archive as this conversion's
+# source. Nothing reads the upstream shape at run time.
+#
+# Each source is named by its data_root()-relative path AND sha256 (never a
+# machine path; src/cameras.jl `upstream_source` refuses an absolute one): the
+# run refuses a file whose hash differs. The export's `reprojection_error` is calibrate_pinhole's MEAN
+# per-image error (Σ‖x − x̂‖₂ / n per image, averaged), not an RMS, so it is
+# stated in the note, never as reprojection_rms.
+
+[experiment]
+generator = "import_cameras"
+
+[[cameras]]
+session = "260527"
+source = "absolute_pose_experiments/260527/images/sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
+sha256 = "0c452de05aafb2df6df831bce4ffbdf065f2ab6230cfdb8bd1b36f299f677602"
+name = "sony-fx3-iso100_tamron-20mm-f2.8-set-to-f22"        # the camera's name in the store
+output = "sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json" # <session>/calibration/<output>
+date = "2026-05-28"                                          # the export file's modification date (calibrate_pinhole records no fit date)
+
+[[cameras]]
+session = "260521"
+source = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json"
+sha256 = "b745b7370fcaca5b5335026c34f48b01ebd0dbcc15b2993d92fdf41a716f4d56"
+name = "sony-fx3-iso125_tamron-20mm-f2.8-set-to-f9.0"
+output = "260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json"
+date = "2026-05-22"                                          # the export file's modification date
+
+[upstream]
+tool = "calibrate_pinhole (BlobBoards-Evaluation, OpenCV calibrateCamera)"
+pixel_frame = "opencv"          # camera_matrix's principal point: OpenCV's (top-left pixel centre at 0, 0)
+# The distortion vector is OpenCV's fourteen (k1 k2 p1 p2 k3 k4 k5 k6 s1 s2 s3
+# s4 tilt_x tilt_y); the fit fixed k3..k6 (flags below) and fitted no
+# thin-prism or tilt terms, so every coefficient past p2 must be zero — the
+# camera is opencv_lens([k1, k2, p1, p2]). A nonzero one is refused.
+n_fitted = 4
+flags_names = { 16384 = "CALIB_RATIONAL_MODEL", 128 = "CALIB_FIX_K3", 2048 = "CALIB_FIX_K4", 4096 = "CALIB_FIX_K5", 8192 = "CALIB_FIX_K6" }

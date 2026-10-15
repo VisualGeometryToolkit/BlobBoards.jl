@@ -1,0 +1,18 @@
+% occlusion_sweep_table.tex — generated assembly; edit freely
+\centering
+\setlength{\tabcolsep}{2pt}
+\providecolor{bbGreen}{HTML}{009E73}
+\providecolor{bbBlue}{HTML}{0072B2}
+\providecolor{bbOrange}{HTML}{E69F00}
+\begin{tabular}{@{}ccc@{}}
+\input{figures/floorplan/occ_rot} & \input{figures/floorplan/occ_trans} & \input{figures/floorplan/occ_pod} \\[1pt]
+(a) Rotation error & (b) Translation error & (c) Probability of detection \\
+\end{tabular}\\[4pt]
+\begin{tikzpicture}[baseline]
+\draw[bbBlue, line width=1.2pt] (0.0cm,0) -- (0.6cm,0);
+\node[anchor=west, font=\small] at (0.7cm,0) {BlobBoards};
+\draw[bbOrange, line width=1.2pt] (3.0cm,0) -- (3.6cm,0);
+\node[anchor=west, font=\small] at (3.7cm,0) {AprilTag};
+\draw[bbGreen, line width=1.2pt] (6.0cm,0) -- (6.6cm,0);
+\node[anchor=west, font=\small] at (6.7cm,0) {ArUco};
+\end{tikzpicture}

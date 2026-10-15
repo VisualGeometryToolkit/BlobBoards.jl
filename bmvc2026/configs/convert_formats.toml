@@ -1,0 +1,36 @@
+# Config of record of scripts/convert_formats.jl, stage 0 of the paper's
+# regeneration: the motion-capture records of the absolute-pose evaluation,
+# from the tracker's raw per-frame exports (inputs:
+# data_root()/absolute_pose_experiments/<session>/poses/motion_tracker) onto
+# VisualGeometryIo's kinds — target_points3d/v1, trajectory/v3, rig/v4 — each
+# the direct serialization of a VisualGeometryCore value. Written to
+# results_root()/convert_formats-<run key of this config>/ (src/runs.jl
+# records_dir), with the run records and a manifest of source sha256 → output.
+
+[experiment]
+generator = "convert_formats"
+# The generation of VisualGeometryIo's kinds the copy is written in: "direct" —
+# every kind the serialization of a VisualGeometryCore value (2026-10-09; the
+# measurement kinds renamed target_points2d/3d, target rigs rig/v4). The
+# previous conversion (run key fa5e3efa819e2094) wrote the record generation.
+formats = "direct"
+
+[sessions]
+# The published session (260521 is unpublished: it fails end-to-end validation).
+names = ["260527"]
+
+[mocap]
+# The tracker's world is the world frame; each tracked body is `body:<id>`.
+sensor = "mocap"                                   # the name every marker frame records as its sensor
+# The vendor export's per-frame layout: `poses` = [board rig, camera rig],
+# `makers` (sic) = 14 marker positions, the first 11 on the board rig and the
+# last 3 on the camera rig (poses/motion_tracker/README.txt). Rotations are flat
+# COLUMN-major 3×3, translations mm, NaN = untracked.
+bodies = [
+    { id = "board_rig", pose = 1, markers = [1, 11] },
+    { id = "camera_rig", pose = 2, markers = [12, 14] },
+]
+n_markers = 14
+method = "the tracker vendor's rigid-body solver, as exported per frame by the capture software"
+# The static-camera recovery of camera-untracked calibration frames (src/recovery.jl).
+recovery = { subsets = "calibration_*", t_tol_mm = 1.0, ang_tol_deg = 0.5, bg_tol = 0.15 }

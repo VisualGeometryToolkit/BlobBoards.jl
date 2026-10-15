@@ -1,0 +1,216 @@
+# =============================================================================
+# Default run configuration — the config of record: `FindBoardsConfig()` and
+# the config structs' @kwdef defaults read THIS file (the deliberate literal
+# exceptions are listed in src/config_defaults.jl; the suite asserts every
+# key config_dict emits is stated here).
+# NB the shipped examples/ hand-build DetectConfig with explicit tuned
+# overrides (peak_threshold = 0.02) — deliberate, visible at their call sites.
+# =============================================================================
+#
+# POLICY: configuration is TOML, data is JSON (cau-tooling EVAL-CONVENTIONS.md).
+#
+# This is the ONE place a default entry point learns which descriptor network
+# to load. It replaced a `DEFAULT_DESCRIPTOR_MODEL` constant inside the
+# BlobBoards package, a `LocalPreferences` key, an `ENV` var, and per-driver
+# `BB_ONNX` — four mechanisms, three of which resolved to a different network
+# from the one the paper actually used.
+#
+# Experiments do NOT read this file; they carry their own config under
+# bmvc2026/configs/ so a sweep records the exact configuration it ran with.
+#
+# -----------------------------------------------------------------------------
+# WHICH NUMBERS ARE FITTED, AND WHICH ARE NOT
+# -----------------------------------------------------------------------------
+#
+# Three kinds of number live in this file, and only the first kind may be
+# swept. Mixing them is how a measured value gets "tuned" away.
+#
+# CROSS-VALIDATED — fitted nuisance parameters. No derivation exists; they are
+# set by held-out validation against EXTERNAL truth and re-fitted per capture.
+#
+#   [find_boards.geometry] outlier_halfwidth
+#
+# It is the uniform OUTLIER component's per-axis half-width in the
+# Student-t/uniform mixture — NOT a gate. It implies no threshold directly:
+# the decision is the Bayes rule on the posterior, and its boundary
+# (RansacScoringDoneRight's `decision_threshold`)
+# derives the radius from the half-width and the solve's own residual scale.
+#
+# They need fitting because the detection-stage E-step holds the inlier prior
+# at ½ (`soft_posterior_weights!`'s default `inlier_prior`; it is not estimated
+# here), so the half-width is the ONLY knob setting the inlier/outlier balance. The scale and nu ARE fitted (VisualGeometryCore's
+# `update_scale!` writes the scale, `update_nu!` the nu, each its own M-step),
+# which is why those are absent here.
+#
+# Do NOT derive a half-width from the image size. That would assert outliers
+# are uniform over the frame; they are STRUCTURED — a descriptor mismatch lands
+# on another printed blob, near the inliers. Measured on the 12-frame fisheye
+# set, the dependence is logarithmic and monotone, so a per-decade grid is
+# enough and there is no cliff to find.
+#
+# Tune it on data held out from the poses it will be scored on.
+#
+# MEASURED — a derivation or a measurement backs the value; re-measure, do not
+# sweep. The detector's tuned thresholds, `[find_boards] min_similarity` (a
+# property of the descriptor network).
+#
+# STRUCTURAL — fixed by the problem, not free at all. `min_inliers` (the
+# minimal sample plus support), the RANSAC budgets.
+#
+# `model` is relative to `data_dir()`, which stays in LocalPreferences.toml:
+# WHERE the data lives is per-machine, WHICH network to use is not.
+
+[descriptor]
+# RealFourthIteration log-polar s96 network (exported 2026-08-10 from
+# hsa/logs/2026_08_10_RealFourthIteration/.../best.onnx) — the network the
+# promoted 260527 snapshot was produced with. Measurably stronger on distant
+# small boards than the earlier `_cuda` export: the 2026-08-14 network A/B
+# attributed 10 lost 2–3 m detections entirely to the older descriptor. No
+# depad needed — this export has ZERO Pad nodes, so ORT's CUDA EP takes the
+# whole graph natively (65.0 µs/patch at batch 64, on par with the depadded
+# `_cuda` graph). See bmvc2026/_research/findings/descriptor_inference_speedup.md.
+# DISTRIBUTION form (Pkg artifact): `artifact` names an entry in the
+# package-root Artifacts.toml — the catalog of published networks, each a
+# lazy, sha256-pinned tarball in the BlobBoards Zenodo record, fetched once
+# into Julia's shared artifact store. No dataset needed. The catalog cannot float; newer weights
+# are a NEW catalog entry, adopted by editing this name.
+model = { artifact = "track_logpolar_circ_s96_iter4" }
+# FROZEN form (data_dir-relative) — what experiment configs under
+# bmvc2026/configs/ use, so the paper's network stays pinned to the DOI'd
+# Zenodo record. Same bytes as the catalog entry above (sha256 6efc291a…):
+#   model = "models/track_logpolar_circ_s96_iter4.onnx"
+
+[find_boards]
+# COMPLETENESS IS THE POINT. Every parameter `FindBoardsConfig` accepts is
+# stated here, including ones sitting at the library default, because a
+# defaulted knob is not recorded — and a default that changes in a later
+# BlobBoards silently reinterprets this file (max_trials already moved
+# 10_000 -> 2_000 once). test/test_config_toml.jl asserts this file names
+# every key `config_dict` emits, so the completeness cannot rot.
+#
+# The exceptions are deliberate and are NOT defaults: `polarity` and
+# `adapt.cutoff` come from each board's bundle, `patch_size` from the ONNX
+# graph. Those are recorded in the boards and the checkpoint respectively.
+min_similarity = 0.6
+# Appearance verification (mandatory): an accepted board needs >=
+# min_appearance_support of its inliers whose gallery/image descriptors reach
+# verify_similarity. Replaced geometry.min_inlier_fraction (2026-08-13).
+# 0.6, calibrated DOWN twice on the 260527 corpus (2026-08-14): distant real
+# boards' median inlier sims dip to 0.66-0.71 at the 2-3 m frontier (0.8 and
+# then 0.7 both cut into the real population), while false boards sit at
+# median 0.07-0.37 — the separation stays total at 0.6.
+verify_similarity = 0.6
+min_appearance_support = 0.5
+max_detections = "unbounded"    # response-rank cap; applied per polarity subset
+# Base seed for the per-fit RANSAC streams: each board's fit draws from
+# Xoshiro(ransac_seed XOR uid), so identical inputs give identical results
+# regardless of thread scheduling, call order, or ambient RNG state. Sweep it
+# to MEASURE fit-stage RNG sensitivity, never to tune (decisions were
+# seed-stable on the 260527 A/B, 2026-08-17). Top-level, not under
+# [find_boards.ransac]: that table maps 1:1 to RVG's RansacConfig, and the
+# seed is BlobBoards' stream-derivation base, not an RVG knob.
+ransac_seed = 0x0b10b5eed
+
+[find_boards.detect]
+# 0.01 was tuned against the pre-upsampling detector and is the incumbent;
+# the 3x3 grid in detection_thresholds_cv.jl sweeps {0.005, 0.01, 0.02}.
+peak_threshold = 0.01
+edge_threshold = 5.0
+# 2x upsample before the scale space (pyramid starts at octave -1).
+# Recovers small blobs at distance; the shipped 260527 poses were
+# produced with it on, which is what poses/bb.upsample was named for.
+upsample = true
+tilts = []   # empty = the IMAS-25 schedule
+# The ONE cutoff still configured, and a DIFFERENT quantity from the board's:
+# the Mahalanobis radius of each detection's elliptical footprint, used for
+# cross-warp duplicate suppression inside the shared detection stage. It cannot
+# be board-derived - NMS runs before any board is known. Larger => bigger
+# footprints => more suppression. VGF's default is 3.0; 2.0 keeps more.
+# band_octaves / band_reach: suppression is scale-banded — a feature can only be
+# suppressed by one whose geometric-mean scale band (floor(log2 sqrt(det S) /
+# band_octaves)) is within band_reach of its own. 1 octave +-1 admits a scale
+# ratio < 4; 0 is the whole-pool rule, under which board-sized extrema and the
+# tilted warps' merged-blob streaks erased the small blobs inside them.
+nms = { type = "ellipse", cutoff = 2.0, band_octaves = 1.0, band_reach = 1 }
+
+[find_boards.adapt]
+# NB no `cutoff` here: it is the printed board's, supplied from the gallery
+# (`_shared_image_cutoff`) so the scan window, the clip test and the
+# canonicalization extent cannot disagree. Use `scan_padding` to over- or
+# undersize the window.
+min_intensity = 1.0e-6
+scan_padding = 1.0
+max_irls_iter = 20                     # quality knob, not just a convergence cap
+spatial_weighting = true
+rtol = 1.0e-6
+# sigma cap as a FRACTION of the image's sqrt(area): sigma > f*sqrt(W*H) is
+# skipped. A resource guard - a blob's fitted support is ~(2*cutoff*sigma)^2,
+# so an unbounded sigma is an OOM - expressed relatively because the same
+# pixel count means different things on different sensors. 0.1 is ~347 px on
+# a 12 MP frame, ~144 px at 1080p, ~55 px at VGA.
+max_scale_fraction = 0.1
+max_scale_ratio = 4.0                  # dimensionless
+max_clip_ratio = 0.2                   # dimensionless
+max_aspect_ratio = 10.0                # dimensionless
+
+[find_boards.track]
+# Board tracking across frames (`track_boards`) — every keyword of that
+# function defaults from here and overrides per call.
+iou_threshold = 0.2         # predicted↔detected ellipse IoU gate per blob
+support_fraction = 0.3      # fraction of predicted blobs that must associate
+patience = 5                # failed frames before a track stops being re-targeted
+keyframe_every = 30         # discovery cadence for untracked boards; 0 disables
+
+[find_boards.geometry]
+# Homography, NOT pose: this file must be reproducible by `FindBoardsConfig()`
+# with no arguments, and `pose` requires a camera. The struct's @kwdef defaults
+# are kept identical to every value below, so "the default" names ONE
+# configuration however you reach it — test_config_toml.jl asserts it.
+type = "homography"
+# 7, not 6: the count gate became INCLUSIVE (>= min_inliers, 2026-08-11) and
+# the default moved up one in lockstep — the effective tuned threshold is
+# unchanged. (PoseGeometry deliberately sits ONE BELOW, 6, and keeps a Julia
+# literal — this table is homography-scoped; see the note at its constructor.)
+min_inliers = 7
+# The half-width of the UNIFORM OUTLIER COMPONENT, pixels — NOT a threshold and
+# NOT the residual scale. The estimators here are Student-t/uniform mixtures:
+# this number is the support the outlier hypothesis spreads its unit mass over,
+# so its density is 1/(2r). The inlier component wins near zero residual only
+# BECAUSE that uniform is thin, and RVG's `fit_division_camera` records the
+# failure verbatim — "a half-width at the median residual makes the outlier
+# component as dense as the inliers and zeroes every weight — measured".
+#
+# So it must stay WELL ABOVE the residual scale — the failure is a half-width
+# AT the median residual, not merely a small one. Setting it to a few times an
+# observed rms is legitimate and makes the mixture stricter (a narrower uniform
+# competes better, so marginal points fall to the outlier component sooner);
+# what it must not do is approach the median. The scale itself is never
+# asserted: the IRLS estimates it by the marginal sweep. It is not a
+# threshold, and the gate it implies is derived, never configured.
+#
+# Absolute by intent, unlike max_scale: it tracks detector localization noise,
+# which is sub-pixel regardless of image size. The package default; the BMVC
+# paper's value is cross-validated (bmvc2026/scripts/outlier_halfwidth_cv.jl).
+outlier_halfwidth = 5.0
+# The RANSAC local-optimization strategy, selected by tag through
+# RobustVisualGeometry's loader over LocalOptimizationDoneRight's `LO_TAGS`. BB
+# pins the posterior-weight Student-t/uniform IRLS on every arm (switched back
+# from the Welsch-HQ arm, 2026-07-28); the Welsch-HQ arm would be
+# `{ type = "hq", loss = "welsch", scale_multiple = "cross_validated" }` here.
+# The fits score with the Student-t + uniform marginal at `outlier_halfwidth`
+# (RansacScoringDoneRight's `StudentTUniformScoring`), stated in the code, not
+# RobustVisualGeometry's MSAC default.
+local_optimization = { type = "student_t_uniform" }
+# NB no `resolve_pose_ambiguity` here: it is pose-only, and the loader
+# refuses it under `type = "homography"`. The plane-induced H is a unique
+# 8-DOF map; the two-fold ambiguity belongs to its DECOMPOSITION into
+# (R, t, n) given K, so an uncalibrated run has no second branch to select.
+# The paper config, which is `pose`, sets it.
+
+[find_boards.ransac]
+min_trials = 100
+# 10_000 rather than the library default of 2_000: on this dataset the agenda
+# carries ~30 candidate boards per image, most of which do not match, and the
+# adaptive stopping rule fires long before the cap on the ones that do.
+max_trials = 10000
+success_prob = 0.99      # RANSAC confidence level

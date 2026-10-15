@@ -1,0 +1,21 @@
+[workspace]
+name = "bmvc2026"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+# The research project's own tools, apart from the package's pixi.toml.
+#   baselines  the AprilTag/ArUco baselines of record (scripts/baselines/
+#              detect_markers.py, run by scripts/detect_baselines.jl): the
+#              versions BlobBoards-Evaluation 88bca9f's pixi.lock resolved
+#              (environment `opencv`), pinned exactly.
+
+[feature.baselines.dependencies]
+python = "==3.14.3"
+numpy = "==2.4.2"
+
+[feature.baselines.pypi-dependencies]
+opencv-python = "==4.13.0.92"
+dt-apriltags = "==3.1.7"
+
+[environments]
+baselines = { features = ["baselines"], no-default-feature = true }

@@ -1,0 +1,16 @@
+% occ_rot.tex — generated (occlusion sweep), edit freely
+\providecolor{bbGreen}{HTML}{009E73}
+\providecolor{bbBlue}{HTML}{0072B2}
+\providecolor{bbOrange}{HTML}{E69F00}
+\begin{tikzpicture}[baseline=(current bounding box.center)]
+\begin{axis}[width=4.05cm, height=3.4cm, xmin=-5, xmax=95,
+  ylabel={median error ($^\circ$)}, xlabel={occlusion level},
+  xtick={0,30,60,90}, xticklabels={{0\%},{30\%},{60\%},{90\%}},
+  ymode=log, log ticks with fixed point, ytick={0.5,1,2,5,10,25},
+  label style={font=\scriptsize}, tick label style={font=\scriptsize},
+  ]
+\addplot[draw=bbBlue, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbBlue, draw=bbBlue}] coordinates {(0,1.077) (10,1.103) (20,1.112) (30,1.147) (40,1.061) (50,1.054) (60,0.8871) (70,0.89) (80,0.7415) (90,0.7878)};
+\addplot[draw=bbOrange, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbOrange, draw=bbOrange}] coordinates {(0,1.242) (10,1.617)};
+\addplot[draw=bbGreen, line width=1.0pt, mark=*, mark size=1.1pt, mark options={fill=bbGreen, draw=bbGreen}] coordinates {(0,3.036) (10,18.79) (20,24.24)};
+\end{axis}
+\end{tikzpicture}

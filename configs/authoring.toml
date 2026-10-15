@@ -1,0 +1,66 @@
+# =============================================================================
+# Board and pattern AUTHORING defaults — what `blob_board` and `blob_pattern`
+# use for every keyword not given (read at precompile time by
+# src/config_defaults.jl, like configs/default.toml's run defaults; kept apart
+# so a run config, a copy of default.toml, never carries knobs no run reads).
+# A board RECORDS every value it was made with (its JSON, its identity), so a
+# change here changes only boards made afterwards. Lengths in mm.
+# =============================================================================
+
+[blob_board]
+# The white margin between the page edge and the board, on every side: clears
+# every office printer's unprintable border (3-6.35 mm; the campus Ricoh's is
+# 4.23 mm). `board_size = canvas_size` is full bleed.
+margin_mm = 10.0
+# The ruler bands along each side of the board, and the corner cells (QR code,
+# uid characters): constant, whatever the board's size; a zero turns a mark off.
+ruler_width_mm = 10.0
+corner_size_mm = 10.0
+# The white inset of a mark's content (ruler ticks, QR code, uid characters).
+frame_padding_mm = 0.0
+# A minor ruler tick's length, as a share of a major one's.
+minor_tick_fraction = 0.5
+# Print the board's identity (file stem, board code, version) under it.
+id_label = true
+major_tick_spacing_mm = 10.0
+minor_tick_spacing_mm = 5.0
+# MEASURED — the smallest disc that prints well at a printer's density
+# (`suggest_blob_sizes(density, extent)[1]`; a board's `blob_sizes` has no default):
+# `min_blob_diameter_mm` at `min_blob_reference_dpi`, inversely
+# proportional to the density (a printer's halftone cells, blocks of printer
+# dots, grow as its density drops, and a disc must span enough of them to print
+# its profile smoothly): 3 mm at 1200 dpi, 6 mm at 600, 12 mm at 300. 6 mm at
+# 600 dpi is an office laser measured 2026-10-11 (examples/print_quality: discs
+# from ~5-6 mm print the profile within ~10 grey levels of 255).
+min_blob_diameter_mm = 3.0
+min_blob_reference_dpi = 1200
+# The cap of `suggest_blob_sizes(density, extent)[2]`, a board's largest disc: `max_blob_fraction`
+# (below) of the side, but never more than this — on a large sheet 20% of a
+# side is a very big disc (A0: 164 mm). A max given as a length is taken as given.
+max_blob_diameter_mm = 64.0
+# The smallest disc any board may have, whatever the printer: below a tenth of
+# a millimetre nothing prints a profile, and the placement grid (cells ~4σ)
+# would need billions of cells — a size typed in the wrong unit is refused.
+min_printable_disc_mm = 0.1
+# The most placement trials per blob size a board may ask for (`max_trials`):
+# a decoded board code places its blobs before its check is read, so an edited
+# or misread value must be refused, not run for hours. 20× the default.
+max_trials_limit = 100000
+[board_raster]
+# The smallest disc's diameter, in pixels, of the image a board is converted to
+# when nobody names a density — the detector's gallery image. A board has no
+# density and that image no halftone, so it is rendered just fine enough to
+# sample the smallest blob well, and no finer: 16 px across is σ = 4 px at the
+# default cutoff (2), twice the 2 px floor every raster of a board must meet.
+# (Until 2026-10 the gallery rasterized at the density the board was made for:
+# 142 px across the smallest disc of a default A4 board.)
+min_blob_px = 16
+
+[blob_pattern]
+# The placement ladder, shared by boards and patterns.
+max_blob_fraction = 0.2      # the default largest disc's diameter, of the pattern's short side
+scales_per_octave = 3
+max_trials = 5000            # placement trials per blob size
+alpha = 1.2                  # how blob counts fall with size: weights ∝ 1/σ^alpha
+cutoff = 2.0                 # a blob's disc radius, in σ (DEFAULT_CUTOFF)
+polarity = "dark"            # dark blobs on a light ground ("light": the reverse)

@@ -1,0 +1,51 @@
+[deps]
+Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
+BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ClusterManagers = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Debugger = "31a5f54b-26ea-5ae9-a837-f05ce5417438"
+DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
+HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+RobustVisualGeometry = "48970fad-9a21-401c-bf6c-679fa4f2bd7f"
+Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
+SlurmClusterManager = "c82cd089-7bf7-41d7-976b-6b5d413cbe0a"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+VideoIO = "d6d074c3-1acf-5d4c-9a43-ef38773959a2"
+VisualGeometryCore = "297d53b8-c8d7-4cd7-a9af-68e656508a81"
+VisualGeometryEval = "3a96b074-0aeb-4323-98af-032cad4f5882"
+VisualGeometryFeatures = "9e05951d-65eb-41d6-b120-50dff4d82817"
+VisualGeometryIo = "d0441031-17df-4f07-bc88-8d8f5a818e7b"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
+
+[compat]
+VisualGeometryEval = "0.1"
+
+[extras]
+CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
+
+[preferences.CUDA_Runtime_jll]
+version = "12.9"
+
+[sources]
+BlobBoards = { path = ".." }

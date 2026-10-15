@@ -1,0 +1,1534 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\data}{\mathrm{data}}
+\newcommand{\InvGamma}{\mathrm{InvGamma}}
+\newcommand{\vect}{\operatorname{vec}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Var}{\operatorname{Var}}
+
+\title{Inlier Tests and Covariance Propagation for RANSAC\\
+  with Known and Unknown Scale}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+% =============================================================================
+\section{Setup and Notation}
+% =============================================================================
+
+Fit a model with $p$ parameters to $n$ candidate inlier points.
+Let $r_i = y_i - f(x_i; \hat\theta)$ be the residuals, assumed i.i.d.\
+$r_i \mid \sigma \sim \Normal(0, \sigma^2)$.
+Define the degrees of freedom $\nu = n - p$ and the residual sum of squares
+\begin{equation}
+  \mathrm{RSS} = \sum_{i=1}^{n} r_i^2.
+\end{equation}
+
+Two cases arise depending on whether $\sigma$ is known or unknown.
+When $\sigma$ is known, the framework is classical Gaussian and the
+test statistics follow $\chi^2$ distributions. When $\sigma$ is unknown,
+a Bayesian treatment with the Jeffreys prior produces Student's $t$
+distributions and $F$ test statistics. Both cases admit systematic
+covariance propagation to derived quantities.
+
+% =============================================================================
+\section{The Jeffreys Prior}
+\label{sec:jeffreys}
+% =============================================================================
+
+The Jeffreys prior is the unique prior that is invariant under
+reparameterization of~$\theta$. It is defined via the Fisher information:
+\begin{equation}
+  \pi(\theta) \;\propto\; \sqrt{\det\, I(\theta)}\,,
+\end{equation}
+where $I(\theta)$ is the Fisher information matrix
+\begin{equation}
+  I(\theta)_{ij}
+  = -\mathbb{E}\!\left[
+      \frac{\partial^2 \log p(x \mid \theta)}
+           {\partial \theta_i \,\partial \theta_j}
+    \right].
+\end{equation}
+
+\subsection{Why reparameterization invariance matters}
+
+A flat prior $\pi(\theta) \propto 1$ is \emph{not} invariant: flat in $\sigma$
+is not flat in $\sigma^2$ or $\log\sigma$, so the choice of parameterization
+implicitly encodes a preference. The Jeffreys prior avoids this by transforming
+correctly under any change of variables $\theta \to \phi(\theta)$.
+
+\subsection{Common cases}
+
+\paragraph{Location parameter} (e.g., mean $\mu$ of a Gaussian with known variance):
+\begin{equation}
+  I(\mu) = 1/\sigma^2 = \text{const}
+  \quad\implies\quad
+  \pi(\mu) \propto 1.
+\end{equation}
+Flat---matches the usual intuition for a location parameter.
+
+\paragraph{Scale parameter} (e.g., $\sigma$ of a Gaussian with known mean):
+\begin{equation}
+  I(\sigma) \propto 1/\sigma^2
+  \quad\implies\quad
+  \pi(\sigma) \propto \frac{1}{\sigma}\,,
+  \qquad\text{equivalently}\quad
+  \pi(\sigma^2) \propto \frac{1}{\sigma^2}\,.
+\end{equation}
+This is a flat prior on $\log\sigma$---uniform across orders of magnitude.
+It assigns equal prior weight to the interval $\sigma \in [0.1,\, 1]$ as to
+$\sigma \in [1,\, 10]$, expressing maximal ignorance about the noise scale.
+
+% =============================================================================
+\section{Known Scale: Classical Framework}
+\label{sec:known}
+% =============================================================================
+
+When $\sigma$ is known, no Bayesian machinery is needed. Everything follows
+directly from the Gaussian likelihood.
+
+\subsection{Inlier test}
+\label{sec:known-inlier}
+
+The residual of a test point is Gaussian:
+$r_* \mid \sigma \sim \Normal(0,\, \sigma^2)$, so
+\begin{equation}
+  \boxed{\frac{r_*^2}{\sigma^2} \;\sim\; \chi^2_1\,.}
+\end{equation}
+Classify as outlier if $r_*^2 / \sigma^2 > \chi^2_{1,\,1-\alpha}$.
+
+For $d$-dimensional residuals with known covariance~$\Sigma$:
+\begin{equation}
+  \boxed{
+    \mathbf{r}_*^\top \Sigma^{-1} \mathbf{r}_*
+    \;\sim\; \chi^2_d\,.
+  }
+\end{equation}
+
+\subsection{Parameter uncertainty}
+\label{sec:known-param}
+
+The conditional distribution of the least-squares estimate is Gaussian:
+\begin{equation}
+  \boxed{
+    \hat\theta \mid \sigma
+    \;\sim\; \Normal\!\left(\theta,\; \sigma^2 (X^\top X)^{-1}\right).
+  }
+\end{equation}
+The covariance $\sigma^2 (X^\top X)^{-1}$ is exact---no estimation
+uncertainty inflates the tails. Individual confidence intervals use
+the standard normal quantile.
+
+\subsection{Propagation to derived quantities}
+\label{sec:known-prop}
+
+For a nonlinear function of the parameters
+$\mathbf{q} = g(\hat\theta)$ with Jacobian $G = \partial g / \partial \theta$:
+\begin{equation}
+  \boxed{
+    \mathbf{q} \mid \sigma
+    \;\sim\; \Normal\!\left(g(\theta),\;
+      \sigma^2\, G\, (X^\top X)^{-1} G^\top\right).
+  }
+\end{equation}
+The covariance is exact and does not depend on the sample size beyond
+what $(X^\top X)^{-1}$ already encodes.
+
+\subsection{Prediction-corrected inlier test}
+\label{sec:known-pred}
+
+The basic inlier test (Section~\ref{sec:known-inlier}) uses only the
+observation noise. But the residual $r_* = y_* - f(x_*; \hat\theta)$
+also depends on the estimated parameters, which are uncertain.
+The total prediction variance is
+\begin{equation}
+  \mathrm{Var}(r_*) = \sigma^2 \left(1 + G_*\, (X^\top X)^{-1} G_*^\top\right),
+\end{equation}
+where $G_* = \partial r_* / \partial \theta$. The corrected test is
+\begin{equation}
+  \boxed{
+    \frac{r_*^2}{\sigma^2(1 + G_*\, (X^\top X)^{-1} G_*^\top)}
+    \;\sim\; \chi^2_1\,.
+  }
+\end{equation}
+
+% =============================================================================
+\section{Unknown Scale: Bayesian Framework}
+\label{sec:unknown}
+% =============================================================================
+
+When $\sigma$ is unknown, we place the Jeffreys prior
+$\pi(\sigma^2) \propto 1/\sigma^2$ (Section~\ref{sec:jeffreys}) and
+marginalize. This produces Student's~$t$ distributions and $F$ test
+statistics that automatically account for scale uncertainty.
+
+\subsection{Posterior for $\sigma^2$}
+
+The posterior is
+\begin{equation}
+  p(\sigma^2 \mid \data)
+  \propto (\sigma^2)^{-\nu/2} \exp\!\left(-\frac{\nu s^2}{2\sigma^2}\right)
+  \cdot \frac{1}{\sigma^2},
+\end{equation}
+where $s^2 = \mathrm{RSS}/\nu$. This gives
+\begin{equation}
+  \sigma^2 \mid \data \;\sim\; \InvGamma\!\left(\frac{\nu}{2},\; \frac{\nu s^2}{2}\right).
+\end{equation}
+
+\subsection{Predictive distribution}
+
+To test whether a new point is an inlier, we need the predictive distribution
+of its residual $r_*$, marginalizing over the unknown~$\sigma^2$:
+\begin{equation}
+  p(r_* \mid \data)
+  = \int_0^\infty
+    \underbrace{\Normal(r_*;\, 0,\, \sigma^2)}_{\text{likelihood}}
+    \;\underbrace{p(\sigma^2 \mid \data)}_{\InvGamma}
+    \; d\sigma^2.
+\end{equation}
+
+Combining the Gaussian and Inverse-Gamma kernels:
+\begin{equation}
+  p(r_* \mid \data)
+  \propto \int_0^\infty
+    (\sigma^2)^{-(\nu+1)/2 - 1}
+    \exp\!\left(-\frac{\nu s^2 + r_*^2}{2\sigma^2}\right)
+    d\sigma^2.
+\end{equation}
+
+Recognizing the integral as a Gamma function in $1/\sigma^2$:
+\begin{equation}
+  p(r_* \mid \data)
+  \propto \left(1 + \frac{r_*^2}{\nu s^2}\right)^{-(\nu+1)/2}.
+\end{equation}
+The predictive density is
+\begin{equation}
+  \boxed{\frac{r_*}{s} \;\sim\; t_\nu\,,}
+\end{equation}
+a Student's $t$ distribution with $\nu$ degrees of freedom and scale $s$.
+
+\subsection{Inlier test}
+\label{sec:unknown-inlier}
+
+\paragraph{Scalar residuals ($d = 1$).}
+The squared test statistic follows an $F$ distribution:
+\begin{equation}
+  \boxed{\frac{r_*^2}{s^2} \;\sim\; F(1, \nu)\,.}
+\end{equation}
+Classify as outlier if
+$r_*^2 / s^2 > F_{1,\nu}^{-1}(1 - \alpha)$,
+where $\alpha$ is the desired Type~I error rate (e.g., $\alpha = 0.01$).
+
+\paragraph{$d$-dimensional residuals.}
+For vector residuals $\mathbf{r}_* \in \mathbb{R}^d$ (e.g., 2D reprojection error)
+with estimated covariance $\hat\Sigma$:
+\begin{equation}
+  \boxed{
+    \frac{\mathbf{r}_*^\top \hat\Sigma^{-1} \mathbf{r}_*}{d}
+    \;\sim\; F(d, \nu)\,.
+  }
+\end{equation}
+
+\subsection{Parameter uncertainty}
+\label{sec:unknown-param}
+
+The same marginalization applies to the model parameter posterior.
+With Gaussian likelihood and the Jeffreys prior on $\sigma^2$:
+\begin{align}
+  p(\theta \mid \sigma^2, \data)
+    &= \Normal\!\left(\hat\theta,\; \sigma^2 (X^\top X)^{-1}\right), \\[4pt]
+  p(\theta \mid \data)
+    &= \int_0^\infty p(\theta \mid \sigma^2, \data)\;
+       p(\sigma^2 \mid \data)\; d\sigma^2.
+\end{align}
+
+The result is a multivariate Student's $t$:
+\begin{equation}
+  \boxed{\theta \mid \data \;\sim\;
+    t_\nu\!\left(\hat\theta,\; s^2 (X^\top X)^{-1}\right).}
+\end{equation}
+Same point estimate as least squares, same covariance shape,
+but heavier tails that account for not knowing $\sigma$.
+
+\subsection{Propagation to derived quantities}
+\label{sec:unknown-prop}
+
+For a nonlinear function of the parameters
+$\mathbf{q} = g(\hat\theta)$ with Jacobian $G = \partial g / \partial \theta$:
+\begin{equation}
+  \boxed{
+    \mathbf{q} \mid \data \;\sim\;
+    t_\nu\!\left(g(\hat\theta),\;
+      s^2\, G\, (X^\top X)^{-1} G^\top\right).
+  }
+\end{equation}
+The scale uncertainty propagates automatically through the heavier tails of
+the $t_\nu$ distribution.
+
+\subsection{Prediction-corrected inlier test}
+\label{sec:unknown-pred}
+
+As in the known-$\sigma$ case (Section~\ref{sec:known-pred}), the
+total prediction variance includes both observation noise and parameter
+uncertainty:
+\begin{equation}
+  v_* = s^2 \left(1 + G_*\, (X^\top X)^{-1} G_*^\top\right).
+\end{equation}
+The corrected test replaces $\chi^2$ with $F$:
+\begin{equation}
+  \boxed{
+    \frac{r_*^2}{v_*} \;\sim\; F(1,\, \nu)\,.
+  }
+\end{equation}
+
+The application of these tests within RANSAC, where the inlier set
+itself must be determined, is addressed in Section~\ref{sec:ransac}.
+
+% =============================================================================
+\section{Asymptotic Equivalence}
+\label{sec:asymptotic}
+% =============================================================================
+
+As the number of fitting points grows ($\nu \to \infty$), three things
+converge simultaneously:
+\begin{enumerate}
+\item The scale estimate concentrates: $s^2 \to \sigma^2$ almost surely
+  (by the law of large numbers applied to $\chi^2_\nu / \nu$).
+\item The Inverse-Gamma posterior concentrates:
+  $\InvGamma(\nu/2,\, \nu s^2/2) \to \delta(\sigma^2)$,
+  collapsing to a point mass.
+\item The $F$ distribution converges: $F(d, \nu) \to \chi^2_d / d$,
+  since the denominator $s^2/\sigma^2 \to 1$.
+\end{enumerate}
+Therefore the unknown-$\sigma$ framework recovers the known-$\sigma$
+$\chi^2$ framework in the large-sample limit:
+\begin{itemize}
+  \item $t_\nu(\hat\theta, s^2 C) \to \Normal(\theta, \sigma^2 C)$,
+  \item $F(d, \nu) \to \chi^2_d / d$,
+  \item $s^2 \to \sigma^2$.
+\end{itemize}
+
+Table~\ref{tab:thresholds} shows the convergence of inlier thresholds
+at $\alpha = 0.01$ for $d = 1$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+  \toprule
+  & Known $\sigma$: $\;\chi^2_1$ threshold & Unknown $\sigma$: $\;F(1,\nu)$ threshold \\
+  \midrule
+  $\nu = 5$   & 6.63 & 16.26 \\
+  $\nu = 10$  & 6.63 & 10.04 \\
+  $\nu = 20$  & 6.63 & 8.10 \\
+  $\nu = 50$  & 6.63 & 7.17 \\
+  $\nu = 100$ & 6.63 & 6.90 \\
+  $\nu \to \infty$ & 6.63 & $\to$ 6.63 \\
+  \bottomrule
+\end{tabular}
+\caption{Convergence of inlier thresholds ($\alpha = 0.01$, $d = 1$).
+  The $F$ threshold approaches the $\chi^2$ threshold as $\nu \to \infty$.}
+\label{tab:thresholds}
+\end{table}
+
+\noindent The correction is largest when $\nu$ is small---exactly when
+scale uncertainty is greatest.  At $\nu = 5$, the $F$ threshold is
+$2.5\times$ the $\chi^2$ threshold; by $\nu = 100$ the gap is under~$5\%$.
+
+% =============================================================================
+\section{Extension to Per-Point Covariances}
+\label{sec:heteroscedastic}
+% =============================================================================
+
+In practice (e.g., computer vision), each measurement $\mathbf{x}_i$
+has a covariance that varies across points. We consider two cases:
+(A)~covariance shapes are known but a global scale is unknown, and
+(B)~the full covariances are known.
+
+\subsection{Known covariance shapes, unknown global scale}
+\label{sec:het-unknown}
+
+Each measurement has covariance
+\begin{equation}
+  \mathrm{Cov}(\mathbf{x}_i) = \sigma^2 \Sigma_i\,,
+\end{equation}
+where $\Sigma_i$ is known (e.g., from the feature detector) and
+$\sigma^2$ is an unknown global scale factor.
+
+\subsubsection{Weighted cost and scale estimate}
+
+The residuals $\mathbf{r}_i \in \mathbb{R}^d$ have likelihood
+$\mathbf{r}_i \mid \theta, \sigma^2 \sim \Normal(\mathbf{0},\, \sigma^2 \Sigma_i)$,
+giving the Mahalanobis cost
+\begin{equation}
+  S = \sum_{i=1}^{n} \mathbf{r}_i^\top \Sigma_i^{-1}\, \mathbf{r}_i\,.
+\end{equation}
+Under the true model, $S / \sigma^2 \sim \chi^2_\nu$ with
+$\nu = dn - p$ ($d$ residual dimensions per point, $p$~model parameters).
+The scale estimate is
+\begin{equation}
+  s^2 = \frac{S}{\nu}\,.
+\end{equation}
+
+\subsubsection{Posterior for $\sigma^2$}
+
+The joint likelihood is
+\begin{equation}
+  p(\mathbf{r}_1, \ldots, \mathbf{r}_n \mid \theta, \sigma^2)
+  \propto (\sigma^2)^{-dn/2}
+  \exp\!\left(-\frac{S}{2\sigma^2}\right).
+\end{equation}
+With the Jeffreys prior $\pi(\sigma^2) \propto 1/\sigma^2$:
+\begin{equation}
+  \sigma^2 \mid \data \;\sim\;
+  \InvGamma\!\left(\frac{\nu}{2},\; \frac{\nu s^2}{2}\right),
+\end{equation}
+identical in form to the isotropic case.
+
+\subsubsection{Inlier test}
+
+For a test point with covariance shape $\Sigma_*$, the Mahalanobis
+distance $\mathbf{r}_*^\top \Sigma_*^{-1} \mathbf{r}_* / \sigma^2 \sim \chi^2_d$.
+After marginalizing over~$\sigma^2$:
+\begin{equation}
+  \boxed{
+    \frac{\mathbf{r}_*^\top \Sigma_*^{-1}\, \mathbf{r}_*}{d \cdot s^2}
+    \;\sim\; F(d,\, \nu).
+  }
+\end{equation}
+Each point is tested against its own error ellipse $\Sigma_*$---an isotropic
+point and a highly elongated point receive different thresholds in pixel space,
+but the same $F(d, \nu)$ threshold in Mahalanobis space.
+
+\subsubsection{Parameter uncertainty}
+
+Define the block-diagonal weight matrix
+$W = \mathrm{blockdiag}(\Sigma_1^{-1}, \ldots, \Sigma_n^{-1})$
+and the Jacobian $J = \partial \mathbf{r} / \partial \theta$.
+Weighted least squares gives
+$\hat\theta \mid \sigma^2 \sim
+\Normal(\theta,\, \sigma^2 (J^\top W J)^{-1})$.
+Marginalizing over $\sigma^2$:
+\begin{equation}
+  \boxed{
+    \hat\theta \mid \data \;\sim\;
+    t_\nu\!\left(\hat\theta,\; s^2 (J^\top W J)^{-1}\right).
+  }
+\end{equation}
+
+\subsubsection{Propagation to derived quantities}
+
+For $\mathbf{q} = g(\hat\theta)$ with Jacobian $G = \partial g / \partial \theta$:
+\begin{equation}
+  \boxed{
+    \mathbf{q} \mid \data \;\sim\;
+    t_\nu\!\left(g(\hat\theta),\;
+      s^2\, G\, (J^\top W J)^{-1} G^\top\right).
+  }
+\end{equation}
+As $\nu \to \infty$, $s^2 \to \sigma^2$ and $t_\nu \to \Normal$,
+recovering the known-scale result.
+
+\subsection{Fully known per-point covariances}
+\label{sec:het-known}
+
+When the full covariances are known---no unknown global scale:
+\begin{equation}
+  \mathrm{Cov}(\mathbf{x}_i) = \Sigma_i\,.
+\end{equation}
+
+\subsubsection{Weighted cost}
+
+The Mahalanobis cost is the same:
+\begin{equation}
+  S = \sum_{i=1}^{n} \mathbf{r}_i^\top \Sigma_i^{-1}\, \mathbf{r}_i\,,
+\end{equation}
+but now $S \sim \chi^2_\nu$ directly (no unknown $\sigma^2$).
+There is no $s^2$ to compute---$S$ is only used as a goodness-of-fit
+diagnostic.
+
+\subsubsection{Inlier test}
+
+For a test point with known covariance $\Sigma_*$:
+\begin{equation}
+  \boxed{
+    \mathbf{r}_*^\top \Sigma_*^{-1}\, \mathbf{r}_*
+    \;\sim\; \chi^2_d\,.
+  }
+\end{equation}
+No $F$ distribution---no scale uncertainty to absorb.
+
+\subsubsection{Parameter uncertainty}
+
+With $W = \mathrm{blockdiag}(\Sigma_1^{-1}, \ldots, \Sigma_n^{-1})$ and
+$J = \partial \mathbf{r} / \partial \theta$:
+\begin{equation}
+  \boxed{
+    \hat\theta \;\sim\; \Normal\!\left(\theta,\; (J^\top W J)^{-1}\right).
+  }
+\end{equation}
+Note the absence of any scale factor: the weight matrix $W$ already
+carries the correct units, and $(J^\top W J)^{-1}$ is the exact
+parameter covariance. Compare with Section~\ref{sec:het-unknown}
+where $\sigma^2$ must be estimated and produces the additional
+factor $s^2$ and $t_\nu$ tails.
+
+\subsubsection{Propagation to derived quantities}
+
+For $\mathbf{q} = g(\hat\theta)$:
+\begin{equation}
+  \boxed{
+    \mathbf{q} \;\sim\; \Normal\!\left(g(\theta),\;
+      G\, (J^\top W J)^{-1} G^\top\right).
+  }
+\end{equation}
+
+\subsubsection{Prediction-corrected inlier test}
+
+The prediction variance for a test point with covariance $\Sigma_*$ is
+\begin{equation}
+  V_* = \Sigma_* + J_*\, (J^\top W J)^{-1} J_*^\top\,,
+\end{equation}
+where $J_* = \partial \mathbf{r}_* / \partial \theta$.
+The corrected test is
+\begin{equation}
+  \boxed{
+    \mathbf{r}_*^\top V_*^{-1}\, \mathbf{r}_*
+    \;\sim\; \chi^2_d\,.
+  }
+\end{equation}
+
+\subsection{Summary: known shapes vs.\ fully known covariances}
+
+Table~\ref{tab:het-comparison} compares the two heteroscedastic cases.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+  \toprule
+  & Known shapes $\sigma^2\Sigma_i$ & Fully known $\Sigma_i$ \\
+  \midrule
+  Unknown & global scale $\sigma^2$ & nothing \\
+  Prior & $\pi(\sigma^2) \propto 1/\sigma^2$ & none needed \\
+  Scale estimate & $s^2 = S/\nu$ & --- \\
+  Param.\ covariance & $s^2(J^\top W J)^{-1}$ & $(J^\top W J)^{-1}$ \\
+  Param.\ distribution & $t_\nu$ & $\Normal$ \\
+  Inlier test & $F(d, \nu)$ & $\chi^2_d$ \\
+  Propagated cov. & $s^2\, G(J^\top W J)^{-1}G^\top$ & $G(J^\top W J)^{-1}G^\top$ \\
+  \bottomrule
+\end{tabular}
+\caption{Comparison of the two heteroscedastic frameworks.
+  The only structural difference is the presence or absence of the
+  unknown global scale~$\sigma^2$.}
+\label{tab:het-comparison}
+\end{table}
+
+\noindent When $\sigma^2$ is present, it must be estimated ($s^2$),
+which inflates the tails ($t_\nu$ instead of $\Normal$, $F$ instead of $\chi^2$).
+When absent, everything is Gaussian and exact.
+
+% =============================================================================
+\section{Uncertain Measurement Covariance}
+\label{sec:uncertain-R}
+% =============================================================================
+
+Sections~\ref{sec:known}--\ref{sec:heteroscedastic} treat the measurement
+covariance as either exactly known or known up to a scalar.  In practice,
+per-point covariances $\Sigma_i$ are themselves \emph{estimated} (e.g., from
+a feature detector or a previous calibration stage) and carry uncertainty.
+This section derives how that uncertainty propagates to the parameter
+covariance~$\boldsymbol{\Sigma}_{\hat\theta}$ and to downstream derived
+quantities.
+
+\subsection{Setup}
+
+Collect the per-point covariances into the full measurement covariance
+\begin{equation}
+  \mathbf{R}
+    = \mathrm{blockdiag}(\Sigma_1, \ldots, \Sigma_n)
+    \;\in\; \mathbb{R}^{dn \times dn},
+\end{equation}
+so that $W = \mathbf{R}^{-1}$ in the notation of
+Section~\ref{sec:heteroscedastic}.  The parameter covariance is
+\begin{equation}
+  \boldsymbol{\Sigma}_{\hat\theta}(\mathbf{R})
+    = \bigl(J^\top \mathbf{R}^{-1} J\bigr)^{-1},
+\end{equation}
+a nonlinear, matrix-valued function of~$\mathbf{R}$.
+
+Now suppose $\mathbf{R}$ is not known exactly but has a distribution
+with mean $\bar{\mathbf{R}}$ and covariance
+\begin{equation}
+  \boldsymbol{\Sigma}_{\!R}
+    = \Cov\!\bigl(\vect(\mathbf{R})\bigr)
+    \;\in\; \mathbb{R}^{(dn)^2 \times (dn)^2}.
+\end{equation}
+Since $\mathbf{R}$ is random,
+$\boldsymbol{\Sigma}_{\hat\theta}$ is a random matrix.  We want its
+distribution.
+
+\subsection{Jacobian via matrix calculus}
+
+We differentiate $\vect(\boldsymbol{\Sigma}_{\hat\theta})$ with respect to
+$\vect(\mathbf{R})$ by chaining three standard matrix differentials.
+
+\paragraph{Step 1: $\mathbf{R} \to \mathbf{R}^{-1}$.}
+\begin{equation}
+  \frac{\partial\,\vect(\mathbf{R}^{-1})}
+       {\partial\,\vect(\mathbf{R})}
+    = -\bigl(\mathbf{R}^{-1} \otimes \mathbf{R}^{-1}\bigr).
+\end{equation}
+
+\paragraph{Step 2: $\mathbf{R}^{-1} \to
+  \mathbf{M} = J^\top \mathbf{R}^{-1} J$.}
+Using $\vect(\mathbf{A}\mathbf{X}\mathbf{B})
+= (\mathbf{B}^\top \!\otimes \mathbf{A})\,\vect(\mathbf{X})$:
+\begin{equation}
+  \frac{\partial\,\vect(\mathbf{M})}
+       {\partial\,\vect(\mathbf{R}^{-1})}
+    = J^\top \!\otimes\, J^\top.
+\end{equation}
+
+\paragraph{Step 3: $\mathbf{M} \to
+  \mathbf{M}^{-1} = \boldsymbol{\Sigma}_{\hat\theta}$.}
+\begin{equation}
+  \frac{\partial\,\vect(\mathbf{M}^{-1})}
+       {\partial\,\vect(\mathbf{M})}
+    = -\bigl(\boldsymbol{\Sigma}_{\hat\theta}
+        \otimes \boldsymbol{\Sigma}_{\hat\theta}\bigr).
+\end{equation}
+
+\paragraph{Chain rule.}
+Multiplying steps 3, 2, 1 and using the mixed-product property
+$(\mathbf{A}\!\otimes\!\mathbf{B})(\mathbf{C}\!\otimes\!\mathbf{D})
+= (\mathbf{A}\mathbf{C})\!\otimes\!(\mathbf{B}\mathbf{D})$:
+\begin{align}
+  \mathbf{G}
+    &= \frac{\partial\,\vect(\boldsymbol{\Sigma}_{\hat\theta})}
+            {\partial\,\vect(\mathbf{R})} \notag\\[4pt]
+    &= \bigl(-\boldsymbol{\Sigma}_{\hat\theta}
+        \otimes \boldsymbol{\Sigma}_{\hat\theta}\bigr)
+       \bigl(J^\top \!\otimes\, J^\top\bigr)
+       \bigl(-\mathbf{R}^{-1} \otimes \mathbf{R}^{-1}\bigr)
+       \notag\\[4pt]
+    &= \bigl(\boldsymbol{\Sigma}_{\hat\theta} J^\top
+       \mathbf{R}^{-1}\bigr)
+       \;\otimes\;
+       \bigl(\boldsymbol{\Sigma}_{\hat\theta} J^\top
+       \mathbf{R}^{-1}\bigr).
+\end{align}
+Define the \textbf{gain matrix}
+\begin{equation}
+  K
+    = \boldsymbol{\Sigma}_{\hat\theta}\,J^\top \mathbf{R}^{-1}
+    = \bigl(J^\top \mathbf{R}^{-1} J\bigr)^{-1}
+      J^\top \mathbf{R}^{-1},
+\end{equation}
+so that
+\begin{equation}
+  \boxed{\mathbf{G} = K \otimes K\,.}
+\end{equation}
+This $K$ is the Gauss--Markov gain (the weighted pseudo-inverse of~$J$).
+
+\subsection{Distribution of the parameter covariance}
+
+By the delta method:
+\begin{equation}
+  \boxed{
+  \begin{aligned}
+    \mathbb{E}\!\bigl[\vect(\boldsymbol{\Sigma}_{\hat\theta})\bigr]
+      &\approx \vect\!\bigl(\boldsymbol{\Sigma}_{\hat\theta}
+        (\bar{\mathbf{R}})\bigr), \\[6pt]
+    \Cov\!\bigl(\vect(\boldsymbol{\Sigma}_{\hat\theta})\bigr)
+      &\approx (K \otimes K)\;
+        \boldsymbol{\Sigma}_{\!R}\;
+        (K^\top \!\otimes\, K^\top).
+  \end{aligned}
+  }
+\end{equation}
+This tells us:
+\begin{itemize}
+  \item The expected parameter covariance is the plug-in value at
+    $\bar{\mathbf{R}}$.
+  \item Each entry $[\boldsymbol{\Sigma}_{\hat\theta}]_{ij}$ has a
+    variance (how uncertain that covariance entry is).
+  \item The gain $K$ determines how strongly measurement-covariance
+    uncertainty maps into parameter-covariance uncertainty.
+\end{itemize}
+
+\subsection{Scalar noise special case}
+
+If $\mathbf{R} = \sigma^2 \mathbf{I}$ with $\sigma^2 \sim
+(\bar\sigma^2,\, \Var(\sigma^2))$, then
+$\boldsymbol{\Sigma}_{\hat\theta} = \sigma^2 (J^\top J)^{-1}$
+is linear in~$\sigma^2$, so the propagation is exact:
+\begin{equation}
+  K = (J^\top J)^{-1} J^\top,
+  \qquad
+  \boldsymbol{\Sigma}_{\!R} = \vect(\mathbf{I})\,
+    \vect(\mathbf{I})^\top\, \Var(\sigma^2).
+\end{equation}
+Therefore
+\begin{equation}
+  \Cov\!\bigl(\vect(\boldsymbol{\Sigma}_{\hat\theta})\bigr)
+    = \vect\!\bigl((J^\top J)^{-1}\bigr)\,
+      \vect\!\bigl((J^\top J)^{-1}\bigr)^\top
+      \cdot \Var(\sigma^2).
+\end{equation}
+All entries of~$\boldsymbol{\Sigma}_{\hat\theta}$ are perfectly correlated
+(rank-1 structure), because they all scale with the single uncertain
+quantity~$\sigma^2$.
+
+\subsection{Propagation through a downstream function}
+
+If the estimated parameters are propagated through a nonlinear function
+$\mathbf{q} = g(\hat\theta)$ with Jacobian
+$G = \partial g / \partial \theta$, the covariance of $\mathbf{q}$
+at fixed~$\mathbf{R}$ is
+\begin{equation}
+  \boldsymbol{\Sigma}_q(\mathbf{R})
+    = G\,\boldsymbol{\Sigma}_{\hat\theta}(\mathbf{R})\, G^\top.
+\end{equation}
+Vectorizing and applying the chain rule:
+\begin{equation}
+  \frac{\partial\,\vect(\boldsymbol{\Sigma}_q)}
+       {\partial\,\vect(\mathbf{R})}
+    = (G \otimes G)(K \otimes K)
+    = (GK) \otimes (GK),
+\end{equation}
+so
+\begin{equation}
+  \boxed{
+    \Cov\!\bigl(\vect(\boldsymbol{\Sigma}_q)\bigr)
+      \approx
+      (GK \otimes GK)\;
+      \boldsymbol{\Sigma}_{\!R}\;
+      (K^\top G^\top \otimes K^\top G^\top).
+  }
+\end{equation}
+This gives the uncertainty in the covariance of any derived quantity
+(e.g., a triangulated 3D point, a reprojected coordinate) due to
+not knowing the measurement covariances exactly.
+
+% =============================================================================
+\section{Application to RANSAC}
+\label{sec:ransac}
+% =============================================================================
+
+The unknown-scale framework (Section~\ref{sec:unknown}) provides
+calibrated inlier tests and uncertainty quantification, but requires a
+clean inlier set to estimate~$s^2$.  This section addresses the
+practical problem of combining these tools with RANSAC, where the
+inlier set itself is the output.
+
+\subsection{The scale--inlier circular dependency}
+\label{sec:outlier-scale}
+
+The scale estimate $s^2 = \mathrm{RSS}/\nu$ and the inlier test
+$r_*^2/s^2 \sim F(1,\nu)$ create a \textbf{circular dependency}: computing
+$s^2$ requires knowing which points are inliers, but classifying inliers
+requires~$s^2$.  If outliers are included in the sum, their large residuals
+inflate $s^2$, widening the $F$ threshold and admitting further outliers.
+In the worst case, $s^2$ absorbs the outlier contamination entirely and the
+test loses all discriminative power.
+
+\subsection{Robust scale estimation}
+
+A robust alternative is the \emph{median absolute deviation} (MAD):
+\begin{equation}
+  \hat\sigma_{\mathrm{MAD}}
+    = 1.4826 \cdot \mathrm{median}\!\bigl(|r_i - \mathrm{median}(r_i)|\bigr),
+\end{equation}
+where the factor 1.4826 makes $\hat\sigma_{\mathrm{MAD}}$ consistent for
+the Gaussian.  The MAD has a breakdown point of 50\%: up to half the data
+can be outliers without corrupting the estimate.  However,
+$\hat\sigma_{\mathrm{MAD}}^2$ does \emph{not} follow a $\chi^2/\nu$
+distribution, so the $F$-test derivation no longer applies exactly.  In
+practice, the MAD is used as a plug-in scale for the $\chi^2$ test
+(treating $\sigma$ as known), accepting the loss of exact calibration.
+
+\subsection{Marginal likelihood scoring}
+\label{sec:marginal-likelihood}
+
+Rather than estimating $\sigma^2$ from a contaminated sample, we
+\emph{eliminate} it entirely by marginalizing against the Jeffreys prior,
+producing a $\sigma$-free model score.
+
+\subsubsection{Mixture model}
+
+Model the data as a mixture of inliers and outliers.  Given a candidate
+model $\theta$ and inlier set~$\mathcal{I}$ (with complement
+$\mathcal{O} = \{1, \ldots, N\} \setminus \mathcal{I}$):
+\begin{itemize}
+  \item \textbf{Inliers}: $r_i \mid \sigma \sim \Normal(0, \sigma^2)$
+    for $i \in \mathcal{I}$, with $n_I = |\mathcal{I}|$ inliers.
+  \item \textbf{Outliers}: $r_i \sim \mathrm{Uniform}[-a, a]$ for
+    $i \in \mathcal{O}$, with $n_O = |\mathcal{O}|$ outliers and
+    half-width~$a$ (e.g., the maximum plausible residual).
+\end{itemize}
+
+\subsubsection{Marginalizing the scale}
+
+The joint likelihood given $\theta$, $\mathcal{I}$, and $\sigma$ is
+\begin{equation}
+  p(\mathbf{r} \mid \theta, \mathcal{I}, \sigma)
+  = \prod_{i \in \mathcal{I}}
+    \frac{1}{\sqrt{2\pi}\,\sigma}
+    \exp\!\left(-\frac{r_i^2}{2\sigma^2}\right)
+  \;\cdot\; \prod_{i \in \mathcal{O}} \frac{1}{2a}\,.
+\end{equation}
+To remove the dependence on $\sigma$, integrate against the Jeffreys
+prior $\pi(\sigma^2) \propto 1/\sigma^2$:
+\begin{equation}
+  p(\mathbf{r} \mid \theta, \mathcal{I})
+  = \frac{1}{(2a)^{n_O}}
+    \cdot \frac{1}{(2\pi)^{n_I/2}}
+    \int_0^\infty
+      (\sigma^2)^{-n_I/2 - 1}
+      \exp\!\left(-\frac{\mathrm{RSS}_I}{2\sigma^2}\right)
+      d\sigma^2\,,
+\end{equation}
+where $\mathrm{RSS}_I = \sum_{i \in \mathcal{I}} r_i^2$.
+The integral is a standard Inverse-Gamma normalizing constant:
+\begin{equation}
+  \int_0^\infty
+    (\sigma^2)^{-n_I/2 - 1}
+    \exp\!\left(-\frac{\mathrm{RSS}_I}{2\sigma^2}\right)
+    d\sigma^2
+  = \Gamma\!\left(\frac{n_I}{2}\right)
+    \left(\frac{\mathrm{RSS}_I}{2}\right)^{\!-n_I/2}.
+\end{equation}
+Taking the logarithm and dropping additive constants that do not depend
+on $\theta$ or~$\mathcal{I}$:
+\begin{equation}
+  \boxed{
+    S(\theta, \mathcal{I})
+    = \log\Gamma\!\left(\frac{n_I}{2}\right)
+      - \frac{n_I}{2}\,\log \mathrm{RSS}_I
+      - n_O\, \log(2a)\,.
+  }
+\end{equation}
+The best model maximizes $S$ over $\theta$ and $\mathcal{I}$.
+
+\subsubsection{Interpretation}
+
+The three terms have clear roles:
+\begin{enumerate}
+  \item $\log\Gamma(n_I/2)$: \emph{Inlier reward}---grows super-linearly
+    with the number of inliers, encouraging larger consensus sets.
+  \item $-\frac{n_I}{2}\log\mathrm{RSS}_I$: \emph{Fit quality}---penalizes
+    large residuals among the inliers.  The implicit scale estimate is
+    $\hat\sigma^2 = \mathrm{RSS}_I / n_I$, the MLE for $\sigma^2$.
+  \item $-n_O\log(2a)$: \emph{Outlier penalty}---each outlier costs
+    $\log(2a)$.  This balances the inlier reward: adding a marginal
+    point to $\mathcal{I}$ is beneficial only if its residual is small
+    enough that the fit quality term improves more than the lost
+    outlier penalty.
+\end{enumerate}
+
+\noindent Note that $S$ is completely \emph{$\sigma$-free}---the scale
+has been integrated out analytically.  There is no threshold to tune,
+no nominal $\sigma$ to supply.  The score automatically finds the
+scale that best explains the data for each candidate model.
+
+\subsubsection{Large-sample approximation}
+
+Using Stirling's approximation $\log\Gamma(n/2) \approx
+\frac{n}{2}\log\frac{n}{2} - \frac{n}{2}$ for large~$n_I$:
+\begin{equation}
+  S \;\approx\; -\frac{n_I}{2}\,\log s_I^2
+    - \frac{n_I}{2}\,\log 2
+    - \frac{n_I}{2}
+    - n_O\, \log(2a)\,,
+\end{equation}
+where $s_I^2 = \mathrm{RSS}_I / n_I$.  The dominant terms are
+$-\frac{n_I}{2}\log s_I^2$ (favor small residual variance) and
+$-n_O\log(2a)$ (penalize outliers).
+
+\subsection{Algorithm}
+\label{sec:algorithm}
+
+The complete procedure has two phases: \emph{model selection} via
+marginal likelihood scoring, followed by \emph{refinement} using the
+prediction-corrected $F$-test (Section~\ref{sec:unknown-pred}).
+Phase~1 selects the model without any $\sigma$ or threshold
+parameter; Phase~2 produces the statistically calibrated inlier
+classification and uncertainty quantification.
+
+\medskip
+
+Algorithm~\ref{alg:score} computes the marginal likelihood score for a
+single candidate model by sweeping sorted residuals.
+
+\begin{algorithm}[ht]
+\caption{Marginal likelihood model score}
+\label{alg:score}
+\begin{algorithmic}[1]
+\Require residuals $r_1, \ldots, r_N$; model DOF $p$; outlier half-width $a$
+\Ensure best score $S^*$; optimal inlier count $k^*$
+\State Sort squared residuals: $r^2_{(1)} \le r^2_{(2)} \le \cdots \le r^2_{(N)}$
+\State $\mathrm{RSS} \gets 0$, \quad $S^* \gets -\infty$
+\For{$k = 1, \ldots, N$}
+  \State $\mathrm{RSS} \gets \mathrm{RSS} + r^2_{(k)}$
+  \If{$k \le p$} \textbf{continue} \Comment{need $k > p$ for a determined model}
+  \EndIf
+  \State $S \gets \log\Gamma(k/2) - \tfrac{k}{2}\log\mathrm{RSS} - (N-k)\log(2a)$
+  \If{$S > S^*$}
+    \State $S^* \gets S$, \quad $k^* \gets k$
+  \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg:ransac} gives the full RANSAC pipeline.  Phase~1 is
+a standard RANSAC loop with Algorithm~\ref{alg:score} replacing the
+fixed-threshold MSAC cost.  Phase~2 iterates the $F$-test until the
+inlier mask stabilizes.
+
+\begin{algorithm}[ht]
+\caption{RANSAC with marginal likelihood scoring and $F$-test refinement}
+\label{alg:ransac}
+\begin{algorithmic}[1]
+\Require points $\mathcal{P} = \{p_1, \ldots, p_N\}$; model solver
+  $\textsc{Solve}$; sample size $m$; outlier half-width $a$;
+  significance level $\alpha$; confidence $\eta$
+\Ensure model $\hat\theta$; inlier mask; parameter covariance
+  $s^2(J^\top\!W J)^{-1}$; DOF $\nu$
+\Statex
+\Statex \textbf{--- Phase 1: Model selection ---}
+\State $S_{\mathrm{best}} \gets -\infty$, \quad $T \gets T_{\max}$
+\For{$\mathrm{trial} = 1, \ldots, T$}
+  \State $\mathcal{S} \gets \textsc{RandomSample}(\mathcal{P},\, m)$
+  \State $\theta \gets \textsc{Solve}(\mathcal{S})$
+  \If{$\theta = \varnothing$} \textbf{continue}
+  \EndIf
+  \State Compute $r_i \gets \textsc{Residual}(\theta, p_i)$ for all $i$
+  \State $(S,\, k) \gets \textsc{MarginalScore}(r_1, \ldots, r_N;\; p,\, a)$
+    \Comment{Alg.~\ref{alg:score}}
+  \If{$S > S_{\mathrm{best}}$}
+    \State $S_{\mathrm{best}} \gets S$, \quad
+      $\theta_{\mathrm{best}} \gets \theta$, \quad
+      $k_{\mathrm{best}} \gets k$
+    \State $T \gets \min\!\bigl(T,\;
+      \lceil\log(1 - \eta) / \log(1 - (k/N)^m)\rceil\bigr)$
+      \Comment{adaptive trials}
+  \EndIf
+\EndFor
+\Statex
+\Statex \textbf{--- Phase 2: $F$-test iterative refinement ---}
+\State $\mathrm{mask} \gets$ indices of $k_{\mathrm{best}}$ smallest $|r_i|$
+  under $\theta_{\mathrm{best}}$
+\Repeat
+  \State $\hat\theta,\, s^2,\, \Sigma_\theta \gets
+    \textsc{WeightedLSQ}\!\bigl(\mathcal{P}[\mathrm{mask}]\bigr)$
+    \Comment{$\Sigma_\theta = (J^\top\!W J)^{-1}$}
+  \State $\nu \gets |\mathrm{mask}| - p$
+  \State $F_{\mathrm{crit}} \gets F_{1,\nu}^{-1}(1 - \alpha)$
+  \State $\mathrm{mask}_{\mathrm{new}} \gets \varnothing$
+  \For{$i = 1, \ldots, N$}
+    \State $r_i \gets \textsc{Residual}(\hat\theta, p_i)$
+    \State $G_i \gets \partial r_i / \partial \theta$
+      \Comment{Jacobian row for point $i$}
+    \State $v_i \gets s^2\!\left(\sigma_i^2
+      + G_i\, \Sigma_\theta\, G_i^\top\right)$
+      \Comment{prediction variance}
+    \If{$r_i^2 / v_i < F_{\mathrm{crit}}$}
+      \State $\mathrm{mask}_{\mathrm{new}} \gets
+        \mathrm{mask}_{\mathrm{new}} \cup \{i\}$
+    \EndIf
+  \EndFor
+  \State $\mathrm{mask} \gets \mathrm{mask}_{\mathrm{new}}$
+\Until{mask unchanged}
+\Statex
+\Statex \textbf{--- Output ---}
+\State $\hat\theta,\, s^2,\, \Sigma_\theta \gets
+  \textsc{WeightedLSQ}\!\bigl(\mathcal{P}[\mathrm{mask}]\bigr)$
+\State $\nu \gets |\mathrm{mask}| - p$
+\State \Return $\hat\theta$, mask, $s^2 \Sigma_\theta$, $\nu$
+  \Comment{$\hat\theta \sim t_\nu(\hat\theta,\, s^2 \Sigma_\theta)$}
+\end{algorithmic}
+\end{algorithm}
+
+\noindent \textbf{Complexity.}
+Phase~1 is $O(T \cdot N \log N)$: each trial sorts $N$ residuals for
+the marginal likelihood sweep.  Phase~2 is $O(L \cdot N)$ where $L$
+is the number of refinement iterations (typically 2--4).  The sort in
+Phase~1 dominates.
+
+\noindent \textbf{Convergence.}
+The Phase~2 iteration is guaranteed to terminate: the number of
+possible masks is finite, $s^2$ is a deterministic function of the
+mask, and each iteration either leaves the mask unchanged (termination)
+or produces a new mask.  Since the $F$-test is monotone in $v_i$, the
+iteration cannot cycle.
+
+\subsection{Connection to MLESAC and MSAC}
+\label{sec:mlesac-connection}
+
+The MLESAC algorithm~\cite{torr2000mlesac} uses a similar inlier/outlier
+mixture model but performs EM to estimate both $\sigma^2$ and the inlier
+ratio~$\gamma$.  The marginal likelihood score~$S$ achieves the same effect
+in closed form by marginalizing $\sigma^2$ rather than iterating.  Both
+approaches converge to the same optimum for large~$n_I$, since the
+marginal likelihood concentrates around the MLE
+$\hat\sigma^2 = \mathrm{RSS}_I / n_I$.
+
+Shekhovtsov~\cite{shekhovtsov2025scoring} provides a clarifying unified
+analysis of the Gaussian-Uniform (GaU) mixture model---Gaussian inlier
+\emph{ray density} $p_{\mathrm{in}}(r) \sim \Normal(0, \sigma^2)$ with
+uniform outlier density---showing that it underlies all commonly used
+scoring functions.  The \emph{profile likelihood} (maximizing over
+discrete inlier labels~$\mathbf{k}$) recovers
+MSAC~\cite{torr1998robust}, while the \emph{marginal likelihood}
+(summing over~$\mathbf{k}$) yields a smooth variant that differs only
+in replacing the hard $\max$ with a soft maximum.  Both are
+parameterized by a decision threshold~$\tau$ and keep $\sigma$ fixed.
+Our score~$S$ (Section~\ref{sec:marginal-likelihood}) marginalizes a
+different nuisance parameter---the scale~$\sigma^2$ itself---producing
+a threshold-free score, while the GaU framework trades one
+hyperparameter ($\sigma$) for another~($\tau$).
+
+\subsection{Comparison with MAGSAC}
+\label{sec:magsac-comparison}
+
+MAGSAC~\cite{barath2019magsac} and its successor
+MAGSAC++~\cite{barath2021magsac} also seek to eliminate the threshold
+parameter by marginalizing over~$\sigma$.  A comprehensive analysis by
+Shekhovtsov~\cite{shekhovtsov2025scoring} reveals that despite a
+derivation containing multiple errors, MAGSAC++ is numerically
+equivalent to the GaU marginal likelihood discussed in
+Section~\ref{sec:mlesac-connection}.  We summarize the key findings
+and contrast them with our approach.
+
+\paragraph{Ray density vs.\ residual distribution.}
+A subtle but critical point, clarified by
+Shekhovtsov~\cite{shekhovtsov2025scoring}, concerns the correct
+density for scoring.  When the observation noise is spherical in
+$\mathbb{R}^d$ with $d_g$ algebraic constraint equations, the true
+correspondence $\bar{x} \in \mathcal{M}_\theta$ is unknown and must
+be marginalized out.  The resulting \emph{ray density}---the marginal
+density along a ray orthogonal to the model manifold---is 1D Gaussian
+$p_{\mathrm{in}}(r) \sim \Normal(0, \sigma^2)$, regardless of the
+ambient dimension~$d$.  This follows because $d - 1$ dimensions are
+``absorbed'' by the unknown position on the manifold, leaving one
+effective dimension.
+
+MAGSAC~\cite{barath2019magsac,barath2021magsac} instead uses the
+$\chi_\nu$ distribution of the \emph{Euclidean distance}
+$\|x - \bar{x}\|$ from the observation to its true position,
+setting $\nu = 4$ for both relative pose and homography (where
+observations are point pairs in $\mathbb{R}^4$).
+The correct codimension is $d_g = 1$ for relative pose and $d_g = 2$
+for homography, giving ray densities $\chi_1$ (half-normal) and
+$\chi_2$ respectively---not $\chi_4$ in either case.
+Our framework uses the scalar signed residual
+$r_i \sim \Normal(0, \sigma^2)$, which coincides with the correct
+ray density for codimension-1 problems.
+
+\paragraph{Three errors that cancel.}
+Shekhovtsov~\cite{shekhovtsov2025scoring} traces the MAGSAC++
+derivation step by step and identifies three compounding errors:
+\begin{enumerate}
+  \item \emph{Wrong distribution}: inlier residuals are modeled as
+    $\chi_\nu$ with $\nu = 4$ (ambient dimension) instead of
+    $\chi_{d_g}$ (codimension).
+  \item \emph{Density treated as probability}: the inlier density
+    $p_{\mathrm{in}}(r;\, \sigma)$---which can exceed~1---is equated
+    with the posterior probability $P(\text{inlier} \mid r)$.
+  \item \emph{Arbitrary IRLS weights}: the scale-marginalized density
+    is plugged directly as IRLS weights, rather than deriving weights
+    from a loss function as in standard robust estimation.
+\end{enumerate}
+By a fortunate numerical coincidence, for $\nu = 4$ (the default in
+the OpenCV implementation) the scale-marginalized $\chi_4$ density
+closely approximates the posterior inlier probability of the GaU
+model.  Consequently, the MAGSAC++ IRLS scheme recovers the correct
+IRLS scheme of the GaU model, and the resulting scoring function is
+numerically indistinguishable from
+$\rho^{\mathrm{GaU}}(r) \propto \mathrm{smax}\bigl((\tau^2 -
+r^2)/(2\sigma^2),\; 0\bigr)$
+with $\sigma \approx 0.96\,\tau$.
+
+This equivalence holds only for $\nu = 4$; changing the ambient
+dimension, fixing the distribution error, or omitting the truncation
+would each produce a different and generally worse estimator.  The
+success of MAGSAC++ is, in this sense, a fortunate accident of the
+specific problems (homography and relative pose with point pairs in
+$\mathbb{R}^4$) on which it was developed and evaluated.
+
+\paragraph{What is actually marginalized.}
+Despite its name, MAGSAC is \emph{not} performing scale
+marginalization in any principled
+sense~\cite{shekhovtsov2025scoring}.  The end result is numerically
+the GaU model with Gaussian inlier density and a fixed
+threshold~$\tau$.  The parameter $\sigma_{\max}$ is effectively
+$\tau / \kappa$ where $\kappa$ is the 99th percentile of $\chi_\nu$,
+and functions as an alternative parameterization of the decision
+threshold, not a scale prior.
+
+Our score~$S$ (Section~\ref{sec:marginal-likelihood}) performs a
+genuine Bayesian marginalization over~$\sigma^2$ with the Jeffreys
+prior $\pi(\sigma^2) \propto 1/\sigma^2$, producing a score that is
+invariant under reparameterization of the scale and requires no
+threshold.  The only user parameter is the outlier half-width~$a$,
+which plays the role of the support of the uniform outlier density and
+has a transparent physical interpretation (maximum plausible residual).
+
+\paragraph{Summary.}
+Table~\ref{tab:scoring-comparison} contrasts the scoring approaches.
+All produce effective model-selection scores; the key distinction is
+that MSAC/GaU and MAGSAC++ are scoring-only methods, while our
+framework additionally provides the post-selection statistical
+inference developed in
+Sections~\ref{sec:known}--\ref{sec:uncertain-R}.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lccc}
+  \toprule
+  & MSAC / GaU & MAGSAC++ & Ours \\
+  \midrule
+  Inlier density $p_{\mathrm{in}}(r)$
+    & $\Normal(0, \sigma^2)$
+    & $\chi_\nu$ (claimed); ${\approx}\,\Normal$ (actual)
+    & $\Normal(0, \sigma^2)$ \\[2pt]
+  Scale treatment
+    & fixed $\sigma$
+    & ``marginalized'' ($\approx$ fixed)
+    & Jeffreys $\int\! d\sigma^2$ \\[2pt]
+  Free parameter
+    & threshold $\tau$
+    & $\sigma_{\max}$ ($\approx \tau/\kappa$)
+    & outlier half-width $a$ \\[2pt]
+  Closed form
+    & yes
+    & no (numerical)
+    & yes ($\Gamma$, $\log$) \\[2pt]
+  Calibrated inlier test
+    & no
+    & no
+    & $F(d,\nu)$ with prediction correction \\[2pt]
+  Parameter distribution
+    & ---
+    & ---
+    & $t_\nu(\hat\theta,\; s^2(J^\top\!WJ)^{-1})$ \\[2pt]
+  Covariance propagation
+    & ---
+    & ---
+    & yes (Sections~\ref{sec:unknown-prop},~\ref{sec:uncertain-R}) \\
+  \bottomrule
+\end{tabular}
+\caption{Comparison of scoring methods.  MSAC and GaU (its marginal
+  likelihood variant) are equivalent up to
+  smoothing~\cite{shekhovtsov2025scoring}; MAGSAC++ is numerically
+  equivalent to GaU for $\nu = 4$.  Our framework is the only one
+  that provides post-selection inference.}
+\label{tab:scoring-comparison}
+\end{table}
+
+\subsection{Scoring equivalence and post-selection inference}
+\label{sec:scoring-equivalence}
+
+Shekhovtsov~\cite{shekhovtsov2025scoring} conducts a rigorous
+experimental comparison of scoring functions on homography estimation
+(HPatches benchmark) and relative pose estimation (PhotoTourism),
+using both large validation sets and cross-validated small validation
+sets with dense threshold grids (200 values).  The central finding is
+striking: \emph{all scoring functions---MSAC, GaU, MAGSAC++, and even
+a learned score trained per-scene---perform identically when the
+threshold hyperparameter is properly tuned}.  Only vanilla RANSAC
+(inlier counting) is measurably worse.  The same holds for local
+optimization: EM, IRLS, and Levenberg--Marquardt refinement with any
+of these scores produce equivalent results.
+
+Prior claims of MAGSAC++'s superiority over MSAC were artifacts of
+insufficient evaluation methodology: comparing complete pipelines
+rather than scoring functions in isolation, using small validation
+sets, and employing inconsistent threshold parameterizations across
+methods~\cite{shekhovtsov2025scoring}.
+
+This finding has two important implications for the present work.
+
+\paragraph{The scoring function is not the bottleneck.}
+Since no scoring function outperforms another for model selection, the
+marginal likelihood score~$S$ in
+Section~\ref{sec:marginal-likelihood} offers a principled alternative
+(threshold-free, proper Bayesian evidence) but should not be expected
+to yield better \emph{model selection} than a well-tuned MSAC.  Any
+of the equivalent scoring functions can serve as Phase~1 in
+Algorithm~\ref{alg:ransac}.
+
+\paragraph{The value lies in post-selection inference.}
+Since all scoring functions are equivalent for choosing which model to
+keep, the discriminating factor must come \emph{after} model
+selection.  This is precisely what the framework of
+Sections~\ref{sec:known}--\ref{sec:uncertain-R} provides:
+\begin{itemize}
+  \item \textbf{Calibrated inlier tests}
+    (Sections~\ref{sec:unknown-inlier},~\ref{sec:unknown-pred}):
+    the $F(d,\nu)$ test with prediction correction produces correctly
+    calibrated Type~I error rates, even at small sample sizes where
+    $\chi^2$ tests are anti-conservative.
+  \item \textbf{Parameter uncertainty}
+    (Section~\ref{sec:unknown-param}): the Student's~$t_\nu$
+    distribution for~$\hat\theta$ provides honest confidence intervals
+    that account for estimating~$\sigma$ from data.
+  \item \textbf{Covariance propagation}
+    (Sections~\ref{sec:unknown-prop},~\ref{sec:uncertain-R}):
+    uncertainty flows systematically to derived quantities
+    (triangulated points, reprojected coordinates) and even accounts
+    for uncertainty in the measurement covariances themselves.
+  \item \textbf{Per-point covariance shapes}
+    (Section~\ref{sec:heteroscedastic}): heteroscedastic noise is
+    handled within the same Bayesian framework, not as an ad hoc
+    extension.
+\end{itemize}
+None of the scoring methods analyzed by
+Shekhovtsov~\cite{shekhovtsov2025scoring}---MSAC, MLESAC, MAGSAC++,
+GaU, or learned scores---provide any of these post-selection
+capabilities.  This positions the statistical framework of
+Sections~\ref{sec:known}--\ref{sec:uncertain-R} as complementary to
+the scoring literature: any of the equivalent scoring functions can be
+used for Phase~1 (model selection), while our framework governs
+Phase~2 (inference on the selected model).
+
+% =============================================================================
+\section{Worked Example: Line Fitting}
+\label{sec:line}
+% =============================================================================
+
+We derive the full covariance propagation for fitting a line to 2D points
+in two cases: (A)~ordinary regression with unknown isotropic noise, and
+(B)~orthogonal distance regression with known per-point covariance shapes
+but unknown global scale.
+
+\subsection{Case A: Ordinary regression ($y = \alpha + \beta x$)}
+
+\subsubsection{Setup}
+
+Given points $(x_i, y_i)$ for $i = 1, \ldots, n$, assume
+$y_i = \alpha + \beta x_i + \epsilon_i$ with $\epsilon_i \sim \Normal(0, \sigma^2)$
+and $\sigma$ unknown. The model has $p = 2$ parameters
+$\theta = (\alpha, \beta)^\top$ and $\nu = n - 2$ degrees of freedom.
+
+The design matrix and parameter estimate are
+\begin{equation}
+  X = \begin{pmatrix} 1 & x_1 \\ 1 & x_2 \\ \vdots & \vdots \\ 1 & x_n \end{pmatrix},
+  \qquad
+  \hat\theta = (X^\top X)^{-1} X^\top \mathbf{y}\,.
+\end{equation}
+
+\subsubsection{Explicit formulas}
+
+Define $\bar{x} = \frac{1}{n}\sum x_i$, $\bar{y} = \frac{1}{n}\sum y_i$,
+and $\mathrm{SS}_x = \sum_{i=1}^n (x_i - \bar{x})^2$. Then
+\begin{equation}
+  \hat\beta = \frac{\sum(x_i - \bar{x})(y_i - \bar{y})}{\mathrm{SS}_x}\,,
+  \qquad
+  \hat\alpha = \bar{y} - \hat\beta\, \bar{x}\,.
+\end{equation}
+
+The residual variance is
+\begin{equation}
+  s^2 = \frac{1}{n-2} \sum_{i=1}^n (y_i - \hat\alpha - \hat\beta\, x_i)^2.
+\end{equation}
+
+The normal equations matrix and its inverse are
+\begin{equation}
+  X^\top X
+  = \begin{pmatrix} n & n\bar{x} \\ n\bar{x} & \textstyle\sum x_i^2 \end{pmatrix},
+  \qquad
+  (X^\top X)^{-1}
+  = \frac{1}{n\, \mathrm{SS}_x}
+    \begin{pmatrix} \sum x_i^2 & -n\bar{x} \\ -n\bar{x} & n \end{pmatrix}.
+\end{equation}
+
+\subsubsection{Parameter uncertainty}
+
+Using the Student's $t$ framework (Section~\ref{sec:unknown-param}):
+\begin{equation}
+  \boxed{
+    \begin{pmatrix} \hat\alpha \\ \hat\beta \end{pmatrix}
+    \;\sim\; t_{n-2}\!\left(
+      \begin{pmatrix} \alpha \\ \beta \end{pmatrix},\;
+      s^2 (X^\top X)^{-1}
+    \right).
+  }
+\end{equation}
+
+Reading off the diagonal entries:
+\begin{align}
+  \mathrm{Var}(\hat\beta) &= \frac{s^2}{\mathrm{SS}_x}\,, \\[6pt]
+  \mathrm{Var}(\hat\alpha) &= s^2 \left(\frac{1}{n} + \frac{\bar{x}^2}{\mathrm{SS}_x}\right), \\[6pt]
+  \mathrm{Cov}(\hat\alpha, \hat\beta) &= -\frac{s^2\, \bar{x}}{\mathrm{SS}_x}\,.
+\end{align}
+
+Individual confidence intervals use the $t_{n-2}$ quantile:
+\begin{equation}
+  \hat\beta \;\pm\; t_{n-2,\,\alpha/2}\;\frac{s}{\sqrt{\mathrm{SS}_x}}\,.
+\end{equation}
+
+\subsubsection{Confidence band for predicted values}
+
+The predicted value at a new location $x_*$ is
+$\hat{y}_* = \hat\alpha + \hat\beta\, x_*$,
+which is the derived quantity $g(\theta) = (1,\; x_*)\, \theta$
+with Jacobian $G = (1,\; x_*)$. By the propagation formula:
+\begin{equation}
+  \mathrm{Var}(\hat{y}_*)
+  = G\, s^2 (X^\top X)^{-1} G^\top
+  = s^2 \left(\frac{1}{n} + \frac{(x_* - \bar{x})^2}{\mathrm{SS}_x}\right).
+\end{equation}
+
+The confidence interval for the line at $x_*$ is
+\begin{equation}
+  \boxed{
+    \hat{y}_* \;\pm\; t_{n-2,\,\alpha/2}\; s
+    \sqrt{\frac{1}{n} + \frac{(x_* - \bar{x})^2}{\mathrm{SS}_x}}\,.
+  }
+\end{equation}
+This is the classic ``bowtie'' confidence band: narrowest at $x_* = \bar{x}$
+and widening as $x_*$ moves away from the data centroid, reflecting increasing
+extrapolation uncertainty.
+
+\subsubsection{Prediction-corrected inlier test}
+
+The residual $r_* = y_* - \hat\alpha - \hat\beta\, x_*$
+depends on the estimated parameters $\hat\theta$, which are uncertain.
+The total prediction variance has two contributions:
+\begin{enumerate}
+\item \emph{Observation noise}: $\mathrm{Var}(\epsilon_*) = \sigma^2$.
+\item \emph{Parameter uncertainty}: the Jacobian
+  $G_* = \partial r_* / \partial \theta = (-1,\; -x_*)$ gives variance
+  $\sigma^2\, G_*\, (X^\top X)^{-1} G_*^\top$.
+\end{enumerate}
+Combining and replacing $\sigma^2$ by $s^2$:
+\begin{equation}
+  v_* = s^2 \left(1 + \frac{1}{n} + \frac{(x_* - \bar{x})^2}{\mathrm{SS}_x}\right),
+\end{equation}
+\begin{equation}
+  \boxed{
+    \frac{r_*^2}{v_*} \;\sim\; F(1,\, n-2).
+  }
+\end{equation}
+The correction $G_*\, (X^\top X)^{-1} G_*^\top$ is the \emph{leverage}
+of the test point. Near the data centroid it contributes only $1/n$;
+far from the centroid, it dominates.
+
+\subsection{Case B: Orthogonal distance with per-point covariance shapes}
+
+\subsubsection{Setup}
+
+Both coordinates of each point carry noise.
+Point $\mathbf{p}_i = (x_i, y_i)^\top$ has covariance
+$\sigma^2 \Sigma_i$ where $\Sigma_i$ is known and $\sigma^2$ is unknown.
+
+Parameterize the line by its unit normal and signed distance from the origin:
+\begin{equation}
+  \mathbf{n}^\top \mathbf{p} + d = 0\,,
+  \qquad
+  \mathbf{n} = (\cos\phi,\; \sin\phi)^\top,
+  \qquad
+  \theta = (\phi,\; d)^\top.
+\end{equation}
+The tangent direction is $\mathbf{t} = (-\sin\phi,\; \cos\phi)^\top$.
+
+\subsubsection{Scalar residual and its variance}
+
+The signed orthogonal distance from point $\mathbf{p}_i$ to the line is
+\begin{equation}
+  r_i = \mathbf{n}^\top \mathbf{p}_i + d\,.
+\end{equation}
+Since $r_i$ is a linear function of $\mathbf{p}_i$, its variance under
+$\mathrm{Cov}(\mathbf{p}_i) = \sigma^2 \Sigma_i$ is
+\begin{equation}
+  \mathrm{Var}(r_i) = \sigma^2\, \mathbf{n}^\top \Sigma_i\, \mathbf{n}
+  \;=:\; \sigma^2\, \sigma_i^2\,,
+\end{equation}
+where $\sigma_i^2 = \mathbf{n}^\top \Sigma_i\, \mathbf{n}$ is the
+\emph{projected variance} of the $i$-th point's covariance along the
+line normal.
+
+\subsubsection{Weighted cost and scale estimate}
+
+Each residual is scalar ($d = 1$), so the weighted Mahalanobis cost is
+\begin{equation}
+  S = \sum_{i=1}^n \frac{r_i^2}{\sigma_i^2}
+    = \sum_{i=1}^n \frac{(\mathbf{n}^\top \mathbf{p}_i + d)^2}
+                        {\mathbf{n}^\top \Sigma_i\, \mathbf{n}}\,,
+\end{equation}
+with $\nu = n - 2$ degrees of freedom. The scale estimate is
+$s^2 = S/(n - 2)$.
+
+\subsubsection{Jacobian of the residual}
+
+The Jacobian of $r_i$ with respect to $\theta = (\phi, d)$ is
+\begin{equation}
+  \frac{\partial r_i}{\partial \phi}
+  = \mathbf{t}^\top \mathbf{p}_i\,,
+  \qquad
+  \frac{\partial r_i}{\partial d} = 1\,,
+\end{equation}
+giving the $1 \times 2$ Jacobian row for point~$i$:
+\begin{equation}
+  J_i = \begin{pmatrix} \mathbf{t}^\top \mathbf{p}_i & 1 \end{pmatrix}.
+\end{equation}
+
+The weighted normal matrix is
+\begin{equation}
+  \boxed{
+    J^\top W J
+    = \sum_{i=1}^n \frac{1}{\sigma_i^2}\,
+      \begin{pmatrix}
+        (\mathbf{t}^\top \mathbf{p}_i)^2 & \mathbf{t}^\top \mathbf{p}_i \\
+        \mathbf{t}^\top \mathbf{p}_i & 1
+      \end{pmatrix},
+  }
+\end{equation}
+where $\sigma_i^2 = \mathbf{n}^\top \Sigma_i\, \mathbf{n}$.
+
+\subsubsection{Parameter uncertainty}
+
+By the general result (Section~\ref{sec:het-unknown}):
+\begin{equation}
+  \boxed{
+    \begin{pmatrix} \hat\phi \\ \hat{d} \end{pmatrix}
+    \;\sim\; t_{n-2}\!\left(
+      \begin{pmatrix} \phi \\ d \end{pmatrix},\;
+      s^2\, (J^\top W J)^{-1}
+    \right).
+  }
+\end{equation}
+
+\subsubsection{Confidence band: distance from a query point to the line}
+
+Let $\mathbf{q}$ be a query point. Its signed distance to the fitted line is
+$\delta = \mathbf{n}^\top \mathbf{q} + d$,
+with Jacobian
+$G = (\mathbf{t}^\top \mathbf{q},\; 1)$.
+The confidence interval is
+\begin{equation}
+  \boxed{
+    \delta \;\pm\; t_{n-2,\,\alpha/2}\;
+    s\, \sqrt{G\, (J^\top W J)^{-1} G^\top}\,.
+  }
+\end{equation}
+As in Case~A, this produces a bowtie-shaped confidence band that
+also reflects the anisotropic covariance structure of the measurements.
+
+\subsubsection{Inlier test}
+
+For a candidate inlier with covariance shape $\Sigma_*$,
+the projected variance is $\sigma_*^2 = \mathbf{n}^\top \Sigma_*\, \mathbf{n}$:
+\begin{equation}
+  \boxed{
+    \frac{r_*^2}{\sigma_*^2 \cdot s^2} \;\sim\; F(1,\, n-2).
+  }
+\end{equation}
+
+\subsubsection{Prediction-corrected inlier test}
+
+The residual $r_* = \mathbf{n}^\top \mathbf{p}_* + d$ depends on
+$\hat\theta = (\hat\phi, \hat{d})$, with Jacobian
+$G_* = (\mathbf{t}^\top \mathbf{p}_*,\; 1)$.
+The total prediction variance is
+\begin{equation}
+  v_* = s^2 \left(\sigma_*^2 + G_*\, (J^\top W J)^{-1} G_*^\top\right),
+\end{equation}
+and the test is
+\begin{equation}
+  \boxed{
+    \frac{r_*^2}{v_*} \;\sim\; F(1,\, n-2).
+  }
+\end{equation}
+
+The correction
+$G_*\, (J^\top W J)^{-1} G_*^\top$
+encodes how well the fitting data constrain the line at the
+location of the test point, producing the same bowtie-shaped
+acceptance region as in Case~A but modulated by the anisotropic
+covariance structure.
+
+\paragraph{Monte Carlo validation.}
+At $\alpha = 0.01$ with $n = 5$ fitting points ($\nu = 3$), the basic
+test falsely rejects ${\sim}5\%$ of true inliers---five
+times the nominal rate. The prediction-corrected test achieves the
+target $99\%$ inlier retention at all~$\nu$, at the cost of reduced
+outlier power when $\nu$ is small. Both tests converge as
+$\nu \to \infty$.
+
+\subsection{Summary: Case A vs.\ Case B}
+
+Table~\ref{tab:line-comparison} summarizes the two line fitting cases.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+  \toprule
+  & Case A (regression) & Case B (orthogonal, heteroscedastic) \\
+  \midrule
+  Parameters & $\theta = (\alpha, \beta)$ & $\theta = (\phi, d)$ \\
+  Residual & $r_i = y_i - \alpha - \beta x_i$ & $r_i = \mathbf{n}^\top \mathbf{p}_i + d$ \\
+  Weight & $w_i = 1$ & $w_i = 1/(\mathbf{n}^\top \Sigma_i\, \mathbf{n})$ \\
+  Normal matrix & $X^\top X$ & $\sum w_i\, J_i^\top J_i$ \\
+  DOF & $n - 2$ & $n - 2$ \\
+  Scale estimate & $s^2 = \frac{1}{n-2}\sum r_i^2$
+    & $s^2 = \frac{1}{n-2}\sum w_i\, r_i^2$ \\
+  Param.\ dist.\ & $t_{n-2}(\hat\theta,\, s^2(X^\top X)^{-1})$
+    & $t_{n-2}(\hat\theta,\, s^2(J^\top W J)^{-1})$ \\
+  Prediction var.\ $v_*$ & $s^2(1 + G_*(X^\top X)^{-1}G_*^\top)$
+    & $s^2(\sigma_*^2 + G_*(J^\top W J)^{-1}G_*^\top)$ \\
+  \bottomrule
+\end{tabular}
+\caption{Comparison of line fitting Cases A and B.  In both cases the
+  point estimate is identical to (weighted) least squares and the only
+  change is replacing $\Normal$ with $t_{n-2}$.}
+\label{tab:line-comparison}
+\end{table}
+
+\noindent In both cases: the covariance shape is identical to the plug-in
+Gaussian, and the heavier $t_{n-2}$ tails account for not knowing~$\sigma$.
+
+% =============================================================================
+% REFERENCES
+% =============================================================================
+
+\begin{thebibliography}{9}
+
+\bibitem{torr1998robust}
+P.~Torr and A.~Zisserman,
+``Robust computation and parametrization of multiple view relations,''
+in \emph{ICCV}, pp.~727--732, 1998.
+
+\bibitem{torr2000mlesac}
+P.~H.~S.~Torr,
+``Bayesian model estimation and selection for epipolar geometry and
+generic manifold fitting,''
+\emph{International Journal of Computer Vision}, 2002.
+
+\bibitem{barath2019magsac}
+D.~Barath, J.~Noskova, and J.~Matas,
+``MAGSAC: Marginalizing sample consensus,''
+in \emph{CVPR}, 2019.
+
+\bibitem{barath2021magsac}
+D.~Barath, J.~Noskova, and J.~Matas,
+``Marginalizing sample consensus,''
+\emph{IEEE Trans.\ Pattern Analysis and Machine Intelligence}, 2021.
+
+\bibitem{shekhovtsov2025scoring}
+A.~Shekhovtsov,
+``RANSAC scoring functions: Analysis and reality check,''
+Preprint, submitted to IJCV, December 2025.
+
+\end{thebibliography}
+
+\end{document}

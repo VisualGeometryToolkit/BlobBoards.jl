@@ -1,0 +1,32 @@
+# Config of record of scripts/make_occlusion_picks.jl: the bottom row of
+# fig:occexamples, one frame per marker system at one occlusion level.
+
+[experiment]
+generator = "occlusion_picks"
+dataset = "260527"
+level = "70"
+tiers = ["bb_absolute_pose_occlusion_70_260527"]
+
+[output]
+dir = "occ_setup/70"                     # under papers/images
+name = "compressed_{tag}_{frame}.png"
+
+[crop]
+# Keep the central 1/keep_fraction_inverse of each side (the marker panel),
+# then downscale by `downscale`: 4240x2832 -> 2120x1416 -> 1060x708. Recovered
+# 2026-10-08 by matching the submitted panels (NCC 0.93, SSIM 0.997).
+keep_fraction_inverse = 2
+downscale = 2
+
+# File-name tag => (image subset, frame)
+[picks.bb]
+subset = "bb"
+frame = "DSC04549"
+
+[picks.apr]
+subset = "apr"
+frame = "DSC04451"
+
+[picks.uco]
+subset = "uco"
+frame = "DSC04362"

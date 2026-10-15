@@ -1,0 +1,532 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+
+\geometry{margin=1in}
+
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\mat}[1]{\mathbf{#1}}
+\newcommand{\planar}[1]{\colorbox{yellow!30}{#1}}
+\newcommand{\highlight}[1]{\textcolor{blue}{\textbf{#1}}}
+
+\newtcolorbox{planarbox}{
+  colback=yellow!10,
+  colframe=orange!80!black,
+  title=\textbf{Planar Constraint},
+  fonttitle=\bfseries
+}
+
+\title{Planar EPnP: Exploiting Coplanarity in Perspective-n-Point}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Problem Setup}
+
+Given $n$ world points lying on a plane and their corresponding image observations, estimate the camera pose $(\mat{R}, \vect{t})$.
+
+\begin{itemize}
+    \item World points: $\vect{X}_i = (x_i, y_i, z_i)^\top$ for $i = 1, \ldots, n$
+    \item Calibrated camera with known intrinsics $\mat{K}$
+    \item Normalized image points: $\tilde{\vect{x}}_i = \mat{K}^{-1}\vect{u}_i = (\tilde{u}_i, \tilde{v}_i, 1)^\top$
+\end{itemize}
+
+\begin{planarbox}
+Without loss of generality, choose world coordinates such that all points lie on the $z=0$ plane:
+\[
+\vect{X}_i = (x_i, y_i, 0)^\top
+\]
+This is the first use of the planar constraint---it reduces each 3D point from 3 coordinates to 2.
+\end{planarbox}
+
+\section{Control Points and Barycentric Coordinates}
+
+The key insight of EPnP is to express all world points as weighted combinations of a small set of \emph{control points}.
+
+\begin{planarbox}
+For \highlight{general 3D points}, any point can be written as an affine combination of \highlight{4 control points} (since 4 points span $\mathbb{R}^3$ affinely).
+
+For \highlight{coplanar points}, we only need \highlight{3 control points} (since 3 points span a plane affinely).
+
+This reduces the number of unknowns from 12 to \textbf{9}.
+\end{planarbox}
+
+\subsection{Choice of Control Points}
+
+For the $z=0$ plane, a natural choice is:
+\begin{align}
+\vect{C}_1 &= (0, 0, 0)^\top \\
+\vect{C}_2 &= (1, 0, 0)^\top \\
+\vect{C}_3 &= (0, 1, 0)^\top
+\end{align}
+
+\subsection{Barycentric Coordinates}
+
+Each world point is expressed as:
+\[
+\vect{X}_i = \alpha_{i1}\vect{C}_1 + \alpha_{i2}\vect{C}_2 + \alpha_{i3}\vect{C}_3, \quad \text{where } \sum_{j=1}^{3} \alpha_{ij} = 1
+\]
+
+For our control points:
+\[
+\alpha_{i2} = x_i, \quad \alpha_{i3} = y_i, \quad \alpha_{i1} = 1 - x_i - y_i
+\]
+
+The $\alpha_{ij}$ are \emph{known} quantities computed from the world coordinates.
+
+\section{Projection Equations}
+
+Let $\vect{c}_j = (c_{jx}, c_{jy}, c_{jz})^\top$ denote control point $j$ in the \emph{camera frame}. These are our \textbf{9 unknowns}:
+\[
+\vect{x} = [c_{1x}, c_{1y}, c_{1z}, c_{2x}, c_{2y}, c_{2z}, c_{3x}, c_{3y}, c_{3z}]^\top \in \mathbb{R}^9
+\]
+
+A world point in the camera frame is:
+\[
+\vect{X}_i^c = \sum_{j=1}^{3} \alpha_{ij} \vect{c}_j
+\]
+
+The projection equations (with depth $\lambda_i > 0$):
+\begin{align}
+\lambda_i \tilde{u}_i &= \sum_{j=1}^{3} \alpha_{ij} c_{jx} \\
+\lambda_i \tilde{v}_i &= \sum_{j=1}^{3} \alpha_{ij} c_{jy} \\
+\lambda_i &= \sum_{j=1}^{3} \alpha_{ij} c_{jz}
+\end{align}
+
+Eliminating $\lambda_i$ by substituting the third equation into the first two:
+\begin{align}
+\sum_{j=1}^{3} \alpha_{ij} (c_{jx} - \tilde{u}_i c_{jz}) &= 0 \label{eq:proj1}\\
+\sum_{j=1}^{3} \alpha_{ij} (c_{jy} - \tilde{v}_i c_{jz}) &= 0 \label{eq:proj2}
+\end{align}
+
+\section{Linear System}
+
+Equations \eqref{eq:proj1}--\eqref{eq:proj2} are \emph{linear} in the unknowns $\vect{x}$. For point $i$, the two rows of the constraint matrix are:
+\begin{align*}
+&[\alpha_{i1}, 0, -\alpha_{i1}\tilde{u}_i, \; \alpha_{i2}, 0, -\alpha_{i2}\tilde{u}_i, \; \alpha_{i3}, 0, -\alpha_{i3}\tilde{u}_i] \\
+&[0, \alpha_{i1}, -\alpha_{i1}\tilde{v}_i, \; 0, \alpha_{i2}, -\alpha_{i2}\tilde{v}_i, \; 0, \alpha_{i3}, -\alpha_{i3}\tilde{v}_i]
+\end{align*}
+
+Stacking all $n$ points yields a $2n \times 9$ matrix $\mat{M}$:
+\[
+\mat{M}\vect{x} = \vect{0}
+\]
+
+\begin{planarbox}
+Compare matrix dimensions:
+\begin{itemize}
+    \item \textbf{General EPnP}: $2n \times 12$ matrix, up to 4D null space
+    \item \textbf{Planar EPnP}: $2n \times 9$ matrix, typically 1D null space
+\end{itemize}
+The planar constraint reduces both the number of unknowns and the complexity of the null space.
+\end{planarbox}
+
+\section{Null Space Solution}
+
+Compute the SVD of $\mat{M}$:
+\[
+\mat{M} = \mat{U}\mat{\Sigma}\mat{V}^\top
+\]
+
+With $n \geq 4$ points in general position, $\text{rank}(\mat{M}) = 8$, so the null space is 1-dimensional:
+\[
+\vect{x} = \beta \vect{v}_1
+\]
+where $\vect{v}_1$ is the right singular vector corresponding to the smallest singular value.
+
+\begin{planarbox}
+In general EPnP, the null space can have dimension up to 4, requiring solution of a system of polynomial equations in 4 unknowns $(\beta_1, \beta_2, \beta_3, \beta_4)$.
+
+In planar EPnP, the null space is typically 1D, so we only solve for a \textbf{single scalar} $\beta$.
+\end{planarbox}
+
+\section{Distance Constraints and Lifting}
+
+The Euclidean distances between control points must be preserved:
+\begin{align}
+\|\vect{c}_1 - \vect{c}_2\|^2 &= \|\vect{C}_1 - \vect{C}_2\|^2 = d_{12}^2 = 1 \\
+\|\vect{c}_1 - \vect{c}_3\|^2 &= \|\vect{C}_1 - \vect{C}_3\|^2 = d_{13}^2 = 1 \\
+\|\vect{c}_2 - \vect{c}_3\|^2 &= \|\vect{C}_2 - \vect{C}_3\|^2 = d_{23}^2 = 2
+\end{align}
+
+Let $\vect{v}_1^{(j)}$ denote the 3-vector corresponding to control point $j$ extracted from $\vect{v}_1$. Substituting $\vect{x} = \beta\vect{v}_1$:
+\begin{align}
+\beta^2 \|\vect{v}_1^{(1)} - \vect{v}_1^{(2)}\|^2 &= 1 \\
+\beta^2 \|\vect{v}_1^{(1)} - \vect{v}_1^{(3)}\|^2 &= 1 \\
+\beta^2 \|\vect{v}_1^{(2)} - \vect{v}_1^{(3)}\|^2 &= 2
+\end{align}
+
+\subsection{Linearization via Lifting}
+
+Introduce the \emph{lifted variable}:
+\[
+\gamma = \beta^2
+\]
+
+The distance constraints become \textbf{linear in $\gamma$}:
+\[
+\gamma \cdot \|\vect{v}_1^{(i)} - \vect{v}_1^{(j)}\|^2 = d_{ij}^2
+\]
+
+With 3 constraints and 1 unknown, solve by least squares (or verify consistency):
+\[
+\gamma = \frac{1}{3}\left( \frac{1}{\|\vect{v}_1^{(1)} - \vect{v}_1^{(2)}\|^2} + \frac{1}{\|\vect{v}_1^{(1)} - \vect{v}_1^{(3)}\|^2} + \frac{2}{\|\vect{v}_1^{(2)} - \vect{v}_1^{(3)}\|^2} \right)
+\]
+
+Then:
+\[
+\beta = \pm\sqrt{\gamma}
+\]
+
+\textbf{Sign disambiguation}: Choose the sign such that all control points have positive depth ($c_{jz} > 0$).
+
+\begin{planarbox}
+In general EPnP with a 4D null space, the lifted variables are $\{\beta_i\beta_j\}$ for $i \leq j$, giving 10 lifted unknowns. The resulting polynomial system is much more complex.
+
+In planar EPnP, we have \textbf{one lifted variable} $\gamma = \beta^2$ and 3 linear constraints---trivially solvable.
+\end{planarbox}
+
+\section{Pose Recovery}
+
+Once the control points in camera frame $\{\vect{c}_1, \vect{c}_2, \vect{c}_3\}$ are determined, recover $(\mat{R}, \vect{t})$ from:
+\[
+\vect{c}_j = \mat{R}\vect{C}_j + \vect{t}
+\]
+
+With $\vect{C}_1 = \vect{0}$:
+\[
+\vect{t} = \vect{c}_1
+\]
+
+The rotation aligns the world frame axes to camera frame:
+\begin{align}
+\vect{r}_1 &= \frac{\vect{c}_2 - \vect{c}_1}{\|\vect{c}_2 - \vect{c}_1\|} \\
+\vect{r}_2' &= \frac{\vect{c}_3 - \vect{c}_1}{\|\vect{c}_3 - \vect{c}_1\|} \\
+\vect{r}_3 &= \vect{r}_1 \times \vect{r}_2' \\
+\vect{r}_2 &= \vect{r}_3 \times \vect{r}_1 \quad \text{(orthogonalize)}\\
+\mat{R} &= [\vect{r}_1 \; \vect{r}_2 \; \vect{r}_3]
+\end{align}
+
+Alternatively, use SVD-based Procrustes on the 3 control point correspondences.
+
+\section{Summary: Where Planarity Helps}
+
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Aspect} & \textbf{General EPnP} & \textbf{Planar EPnP} \\
+\hline
+Control points & 4 & \planar{3} \\
+Unknowns & 12 & \planar{9} \\
+Matrix size & $2n \times 12$ & \planar{$2n \times 9$} \\
+Null space dim & 1--4 & \planar{1} \\
+Lifted variables & up to 10 & \planar{1} \\
+Polynomial degree & up to 4 & \planar{trivial (linear in $\beta^2$)} \\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{1em}
+
+\begin{planarbox}
+\textbf{Key insight}: The planar constraint reduces the affine span from $\mathbb{R}^3$ (4 control points) to a plane (3 control points). This cascades through the entire algorithm:
+\begin{enumerate}
+    \item Fewer control points $\Rightarrow$ fewer unknowns
+    \item Fewer unknowns $\Rightarrow$ smaller null space
+    \item Smaller null space $\Rightarrow$ simpler polynomial system
+    \item Simpler polynomials $\Rightarrow$ closed-form linear solution
+\end{enumerate}
+The result is an \textbf{algebraic least-squares} solution that is entirely linear after lifting.
+\end{planarbox}
+
+\section{Algorithm Summary}
+
+\begin{enumerate}
+    \item Compute barycentric coordinates $\alpha_{ij}$ for each point relative to 3 control points
+    \item Form the $2n \times 9$ matrix $\mat{M}$ from projection constraints
+    \item SVD of $\mat{M}$ $\rightarrow$ null space vector $\vect{v}_1$
+    \item Solve for $\gamma = \beta^2$ linearly from distance constraints
+    \item Recover $\beta = \pm\sqrt{\gamma}$ with sign from depth positivity
+    \item Extract control points: $\vect{c}_j = \beta \vect{v}_1^{(j)}$
+    \item Recover $\mat{R}, \vect{t}$ from control point correspondences
+\end{enumerate}
+
+\newpage
+\part*{IPPE: Infinitesimal Plane-based Pose Estimation}
+
+\section{Motivation}
+
+While planar EPnP works well, it has a fundamental limitation: it returns a \emph{single} pose estimate, but the planar PnP problem generically has \textbf{two valid solutions} due to a reflection ambiguity.
+
+IPPE (Collins \& Bartoli, ICCV 2014) is designed specifically for planar targets and:
+\begin{itemize}
+    \item Works directly with the homography (natural for planes)
+    \item Explicitly computes \textbf{both} valid poses
+    \item Minimizes a geometric error metric
+    \item Provides closed-form solutions via eigendecomposition
+\end{itemize}
+
+\section{Homography Setup}
+
+For points on the $z=0$ plane, the projection is:
+\[
+\vect{u} \sim \mat{K}[\vect{r}_1 \; \vect{r}_2 \; \vect{t}]
+\begin{bmatrix} X \\ Y \\ 1 \end{bmatrix}
+= \mat{H}
+\begin{bmatrix} X \\ Y \\ 1 \end{bmatrix}
+\]
+
+where the $3 \times 3$ homography is:
+\[
+\mat{H} = \mat{K}[\vect{r}_1 \; \vect{r}_2 \; \vect{t}]
+\]
+
+\begin{planarbox}
+The third column of $\mat{R}$ drops out because it multiplies $z = 0$. This is the fundamental simplification from planarity---the full 3D$\to$2D projection reduces to a 2D$\to$2D homography.
+\end{planarbox}
+
+\subsection{Normalized Homography}
+
+For a calibrated camera, define the \emph{normalized homography}:
+\[
+\bar{\mat{H}} = \mat{K}^{-1}\mat{H} = [\vect{r}_1 \; \vect{r}_2 \; \vect{t}] = [\bar{\vect{h}}_1 \; \bar{\vect{h}}_2 \; \bar{\vect{h}}_3]
+\]
+
+The columns $\bar{\vect{h}}_1, \bar{\vect{h}}_2$ should be the first two columns of a rotation matrix, satisfying:
+\begin{align}
+\|\bar{\vect{h}}_1\| &= 1 \label{eq:norm1}\\
+\|\bar{\vect{h}}_2\| &= 1 \label{eq:norm2}\\
+\bar{\vect{h}}_1^\top \bar{\vect{h}}_2 &= 0 \label{eq:ortho}
+\end{align}
+
+Due to noise, the estimated $\bar{\mat{H}}$ will not satisfy these exactly.
+
+\section{The Two-Solution Ambiguity}
+
+\begin{planarbox}
+A plane viewed from one side is projectively indistinguishable from a \emph{different} plane viewed from the other side. This creates a fundamental \textbf{two-fold ambiguity} in planar pose estimation.
+
+Given one valid pose $(\mat{R}_1, \vect{t}_1)$, there exists a second valid pose $(\mat{R}_2, \vect{t}_2)$ that produces the same image.
+\end{planarbox}
+
+Geometrically, the two solutions correspond to:
+\begin{enumerate}
+    \item The ``correct'' pose (plane in front of camera, normal pointing toward camera)
+    \item A ``flipped'' pose (virtual plane, related by reflection)
+\end{enumerate}
+
+EPnP returns only one solution and may choose the wrong one. IPPE computes both.
+
+\section{IPPE Derivation}
+
+\subsection{Objective Function}
+
+IPPE minimizes the \emph{object-space collinearity error}. For each point, the world point $\vect{X}_i$, its image $\vect{u}_i$, and the camera center must be collinear.
+
+Define the normalized image ray:
+\[
+\vect{m}_i = \frac{\mat{K}^{-1}\vect{u}_i}{\|\mat{K}^{-1}\vect{u}_i\|}
+\]
+
+The error for point $i$ is the distance from the transformed world point to the ray:
+\[
+e_i = \|(\mat{I} - \vect{m}_i\vect{m}_i^\top)(\mat{R}\vect{X}_i + \vect{t})\|^2
+\]
+
+\subsection{Simplification via Homography}
+
+Using $\vect{X}_i = (X_i, Y_i, 0)^\top$ and $\bar{\mat{H}} = [\vect{r}_1 \; \vect{r}_2 \; \vect{t}]$:
+\[
+\mat{R}\vect{X}_i + \vect{t} = X_i\vect{r}_1 + Y_i\vect{r}_2 + \vect{t} = \bar{\mat{H}}\tilde{\vect{X}}_i
+\]
+
+where $\tilde{\vect{X}}_i = (X_i, Y_i, 1)^\top$.
+
+The homography gives us:
+\[
+\vect{m}_i \propto \bar{\mat{H}}\tilde{\vect{X}}_i
+\]
+
+so:
+\[
+\vect{m}_i = \frac{\bar{\mat{H}}\tilde{\vect{X}}_i}{\|\bar{\mat{H}}\tilde{\vect{X}}_i\|}
+\]
+
+\subsection{Rotation Parameterization}
+
+Since $\vect{r}_1, \vect{r}_2$ must be orthonormal, we can write:
+\[
+\vect{r}_1 = \mat{U}\vect{a}, \quad \vect{r}_2 = \mat{U}\vect{b}
+\]
+
+where $\mat{U}$ is a $3 \times 2$ matrix with orthonormal columns spanning the same subspace as $[\bar{\vect{h}}_1 \; \bar{\vect{h}}_2]$, and $\vect{a}, \vect{b} \in \mathbb{R}^2$ are unit vectors with $\vect{a}^\top\vect{b} = 0$.
+
+\subsection{SVD of the Homography Columns}
+
+Compute the SVD of the first two columns:
+\[
+[\bar{\vect{h}}_1 \; \bar{\vect{h}}_2] = \mat{U}\mat{\Sigma}\mat{V}^\top
+\]
+
+where:
+\begin{itemize}
+    \item $\mat{U} \in \mathbb{R}^{3 \times 2}$ has orthonormal columns
+    \item $\mat{\Sigma} = \text{diag}(\sigma_1, \sigma_2)$ with $\sigma_1 \geq \sigma_2 > 0$
+    \item $\mat{V} \in \mathbb{R}^{2 \times 2}$ is orthogonal
+\end{itemize}
+
+\subsection{The Two Solutions}
+
+The key insight is that we seek $\vect{a}, \vect{b} \in \mathbb{R}^2$ such that:
+\[
+[\vect{r}_1 \; \vect{r}_2] = \mat{U}[\vect{a} \; \vect{b}]
+\]
+
+with $\|\vect{a}\| = \|\vect{b}\| = 1$ and $\vect{a}^\top\vect{b} = 0$.
+
+Define the matrix:
+\[
+\mat{J} = \mat{\Sigma}\mat{V}^\top =
+\begin{bmatrix}
+j_{11} & j_{12} \\
+j_{21} & j_{22}
+\end{bmatrix}
+\]
+
+IPPE shows that minimizing the reprojection error leads to finding $[\vect{a} \; \vect{b}]$ as a $2 \times 2$ rotation matrix $\mat{Q}$ such that:
+\[
+[\vect{a} \; \vect{b}] = \mat{Q}
+\]
+
+The optimal $\mat{Q}$ satisfies:
+\[
+\mat{Q}^\top \mat{J}^\top \mat{J} \mat{Q} = \text{diagonal}
+\]
+
+This is achieved by the eigenvector matrix of $\mat{J}^\top\mat{J}$.
+
+\subsection{Closed-Form Solution}
+
+Compute:
+\[
+\mat{J}^\top\mat{J} = \mat{V}\mat{\Sigma}^2\mat{V}^\top =
+\begin{bmatrix}
+j_{11}^2 + j_{21}^2 & j_{11}j_{12} + j_{21}j_{22} \\
+j_{11}j_{12} + j_{21}j_{22} & j_{12}^2 + j_{22}^2
+\end{bmatrix}
+\]
+
+The eigenvectors of this $2 \times 2$ symmetric matrix give two orthogonal directions. Let $\mat{Q}_1 = [\vect{q}_1 \; \vect{q}_2]$ be the eigenvector matrix.
+
+\begin{planarbox}
+The \textbf{two valid rotations} are:
+\begin{align}
+[\vect{r}_1^{(1)} \; \vect{r}_2^{(1)}] &= \mat{U}\mat{Q}_1 \\
+[\vect{r}_1^{(2)} \; \vect{r}_2^{(2)}] &= \mat{U}\mat{Q}_2
+\end{align}
+where $\mat{Q}_2$ is $\mat{Q}_1$ with one column negated (the reflection).
+\end{planarbox}
+
+Complete the rotations:
+\[
+\vect{r}_3^{(k)} = \vect{r}_1^{(k)} \times \vect{r}_2^{(k)}, \quad \mat{R}_k = [\vect{r}_1^{(k)} \; \vect{r}_2^{(k)} \; \vect{r}_3^{(k)}]
+\]
+
+\subsection{Translation Recovery}
+
+The translation is recovered from the third column of $\bar{\mat{H}}$:
+\[
+\vect{t} = \bar{\vect{h}}_3 \cdot s
+\]
+
+where the scale $s$ is determined by the constraint that $\|\vect{r}_1\| = 1$:
+\[
+s = \frac{1}{\sigma_1 + \sigma_2} \cdot 2 = \frac{2}{\text{trace}(\mat{\Sigma})}
+\]
+
+(The exact formula depends on normalization conventions.)
+
+\subsection{Disambiguation}
+
+Given both poses $(\mat{R}_1, \vect{t}_1)$ and $(\mat{R}_2, \vect{t}_2)$:
+
+\begin{enumerate}
+    \item \textbf{Depth check}: Discard poses where points project behind the camera ($z < 0$)
+    \item \textbf{Reprojection error}: Choose the pose with smaller $\sum_i \|\vect{u}_i - \pi(\mat{R}, \vect{t}, \vect{X}_i)\|^2$
+    \item \textbf{External constraint}: Use IMU, previous frame, or scene knowledge
+\end{enumerate}
+
+Often both poses pass the depth check, so reprojection error or temporal consistency is needed.
+
+\section{IPPE Algorithm Summary}
+
+\begin{enumerate}
+    \item \textbf{Estimate homography} $\mat{H}$ from point correspondences (DLT + normalization)
+    \item \textbf{Normalize}: $\bar{\mat{H}} = \mat{K}^{-1}\mat{H}$
+    \item \textbf{SVD}: $[\bar{\vect{h}}_1 \; \bar{\vect{h}}_2] = \mat{U}\mat{\Sigma}\mat{V}^\top$
+    \item \textbf{Form} $\mat{J} = \mat{\Sigma}\mat{V}^\top$
+    \item \textbf{Eigendecompose} $\mat{J}^\top\mat{J}$ to get eigenvector matrix $\mat{Q}_1$
+    \item \textbf{Two rotations}: $[\vect{r}_1 \; \vect{r}_2]_k = \mat{U}\mat{Q}_k$ for $k = 1, 2$
+    \item \textbf{Complete}: $\vect{r}_3 = \vect{r}_1 \times \vect{r}_2$
+    \item \textbf{Translation}: $\vect{t}_k = s \cdot \bar{\vect{h}}_3$
+    \item \textbf{Disambiguate}: Choose pose with lower reprojection error
+\end{enumerate}
+
+\section{Comparison: Planar EPnP vs IPPE}
+
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Aspect} & \textbf{Planar EPnP} & \textbf{IPPE} \\
+\hline
+Approach & Control points + lifting & Homography + eigen \\
+Intermediate & Barycentric coords & Homography $\mat{H}$ \\
+Core computation & SVD of $2n \times 9$ & SVD of $3 \times 2$ + eigen of $2 \times 2$ \\
+Solutions returned & 1 & \planar{2 (explicit)} \\
+Error minimized & Algebraic (control pt) & Object-space collinearity \\
+Handles ambiguity & No (may pick wrong) & \planar{Yes (returns both)} \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{planarbox}
+\textbf{Key advantage of IPPE}: By working directly with the homography and explicitly computing both solutions, IPPE correctly handles the inherent two-fold ambiguity of planar pose estimation. This is critical for:
+\begin{itemize}
+    \item Near-frontal views (where both solutions are geometrically plausible)
+    \item Initialization for tracking (need both hypotheses)
+    \item Robust estimation (can verify against other constraints)
+\end{itemize}
+\end{planarbox}
+
+\section{When to Use Which}
+
+\textbf{Use Planar EPnP when}:
+\begin{itemize}
+    \item You have many points and want a single fast estimate
+    \item The viewing angle is oblique (ambiguity is easily resolved)
+    \item You're feeding into iterative refinement anyway
+\end{itemize}
+
+\textbf{Use IPPE when}:
+\begin{itemize}
+    \item You need both pose hypotheses explicitly
+    \item Views may be near-frontal (high ambiguity)
+    \item You want the geometrically optimal solution
+    \item Tracking applications where you need to maintain both hypotheses
+\end{itemize}
+
+\section*{References}
+
+\begin{enumerate}
+    \item Lepetit, V., Moreno-Noguer, F., \& Fua, P. (2009). EPnP: An accurate $O(n)$ solution to the PnP problem. \textit{IJCV}, 81(2), 155--166.
+
+    \item Collins, T., \& Bartoli, A. (2014). Infinitesimal plane-based pose estimation. \textit{IJCV}, 109(3), 252--286.
+
+    \item Zhang, Z. (2000). A flexible new technique for camera calibration. \textit{IEEE TPAMI}, 22(11), 1330--1334.
+\end{enumerate}
+
+\end{document}

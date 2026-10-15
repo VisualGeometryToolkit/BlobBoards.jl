@@ -1,0 +1,54 @@
+[workspace]
+authors = ["James Pritts <jbpritts@gmail.com>"]
+channels = ["conda-forge"]
+name = "BlobBoards.jl"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+# The default env carries nothing: BlobBoards needs no external tool at runtime
+# (until 2026-10 it carried ghostscript and qpdf, which wrote the PDF/X print
+# master; src/authoring/pdf.jl writes it directly now). Julia itself is a stated
+# prerequisite (install via the standard juliaup:
+# `curl -fsSL https://install.julialang.org | sh`) — pixi providing a second
+# Julia toolchain just duplicated depots and channel state next to everyone's
+# global juliaup.
+#   pixi run -e py julia --project=.              # the Python interface
+#   pixi run -e train python examples/training/…  # + torch training stack
+# Dropped 2026-07: poppler (Julia uses the Poppler_jll artifact), gh (dev
+# tool), explicit openssl pin (transitive); cmake/eigen/compilers (P3P is
+# native in VGC ≥0.3.2, RVG no longer hard-deps PoseLib, and VGC ships a
+# prebuilt libellipse_area — nothing compiles C++ at install anymore).
+# Python interface moved to the `py` feature — BlobBoardsPythonExt only
+# activates under `using PythonCall` anyway.
+[dependencies]
+
+[feature.py.dependencies]
+python = ">=3.14.0,<3.15"
+pint = ">=0.24.4,<1"
+numpy = ">=2,<3"
+matplotlib-base = ">=3.9,<4"   # the docs' visual checks (overlays from find_boards' arrays)
+pytest = ">=8,<9"              # python/tests: Julia parity, docstrings, runnable docs
+
+[feature.py.pypi-dependencies]
+juliacall = ">=0.9.24,<1"
+blobboards = { path = "./python", editable = true }
+setuptools = "<80"
+
+[feature.py.activation.env]
+JULIA_CONDAPKG_BACKEND = "Null"
+JULIA_PYTHONCALL_EXE = "$PIXI_PROJECT_ROOT/.pixi/envs/py/bin/python"
+
+[feature.train.pypi-dependencies]
+torch = ">=2.10.0, <3"
+h5py = ">=3.15.1, <4"
+pytorch-metric-learning = ">=2.9.0, <3"
+onnxscript = ">=0.6.2, <0.7"
+onnx = ">=1.20.1, <2"
+tensorboard = ">=2.20.0, <3"
+
+[environments]
+default = { solve-group = "default" }
+py = { features = ["py"], solve-group = "default" }
+train = { features = ["py", "train"], solve-group = "default" }

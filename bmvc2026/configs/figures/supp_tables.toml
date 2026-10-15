@@ -1,0 +1,20 @@
+# Config of record of scripts/make_supp_tables.jl: the macros behind
+# tab:supp:params (board_params.tex) and tab:supp:settings (run_settings.tex).
+
+[experiment]
+generator = "supp_tables"
+dataset = "260527"                       # absolute_pose_experiments/<dataset>
+tiers = ["bb_absolute_pose_inputs"]
+
+[inputs]
+boards_dir = "boards/blobboards"         # dataset-relative: the evaluation gallery's board JSONs
+run = "bmvc2026_260527.toml"             # configs/-relative: the BlobBoards run config of record; the table
+                                         # reads the EFFECTIVE configuration its run wrote (sweep_dir(run)/poses/bb/_config.toml)
+
+[board_params]
+output = "board_params.tex"              # under plotsdir(); regenerate_paper.jl copies it into papers/figures/floorplan
+# Size classes in increasing pattern extent; each name becomes the suffix of its macros.
+size_classes = ["Small", "Medium", "Large"]
+
+[run_settings]
+output = "run_settings.tex"

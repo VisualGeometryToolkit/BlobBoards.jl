@@ -1,0 +1,42 @@
+# Config of record of scripts/make_adapted_panels.jl: the top row of
+# fig:occexamples — the source photo and one panel per paper board, the board
+# pattern projected through the recovered homography over the adapted inliers.
+
+[experiment]
+generator = "adapted_panels"
+tiers = ["bb_absolute_pose_inputs", "bb_assets"]
+
+[inputs]
+image = "absolute_pose_experiments/teaser/testit.jpg"   # data_root()-relative
+boards_dir = "evaluation/blobboards_original"           # data_root()-relative gallery boards
+gallery = "board_features.jld2"                         # a CACHE: results_root()/galleries/<gallery>
+network = "package"                     # "package" = BlobBoards configs/default.toml (track_logpolar_circ_s96_iter4, the network these panels were made with); else a configs/-relative run config naming it
+
+[find_boards]
+# Detector settings differ from the run config of record, deliberately:
+detector_exception = "uncalibrated figure on the teaser photo (no camera of the 260527 session): the homography path, with the detector settings these panels were made with — not the calibrated evaluation config"
+# Uncalibrated figure (homography path), hand-set detector — deliberately NOT
+# the config of record of the sweep, which is calibrated.
+geometry = "homography"
+polarity = "dark"
+peak_threshold = 0.02
+edge_threshold = 5.0
+nms_cutoff = "default"                   # "default" = BlobBoards.DEFAULT_CUTOFF
+
+[render]
+photo_px = 1400                          # the photo is resized to this width under the vector overlay
+figure_width = 1600                      # Makie units; height follows the photo's aspect
+px_per_unit = 1.5                        # -> the 2400x3200 PNG the paper includes
+inlier_color = "yellow"
+inlier_strokewidth = 2.5
+marker_size = 12
+outline_width = 7.0
+blob_width = 4.0
+write_vector = false                     # also write the vector PDF master (~23 MB each)
+
+[output]
+dir = "adapted"                          # under papers/images
+original = "original"                    # + the photo's extension
+name = "adapted_{uid}.png"
+# The boards the figure shows, in column order (colours are assigned over all detections).
+uids = ["fde", "f80", "336", "14b"]
