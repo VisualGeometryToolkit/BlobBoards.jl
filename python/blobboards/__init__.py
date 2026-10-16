@@ -345,18 +345,20 @@ def _init():
     _jl.seval("import Pkg")
     _jl.Pkg.activate(authoring_env, io=_jl.devnull)
 
-    # Ensure the General registry is present and the environment is
-    # instantiated. Without this, a fresh depot (e.g. /root/.julia in a
-    # clean container) has the Manifest's deps unresolved and `using
-    # BlobBoards` fails with cryptic precompile errors. First import on a
-    # fresh box pays the download/precompile cost once; subsequent imports
-    # no-op. Nothing here writes a Project.toml.
+    # Ensure the registries are present and the environment is instantiated.
+    # Without this, a fresh depot (e.g. /root/.julia in a clean container)
+    # has the workspace unresolved and `using BlobBoards` fails with cryptic
+    # precompile errors. No Manifest is committed (the repository is one Pkg
+    # workspace), so the first instantiate RESOLVES it, and the stack packages
+    # are in CauRegistry until they are registered in General: both are
+    # needed. First import on a fresh box pays the download/precompile cost
+    # once; subsequent imports no-op. Nothing here writes a Project.toml.
     _jl.seval("""
         let
-            regs = Pkg.Registry.reachable_registries()
-            if !any(r -> r.name == "General", regs)
-                Pkg.Registry.add("General")
-            end
+            names = [r.name for r in Pkg.Registry.reachable_registries()]
+            "General" in names || Pkg.Registry.add("General")
+            "CauRegistry" in names ||
+                Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")
             Pkg.instantiate(io=devnull)
         end
     """)
