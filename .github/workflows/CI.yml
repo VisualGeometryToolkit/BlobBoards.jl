@@ -45,6 +45,13 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.8.1
         with:
           environments: py
+      # The CUDA_Runtime_jll version pin (12.9, for ONNXRunTime's CUDA provider)
+      # forces the CUDA artifacts onto a runner that has no GPU driver, and
+      # CUDNN_jll then fails to load (libcuda.so.1 missing) when cuDNN
+      # precompiles. Unpinned, a driverless host selects no CUDA artifact and
+      # the GPU paths are skipped — so this checkout drops the pin.
+      - name: Drop the CUDA runtime pin (no GPU driver here)
+        run: julia -e 'using TOML; for f in filter(isfile, ["Project.toml"; joinpath.(readdir(), "Project.toml")]); p = TOML.parsefile(f); prefs = get(p, "preferences", Dict()); haskey(prefs, "CUDA_Runtime_jll") || continue; delete!(prefs, "CUDA_Runtime_jll"); isempty(prefs) && delete!(p, "preferences"); open(io -> TOML.print(io, p), f, "w"); end'
       # CauRegistry as well as General until the stack is in General. The repo is
       # one workspace: instantiating the test member resolves every member into
       # the one root Manifest and installs what the tests need.
