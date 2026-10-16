@@ -322,7 +322,7 @@ canvas and `Pdf(; bleed)`:
 
 ![An A4 board written with Pdf(bleed = 2mm): the 214 × 301 mm page (MediaBox = BleedBox), the 210 × 297 mm TrimBox 2 mm in, and the 190 × 277 mm board 10 mm inside the trim](../assets/generated/page_boxes.svg)
 
-- **What you pass is the finished size.** `"A4"` or `blob_board(1000mm, 1000mm; …)`
+- **What you give is the finished size.** `"A4"` or `blob_board(1000mm, 1000mm; …)`
   is the sheet after trimming; `margin` is measured from the trim. The bleed
   adds a white strip outside it, so a cut that is slightly off never shows.
 - **What tools report.** A viewer's page size is the MediaBox: the 1 m board

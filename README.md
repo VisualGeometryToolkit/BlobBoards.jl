@@ -365,8 +365,8 @@ See `examples/training/` for the command-line builder and its SLURM drivers.
 ## Development
 
 The repository ships git hooks in `.githooks/` that keep your local
-`Manifest.toml` resolvable: after a pull, checkout or rebase that changes
-`Project.toml`, they re-resolve the environment (resolve only; precompilation
+`Manifest.toml` resolvable: after a pull, checkout or rebase that changes any
+workspace member's `Project.toml`, they re-resolve the workspace (resolve only; precompilation
 waits for the next `using`). They are opt-in, once per clone:
 
 ```bash

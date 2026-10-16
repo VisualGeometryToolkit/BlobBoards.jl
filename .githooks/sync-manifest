@@ -13,12 +13,11 @@
 #
 #     git config core.hooksPath .githooks
 #
-# Behaviour: when Project.toml differs between the old and new HEAD, run a
-# resolve-only Pkg.update() — precompilation is deferred to the first `using` —
-# in the root env and in every subdirectory env that already carries an
-# UNTRACKED Manifest. A tracked root Manifest came with the pull and is only
-# instantiated (download, no resolve); tracked subproject Manifests are left
-# alone. Never fails the git command; on error it says what to run by hand.
+# Behaviour: the repository is one Pkg workspace (the package and every member
+# project resolve together in the root Manifest). When any
+# Project.toml differs between the old and new HEAD, run a resolve-only
+# Pkg.update() in the root env — precompilation is deferred to the first
+# `using`. Never fails the git command; on error it says what to run by hand.
 #
 # Manual form:  .githooks/sync-manifest [<old-rev> [<new-rev>]]
 
@@ -37,9 +36,10 @@ esac
 
 log() { printf '[sync-manifest] %s\n' "$*" >&2; }
 
-# Nothing to do unless Project.toml moved (deps, compat and version live there).
+# Nothing to do unless a workspace member's Project.toml moved (deps, compat
+# and version live there).
 if git rev-parse --verify -q "$old^{commit}" >/dev/null 2>&1; then
-  git diff --quiet "$old" "$new" -- Project.toml && exit 0
+  git diff --quiet "$old" "$new" -- Project.toml '*/Project.toml' && exit 0
 fi
 
 if command -v julia >/dev/null 2>&1; then
@@ -53,21 +53,11 @@ fi
 
 TIMEOUT=(); command -v timeout >/dev/null 2>&1 && TIMEOUT=(timeout 900)
 
-root_tracked=$(git ls-files -- Manifest.toml 'Manifest-v*.toml')
-
-# Root env, plus subdirectory envs that already have an untracked Manifest.
-envs=(.)
-for p in */Project.toml; do
-  [ -f "$p" ] || continue
-  d=${p%/Project.toml}
-  ls "$d"/Manifest.toml "$d"/Manifest-v*.toml >/dev/null 2>&1 || continue
-  [ -n "$(git ls-files -- "$d/Manifest.toml" "$d/Manifest-v*.toml")" ] && continue
-  envs+=("$d")
-done
+envs=(.)                      # the workspace root resolves every member
 
 range="$(git rev-parse --short "$old" 2>/dev/null || echo '?')..$(git rev-parse --short "$new" 2>/dev/null || echo HEAD)"
 for d in "${envs[@]}"; do
-  if [ "$d" = . ] && [ -n "$root_tracked" ]; then mode=instantiate; else mode=update; fi
+  mode=update
   log "Project.toml changed in $range — Pkg.$mode() in $d/ (precompile deferred)"
   if JULIA_PKG_PRECOMPILE_AUTO=0 "${TIMEOUT[@]}" "${JULIA[@]}" --startup-file=no --project="$d" \
        "$repo/.githooks/sync-manifest.jl" "$mode" 2>&1 | sed 's/^/[sync-manifest]   /' >&2

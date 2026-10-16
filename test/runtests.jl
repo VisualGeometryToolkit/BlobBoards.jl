@@ -7,11 +7,15 @@
 # when the card is busy, never the gate on a GPU machine.
 using Test, ReTestItems, BlobBoards
 
-const ITEMS = joinpath(@__DIR__, "items_test.jl")
+# The items come from the package (test/items_test.jl; ReTestItems does not
+# descend into bmvc2026/, which has its own Project.toml). Named by the module,
+# not by the file: from a path ReTestItems walks up to the nearest Project.toml,
+# which is the unnamed workspace member test/Project.toml, and fails to build a
+# test env for it.
 const NWORKERS = clamp(Sys.CPU_THREADS ÷ 4, 1, 6)
 
 runtests(
-    ti -> !(:gpu in ti.tags), ITEMS;
+    ti -> !(:gpu in ti.tags), BlobBoards;
     nworkers = NWORKERS, nworker_threads = 4, testitem_timeout = 3600, report = false,
 )
 # The Python interface, serially in this process: PythonCall's initialisation
@@ -41,7 +45,7 @@ elseif !CUDA.functional()
     @warn "GPU test items SKIPPED: no functional CUDA device"
 else
     runtests(
-        ti -> :gpu in ti.tags, ITEMS;
+        ti -> :gpu in ti.tags, BlobBoards;
         nworkers = 1, nworker_threads = 8, testitem_timeout = 3600, report = false,
     )
 end

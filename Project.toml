@@ -72,18 +72,13 @@ BlobBoardsPythonExt = "PythonCall"
 BlobBoardsTrainingExt = ["Lux", "Optimisers", "Enzyme", "Reactant", "NNlib", "TensorBoardLogger", "Zygote"]
 
 [compat]
-Accessors = "0.1"
-Aqua = "0.8"
 Artifacts = "1"
 Base64 = "1"
-CairoMakie = "0.15"
 Colors = "0.13"
 ConstructionBase = "1"
 CoordinateTransformations = "0.6"
 CUDA = "5.11.0"
-CUDA_Runtime_jll = "0.21"
 Enzyme = "0.13.134"
-ExplicitImports = "1.15"
 Dates = "1"
 FileIO = "1"
 FixedPointNumbers = "0.8"
@@ -95,8 +90,6 @@ HDF5 = "0.17.2"
 ImageFiltering = "0.7.12"
 ImageTransformations = "0.10.2"
 Interpolations = "0.16.3"
-JET = "0.12"
-ReTestItems = "1"
 JLD2 = "0.6.3"
 
 JSON3 = "1"
@@ -132,9 +125,7 @@ Statistics = "1"
 StructArrays = "0.7"
 StructTypes = "1"
 TOML = "1"
-TiffImages = "0.11"
 TensorBoardLogger = "0.1"
-Test = "1"
 VideoIO = "1.4.0"
 VisualGeometryCore = "0.1"
 VisualGeometryFeatures = "0.1"
@@ -144,52 +135,11 @@ Zygote = "0.7"
 cuDNN = "1.4.7"
 julia = "1.12"
 
-[extras]
-Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
-Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
-CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
-ReTestItems = "817f1d60-ba6b-4fd5-9520-3cf149f6a823"
-PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-TiffImages = "731e570b-9d59-4bfa-96dc-6df516fadf69"
-
-[targets]
-test = ["Test", "ReTestItems", "PythonCall", "Aqua", "CairoMakie", "JET", "Accessors", "CUDA_Runtime_jll", "CUDA", "cuDNN", "ExplicitImports", "TiffImages"]
-
-# TWO EXTENSIONS NEVER LOAD UNDER `Pkg.test`, because their triggers are not
-# in the target above. An extension whose triggers are absent is not merely
-# untested — it cannot even fail to compile, so edits to it ship unverified.
-# Each omission is deliberate:
-#
-#   BlobBoardsTrainingExt  Reactant — cannot coexist with the cuDNN the
-#                          evaluation path needs (Reactant bundles its own);
-#                          that conflict is why Lux inference and training are
-#                          separate extensions in the first place.
-#   BlobBoardsLuxExt       Lux + NNlib — adding them pulls the whole Lux stack
-#                          into every test env for one inference backend.
-#
-# So verify them BY HAND when you touch them. LuxExt: the bmvc2026 project
-# already has Lux + cuDNN. TrainingExt: put a Project.toml that carries every
-# trigger (Reactant, Lux, NNlib, …) into a scratch dir, add
-# `[sources] BlobBoards = { path = "<checkout>" }`, then
-#
-#   julia --project=<scratch> -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
-#
-# and read the "BlobBoards → BlobBoardsTrainingExt" line. Pkg.precompile
-# compiles each extension with exactly its own triggers, which is how the
-# 2026-09-07 audit found TrainingExt had been unable to compile at all (it
-# asserted LuxExt was loaded; LuxExt needs cuDNN, which TrainingExt does not
-# trigger on). Last run 2026-09-07: all six extensions precompile.
-
-# CHECKED IN, unlike LocalPreferences.toml. `Pkg.test` builds a throwaway
-# project in a tempdir, which never sees this repo's LocalPreferences — so the
-# 12.9 pin that makes interactive runs work was invisible to every gate, and
-# the suite silently described patches on the ONNX CPU EP. ORT's CUDA provider
-# requires a CUDA runtime >= 12.0 and < 13.0; the machine default is 13.2.
-# CUDA_Runtime_jll is in the test target above so the temp env actually
-# installs the pinned runtime.
+# CHECKED IN, unlike LocalPreferences.toml: ORT's CUDA provider requires a CUDA
+# runtime >= 12.0 and < 13.0, and the machine default is 13.2. Every workspace
+# member that runs CUDA carries the same pin (test/, gpu/, examples/, …).
 [preferences.CUDA_Runtime_jll]
-version = "0.1.0"
+version = "12.9"
+
+[workspace]
+projects = ["test", "docs", "gpu", "examples", "authoring", "bmvc2026"]

@@ -4,23 +4,13 @@
 *.pt
 examples/training/checkpoints/
 
-# Per-user preferences and the PACKAGE Manifest (regenerable; BB resolves
-# against its compat ranges instead of pinning one).
-# Root-anchored: bmvc2026/Manifest.toml is TRACKED (2026-08-18) — the
-# research project pins its environment the canonical DrWatson way, with
-# BlobBoards dev'd by RELATIVE path (".."), so git checkout + Pkg.instantiate
-# reproduces it on any machine.
+# Per-user preferences, and every Manifest: the repository is one Pkg
+# workspace (the package, test/, docs/, gpu/, examples/, authoring/ and
+# bmvc2026/) resolved in one root Manifest, which is regenerable and not
+# committed; no member has a Manifest of its own.
 LocalPreferences.toml
-/Manifest.toml
-/Manifest-v1.*.toml
-/docs/Manifest.toml
-/src/Manifest.toml
-/gpu/Manifest.toml
-/examples/Manifest.toml
-/authoring/Manifest.toml
-# Negation: the user-global gitignore also ignores Manifest.toml everywhere;
-# this re-includes the ONE tracked research-project Manifest.
-!bmvc2026/Manifest.toml
+Manifest.toml
+Manifest-v*.toml
 
 # Claude Code per-machine state
 .claude/settings.local.json

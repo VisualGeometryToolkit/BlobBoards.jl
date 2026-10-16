@@ -45,16 +45,21 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.8.1
         with:
           environments: py
-      # CauRegistry as well as General until the stack is in General.
-      - uses: julia-actions/julia-buildpkg@v1
-        with:
-          localregistry: https://github.com/prittjam/CauRegistry.jl.git
+      # CauRegistry as well as General until the stack is in General. The repo is
+      # one workspace: instantiating the test member resolves every member into
+      # the one root Manifest and installs what the tests need.
+      - name: Instantiate the test environment
+        run: |
+          julia -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")'
+          julia --project=test -e 'using Pkg; Pkg.instantiate()'
       - name: Run tests
         run: pixi run -e py julia --color=yes --project=. -e 'using Pkg; Pkg.test(; coverage = true)'
       # The Python package itself (python/tests: argument handling, the
       # docstring examples, parity with Julia). It runs Julia in the checkout's
       # authoring/ env (PythonCall + the dev'd checkout); the GPU tests skip
       # themselves on a hosted runner.
+      - name: Instantiate the Python package's Julia environment (authoring/)
+        run: julia --project=authoring -e 'using Pkg; Pkg.instantiate()'
       - name: Run Python tests
         working-directory: python
         run: pixi run -e py pytest tests -q -p no:cacheprovider

@@ -42,6 +42,17 @@ julia --project=. examples/generate/board.jl
 julia --project=authoring -e 'using Pkg; Pkg.instantiate()'
 ```
 
+### One workspace, one Manifest
+
+The repository is one Pkg workspace (root `[workspace]`: `test`, `docs`, `gpu`,
+`examples`, `authoring`, `bmvc2026`). Each member keeps its own `Project.toml`
+— its own deps, and `[sources] BlobBoards = {path = ".."}` — but all of them
+resolve together into the ONE `Manifest.toml` at the root, which is not
+committed (no member has a Manifest; `.gitignore` ignores them all). The test
+deps live in `test/Project.toml` (no `[extras]`/`[targets]`), and `Pkg.test()`
+runs that member without a sandbox, against the shared Manifest. After a pull
+that moves any member's `Project.toml`, the `.githooks` re-resolve the root.
+
 ### `--project=.` has no CUDA — use `--project=gpu`
 
 CUDA and cuDNN are `[weakdeps]` (they must be, or `BlobBoardsCUDAExt` could not
@@ -57,8 +68,8 @@ Board authoring used to bite the same way (an extension triggered by
 (src/authoring/) and needs nothing extra — the sheet font is vendored in
 assets/fonts, libtiff/zlib/FreeType are ordinary deps. `authoring/Project.toml`
 remains the companion env for what `--project=.` cannot load: PythonCall (the
-Python package activates it), CairoMakie for the Makie plots, Revise; its
-Manifest is gitignored.
+Python package activates it), CairoMakie for the Makie plots, Revise; it
+resolves with the rest of the workspace.
 
 `gpu/Project.toml` is the GPU env (renamed from `dev/` 2026-09-07; `dev/` is now
 tooling only — `dev.jl` baselines, converters, archived logs, no Project.toml):
@@ -67,7 +78,7 @@ and CUDA_Runtime_jll as ordinary deps, and carries the runtime pin itself in a
 `[preferences.CUDA_Runtime_jll]` block (12.9, the SAME pin as the root
 Project.toml — ORT's CUDA provider takes 12.x only). The pin lives in `Project.toml` rather than a `LocalPreferences.toml`
 because `.gitignore` excludes the latter. Use `--project=.` for CPU-only work;
-the test target already carries CUDA + cuDNN of its own.
+`test/Project.toml` carries CUDA + cuDNN (and the same pin) of its own.
 
 `examples/training/build_tracks.jl` (the `.tracks` builder CLI and its SLURM
 drivers) runs under this env. `examples/Project.toml` is the desktop superset
