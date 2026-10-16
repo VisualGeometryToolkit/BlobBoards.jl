@@ -47,9 +47,14 @@ makedocs(;
 # The site is the blobboards organization page (https://blobboards.github.io):
 # unversioned, at the root of that repository's `main` branch. CI deploys it
 # (.github/workflows/docs.yml, with a deploy key for that repository).
+# Documenter deploys only when the building repository's name occurs in `repo`;
+# the site is another repository, so the deploy config names it as the target
+# (authentication is the DOCUMENTER_KEY deploy key either way).
+const SITE_REPO = "blobboards/blobboards.github.io"
 deploydocs(;
-    repo="github.com/blobboards/blobboards.github.io.git",
+    repo="github.com/$(SITE_REPO).git",
     branch="main",
     devbranch="main",
     versions=nothing,
+    deploy_config=Documenter.GitHubActions(SITE_REPO, get(ENV, "GITHUB_EVENT_NAME", ""), get(ENV, "GITHUB_REF", "")),
 )
