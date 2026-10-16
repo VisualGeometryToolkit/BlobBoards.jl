@@ -24,8 +24,8 @@ hero:
       text: API Reference
       link: /api/public/
     - theme: alt
-      text: Code (coming soon)
-      link: "#code-coming-soon"
+      text: Code
+      link: https://github.com/VisualGeometryToolkit/BlobBoards.jl
 features:
   - icon: 🖨️
     title: Author a board
@@ -174,6 +174,13 @@ weights and the example data the package ships.
   networks and the boards, still image and video the bundled examples run on. The
   package's `Artifacts.toml` is an add-only, hash-pinned catalog of them, each entry
   fetched lazily from a numbered version of the record.
+
+## Related projects
+
+Part of the [Visual Geometry Toolkit](https://visualgeometrytoolkit.github.io), Julia packages for robust visual geometry from Kiel University:
+
+- [RANSAC Scoring Done Right](https://ransacscoringdoneright.github.io): marginalize the scale, then choose the inliers (NeurIPS 2026)
+- [Robust Local Optimization Done Right](https://localoptimizationdoneright.github.io): score sharp, refine soft (ACCV 2026)
 
 ## Citation
 
