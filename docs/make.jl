@@ -17,7 +17,7 @@ makedocs(;
         assets=["assets/landing_tagline.css", "assets/landing_tagline.js"],
         prettyurls=get(ENV, "CI", "false") == "true" || get(ENV, "BB_DOCS_DEPLOY", "0") == "1",
         canonical="https://blobboards.github.io",
-        edit_link="master",
+        edit_link="main",
     ),
     plugins=[LandingPage(), CodeBlocks()],
     warnonly=[:missing_docs, :cross_references, :docs_block],
@@ -50,6 +50,6 @@ makedocs(;
 deploydocs(;
     repo="github.com/blobboards/blobboards.github.io.git",
     branch="main",
-    devbranch="master",
+    devbranch="main",
     versions=nothing,
 )
