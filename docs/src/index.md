@@ -10,9 +10,9 @@ hero:
     Kiel University
     BMVC 2026
   image:
-    src: /assets/landing/hero_board.png
-    dark: /assets/landing/hero_board_dark.png
-    alt: A square BlobBoard, a multi-scale field of Gaussian blobs inside a ruler frame, with uid glyphs in three corners and a QR code in the fourth.
+    src: /assets/landing/hero_board.svg
+    dark: /assets/landing/hero_board_dark.svg
+    alt: A square BlobBoard, a multi-scale field of Gaussian blobs with uid glyphs in three corners and a QR code in the fourth.
   actions:
     - theme: brand
       text: Getting started

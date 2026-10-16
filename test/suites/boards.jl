@@ -1479,7 +1479,7 @@ end
 
     # a stored v3 board whose render record names a raster but no density rebuilds at its print density
     mktempdir() do dir
-        BlobBoards.rebuild_board(joinpath(pkgdir(BlobBoards), "docs", "hero_board.json"); dir)
+        BlobBoards.rebuild_board(joinpath(pkgdir(BlobBoards), "test", "fixtures", "v3_raster_render_no_density.json"); dir)
         @test any(endswith(".png"), readdir(dir))
     end
 
