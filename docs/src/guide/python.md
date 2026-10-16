@@ -108,11 +108,13 @@ Julia names a board's output with a value (`Pdf()`, `Tiff(600dpi)`,
 | `density` | dots per inch (a number or a Pint quantity); required for `"tiff"` and `"png"` | the raster's pixels; for a PDF, only the returned pixel blobs |
 | `icc_profile` | `"linear"` (default) or the path of a grey ICC profile | PDF, TIFF |
 | `shading_function` | `"calculator"` (default) or `"sampled"` | PDF |
+| `bleed` | a print shop's trim allowance on every side, in mm (a number or a Pint length; default 0): the page grows by it, the TrimBox stays the paper (Julia's `Pdf(bleed = …)`; see [Page boxes and bleed](@ref)) | PDF |
 
 ```python
 import tempfile
 out = tempfile.mkdtemp()
 blob_board("A5", blob_sizes=(12, 0.2 * short_side), seed=1, dir=out, format="png", density=300)
+blob_board("A5", blob_sizes=(12, 0.2 * short_side), seed=1, dir=out, bleed=2)   # PDF with 2 mm bleed
 ```
 
 A raster must give the board's smallest blob at least 2 pixels per σ. The

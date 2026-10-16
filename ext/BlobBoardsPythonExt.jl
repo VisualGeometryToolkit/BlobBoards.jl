@@ -159,6 +159,7 @@ function BlobBoards.blob_board_python(
         icc_profile = nothing,
         id_label = nothing,
         shading_function = nothing,
+        bleed = nothing,
         board_size = nothing,
         margin = nothing,
         ruler_width = nothing,
@@ -189,7 +190,7 @@ function BlobBoards.blob_board_python(
     density_jl = _py_none(density) ? nothing : pint_to_julia_density(density)
     julia_kwargs = _filter_kwargs(
         dir = dir === nothing ? nothing : string(dir),
-        output = _py_output(format, density_jl, icc_profile, shading_function),
+        output = _py_output(format, density_jl, icc_profile, shading_function, bleed),
         id_label = _py_none(id_label) ? nothing : (id_label isa Py ? pyconvert(Bool, id_label) : Bool(id_label)),
         board_size = _py_size2(board_size), margin = _py_size2(margin),
         ruler_width = _py_mm(ruler_width), corner_size = _py_mm(corner_size), frame_padding = _py_mm(frame_padding),
@@ -217,16 +218,20 @@ end
 # gets). `nothing` when Python names none of the four (Julia's default then
 # applies: a PDF). What a format has no use for the Julia types refuse by
 # construction; Python's flat keywords can still SAY it, so it is refused here:
-# a raster has no shading function, a PNG no profile. (A PDF's file has no
-# density: Python's `density` is then only the density of the pixel coordinates
-# it gets back.)
-function _py_output(format, density, icc_profile, shading_function)
+# a raster has no shading function and no bleed, a PNG no profile. (A PDF's
+# file has no density: Python's `density` is then only the density of the pixel
+# coordinates it gets back.)
+function _py_output(format, density, icc_profile, shading_function, bleed = nothing)
     str(x) = x isa Py ? pyconvert(String, x) : string(x)
     fmt = _py_none(format) ? "pdf" : lowercase(str(format))
     icc = _py_none(icc_profile) ? nothing : str(icc_profile)
     shading = _py_symbol(shading_function)
-    _py_none(format) && icc === nothing && shading === nothing && return nothing
+    bleed_jl = _py_none(bleed) ? nothing : _py_mm(bleed)
+    _py_none(format) && icc === nothing && shading === nothing && bleed_jl === nothing && return nothing
     if fmt != "pdf"
+        bleed_jl === nothing || throw(
+            ArgumentError("bleed applies to PDF output only; format = $(repr(fmt)) is a raster, which has no page boxes")
+        )
         shading === nothing || throw(
             ArgumentError("shading_function applies to PDF output only; format = $(repr(fmt)) is a raster converted from the PDF")
         )
@@ -235,7 +240,7 @@ function _py_output(format, density, icc_profile, shading_function)
         )
     end
     return BlobBoards._recorded_output(
-        (; format = fmt, icc_profile = icc == "linear" ? nothing : icc, shading_function = something(shading, :calculator), density)
+        (; format = fmt, icc_profile = icc == "linear" ? nothing : icc, shading_function = something(shading, :calculator), density, bleed = bleed_jl)
     )
 end
 
@@ -306,14 +311,14 @@ end
 # or — for a PDF — at `density` when given, else the board's own raster density.
 function BlobBoards.render_board_python(
         json_path; dir, format = nothing, density = nothing, icc_profile = nothing,
-        id_label = false, shading_function = nothing, image_origin = "colmap",
+        id_label = false, shading_function = nothing, bleed = nothing, image_origin = "colmap",
     )
     bundle, _, config_hash = BlobBoards.load_bundle(string(json_path))
     bundle isa BoardBundle || throw(ArgumentError("render_board: $(json_path) is not a board bundle"))
     given = _py_none(density) ? nothing : pint_to_julia_density(density)
     grid = bundle.preamble.board_config.layout_grid
     given === nothing || BlobBoards._check_v3_density(grid, given, "density = $(given)")     # before any file is written
-    output = something(_py_output(format, given, icc_profile, shading_function), Pdf())
+    output = something(_py_output(format, given, icc_profile, shading_function, bleed), Pdf())
     BlobBoards.render_board(
         bundle; dir = string(dir), output, id_label = id_label isa Py ? pyconvert(Bool, id_label) : Bool(id_label), config_hash
     )

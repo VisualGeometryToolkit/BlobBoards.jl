@@ -84,6 +84,35 @@ def test_blob_board_raster_needs_a_density(tmp_path):
     assert any(f.endswith(".png") for f in os.listdir(tmp_path))
 
 
+def _pdf_boxes_mm(path):
+    """The page boxes of a one-page PDF, in mm: {"MediaBox": [x0, y0, x1, y1], …}."""
+    import re
+    s = open(path, "rb").read().decode("latin-1")
+    return {k: [float(v) * 25.4 / 72 for v in re.search(rf"/{k}\s*\[([^\]]*)\]", s).group(1).split()]
+            for k in ("MediaBox", "BleedBox", "TrimBox")}
+
+
+def test_blob_board_bleed(tmp_path):
+    # Julia's Pdf(bleed): the paper is the finished sheet (TrimBox), the page
+    # grows by the bleed on every side; the board and its uid do not change.
+    kw = dict(blob_sizes=(3, 12), seed=0x5EED, corner_size=15, ruler_width=0)
+    plain = blob_board("A5", dir=str(tmp_path / "plain"), **kw)
+    bled = blob_board("A5", dir=str(tmp_path / "bleed"), bleed=2, **kw)
+    assert bled.uid == plain.uid and np.array_equal(bled.blobs, plain.blobs)
+    pdf = next(f for f in os.listdir(tmp_path / "bleed") if f.endswith(".pdf"))
+    boxes = _pdf_boxes_mm(tmp_path / "bleed" / pdf)
+    assert np.allclose(boxes["MediaBox"], [0, 0, 152, 214], atol=0.01)
+    assert boxes["BleedBox"] == boxes["MediaBox"]
+    assert np.allclose(boxes["TrimBox"], [2, 2, 150, 212], atol=0.01)
+    # render_board takes it too, and a raster has no page boxes to bleed
+    json_path = str(tmp_path / "bleed" / pdf.replace(".pdf", ".json"))
+    render_board(json_path, dir=str(tmp_path / "re"), bleed=2)
+    re_pdf = next(f for f in os.listdir(tmp_path / "re") if f.endswith(".pdf"))
+    assert np.allclose(_pdf_boxes_mm(tmp_path / "re" / re_pdf)["TrimBox"], [2, 2, 150, 212], atol=0.01)
+    with pytest.raises(Exception, match="bleed"):
+        blob_board("A5", dir=str(tmp_path / "png"), format="png", density=300, bleed=2, **kw)
+
+
 def test_blob_pattern_matches_julia(jl):
     py = blob_pattern(400, 300, blob_sizes=(12, None), seed=0x52)
     expr = "BlobBoards.blob_pattern(400, 300; seed = 0x52, blob_sizes = (12BlobBoards.px, nothing))"

@@ -597,7 +597,7 @@ def blob_board(paper, *, blob_sizes, seed=None,
                major_tick_spacing=None, minor_tick_spacing=None,
                major_tick_width=None, minor_tick_width=None,
                dir=None, format=None, density=None, icc_profile=None, id_label=None,
-               shading_function=None,
+               shading_function=None, bleed=None,
                scales_per_octave=None,
                max_trials=None, alpha=None, cutoff=None,
                polarity=None,
@@ -613,7 +613,7 @@ def blob_board(paper, *, blob_sizes, seed=None,
     printer a board is sized for enters through ``blob_sizes``, with
     ``suggest_blob_sizes(density, extent)``. Where Julia names the output with a value
     (``Pdf()``, ``Tiff(density)``, ``Png(density)``), Python names it with
-    ``format``, ``density``, ``icc_profile`` and ``shading_function``. Removed
+    ``format``, ``density``, ``icc_profile``, ``shading_function`` and ``bleed``. Removed
     keywords (``pdf_standard``, ``print_density``, ``blob_measure``,
     ``frame_style``, ``frame_width``, ``raster_aligned``) and the former
     positional ``dpi`` are not parameters, so giving one is a ``TypeError``.
@@ -654,8 +654,9 @@ def blob_board(paper, *, blob_sizes, seed=None,
     margin : tuple, optional
         The white margin around the board, which is centred on the paper, as
         (width, height) in mm: left and right of it, above and below. Default
-        (10, 10); (0, 0) is full bleed. The board is the paper less twice the
-        margin.
+        (10, 10). The board is the paper less twice the margin. The paper is
+        the finished sheet: for a print shop that trims, keep the margin and
+        give ``bleed``.
     board_size : tuple, optional
         The board instead, as (width, height) in mm; its margin is half the
         paper's excess. ``margin`` and ``board_size`` are mutually exclusive.
@@ -688,6 +689,13 @@ def blob_board(paper, *, blob_sizes, seed=None,
         function) or "sampled" (a sampled
         table, for a RIP that mishandles calculator functions). PDF only: "tiff"
         and "png" are the PDF converted at ``density``.
+    bleed : float or pint.Quantity, optional
+        A print shop's trim allowance in mm on every side (default: 0), PDF
+        only — Julia's ``Pdf(bleed=…)``. The paper stays the finished sheet and
+        the PDF's TrimBox; the page (MediaBox = BleedBox) grows by ``bleed`` on
+        each side, a white strip the shop cuts off. The board, its uid and file
+        name do not change; the JSON records the bleed, so a rebuild prints the
+        same page. A Pint length works too.
     scales_per_octave : int, optional
         Number of scales per octave (default: 3).
     max_trials : int, optional
@@ -742,7 +750,7 @@ def blob_board(paper, *, blob_sizes, seed=None,
         seed=seed, ruler_width=ruler_width, corner_size=corner_size,
         frame_padding=frame_padding, margin=margin, board_size=board_size,
         dir=dir, format=format, density=density, icc_profile=icc_profile,
-        id_label=id_label, shading_function=shading_function,
+        id_label=id_label, shading_function=shading_function, bleed=bleed,
         scales_per_octave=scales_per_octave, max_trials=max_trials, α=alpha,
         cutoff=cutoff, polarity=polarity,
         major_tick_spacing=major_tick_spacing, minor_tick_spacing=minor_tick_spacing,
@@ -832,7 +840,7 @@ def load_board(json_path, *, image_origin="colmap", density=None) -> BoardResult
 
 
 def render_board(json_path, *, dir, format=None, density=None, icc_profile=None,
-                 id_label=False, shading_function=None, image_origin="colmap") -> BoardResult:
+                 id_label=False, shading_function=None, bleed=None, image_origin="colmap") -> BoardResult:
     """
     Re-render a stored board without re-running placement — Julia's ``render_board``.
 
@@ -862,6 +870,9 @@ def render_board(json_path, *, dir, format=None, density=None, icc_profile=None,
         Print the identity line under the board (boards in circulation have none).
     shading_function : str, optional
         "calculator" (default) or "sampled" (PDF only; see ``blob_board``).
+    bleed : float or pint.Quantity, optional
+        A print shop's trim allowance in mm on every side (default: 0), PDF
+        only; see ``blob_board``.
     image_origin : str, default "colmap"
         Pixel convention of the returned blobs.
 
@@ -891,7 +902,7 @@ def render_board(json_path, *, dir, format=None, density=None, icc_profile=None,
     return _board_result(_jl.BlobBoards.render_board_python(
         str(json_path), dir=str(dir), format=format, density=density,
         icc_profile=icc_profile, id_label=bool(id_label), shading_function=shading_function,
-        image_origin=image_origin))
+        bleed=bleed, image_origin=image_origin))
 
 
 def example_data(name) -> str:
