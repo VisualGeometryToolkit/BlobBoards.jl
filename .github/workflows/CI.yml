@@ -45,7 +45,10 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.8.1
         with:
           environments: py
+      # CauRegistry as well as General until the stack is in General.
       - uses: julia-actions/julia-buildpkg@v1
+        with:
+          localregistry: https://github.com/prittjam/CauRegistry.jl.git
       - name: Run tests
         run: pixi run -e py julia --color=yes --project=. -e 'using Pkg; Pkg.test(; coverage = true)'
       # The Python package itself (python/tests: argument handling, the
