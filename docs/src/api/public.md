@@ -128,8 +128,9 @@ BlobBoards extends `CoordinateTransformations` constructors:
 - `AffineMap(bundle::BoardBundle, from, to; image_origin, density)` — coordinate-system transforms (`:pixel`/`:physical`/`:world`)
 
 For image-origin conventions (`:colmap`/`:julia`/`:opencv`), use
-`Translation(:colmap, :julia)` (defined in VisualGeometryCore — returns a
-`px`-unit-bearing `Translation`).
+`EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})` (from VisualGeometryCore;
+not exported by BlobBoards, so `using BlobBoards: EuclideanMap, PixelFrame`). It
+acts on plain pixel coordinates: `ustrip.(px, centroid(d))`.
 
 ## Unit Conversion Helpers
 
@@ -188,7 +189,7 @@ The main types used in BlobBoards are:
 - `Disc` - Isotropic blob/feature type (from VisualGeometryCore)
 - `PatternConfig` - Pattern generation configuration
 - `BoardConfig` - Board layout configuration
-- `PatternBundle` - Pattern with metadata (returned by `blob_pattern`)
+- `PatternBundle` - Pattern with metadata (what `blob_pattern(…; dir)` writes as JSON, and `BlobBoards.load` returns)
 - `BoardBundle` - Board with metadata (returned by `blob_board`)
 
 ## Media enumeration

@@ -9,6 +9,11 @@ using BlobBoards
 DocMeta.setdocmeta!(BlobBoards.Authoring.QREncode, :DocTestSetup,
     :(using BlobBoards.Authoring.QREncode; using BlobBoards.Authoring.QREncode: getmode, getversion); recursive = true)
 
+# The guide's figures are drawn from the package itself (docs/diagrams.jl), so
+# they follow the code: regenerated on every build, never committed.
+include(joinpath(@__DIR__, "diagrams.jl"))
+write_diagrams(joinpath(@__DIR__, "src", "assets", "generated"))
+
 makedocs(;
     modules=[BlobBoards],
     authors="James Pritts <jbpritts@gmail.com>",

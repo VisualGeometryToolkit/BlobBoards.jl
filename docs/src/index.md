@@ -80,10 +80,13 @@ Copy the command for your language and install method.
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoards.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-**Pkg** — from the General registry (Julia 1.12+):
+**Pkg** — from CauRegistry, where BlobBoards and its stack live until they
+are registered in General (Julia 1.12+):
 
 ```julia
-using Pkg; Pkg.add("BlobBoards")
+using Pkg
+Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
+Pkg.add("BlobBoards")
 ```
 
 ### Python
@@ -106,7 +109,7 @@ git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoard
 ## Getting started
 
 Install BlobBoards and generate, print and detect your first board in
-[Getting Started](guide/getting-started.md). [Authoring boards](guide/boards.md) covers the
+[Getting Started](guide/getting-started.md). [Authoring boards](guide/boards.md) covers
 every board option and printing; [Detecting boards](guide/detection.md)
 covers `find_boards`, pose estimation and GPU acceleration. The [Overview](overview.md)
 introduces patterns, boards and the coordinate conventions.

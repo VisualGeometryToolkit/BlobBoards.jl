@@ -9,7 +9,7 @@ See [Public API](public.md) for `blob_pattern`.
 ### Blob Placement
 
 Blobs are placed largest scale first, each at a random centre that does not
-overlap a placed blob (an R-tree holds the placed discs), so placement is
+overlap a placed blob (per-level uniform grids hold the placed discs), so placement is
 reproducible from the seed alone.
 
 ### Scale Calculation
@@ -21,4 +21,4 @@ The following internal functions handle scale distribution:
 
 ### Rendering
 
-- `render_blob!(pattern, blob; extent)` - Render a single Gaussian blob to the pattern image
+- `render_blob!(pattern, blob; cutoff)` - Render a single Gaussian blob to the pattern image

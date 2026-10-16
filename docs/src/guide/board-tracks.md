@@ -27,7 +27,7 @@ and accumulates multi-modal, multi-scale patch tracks into a single `.tracks`
 ```julia
 using BlobBoards
 
-out = build_tracks_for_sequences(
+out = BlobBoards.build_tracks_for_sequences(
     "/data/boards",          # board .json files
     "/data/models/blob_matcher.onnx",
     "/data/videos";          # videos and/or photos
@@ -36,7 +36,7 @@ out = build_tracks_for_sequences(
     output_dir = "/data/out",
     output_name = "tracks",
 )
-# => "/data/out/tracks.tracks"
+# => "/data/out/tracks_logpolar_s32.tracks" (the name gets _<patch_type>_s<scale>)
 ```
 
 Run with `julia --threads=N` (e.g. 16). Two stages use the extra threads: the
@@ -58,11 +58,12 @@ Anchor and tracked sequences share track ids (`board_offset + i`, where
 reference patch is recoverable by id. Anchors are **not** seeded into the tracked
 sequences.
 
-Each observation stores three patch views — `log_polar`, `cartesian`, and
-`original` — at every scale in `scales`, plus the observation's `affine_shape`.
-Cartesian and log-polar are sampled off the **adapted** elliptical frame;
-`original` is sampled off the raw **SIFT-detection** disc, so its scale is
-relative to the detector's σ rather than the fitted σ.
+Each observation stores one patch — of the run's `patch_type` (`:logpolar`,
+`:cartesian` or `:original`) at its `scale` — plus a mask and the observation's
+`affine_shape`; a file holds one patch type at one scale (run again for
+another). Cartesian and log-polar patches are sampled off the **adapted**
+elliptical frame; `original` is sampled off the raw **SIFT-detection** disc, so
+its scale is relative to the detector's σ rather than the fitted σ.
 
 ## Pipeline
 
@@ -144,7 +145,7 @@ that do not alias. `3`–`4` is the quality sweet spot.
 |-----------|---------|-------------|
 | `n_frames` | `nothing` | Uniformly sample N frames (stride computed) |
 | `stride` | `nothing` | Process every `stride`-th frame |
-| `max_image_pixels` | `3840*2160` | Cap on total pixels per frame; `nothing` = native |
+| `max_image_pixels` | `nothing` | Cap on total pixels per frame; `nothing` = native |
 
 `n_frames` and `stride` are mutually exclusive; neither = every frame. Both are
 ignored for photos.
@@ -159,7 +160,7 @@ canonicalize all share one coordinate system.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `iou_threshold` | `0.3` | Minimum symmetric IoU for a valid correspondence |
+| `iou_threshold` | `0.6` | Minimum symmetric IoU for a valid correspondence |
 | `max_detections` | `typemax(Int)` | Per-frame detection cap |
 
 **Quality filter.** A spurious board's fitted homography does not explain the
@@ -177,7 +178,8 @@ can exhaust GPU memory — a Sony FX3 frame yields ~50k detections.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `scales` | `[4,8,16,32,64,96,128]` | Patch scales = half patch width/height in σ |
+| `patch_type` | `:logpolar` | `:logpolar`, `:cartesian` or `:original`; one per file |
+| `scale` | `32` | Patch scale = half patch width/height in σ; one per file |
 | `supersample` | `1` | Anti-aliasing supersample factor (see above) |
 | `confuser_factor` | `1.0` | Cap confusers at `factor × tracked patches` |
 
@@ -192,7 +194,7 @@ tight.
 |-----------|---------|-------------|
 | `p_downsample` | `0.75` | Probability of the resolution-loss down/up-resample; `0` disables |
 | `p_perspective` | `0.5` | Probability of the perspective warp; `0` disables |
-| `perspective_strengthen_max` | `2.0` | `γ ~ U[0, max]`; vanishing line scaled by `1+γ` |
+| `perspective_strengthen_max` | `1.0` | `γ ~ U[0, max]`; vanishing line scaled by `1+γ` |
 | `perspective_jitter_max` | `0.1` | Extra random-direction tilt, board-normalized |
 
 `perspective_strengthen_max = 0` reproduces the frame's real perspective; larger
@@ -207,7 +209,7 @@ values exaggerate it along the board's own tilt.
 | `write_anchors` | `true` | Write the per-board GT anchor sequences |
 | `async_writer` | `true` | Overlap HDF5 compression with GPU compute |
 | `writer_buffer` | `1` | Depth of the async-writer queue |
-| `backend` | `CudaBackend()` | Compute backend for adapt/canonicalize/describe |
+| `backend` | `default_device()` | Compute backend for adapt/canonicalize/describe |
 
 ## Resume
 
@@ -333,18 +335,16 @@ Nothing extra is stored for the chart — it is rebuilt from `view_angles`,
 `n_visible` and per-observation `frame_id` counts, so it is recomputable offline:
 
 ```julia
-stats = view_angle_profile("tracks_logpolar_s32.tracks")     # records, no plotting
-save_view_angle_figure("profile.png", stats)                 # needs CairoMakie
-save_view_angle_figure("fine.svg", stats; edges = 0:5:90)    # finer bins, vector out
-save_view_angle_figure("one_board.png", filter(s -> s.uid == uid, stats))
-print_view_angle_profile(stats)                              # text, no backend needed
+stats = BlobBoards.view_angle_profile("tracks_logpolar_s32.tracks")     # records, no plotting
+BlobBoards.save_view_angle_figure("profile.png", stats)                 # needs CairoMakie
+BlobBoards.save_view_angle_figure("fine.svg", stats; edges = 0:5:90)    # finer bins, vector out
+BlobBoards.save_view_angle_figure("one_board.png", filter(s -> s.uid == uid, stats))
+BlobBoards.print_view_angle_profile(stats)                              # text, no backend needed
 ```
 
 Files built before `n_visible` existed still profile; the recall panel says so
 rather than drawing an empty one.
 
-The legacy `Vector{Track}` save path instead writes a single `untracked/patches`
-dataset; see the [Public API](../api/public.md#Training-Pipeline) training section.
 
 ## Known Issues
 

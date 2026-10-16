@@ -20,33 +20,23 @@ Different software uses different conventions for where the "first pixel" is loc
 
 ### Visual Representation
 
-```
-     :colmap               :opencv               :julia
-  corner at (0,0)       corner at (0,0)      corner at (0.5,0.5)
-        ↓                     ↓                     ↓
-   ┌─────────┐          ┌─────────┐          ┌─────────┐
-   │(0.5,0.5)│          │  (0,0)  │          │  (1,1)  │
-   │    •    │          │    •    │          │    •    │
-   │  pixel  │          │  pixel  │          │  pixel  │
-   └─────────┘          └─────────┘          └─────────┘
-```
+![Where each image-origin convention puts the first pixel's centre and its top-left corner](../assets/generated/image_origins.svg)
 
 ### Converting Between Image Origins
 
+The conversion is a `EuclideanMap` between `PixelFrame`s, the map the figure
+above is drawn with. It acts on plain pixel coordinates, so strip the unit
+first:
+
 ```julia
 using BlobBoards
-using CoordinateTransformations: Translation
+using BlobBoards: EuclideanMap, PixelFrame, centroid, ustrip     # not exported
 
-# Image-origin conversion is a Translation — composable, callable on points/Discs/blobs
-T = Translation(:colmap, :opencv)            # Translation(Vec2(-0.5, -0.5) * px)
-b = blobs(bundle, :pattern; density = 300dpi)   # always in :colmap convention
-b_opencv = T.(b)                             # shift every blob in place
+b = blobs(bundle, :pattern; density = 300dpi)                   # always in the :colmap convention
+to_opencv = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:opencv})
+centres_opencv = [to_opencv(ustrip.(px, centroid(d))) for d in b]   # each centre shifted by (-0.5, -0.5)
 
-T = Translation(:colmap, :julia)
-julia_point = T(colmap_point)
-
-# Strip units when composing with plain-Float64 maps
-unitless = ustrip(T)
+to_julia = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})   # shifted by (+0.5, +0.5)
 ```
 
 ## Reference Frames
@@ -61,56 +51,22 @@ For calibration boards, three nested reference frames define where the coordinat
 
 ### Layout Diagram
 
-```
-    ◀──────────────────── canvas_size.width ────────────────────▶
+![The :canvas, :board and :pattern origins on an A5 board: the canvas origin at the page corner, the board and pattern origins together 10 mm in](../assets/generated/reference_frames.svg)
 
-    ┌───────────────────────────────────────────────────────────┐   ▲
-    │ ○ :canvas origin                                          │   │
-    │  (0,0)                                                    │   │
-    │    ┌────────────────────────────────────────────────┐     │   │
-    │    │ ○ :board origin                                │     │   │
-    │    │  (0,0)                                         │     │   │
-    │    │    ┌────────────────────────────────────┐      │     │   │
-    │    │    │ ○ :pattern origin                  │      │     │   │
-    │    │    │  (0,0)                             │      │     │   │
-    │    │    │                                    │      │     │   │
-    │◀─▶│◀──▶│        ┌───┐                       │◀────▶│◀───▶│   │
-    │ m │ f  │        │ ● │  blob                 │  f   │  m  │   c
-    │ a │ r  │        └───┘                       │  r   │  a  │   a
-    │ r │ a  │                                    │  a   │  r  │   n
-    │ g │ m  │                                    │  m   │  g  │   v
-    │ i │ e  │                                    │  e   │  i  │   a
-    │ n │    │        pattern_size                │      │  n  │   s
-    │   │    │                                    │      │     │   _
-    │   │    │                                    │      │     │   s
-    │   │    └────────────────────────────────────┘      │     │   i
-    │   │    ◀────── pattern_size.width ─────────▶       │     │   z
-    │   │                                                │     │   e
-    │   └────────────────────────────────────────────────┘     │   .
-    │   ◀─────────────  board_size.width  ──────────────▶      │   h
-    │                                                          │   e
-    └──────────────────────────────────────────────────────────┘   i
-                                                                   g
-    Legend:                                                        h
-    ○ = coordinate origin (top-left corner)                        t
-    ● = blob center                                                ▼
-    m = margin (canvas edge to board edge)
-    f = the band (board edge to pattern edge): a stored v3 board only
-```
-
-On a board made today the pattern IS the board (`f` = 0): the frame's marks —
-corner cells and ruler bands — are reserved areas on it, which placement keeps
-clear of, so `:pattern` and `:board` coincide. A stored v3 board keeps its
-inset pattern, as drawn above.
+On a board made today the pattern IS the board: the frame's marks — corner
+cells and ruler bands — are reserved areas on it, which placement keeps clear
+of, so `:pattern` and `:board` share an origin, as the figure shows. A stored
+v3 board keeps its pattern inset inside a frame, and its `:pattern` origin
+lies inside its `:board` one.
 
 ### Converting Between Reference Frames
 
 ```julia
-bundle, _ = load("blob_board.json")
+bundle, _ = BlobBoards.load("blob_board.json")
 
 # Get Translation between frames (in the board's stored unit: points on a v4
 # board, pixels on a stored v3 board)
-T = Translation(board_config(bundle), :pattern, :board)
+T = BlobBoards.Translation(board_config(bundle), :pattern, :board)
 board_point = T(pattern_point)
 
 # Or extract blobs directly in desired frame
@@ -121,13 +77,13 @@ b_canvas = blobs(bundle, :canvas; units = mm)
 ### Coordinate Values Example
 
 For a blob at pattern coordinates `(80mm, 120mm)` on an A4 board with the
-default 10 mm margin and 10 mm frame:
+default 10 mm margin:
 
 | Frame | Blob Center |
 |-------|-------------|
 | `:pattern` | `(80mm, 120mm)` |
-| `:board` | `(90mm, 130mm)` (the frame) |
-| `:canvas` | `(100mm, 140mm)` (the frame and the margin) |
+| `:board` | `(80mm, 120mm)` (the pattern is the board) |
+| `:canvas` | `(90mm, 130mm)` (the margin) |
 
 ## Coordinate Systems
 
@@ -136,16 +92,16 @@ For transforms between pixel and physical units, use `:pixel`, `:physical`, and 
 | System | Units | Description |
 |--------|-------|-------------|
 | `:pixel` | `px` | Pixel coordinates at `density`, the density of the pixels you ask for (and `image_origin`) |
-| `:physical` | `mm` | Physical coordinates in pattern frame |
-| `:world` | unitless mm | Centered origin, y-axis up |
+| `:physical` | `mm` | Physical coordinates, y down, origin at the canvas top-left |
+| `:world` | unitless mm | Origin at the canvas centre, y-axis up |
 
 ### Pixel to Physical Transform
 
 ```julia
-bundle, _ = load("blob_board.json")
+bundle, _ = BlobBoards.load("blob_board.json")
 
 # Get affine transform from pixels (of a 300 dpi image of the board) to mm
-H = AffineMap(bundle, :pixel, :physical; image_origin=:julia, density=300dpi)
+H = BlobBoards.AffineMap(bundle, :pixel, :physical; image_origin=:julia, density=300dpi)
 
 # Transform a pixel point to physical coordinates
 physical_pt = H(Point2(100.0, 200.0))
@@ -155,7 +111,7 @@ physical_pt = H(Point2(100.0, 200.0))
 
 ```julia
 # Direct transform from pixels to world frame
-H = AffineMap(bundle, :pixel, :world; image_origin=:opencv, density=300dpi)
+H = BlobBoards.AffineMap(bundle, :pixel, :world; image_origin=:opencv, density=300dpi)
 world_pt = H(Point2(100.0, 200.0))
 ```
 
@@ -166,7 +122,7 @@ world_pt = H(Point2(100.0, 200.0))
 The `blobs` function takes a reference frame (positional) and optional units:
 
 ```julia
-bundle, _ = load("blob_board.json")
+bundle, _ = BlobBoards.load("blob_board.json")
 
 # Pixel units (default) in pattern frame, at the density of the image they are
 # in (a stored v3 board's own by default; required for a v4 board)
@@ -186,13 +142,13 @@ For 3D calibration (centered origin, y-up, mm):
 
 ```julia
 b = blobs(bundle, :world)
-# origin at pattern center
+# origin at the canvas centre (the board's, for a centred board)
 # x-axis right, y-axis up
 # units: mm (stripped to Float64)
 
 # Lift to 3D points on z=0 plane
 using GeometryBasics: Point3
-X = Point3.(vcat.(centroid.(b), 0.0))
+X = Point3.(vcat.(BlobBoards.centroid.(b), 0.0))
 ```
 
 ## Bounding Rectangles
@@ -202,7 +158,7 @@ Get rectangles for different regions:
 ```julia
 using GeometryBasics: Rect
 
-bundle, _ = load("blob_board.json")
+bundle, _ = BlobBoards.load("blob_board.json")
 
 # Pattern bounds (origin at 0,0)
 rect = Rect(bundle, :pattern)
@@ -217,33 +173,30 @@ rect = Rect(bundle, :board)
 ### Feature Detection Pipeline
 
 ```julia
-bundle, image = load("blob_board.json")
+using BlobBoards: EuclideanMap, PixelFrame, centroid, ustrip     # not exported
+bundle, image = BlobBoards.load("blob_board.json")
 
-# Detect blobs (your detector returns OpenCV convention)
-detected = detect_blobs(image)
-
-# Get ground truth at the image's density, convert to OpenCV convention
+# Ground truth at the image's density, as OpenCV-convention centres (an
+# external detector's convention)
 gt = blobs(bundle, :canvas; density = 300dpi)
-gt_opencv = Translation(:colmap, :opencv).(gt)
+to_opencv = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:opencv})
+gt_opencv = [to_opencv(ustrip.(px, centroid(d))) for d in gt]
 
-# Match and evaluate
-matches = match_blobs(detected, gt_opencv)
+# then match your detector's output against gt_opencv with your own matcher
 ```
 
 ### Camera Calibration
 
 ```julia
-bundle, image = load("blob_board.json")
+using BlobBoards: centroid                                     # not exported
+bundle, image = BlobBoards.load("blob_board.json")
 
-# Get 3D points (world frame, z=0)
+# 3D points (world frame, z = 0)
 b = blobs(bundle, :world)
-X = Point3.(vcat.(centroid.(b), 0.0))
+X = BlobBoards.Point3.(vcat.(BlobBoards.centroid.(b), 0.0))
 
-# Get 2D image points (from detection)
-x = detect_and_match(image, b)
-
-# Estimate camera pose
-camera = estimate_pose(X, x)
+# The 2D image points and the pose come from your own detection and solver
+# (BlobBoards' own pipeline does both: find_boards, Detecting Boards).
 ```
 
 ## Unit Conversions

@@ -207,9 +207,8 @@ picks the GPU when CUDA is loaded and functional, and the CPU otherwise. The
 descriptor network runs in ONNX Runtime, on its CUDA execution provider or its
 CPU one.
 
-CUDA and cuDNN are **weak** dependencies of BlobBoards. As with CairoMakie for
-authoring, a package's own project cannot load its weak dependencies. The
-checkout ships a companion environment, `gpu/`, that dev's the checkout and adds:
+CUDA and cuDNN are **weak** dependencies of BlobBoards, and a package's own
+project cannot load its weak dependencies. The checkout ships a companion environment, `gpu/`, that dev's the checkout and adds:
 
 | Package | Activates |
 |---------|-----------|
@@ -287,9 +286,8 @@ using CUDA
 CUDA.set_runtime_version!(v"12.9")   # writes the pin to LocalPreferences.toml; restart Julia
 ```
 
-After the restart, the check below must report `:cuda`. Add CairoMakie for
-the example boards (definitions only), and FileIO, Colors and ImageIO to load
-images.
+After the restart, the check below must report `:cuda`. Add FileIO, Colors
+and ImageIO to load images.
 
 The pin matters because the newest CUDA runtime CUDA.jl would otherwise pick
 can be 13.x, and ONNX Runtime 1.20's CUDA provider accepts only 12.x, so

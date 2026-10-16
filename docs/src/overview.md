@@ -9,7 +9,7 @@ BlobBoards.jl creates calibration targets with blob patterns that are:
 - **Deterministic**: Bit-exact reproducible via seeded configuration
 - **Multi-scale**: Logarithmically distributed blob sizes for scale-invariant detection
 - **Print-ready**: PDF output with rulers, QR codes, and metadata
-- **Configurable**: Physical units (mm, inch) with compile-time unit checking
+- **Configurable**: Physical units (mm, inch) with run-time unit checking
 
 ## Quick Start
 
@@ -90,7 +90,7 @@ See the [Coordinates Guide](guide/coordinates.md) for detailed documentation.
 
 **Tooling**
 - Training pipeline: detect, track, and extract canonicalized patches from video
-- FileIO integration for `.tracks` files (HDF5 format)
+- `.tracks` files are plain HDF5
 - Visualization helpers for Makie backends
 
 ## Installation
@@ -113,6 +113,7 @@ Pages = [
     "guide/patterns.md",
     "guide/boards.md",
     "guide/coordinates.md",
+    "guide/detection.md",
     "guide/board-tracks.md",
     "guide/python.md",
     "api/public.md",

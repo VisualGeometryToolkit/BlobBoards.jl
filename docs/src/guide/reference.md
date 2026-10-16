@@ -38,7 +38,7 @@ blob_pattern(config::PatternConfig; dir=nothing)
 | `scales_per_octave` | Int | `3` | Number of scales per doubling of size |
 | `α` | Float64 | `1.2` | Scale sampling bias (higher = more small blobs) |
 | `cutoff` | Float64 | `2.0` | Gaussian truncation radius in σ — use the default 2 |
-| `max_trials` | Int | `5000` | Max placement attempts per blob |
+| `max_trials` | Int | `5000` | Max placement attempts per blob size |
 | `raster_aligned` | Bool | `true` | Snap blob centers to pixel centers |
 | `polarity` | Symbol | `:dark` | Blob polarity (`:dark` or `:light`) |
 | `dir` | String | `nothing` | Output directory (saves PNG + JSON if provided) |
@@ -50,8 +50,8 @@ stores the blob sizes as σ in logical units (a disc's diameter is `2·cutoff·�
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `min_scale` | LogicalCount | Smallest σ (px) — the bottom rung of the scale ladder |
-| `max_scale` | LogicalCount | Largest σ (px) — the top of the scale ladder, exactly as requested |
+| `min_scale` | length (px) | Smallest σ (px) — the bottom rung of the scale ladder |
+| `max_scale` | length (px) | Largest σ (px) — the top of the scale ladder, exactly as requested |
 
 `PatternConfig(; pattern_resolution, min_scale, max_scale, …)` takes these
 storage-level σ values directly (`max_scale = nothing` applies the default rule).
@@ -60,7 +60,6 @@ storage-level σ values directly (`max_scale = nothing` applies the default rule
 
 ```julia
 using BlobBoards
-using VisualGeometryCore: px
 
 # Basic usage
 pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234)
@@ -154,7 +153,7 @@ bundle = blob_board("A4";
     dir = "./output"
 )
 
-# A3 print master with an explicit ICC profile
+# A3 print master, naming its ICC profile (here the default, linear reflectance)
 bundle = blob_board("A3";
     blob_sizes = suggest_blob_sizes(1200dpi, "A3"),
     output = Pdf(icc_profile = :linear),
@@ -177,14 +176,14 @@ bundle = blob_board("A4";
 | ANSI | `ANSI A`, `ANSI B`, `ANSI C`, `ANSI D`, `ANSI E`, `ANSI E1` |
 | Common | `Letter`, `US Letter`, `Legal`, `Tabloid`, `Ledger` |
 
-## Blob and Saddle Point Extraction
+## Blob Extraction
 
 ### `blobs` - Unified Extraction
 
 Extract blobs with specified reference frame and units:
 
 ```julia
-bundle, image = load("blob_board.json")
+bundle, image = BlobBoards.load("blob_board.json")
 
 # Pixel units (default) in pattern frame, at the density you name (a v3 board's own by default)
 b = blobs(bundle, :pattern; density = 300dpi)
@@ -211,9 +210,9 @@ b = blobs(bundle, :world)
 ### Loading
 
 ```julia
-bundle, image = load("blob_board.json")   # From JSON
-bundle, image = load("blob_board.pdf")    # From PDF
-bundle, image = load("blob_pattern.png")  # From PNG
+bundle, image = BlobBoards.load("blob_board.json")   # From JSON
+bundle, image = BlobBoards.load("blob_board.pdf")    # From PDF
+bundle, image = BlobBoards.load("blob_pattern.png")  # From PNG
 ```
 
 ### Saving
@@ -236,7 +235,7 @@ Detect the boards in every media item under a directory and accumulate their
 patch tracks into one `.tracks` file:
 
 ```julia
-out = build_tracks_for_sequences(board_dir, model_path, video_dir;
+out = BlobBoards.build_tracks_for_sequences(board_dir, model_path, video_dir;
     n_frames = 100,            # or stride=5
     output_dir = "./output",   # writes <output_name>_<patch_type>_s<scale>.tracks
     iou_threshold = 0.6,
@@ -290,12 +289,12 @@ Every board is saved as a print file plus a JSON sidecar, `blob_board_<uid>_<has
   "hashes":        { "config": "<sha256 of the schema, the canonical preamble and the blobs>" },
   "render":        { "format": "pdf", "icc_profile": "linear",
                      "id_label": true, "shading_function": "calculator",
-                     "density": null }
+                     "density": null, "bleed": { "value": 0, "unit": "mm" } }
 }
 ```
 
 For a raster, `render` records `"format": "tiff"` or `"png"` and
-`"density": { "value": 600, "unit": "dpi" }` (a PNG's `icc_profile` is `null`).
+`"density": { "value": 600, "unit": "dpi" }` (a PNG's `icc_profile` is `null`, and a raster's `bleed` is `null`).
 A custom ICC profile is recorded with its bytes — `{ "name": "press.icc",
 "sha256": …, "data": "<base64>" }` — so a rebuild needs no original file.
 
@@ -303,7 +302,8 @@ Lengths are `{ "value": …, "unit": "mm" | "pt" | "dpi" }`; a tick's `width` is
 its full drawn length across the frame band. Blob centres are 0.01 pt grid
 values, the very numbers the print master holds.
 
-- **Identity** is `hashes.config`, the SHA-256 of the canonical `preamble`; the
+- **Identity** is `hashes.config`, the SHA-256 of the schema, the canonical
+  `preamble` and the blobs; the
   file name and the printed uid are its first characters. It is stored, never
   recomputed on load.
 - **Blob sizes** are stored only as σ in points (`min_scale`, `max_scale`);

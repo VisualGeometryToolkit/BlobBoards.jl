@@ -1,5 +1,6 @@
 [deps]
 BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterCodeBlocks = "b6400b83-267f-4b55-9fd8-bffc853bdfd8"
 DocumenterLandingPage = "1c52b33b-3e2f-4e99-b3b5-a6ad63f0d6d2"
@@ -8,6 +9,7 @@ DocumenterLandingPage = "1c52b33b-3e2f-4e99-b3b5-a6ad63f0d6d2"
 BlobBoards = {path = ".."}
 
 [compat]
+CairoMakie = "0.15"
 Documenter = "1.17"
 DocumenterCodeBlocks = "1.5.1"
 DocumenterLandingPage = "0.2.2"

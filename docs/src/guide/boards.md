@@ -173,17 +173,7 @@ described in the reference and the [Patterns guide](patterns.md).
 
 ## Frame and ruler
 
-```
-┌──────┬───────────────────┬─────────┐
-│  QR  │    North ruler    │  uid 1  │
-├──────┘                   └─────────┤
-│ West                          East │
-│ruler    blobs fill the     ruler   │
-│         whole board                │
-├──────┐                   ┌─────────┤
-│uid 2 │    South ruler    │  uid 3  │
-└──────┴───────────────────┴─────────┘
-```
+![A default A5 board: the QR code and three uid cells in the corners, the ruler bands between them, and the blobs filling the rest of the board](../assets/generated/frame_marks.svg)
 
 The blobs are placed on the whole board. Everything else printed on it — the
 frame's **marks** — is a reserved rectangle that placement keeps clear of. There
@@ -330,20 +320,7 @@ canvas and `Pdf(; bleed)`:
 | TrimBox (the cut) | = MediaBox | the canvas, 2 mm in from every edge |
 | board (inside the `margin`) | 190 × 277 mm, 10 mm in | 190 × 277 mm, 10 mm in from the TrimBox |
 
-```
-┌──────────── MediaBox = BleedBox (214 × 301 mm) ───────────┐
-│ ┌──────────── TrimBox: the A4 sheet (210 × 297 mm) ─────┐ │
-│ │                 margin (10 mm)                        │ │
-│ │   ┌────────────── board (190 × 277 mm) ───────────┐   │ │
-│ │   │ [QR]                                    [uid] │   │ │
-│ │   │                     blobs                     │   │ │
-│ │   │ [uid]                                   [uid] │   │ │
-│ │   └───────────────────────────────────────────────┘   │ │
-│ │                    id label                           │ │
-│ └───────────────────────────────────────────────────────┘ │
-│                  bleed (2 mm, white)                      │
-└───────────────────────────────────────────────────────────┘
-```
+![An A4 board written with Pdf(bleed = 2mm): the 214 × 301 mm page (MediaBox = BleedBox), the 210 × 297 mm TrimBox 2 mm in, and the 190 × 277 mm board 10 mm inside the trim](../assets/generated/page_boxes.svg)
 
 - **What you pass is the finished size.** `"A4"` or `blob_board(1000mm, 1000mm; …)`
   is the sheet after trimming; `margin` is measured from the trim. The bleed
@@ -450,7 +427,7 @@ Every new board prints its identity in one 6 pt line under the board, in the
 sheet margin (inside the trimmed sheet, clear of the printer's unprintable border):
 
 ```
-blob_board_0d4_35510 · BB4/210MM/297MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/A4/4.25196850394/26.929/3/5000/1.2/2/D/0D435510 · BlobBoards 1.1.2
+blob_board_0d4_35510 · BB4/210MM/297MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/A4/4.25196850394/26.929/3/5000/1.2/2/D/0D435510 · BlobBoards 0.1.0
 ```
 
 The middle part is the board code, the same string the QR code holds:
@@ -464,8 +441,8 @@ turns it off without changing the UID. A board that fills its sheet has no room
 for it, and the label is skipped (with a warning for a frameless board, which
 would otherwise carry no printed identity). The JSON's `render` block records
 whether it was drawn: `BlobBoards.rebuild_board` and the gallery's regeneration rebuild
-the sheet as recorded, and a board with no `render` block (written before
-0.36.2) rebuilds without one. `render_board` defaults to `false`.
+the sheet as recorded, and a board with no `render` block (an older file)
+rebuilds without one. `render_board` defaults to `false`.
 
 ## Printing
 
@@ -510,11 +487,12 @@ bundle, image = BlobBoards.load("./output/blob_board_<uid>.json")
 
 # 2. Re-render the stored board (its recorded blobs, frame, QR and uid);
 #    no placement is re-run, so it matches the printed board exactly.
-#    The output is the first argument; `dir` is required.
+#    `output` is a keyword (default Pdf()); `dir` is required.
 BlobBoards.render_board(bundle; dir = "./rerender", output = Png(300dpi))
 BlobBoards.render_board(bundle; dir = "./rerender")                        # Pdf() by default
 
-# 3. Re-generate from the configuration (placement is re-run from the seed)
+# 3. Rebuild as printed, from the JSON alone (a board made today has its
+#    placement re-run from the seed as a check, and is refused on a mismatch)
 bundle = BlobBoards.rebuild_board("./output/blob_board_<uid>.json"; dir = "./output2")
 ```
 
@@ -527,7 +505,7 @@ Form 3 writes the board as its JSON's `render` block records (`output` and
 bundle, image = BlobBoards.load("./output/blob_board_<uid>.json")
 
 blobs(bundle, :pattern; units = mm)                  # mm, pattern frame
-blobs(bundle, :board; units = mm)                    # mm, board frame (includes the frame band)
+blobs(bundle, :board; units = mm)                    # mm, board frame (the same as :pattern on a board made today)
 blobs(bundle, :canvas; density = 300dpi)       # px of a 300 dpi conversion (COLMAP convention)
 blobs(bundle, :world)                                # centred, y-up, unitless mm: the z = 0 calibration plane
 

@@ -26,7 +26,7 @@ Generate deterministic, multi-scale blob patterns and printable calibration boar
 
 **Training and tooling**
 - Training pipeline: detect, track, and extract canonicalized patches from video
-- FileIO integration for `.tracks` files (HDF5 format)
+- `.tracks` training files (plain HDF5)
 - Makie visualization (any backend); pipeline-stage capture for offline inspection
 
 ## Quick Start
@@ -66,14 +66,15 @@ bundle, img = BlobBoards.load("board.json")
 # Get blobs in pixel units (default), at the density of the image they are in
 # (a stored v3 board's own by default; a v4 board's layout has no density)
 blobs_px = blobs(bundle, :pattern; density = 300dpi)   # Pattern coordinate frame
-blobs_px = blobs(bundle, :board; density = 300dpi)     # Board coordinate frame (includes borders)
+blobs_px = blobs(bundle, :board; density = 300dpi)     # Board coordinate frame (the same as :pattern on a board made today)
 
 # Get blobs in physical units
 blobs_mm = blobs(bundle, :pattern; units=mm)    # Physical coordinates in mm
 
-# Convert between image origin conventions — Translation extends CoordinateTransformations,
-# is unit-bearing (`px`), and composes via `∘`.
-blobs_julia = Translation(:colmap, :julia).(blobs_px)
+# Convert between image origin conventions: a map on plain pixel coordinates
+using BlobBoards: EuclideanMap, PixelFrame, centroid, ustrip
+to_julia = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})
+centres_julia = [to_julia(ustrip.(px, centroid(d))) for d in blobs_px]
 ```
 
 Image origin conventions:
@@ -172,7 +173,7 @@ julia --project=examples examples/pipeline/scan_media_directory.jl <media-dir>
 ```bash
 # With pixi (recommended)
 pixi run -e py python python/examples/boards/generate_a4_board.py
-pixi run -e py python python/examples/patterns/generate_800x600_pattern.py
+pixi run -e py python python/examples/find_boards.py
 
 # Or with manual setup
 python python/examples/boards/generate_a4_board.py
@@ -217,7 +218,7 @@ Key options:
   is a paper name, a `Size2` or a `(width, height)` tuple.
   The max must be given: a length or a `short_side` fraction. A board is laid
   out on a fixed 1/7200-inch grid and has no pixel density
-- `output`: `Pdf()` (default; options `shading_function`, `icc_profile`),
+- `output`: `Pdf()` (default; options `shading_function`, `icc_profile`, `bleed`),
   `Tiff(density; icc_profile)` or `Png(density)` —
   a raster names its own density, e.g. `Tiff(600dpi)`
 - `id_label`: print the board's identity under it in 6 pt (default `true`)
@@ -250,10 +251,12 @@ before 2026-10-01 are refused and must be regenerated.
 
 ### As a dependency
 
-BlobBoards is registered in the General registry (Julia 1.12+):
+BlobBoards and its stack are in CauRegistry until they are registered in
+General (Julia 1.12+):
 
 ```julia
 using Pkg
+Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
 Pkg.add("BlobBoards")
 ```
 
@@ -331,35 +334,27 @@ See [python/README.md](python/README.md) for full API reference.
 
 ## Training Pipeline
 
-Build tracks of canonicalized blob patches from video with ground-truth homographies,
+Build tracks of canonicalized blob patches from videos and photos of the boards,
 for training local feature descriptors.
 
 ```julia
 using BlobBoards
 
-# Build tracks from video + GT homographies
-out = build_tracks(
-    "video.mp4",
-    "homographies.npy";
-    n_frames = 100,
-    output_dir = "./output",   # saves video.tracks (filename from video)
+out = BlobBoards.build_tracks_for_sequences(
+    "/data/boards",                     # board .json files
+    "/data/models/blob_matcher.onnx",   # descriptor network
+    "/data/videos";                     # videos and/or photos
+    output_dir = "/data/out",
+    output_name = "tracks",
 )
-# out.output_path == "./output/video.tracks"
-
-# Load tracks via FileIO
-using FileIO
-data = FileIO.load("./output/video.tracks")
-data.tracks       # Vector{Track} — each track has frame IDs + patch matrices
-data.untracked    # Unmatched patches (negative training signal)
-
-# Or via BlobBoards.load (also accepts legacy .h5)
-data = BlobBoards.load("./output/video.tracks")
-
-# Visualize longest tracks
-plot_tracks(data.tracks)
+# => "/data/out/tracks_logpolar_s32.tracks": one patch type at one scale
 ```
 
-See `examples/training/` for complete Julia and Python examples.
+A `.tracks` file is plain HDF5 (`examples/training/TRACKS_FORMAT.md`): read it
+with HDF5.jl, h5py, or `blobboards.load_tracks` from Python. See
+[Board Tracks](https://blobboards.github.io/guide/board-tracks/) for the options.
+
+See `examples/training/` for the command-line builder and its SLURM drivers.
 
 ## Reproducibility
 

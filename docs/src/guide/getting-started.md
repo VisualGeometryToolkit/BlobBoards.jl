@@ -39,7 +39,6 @@ For training data or custom layouts, generate just the pattern:
 
 ```julia
 using BlobBoards
-using VisualGeometryCore: px
 
 # Generate a 800x600 pixel pattern
 pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234)
@@ -53,7 +52,7 @@ pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), dir=
 ### From Board Files
 
 ```julia
-bundle, image = load("blob_board.json")
+bundle, image = BlobBoards.load("blob_board.json")
 
 # Physical coordinates (mm) relative to pattern origin
 b = blobs(bundle, :pattern; units=mm)
@@ -68,7 +67,7 @@ b = blobs(bundle, :pattern; density = 300dpi)
 ### From Pattern Files
 
 ```julia
-bundle = load("blob_pattern.json")
+bundle, _ = BlobBoards.load("blob_pattern.json")
 
 # Pixel coordinates (COLMAP convention)
 b = blobs(bundle)
@@ -77,22 +76,22 @@ b = blobs(bundle)
 ### World Coordinates for 3D Calibration
 
 ```julia
-bundle, image = load("blob_board.json")
+bundle, image = BlobBoards.load("blob_board.json")
 
 # Get blobs in world frame (centered, y-up, unitless mm)
 world = blobs(bundle, :world)
 
 # Lift to 3D points on z=0 plane
 using GeometryBasics: Point3
-X = [Point3(b.center..., 0.0) for b in blobs]
+X = [Point3(b.center..., 0.0) for b in world]
 ```
 
 ## Loading Saved Boards
 
 ```julia
 # Load from any paired file (JSON, PNG, or PDF)
-bundle, image = load("blob_board_abc_12345.json")
-bundle, image = load("blob_board_abc_12345.pdf")
+bundle, image = BlobBoards.load("blob_board_abc_12345.json")
+bundle, image = BlobBoards.load("blob_board_abc_12345.pdf")
 
 # Access configuration
 config = pattern_config(bundle)

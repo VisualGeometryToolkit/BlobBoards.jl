@@ -89,3 +89,6 @@ bmvc2026/sweep_*.log
 
 # The paper is linked from arXiv, never shipped with the docs.
 docs/**/*.pdf
+
+# figures drawn by docs/diagrams.jl at build time
+docs/src/assets/generated/

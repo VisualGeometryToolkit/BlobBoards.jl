@@ -55,8 +55,8 @@ it on first use; the first call can take minutes on a fresh machine.
 | `BoardResult`, `BoardPreamble`, `BoardConfig`, `PatternResult`, `PatternConfig` | `BoardBundle`, `BoardPreamble`, [`BoardConfig`](@ref), …, [`PatternConfig`](@ref) | results and configurations |
 
 Two Julia options have no Python form: the radially distorted geometry (`RadialHomographyGeometry`)
-and the leading pixel-type argument of `blob_board` / `blob_pattern` (patterns
-and boards are 8-bit grey from Python).
+and the leading pixel-type argument of `blob_pattern` (patterns are 8-bit grey
+from Python; a board has no pixel type).
 
 ## Quick start
 
@@ -282,8 +282,8 @@ v3 was laid out on its printer's pixels, and its own density is the default.
 
 | `reference_frame` | Origin | Description |
 |-------------------|--------|-------------|
-| `"pattern"` | Pattern top-left | Excludes the frame (default) |
-| `"board"` | Board top-left | Includes the frame |
+| `"pattern"` | Pattern top-left | The default; on a board made today the same as `"board"` |
+| `"board"` | Board top-left | A stored v3 board's pattern sits inside its frame |
 | `"canvas"` | Page top-left | Includes the margins |
 | `"world"` | Board centre, y up, mm | What a `find_boards` homography maps to pixels |
 

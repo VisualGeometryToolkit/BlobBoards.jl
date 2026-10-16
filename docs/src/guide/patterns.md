@@ -8,7 +8,6 @@ A blob pattern is a collection of Gaussian blobs placed on a white background wi
 
 ```julia
 using BlobBoards
-using VisualGeometryCore: px
 
 # Basic pattern generation
 pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing))
@@ -69,7 +68,7 @@ ladder itself is `calc_blob_scales(min_scale, max_scale; scales_per_octave = 3)`
 
 ## Placement Algorithm
 
-Blobs are placed using rejection sampling with R-tree collision detection:
+Blobs are placed using rejection sampling, collisions checked in per-level uniform grids (cell 2·cutoff·σ):
 
 1. Larger scales are placed first (greedy packing)
 2. Each blob attempts random placement up to `max_trials` times
@@ -126,7 +125,7 @@ p2, b2, _ = blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234)
 # p1 == p2 and b1 == b2
 
 # From saved configuration
-bundle, image = load("blob_pattern.json")
+bundle, image = BlobBoards.load("blob_pattern.json")
 config = pattern_config(bundle)
 # Regenerate identical pattern from config
 ```
@@ -148,15 +147,15 @@ pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), pola
 Blobs are stored in COLMAP convention internally (first pixel center at 0.5, 0.5):
 
 ```julia
-bundle, _ = load("blob_pattern.json")
+bundle, _ = BlobBoards.load("blob_pattern.json")
 
 # Get blobs in COLMAP convention
 b = blobs(bundle)
 
-# Convert to other conventions using Translation (extends CoordinateTransformations,
-# is unit-bearing, composes via ∘).
-b_opencv = Translation(:colmap, :opencv).(b)
-b_julia = Translation(:colmap, :julia).(b)
+# Convert to other conventions: a map on plain pixel coordinates
+using BlobBoards: EuclideanMap, PixelFrame, centroid, ustrip     # not exported
+centres_opencv = [EuclideanMap(PixelFrame{:colmap}, PixelFrame{:opencv})(ustrip.(px, centroid(d))) for d in b]
+centres_julia = [EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})(ustrip.(px, centroid(d))) for d in b]
 ```
 
 ## Configuration Object

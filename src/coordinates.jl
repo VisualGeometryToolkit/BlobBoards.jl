@@ -168,9 +168,11 @@ b = blobs(bundle, :pattern; units=mm)
 b = blobs(bundle, :world)
 X = Point3.(vcat.(centroid.(b), 0.0))  # 3D points on z=0 plane
 
-# Julia's pixel origin: pixel coordinates first, then the origin map
+# Julia's pixel origin: pixel coordinates first, then the origin map, which
+# acts on plain numbers (strip the pixel unit)
 b = blobs(bundle, :canvas; density = 300dpi)
-u = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia}).(centroid.(b))
+to_julia = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})
+u = [to_julia(ustrip.(px, centroid(d))) for d in b]
 ```
 """
 function blobs(bundle::BoardBundle, reference_frame::Symbol; units::Union{Real, Units} = px, density::Union{Nothing, Quantity} = nothing)
