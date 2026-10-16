@@ -28,16 +28,16 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LocalOptimizationDoneRight = "87a2e6a3-7afc-471f-bd1b-aa3740a29cd9"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 ONNXRunTime = "e034b28e-924e-41b2-b98f-d2bbeb830c6a"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PNGFiles = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RansacScoringDoneRight = "e23d4225-f201-4c3a-a297-7efae5f2deeb"
 RobustVisualGeometry = "48970fad-9a21-401c-bf6c-679fa4f2bd7f"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
-Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 SpatialIndexing = "d4ead438-fe20-5cc5-a293-4fd39a41b74c"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
@@ -60,9 +60,9 @@ NNlib = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
 Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
 PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
 Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
-cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 TensorBoardLogger = "899adc3e-224a-11e9-021f-63837185c80f"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [extensions]
 BlobBoardsCUDAExt = "CUDA"
@@ -76,17 +76,17 @@ Accessors = "0.1"
 Aqua = "0.8"
 Artifacts = "1"
 Base64 = "1"
+CUDA = "5.11.0"
+CUDA_Runtime_jll = "0.21"
 CairoMakie = "0.15"
 Colors = "0.13"
 ConstructionBase = "1"
 CoordinateTransformations = "0.6"
-CUDA = "5.11.0"
-CUDA_Runtime_jll = "0.21"
+Dates = "1"
 Enzyme = "0.13.134"
 ExplicitImports = "1.15"
-Dates = "1"
 FileIO = "1"
-FixedPointNumbers = "0.8"
+FixedPointNumbers = "0.8, 0.9"
 FlexUnits = "0.6.11"
 FreeType = "4"
 FreeTypeAbstraction = "0.10"
@@ -96,9 +96,7 @@ ImageFiltering = "0.7.12"
 ImageTransformations = "0.10.2"
 Interpolations = "0.16.3"
 JET = "0.12"
-ReTestItems = "1"
 JLD2 = "0.6.3"
-
 JSON3 = "1"
 KernelAbstractions = "0.9.41"
 Libtiff_jll = "4.7"
@@ -110,21 +108,19 @@ Makie = "0.24"
 NNlib = "0.9.33"
 ONNXRunTime = "1.3.1"
 Optimisers = "0.4.7"
-Pkg = "1"
 PNGFiles = "0.4"
+Pkg = "1"
 Poppler_jll = "25.10.0"
 Preferences = "1"
 PythonCall = "0.9"
 Random = "1"
 RansacScoringDoneRight = "0.1"
+ReTestItems = "1"
 Reactant = "0.2.240"
 RobustVisualGeometry = "0.1"
 Rotations = "1"
 SHA = "0.7, 1"
 Scratch = "1"
-# Exactly General's 0.1.6: a fork of SpatialIndexing registered under the SAME
-# UUID at 0.1.7–0.1.10 would otherwise satisfy a plain "0.1.6". The
-# fork-only queries now come from VisualGeometryCore.SpatialQueries.
 SpatialIndexing = "=0.1.6"
 SpecialFunctions = "2.7.1"
 StaticArrays = "1"
@@ -132,9 +128,9 @@ Statistics = "1"
 StructArrays = "0.7"
 StructTypes = "1"
 TOML = "1"
-TiffImages = "0.11"
 TensorBoardLogger = "0.1"
 Test = "1"
+TiffImages = "0.11"
 VideoIO = "1.4.0"
 VisualGeometryCore = "0.1"
 VisualGeometryFeatures = "0.1"
@@ -147,49 +143,17 @@ julia = "1.12"
 [extras]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
-ReTestItems = "817f1d60-ba6b-4fd5-9520-3cf149f6a823"
 PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+ReTestItems = "817f1d60-ba6b-4fd5-9520-3cf149f6a823"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TiffImages = "731e570b-9d59-4bfa-96dc-6df516fadf69"
 
-[targets]
-test = ["Test", "ReTestItems", "PythonCall", "Aqua", "CairoMakie", "JET", "Accessors", "CUDA_Runtime_jll", "CUDA", "cuDNN", "ExplicitImports", "TiffImages"]
-
-# TWO EXTENSIONS NEVER LOAD UNDER `Pkg.test`, because their triggers are not
-# in the target above. An extension whose triggers are absent is not merely
-# untested — it cannot even fail to compile, so edits to it ship unverified.
-# Each omission is deliberate:
-#
-#   BlobBoardsTrainingExt  Reactant — cannot coexist with the cuDNN the
-#                          evaluation path needs (Reactant bundles its own);
-#                          that conflict is why Lux inference and training are
-#                          separate extensions in the first place.
-#   BlobBoardsLuxExt       Lux + NNlib — adding them pulls the whole Lux stack
-#                          into every test env for one inference backend.
-#
-# So verify them BY HAND when you touch them. LuxExt: the bmvc2026 project
-# already has Lux + cuDNN. TrainingExt: put a Project.toml that carries every
-# trigger (Reactant, Lux, NNlib, …) into a scratch dir, add
-# `[sources] BlobBoards = { path = "<checkout>" }`, then
-#
-#   julia --project=<scratch> -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
-#
-# and read the "BlobBoards → BlobBoardsTrainingExt" line. Pkg.precompile
-# compiles each extension with exactly its own triggers, which is how the
-# 2026-09-07 audit found TrainingExt had been unable to compile at all (it
-# asserted LuxExt was loaded; LuxExt needs cuDNN, which TrainingExt does not
-# trigger on). Last run 2026-09-07: all six extensions precompile.
-
-# CHECKED IN, unlike LocalPreferences.toml. `Pkg.test` builds a throwaway
-# project in a tempdir, which never sees this repo's LocalPreferences — so the
-# 12.9 pin that makes interactive runs work was invisible to every gate, and
-# the suite silently described patches on the ONNX CPU EP. ORT's CUDA provider
-# requires a CUDA runtime >= 12.0 and < 13.0; the machine default is 13.2.
-# CUDA_Runtime_jll is in the test target above so the temp env actually
-# installs the pinned runtime.
 [preferences.CUDA_Runtime_jll]
 version = "0.1.0"
+
+[targets]
+test = ["Test", "ReTestItems", "PythonCall", "Aqua", "CairoMakie", "JET", "Accessors", "CUDA_Runtime_jll", "CUDA", "cuDNN", "ExplicitImports", "TiffImages"]
