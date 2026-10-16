@@ -49,7 +49,7 @@ A keyword outside this list is an `ArgumentError`, never silently ignored.
   file was rendered (its `render` block).
 - `output = Pdf()`: what the board is written as — a [`Pdf`](@ref), a
   [`Tiff`](@ref) or a [`Png`](@ref), each carrying only its own options:
-  - `Pdf(; shading_function = :calculator, icc_profile = :linear)` — the print
+  - `Pdf(; shading_function = :calculator, icc_profile = :linear, bleed = 0mm)` — the print
     master: PDF/X-4 (also PDF/A-2b), written directly by BlobBoards with no
     external tools; vector frame, text in one embedded font, no image, and
     one radial shading per blob, so the printer evaluates the Gaussian at its
@@ -58,7 +58,10 @@ A keyword outside this list is an `ArgumentError`, never silently ignored.
     PostScript calculator function) or `:sampled` (a sampled table, for a RIP
     that mishandles calculator functions); `icc_profile` the grey profile of
     the OutputIntent, `:linear` (linear reflectance) or the path of a
-    single-channel ICC file.
+    single-channel ICC file; `bleed` a print shop's trim allowance on every
+    side: the canvas stays the finished sheet and the TrimBox, the page
+    (MediaBox = BleedBox) grows by `bleed` each way — a white strip cut off.
+    A rendering option: the board and its uid do not change.
   - `Tiff(density; icc_profile = :linear)` — the whole sheet converted at
     `density` (pixels per inch, a whole number; the page rounded up to whole
     pixels: a pixel coordinate is the page's points × dpi/72), 8-bit grey, LZW,
@@ -71,7 +74,7 @@ A keyword outside this list is an `ArgumentError`, never silently ignored.
   PDF has no such bound).
 - `id_label = true`: print the board's identity (file stem, board code,
   BlobBoards version) in one 6 pt line under the board, in the sheet
-  margin outside the TrimBox. Skipped when the margin has no room (with a warning
+  margin. Skipped when the margin has no room (with a warning
   for a frameless board, which then carries no printed identity). A rendering
   option, not part of the identity.
 
@@ -110,7 +113,8 @@ density — and is not a keyword). A canvas side may not exceed 9999.99 pt
 - `margin = Size2(width = 10mm, height = 10mm)` (`DEFAULT_BOARD_MARGIN`): the
   white margin around the board, which is always centred on the page — `width`
   left and right of it, `height` above and below. The board is the canvas less
-  twice the margin; the PDF TrimBox marks it. The default clears office
+  twice the margin. The canvas is the finished sheet, the PDF's TrimBox (a
+  print shop's trim allowance is `Pdf(bleed)`, outside it). The default clears office
   printers' unprintable border (3–6.35 mm) and leaves the id label its 9.25 mm
   under the board. A zero margin is full bleed. The board records its margin.
 - `board_size`: the board instead, a `Size2` of lengths ≤ the canvas; its margin

@@ -116,7 +116,7 @@ the pattern's short side, no cap); `nothing` is an `ArgumentError`.
 
 | `output` | Written as | Options |
 |----------|------------|---------|
-| `Pdf()` (default) | the PDF/X-4 print master; no density | `shading_function = :calculator` (or `:sampled`), `icc_profile = :linear` (or a grey ICC file) |
+| `Pdf()` (default) | the PDF/X-4 print master; no density | `shading_function = :calculator` (or `:sampled`), `icc_profile = :linear` (or a grey ICC file), `bleed = 0mm` (a print shop's trim allowance: the page grows by it on every side, the TrimBox stays the finished sheet) |
 | `Tiff(density)` | the sheet converted at `density`, 8-bit grey TIFF | `icc_profile = :linear` |
 | `Png(density)` | the sheet converted at `density`, grey PNG | — |
 

@@ -233,7 +233,7 @@ Paper sizes: `"A4"`, `"A5"`, `"Letter"`, or custom `Size2(width, height)`
 ## Outputs
 
 - **PDF**: the print master — always PDF/X-4 (OutputIntent, TrimBox at the
-  board, "print at actual size"), each blob a vector radial shading; BlobBoards
+  finished sheet, optional print-shop bleed `Pdf(bleed = 2mm)`, "print at actual size"), each blob a vector radial shading; BlobBoards
   writes the file itself, with no external tools
 - **TIFF**: the same sheet converted at the TIFF's density, an LZW raster with resolution tags and ICC profile
 - **PNG**: the same conversion as a grey PNG, for training datasets

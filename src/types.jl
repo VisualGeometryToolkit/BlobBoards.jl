@@ -835,7 +835,7 @@ struct BoardConfig{L <: VgcQuantity, G <: LayoutGrid, F <: VgcQuantity, P <: Vgc
 end
 
 # The integral layout a board is drawn with — the ONE derivation of its sizes
-# and margins: the figure, the TrimBox and `Translation(:pattern, :canvas)` all
+# and margins: the figure and `Translation(:pattern, :canvas)` both
 # read it. (Re-deriving the margins elsewhere put the pattern 1 px off on boards
 # with an odd vertical slack, 2026-10.)
 BoardLayout(bc::BoardConfig) = BoardLayout(bc.canvas_size, bc.board_size, bc.ruler_width, bc.corner_size, bc.layout_grid)

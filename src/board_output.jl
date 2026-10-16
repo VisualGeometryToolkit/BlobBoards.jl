@@ -80,7 +80,7 @@ function _output_density(density)
 end
 
 """
-    Pdf(; shading_function = :calculator, icc_profile = :linear)
+    Pdf(; shading_function = :calculator, icc_profile = :linear, bleed = 0mm)
 
 The print master: a PDF/X-4 file (also PDF/A-2b) that BlobBoards writes itself
 — vector frame, text in one embedded font, and every blob a radial shading the
@@ -93,12 +93,25 @@ prints at any.
 - `icc_profile`: the grey profile of the OutputIntent, declaring how the values
   print — `:linear` (linear reflectance, the default) or the path of a
   single-channel ICC file.
+- `bleed`: the trim allowance a print shop asks for, a length ≥ 0 on every
+  side. The canvas (`"A4"`, `1000mm × 1000mm`) is the FINISHED sheet and the
+  PDF's TrimBox; the page (MediaBox, = BleedBox) is the canvas plus `bleed` on
+  each side, a white strip the shop cuts off. `margin` is measured from the
+  trim. A rendering option, like `id_label`: the board, its uid and its QR are
+  the same with or without it. Rounded to the board's layout grid.
 """
 struct Pdf <: BoardOutput
     shading_function::Symbol
     icc_profile::Union{Nothing, String}      # `nothing`: the built-in linear profile
-    Pdf(; shading_function::Symbol = :calculator, icc_profile = :linear) =
-        new(_check_shading_function(shading_function), _icc_path(icc_profile))
+    bleed::typeof(1.0mm)
+    Pdf(; shading_function::Symbol = :calculator, icc_profile = :linear, bleed = 0mm) =
+        new(_check_shading_function(shading_function), _icc_path(icc_profile), _check_bleed(bleed))
+end
+
+function _check_bleed(bleed)
+    bleed isa Quantity && dimension(bleed) == dimension(mm) && ustrip(mm, bleed) >= 0 ||
+        throw(ArgumentError("bleed must be a length ≥ 0 (e.g. Pdf(bleed = 2mm)), got $(repr(bleed))"))
+    return Float64(ustrip(mm, bleed)) * mm
 end
 
 """
@@ -160,8 +173,11 @@ _recorded_density(o::BoardOutput) = (d = _density(o); d === nothing ? nothing : 
 # label was actually drawn. The inverse of `_recorded_output ∘ _render_options`.
 _render_record(o::BoardOutput, id_label) = (;
     format = _format(o), icc_profile = _recorded_icc(o), id_label,
-    shading_function = _recorded_shading(o), density = _recorded_density(o),
+    shading_function = _recorded_shading(o), density = _recorded_density(o), bleed = _recorded_bleed(o),
 )
+# A PDF's bleed, in mm; a raster has none (it is the default PDF, converted).
+_recorded_bleed(o::Pdf) = (value = ustrip(mm, o.bleed), unit = "mm")
+_recorded_bleed(::BoardOutput) = nothing
 
 # The output a render record describes (`opts`: `_render_options`; the Python
 # bridge hands its flat keywords through the same reading). A raster without a
@@ -169,7 +185,7 @@ _render_record(o::BoardOutput, id_label) = (;
 function _recorded_output(opts)
     fmt = lowercase(opts.format)
     icc = something(opts.icc_profile, :linear)
-    fmt == "pdf" && return Pdf(; opts.shading_function, icc_profile = icc)
+    fmt == "pdf" && return Pdf(; opts.shading_function, icc_profile = icc, bleed = something(get(opts, :bleed, nothing), 0mm))
     fmt in ("tiff", "tif", "png") || throw(ArgumentError("render.format must be \"pdf\", \"tiff\" or \"png\", got $(repr(opts.format))"))
     opts.density === nothing && throw(
         ArgumentError("a $(fmt) is a raster and needs its density, and none is given or recorded: name one (Png(300dpi); from Python, density = 300)")

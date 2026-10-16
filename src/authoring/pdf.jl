@@ -268,7 +268,8 @@ end
 
 # The bytes of a one-page PDF/X-4 + PDF/A-2b print master.
 #
-# `page` and `trimbox` are in points (strings, as the file is to hold them);
+# `page` and `trimbox` are in points (strings, as the file is to hold them):
+# the page is the MediaBox and the BleedBox, the TrimBox the finished sheet;
 # `content` is the page's content stream; `shading` the blobs' shared radial
 # shading as (dictionary entries of its function, the function's data), named
 # `/B` in the page's resources; `chars` the characters the content sets in the
@@ -308,7 +309,8 @@ function _print_master(;
         PdfObject(_output_intent("GTS_PDFA1", condition, icc)),
         _stream("/N 1", read(icc_path)),
         PdfObject(
-            "/Type /Page /Parent $pages 0 R /MediaBox [ 0 0 $(page[1]) $(page[2]) ] /TrimBox [ $(join(trimbox, ' ')) ] " *
+            "/Type /Page /Parent $pages 0 R /MediaBox [ 0 0 $(page[1]) $(page[2]) ] /BleedBox [ 0 0 $(page[1]) $(page[2]) ] " *
+                "/TrimBox [ $(join(trimbox, ' ')) ] " *
                 "/Resources << /Shading << /B $shading_obj 0 R >>$font_resource >> /Contents $contents 0 R"
         ),
         _stream("", content),

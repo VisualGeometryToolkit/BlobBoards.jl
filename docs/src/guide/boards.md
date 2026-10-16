@@ -301,7 +301,10 @@ bundle = blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), dir = "
   side itself, ask the print shop to preflight the file (most do, with callas
   pdfToolbox or Enfocus PitStop).
 - an OutputIntent declaring the print condition (linear-reflectance grey by
-  default; see ICC profiles below) and a TrimBox at the board area
+  default; see ICC profiles below) and page boxes: the TrimBox is the
+  finished sheet (the canvas: `"A4"` is 210 × 297 mm), and with
+  `Pdf(bleed = 2mm)` the page (MediaBox = BleedBox) is 2 mm larger on every
+  side, a white strip the shop cuts off (see Print-shop bleed below)
 - the blobs as **vector shadings** (below)
 - vector rulers, and the text (the uid characters in the corners, the id
   label) set in one embedded font, so the page is searchable and the label's
@@ -388,7 +391,7 @@ bundle = blob_board("A4"; blob_sizes = sizes, output = Pdf(icc_profile = "/path/
 ## Identity Label
 
 Every new board prints its identity in one 6 pt line under the board, in the
-sheet margin (outside the TrimBox, clear of the printer's unprintable border):
+sheet margin (inside the trimmed sheet, clear of the printer's unprintable border):
 
 ```
 blob_board_0d4_35510 · BB4/210MM/297MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/A4/4.25196850394/26.929/3/5000/1.2/2/D/0D435510 · BlobBoards 1.1.2
@@ -426,7 +429,26 @@ A board is a measuring instrument, so it must be printed at **exactly 100%**.
   `major_tick_spacing` apart, so at the default spacing ten intervals must
   span exactly 100.0 mm. On a frameless board, measure the pattern edge to
   edge. A "fit" print comes out about 3% short.
-- Print shops print PDF/X at 100% by default; the TrimBox marks the board.
+- Print shops print PDF/X at 100% by default and cut to the TrimBox, the
+  finished sheet.
+
+### Print-shop bleed
+
+A print shop that trims its sheets asks for a trim allowance ("2 mm bleed on
+every side"). Give it to the PDF, not to the board:
+
+```julia
+blob_board("A4"; blob_sizes = suggest_blob_sizes(1200dpi, "A4"), output = Pdf(bleed = 2mm), dir = "./out")
+```
+
+The page is then 214 × 301 mm (MediaBox = BleedBox), the TrimBox the A4 sheet
+2 mm in from every edge, and the board where it is on a plain A4 sheet: 10 mm
+`margin` from the trim. The bleed strip is white. Bleed is a rendering option,
+like `id_label`: the board, its uid, QR code and JSON definition are those of
+the same board without bleed, and the JSON's `render` block records it, so
+`rebuild_board` prints the same sheet. Do NOT enlarge the canvas and the margin
+yourself instead: the TrimBox would land on the larger sheet and the board
+would get a different uid.
 
 ## Reproducing a board
 

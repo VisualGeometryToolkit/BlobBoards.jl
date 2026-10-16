@@ -293,7 +293,7 @@ const _LEGACY_SHADING_FUNCTIONS = Dict(
 )
 
 """
-    _render_options(json_obj) -> (; format, icc_profile, id_label, shading_function, density)
+    _render_options(json_obj) -> (; format, icc_profile, id_label, shading_function, density, bleed)
 
 The render options a bundle JSON records in its `render` block — how its print
 file was made (`_recorded_output` turns them into the output). A file without
@@ -315,6 +315,9 @@ and means nothing for a PDF. A recorded `pdf_standard` (written until
 2026-10-14) is not read: the print master is always PDF/X-4. A custom ICC
 profile is embedded in the record (`_icc_record`) and written back to a
 content-addressed scratch file for the rebuild.
+
+`bleed` is a PDF's trim allowance (`Pdf(; bleed)`), a length; `nothing` when
+none is recorded (every board written before it existed: no bleed).
 """
 function _render_options(json_obj::JSON3.Object)
     # isa-narrowed field by field: dynamic JSON3 access is a union JET cannot
@@ -326,6 +329,7 @@ function _render_options(json_obj::JSON3.Object)
     id_label = false
     shading_function = :calculator          # the calculator function: the exact profile
     density = nothing
+    bleed = nothing                         # a PDF's trim allowance; none recorded: no bleed
     r = get(json_obj, :render, nothing)
     if r isa JSON3.Object
         f = get(r, :format, nothing)
@@ -343,8 +347,10 @@ function _render_options(json_obj::JSON3.Object)
         d = get(r, :density, nothing)
         d isa JSON3.Object || (d = get(r, :print_density, nothing))
         d isa JSON3.Object && lowercase(format) != "pdf" && (density = _density_record(d))
+        b = get(r, :bleed, nothing)
+        b isa JSON3.Object && lowercase(format) == "pdf" && (bleed = _bleed_record(b))
     end
-    return (; format, icc_profile, id_label, shading_function, density)
+    return (; format, icc_profile, id_label, shading_function, density, bleed)
 end
 
 # An embedded ICC profile (`_icc_record`) as a file the output can name: its
@@ -365,6 +371,13 @@ function _icc_from_record(c::JSON3.Object)
         mv(tmp, path; force = true)
     end
     return path
+end
+
+# A recorded bleed, `{value, unit}` a length; anything else is refused.
+function _bleed_record(b)
+    q = StructTypes.construct(ScalarOrQuantity, b)
+    (q isa Quantity && dimension(q) == dimension(mm)) || throw(ArgumentError("render.bleed must be a length, got $(b)"))
+    return q
 end
 
 # A recorded density, `{value, unit}` in dpi; anything else is refused.

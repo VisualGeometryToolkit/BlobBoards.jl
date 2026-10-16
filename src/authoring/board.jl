@@ -307,11 +307,11 @@ end
 #
 # # Keyword Arguments
 # - `blob_sizes` (required): printed disc diameter range in **physical units** (see above).
-# - `output`: `Pdf(; shading_function, icc_profile)` (default — the PDF/X-4
+# - `output`: `Pdf(; shading_function, icc_profile, bleed)` (default — the PDF/X-4
 #   print master, no density), `Tiff(density; icc_profile)` or `Png(density)`
 # - `id_label`: print the board's identity (file stem, board code, BlobBoards
-#   version) in 6 pt under the board, in the sheet margin outside the
-#   TrimBox (default `true`; skipped with a warning when the margin has no room)
+#   version) in 6 pt under the board, in the sheet margin (default `true`;
+#   skipped with a warning when the margin has no room)
 # - `margin`: the white margin around the centred board (default
 #   `DEFAULT_BOARD_MARGIN` = 10 mm on every side): a `Size2` — `width` left and
 #   right of the board, `height` above and below; zero is full bleed. Or `board_size`: the board itself (its margin is
@@ -439,7 +439,22 @@ end
 #   2·cutoff·2 pixels) — a board with 1 mm discs is not silently rendered at 150 dpi;
 # - the sheet must fit a Cairo image surface (`_CAIRO_MAX_IMAGE_PX` per side:
 #   pdftocairo converts through one).
-_check_output(::Pdf, preamble::BoardPreamble, board_sizes) = nothing
+# - a PDF's page, the canvas plus its bleed, must keep the point grid's
+#   precision (`MAX_POINT_GRID_SIDE_PT`), as the canvas itself does.
+function _check_output(o::Pdf, preamble::BoardPreamble, board_sizes)
+    preamble.board_config.layout_grid isa PointGrid || return nothing
+    c = board_sizes.canvas_size
+    grid = preamble.board_config.layout_grid
+    units = maximum(ustrip.(px, (c.width, c.height))) + 2 * ustrip(px, o.bleed * BlobBoards.grid_density(grid))
+    side = units / BlobBoards._POINT_GRID_PER_PT                                                   # points
+    side <= BlobBoards.MAX_POINT_GRID_SIDE_PT || throw(
+        ArgumentError(
+            "the page, the canvas plus $(BlobBoards._short_number(ustrip(mm, o.bleed))) mm of bleed on each side, " *
+                "is $(BlobBoards._short_number(side)) pt; a page side may not exceed $(BlobBoards.MAX_POINT_GRID_SIDE_PT) pt"
+        )
+    )
+    return nothing
+end
 function _check_output(o::Union{Tiff, Png}, preamble::BoardPreamble, board_sizes)
     bc, pc = preamble.board_config, preamble.pattern_config
     grid = bc.layout_grid

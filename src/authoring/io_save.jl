@@ -41,18 +41,24 @@ end
 # lossless Flate, DeviceGray, no transparency, no image, text in one embedded
 # font; plain objects (no object streams / xref streams), readable by older RIPs.
 #
-# The page is EXACTLY the canvas, grid units · points per unit — a whole number
-# of grid units (A4 on the point grid: 59527 × 84188 units = 595.27 × 841.88 pt,
-# the grid's floor of 210 × 297 mm; a v3 board at 300 dpi: 2480 px = 595.2 pt) —
-# and the TrimBox the board area inside the margins.
+# The canvas is EXACTLY the finished sheet, grid units · points per unit — a
+# whole number of grid units (A4 on the point grid: 59527 × 84188 units =
+# 595.27 × 841.88 pt, the grid's floor of 210 × 297 mm; a v3 board at 300 dpi:
+# 2480 px = 595.2 pt) — and it is the TrimBox: what the print shop cuts to.
+# The page (MediaBox, = BleedBox) is the canvas plus `o.bleed` on every side,
+# a white strip cut off; with no bleed the three boxes coincide. (Until 2026-10-16 the
+# TrimBox was the board inside the margins, so a shop trimming to it cut away
+# the margin and the id label.)
 function _write_output(o::Pdf, path, sheet::Sheet, bundle::BoardBundle; title::AbstractString)
     grid = bundle.preamble.board_config.layout_grid
     len(units) = _page_length(grid, units)
     w, h = _canvas_units(bundle)
-    left, right, bottom, top = BoardLayout(bundle.preamble.board_config).margin
+    b = round(Int, ustrip(px, o.bleed * BlobBoards.grid_density(grid)))     # whole grid units
+    content = _page_content(sheet, bundle)
+    b == 0 || (content = "q 1 0 0 1 $(len(b)) $(len(b)) cm\n" * content * "Q\n")
     bytes = _print_master(;
-        page = (len(w), len(h)), trimbox = (len(left), len(bottom), len(w - right), len(h - top)),
-        content = _page_content(sheet, bundle),
+        page = (len(w + 2b), len(h + 2b)), trimbox = (len(b), len(b), len(w + b), len(h + b)),
+        content,
         shading = _profile_function(o.shading_function, bundle.preamble.pattern_config),
         sheet.chars, o.icc_profile, title
     )

@@ -565,10 +565,17 @@ end
     end
 end
 
+# The page boxes of a PDF, in points: Dict("MediaBox" => [[x0, y0, x1, y1], …], …).
+pdf_boxes(s::AbstractString) = Dict(
+    k => [parse.(Float64, split(m.captures[1])) for m in eachmatch(Regex("/$k\\s*\\[([^\\]]*)\\]"), s)]
+        for k in ("MediaBox", "BleedBox", "TrimBox")
+)
+
 @testset "PDF output: the PDF/X-4 print contract" begin
     # The print master carries the contract a print shop's preflight checks:
-    # identification, an OutputIntent with its ICC profile and a page-level
-    # TrimBox at the board area. It holds no image, its text is set in one
+    # identification, an OutputIntent with its ICC profile and page boxes:
+    # the TrimBox is the finished sheet (the canvas), so a shop cutting to it
+    # keeps the margin and the id label. It holds no image, its text is set in one
     # embedded font, and its objects are plain: no object streams, no
     # cross-reference stream.
     mktempdir() do root
@@ -592,12 +599,12 @@ end
         @test String(bytes[(xref + 1):(xref + 4)]) == "xref"
         entries = [parse(Int, m[1]) for m in eachmatch(r"\n(\d{10}) 00000 n ", s)]
         @test all(startswith(String(bytes[(off + 1):(off + 12)]), "$n 0 obj\n") for (n, off) in enumerate(entries))
-        # one TrimBox, on the page, inside the page: the 80 mm board centred on A5
-        boxes = [parse.(Float64, split(m.captures[1])) for m in eachmatch(r"/TrimBox\s*\[([^\]]*)\]", s)]
-        @test length(boxes) == 1
-        x0, y0, x1, y1 = only(boxes)
-        @test isapprox(x1 - x0, 80 / 25.4 * 72; atol = 0.5) && isapprox(y1 - y0, 80 / 25.4 * 72; atol = 0.5)
-        @test isapprox((x0 + x1) / 2, 148 / 25.4 * 72 / 2; atol = 1)
+        # one each of MediaBox, BleedBox and TrimBox; with no bleed all three are
+        # the A5 page (the 80 mm board centred on it is NOT the trim)
+        boxes = pdf_boxes(s)
+        @test all(k -> length(boxes[k]) == 1, ("MediaBox", "BleedBox", "TrimBox"))
+        a5 = [0, 0, 148 / 25.4 * 72, 210 / 25.4 * 72]
+        @test all(k -> isapprox(only(boxes[k]), a5; atol = 0.02), ("MediaBox", "BleedBox", "TrimBox"))
         # the one standard: a board recorded under another (X-3, X-1a, a plain PDF:
         # they went with Ghostscript, 2026-10) is rebuilt as PDF/X-4, which is
         # not recorded (`pdf_standard`, written until 2026-10-14, is not read)
@@ -605,6 +612,41 @@ end
         obj["render"]["pdf_standard"] = "x3"
         BlobBoards.rebuild_board(JSON3.write(obj); dir = joinpath(root, "re"))
         @test !haskey(JSON3.read(read(onlyjson(joinpath(root, "re")), String)).render, :pdf_standard)
+    end
+end
+
+@testset "PDF bleed: the canvas is the trim, the page the canvas plus the bleed" begin
+    # A print shop asks for a trim allowance: `Pdf(bleed)` makes the page the
+    # canvas plus `bleed` on every side (MediaBox = BleedBox) and keeps the TrimBox
+    # at the finished sheet. It is a rendering option: the board, its uid and its
+    # blobs are those of the same board without bleed, and the record carries it
+    # so a rebuild prints the same sheet.
+    mktempdir() do root
+        kw = (; blob_sizes = (3mm, 12mm), seed = 0x5eed, corner_size = 15mm, ruler_width = 0mm)
+        plain = blob_board("A5"; kw..., dir = joinpath(root, "plain"))
+        bled = blob_board("A5"; kw..., output = Pdf(bleed = 2mm), dir = joinpath(root, "bleed"))
+        @test bled.blobs == plain.blobs
+        @test basename(onlypdf(joinpath(root, "bleed"))) == basename(onlypdf(joinpath(root, "plain")))   # one uid
+        pt(x) = x / 25.4 * 72
+        boxes = pdf_boxes(String(read(onlypdf(joinpath(root, "bleed")))))
+        @test isapprox(only(boxes["MediaBox"]), [0, 0, pt(152), pt(214)]; atol = 0.02)
+        @test only(boxes["BleedBox"]) == only(boxes["MediaBox"])
+        @test isapprox(only(boxes["TrimBox"]), [pt(2), pt(2), pt(150), pt(212)]; atol = 0.02)
+        rec = JSON3.read(read(onlyjson(joinpath(root, "bleed")), String)).render
+        @test rec.bleed.value == 2 && rec.bleed.unit == "mm"
+        # the rebuild prints what was printed: the same boxes
+        BlobBoards.rebuild_board(onlyjson(joinpath(root, "bleed")); dir = joinpath(root, "re"))
+        @test pdf_boxes(String(read(onlypdf(joinpath(root, "re"))))) == boxes
+        # a raster is the sheet without bleed (it has no page boxes)
+        @test BlobBoards._recorded_bleed(Png(300dpi)) === nothing
+        @test_throws ArgumentError Pdf(bleed = -1mm)
+        @test_throws ArgumentError Pdf(bleed = 2)
+        @test_throws ArgumentError Pdf(bleed = 300dpi)
+        # the page, canvas plus bleed, keeps the point grid's precision, as the canvas does
+        @test_throws ArgumentError blob_board(
+            3520mm, 100mm; blob_sizes = (3mm, 12mm), corner_size = 0mm, ruler_width = 0mm,
+            output = Pdf(bleed = 10mm), dir = joinpath(root, "big")
+        )
     end
 end
 
@@ -745,7 +787,7 @@ end
         # a PDF has no density, and records none; a raster records its own
         @test jon.render.density === nothing && !haskey(jon.render, :print_density)
         @test BlobBoards._render_options(jon) ==
-            (format = "pdf", icc_profile = nothing, id_label = true, shading_function = :calculator, density = nothing)
+            (format = "pdf", icc_profile = nothing, id_label = true, shading_function = :calculator, density = nothing, bleed = 0mm)
         @test BlobBoards._recorded_output(BlobBoards._render_options(jon)) == Pdf()
         mk(joinpath(root, "png"); output = Png(300dpi))
         jpng = JSON3.read(read(onlyjson(joinpath(root, "png")), String))
@@ -776,7 +818,7 @@ end
         # a file without a render block: the as-printed defaults (a PDF, no label)
         legacy = JSON3.read(str_on, Dict{String, Any}); delete!(legacy, "render")
         @test BlobBoards._render_options(JSON3.read(JSON3.write(legacy))) ==
-            (format = "pdf", icc_profile = nothing, id_label = false, shading_function = :calculator, density = nothing)
+            (format = "pdf", icc_profile = nothing, id_label = false, shading_function = :calculator, density = nothing, bleed = nothing)
         BlobBoards.rebuild_board(JSON3.write(legacy); dir = joinpath(root, "re_legacy"))
         @test !labelled(onlypdf(joinpath(root, "re_legacy")))
 
