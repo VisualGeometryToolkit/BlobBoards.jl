@@ -97,9 +97,12 @@ Frame and ruler, below). By default the board leaves a **10 mm white margin** on
 every side of the page: office printers cannot print the outer few millimetres
 of a sheet (3–6.35 mm; the campus Ricoh 4.23 mm), and anything there — the
 corner glyphs, the QR code, the ruler's ends — would be cut off. The margin
-also holds the id label under the board. For a print shop that trims, set
-a zero margin (full bleed). The board records its margin, and its QR code
-carries it.
+also holds the id label under the board. The canvas is always the FINISHED
+sheet: for a print shop that trims, keep the canvas and the margin and add a
+trim allowance to the PDF with `Pdf(bleed = 2mm)` (see
+[Page boxes and bleed](#Page-boxes-and-bleed)). A zero margin makes the board
+the whole sheet, with nothing left for the id label. The board records its
+margin, and its QR code carries it.
 
 ## Blobs
 
@@ -268,7 +271,7 @@ carries exactly the options its format has:
 
 | `output` | File | Options | Density |
 |----------|------|---------|---------|
-| [`Pdf`](@ref)`()` (default) | the print master, PDF/X-4 | `shading_function = :calculator`, `icc_profile = :linear` | none |
+| [`Pdf`](@ref)`()` (default) | the print master, PDF/X-4 | `shading_function = :calculator`, `icc_profile = :linear`, `bleed = 0mm` | none |
 | [`Tiff`](@ref)`(density)` | the sheet converted to an 8-bit grey TIFF | `icc_profile = :linear` | the image's, e.g. `Tiff(600dpi)` |
 | [`Png`](@ref)`(density)` | the sheet converted to a grey PNG, for digital use | — | the image's, e.g. `Png(300dpi)` |
 
@@ -276,6 +279,7 @@ carries exactly the options its format has:
 sizes = suggest_blob_sizes(600dpi, "A4")
 bundle = blob_board("A4"; blob_sizes = sizes, dir = "./output")                             # Pdf()
 bundle = blob_board("A4"; blob_sizes = sizes, dir = "./output", output = Pdf(shading_function = :sampled))
+bundle = blob_board("A4"; blob_sizes = sizes, dir = "./output", output = Pdf(bleed = 2mm))      # print-shop bleed
 bundle = blob_board("A4"; blob_sizes = sizes, dir = "./output", output = Tiff(600dpi))
 bundle = blob_board("A4"; blob_sizes = sizes, dir = "./output", output = Png(300dpi))
 ```
@@ -301,10 +305,9 @@ bundle = blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), dir = "
   side itself, ask the print shop to preflight the file (most do, with callas
   pdfToolbox or Enfocus PitStop).
 - an OutputIntent declaring the print condition (linear-reflectance grey by
-  default; see ICC profiles below) and page boxes: the TrimBox is the
-  finished sheet (the canvas: `"A4"` is 210 × 297 mm), and with
-  `Pdf(bleed = 2mm)` the page (MediaBox = BleedBox) is 2 mm larger on every
-  side, a white strip the shop cuts off (see Print-shop bleed below)
+  default; see ICC profiles below)
+- page boxes: the TrimBox is the finished sheet, and an optional bleed
+  around it (see [Page boxes and bleed](#Page-boxes-and-bleed))
 - the blobs as **vector shadings** (below)
 - vector rulers, and the text (the uid characters in the corners, the id
   label) set in one embedded font, so the page is searchable and the label's
@@ -312,6 +315,59 @@ bundle = blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), dir = "
 
 BlobBoards writes the file directly: one page with a Flate-compressed content
 stream, and one shared radial shading painted once per blob.
+
+#### Page boxes and bleed
+
+A PDF page carries nested boxes. Viewers show the **MediaBox** (the page);
+a print shop cuts to the **TrimBox** (the finished sheet); the **BleedBox**
+says how far printing may run past the cut. BlobBoards sets them from the
+canvas and `Pdf(; bleed)`:
+
+| Box | `Pdf()` (default) | `Pdf(bleed = 2mm)` |
+|:----|:------------------|:-------------------|
+| MediaBox (the page) | the canvas: A4 is 210 × 297 mm | the canvas plus 2 mm on every side: 214 × 301 mm |
+| BleedBox | = MediaBox | = MediaBox |
+| TrimBox (the cut) | = MediaBox | the canvas, 2 mm in from every edge |
+| board (inside the `margin`) | 190 × 277 mm, 10 mm in | 190 × 277 mm, 10 mm in from the TrimBox |
+
+```
+┌──────────── MediaBox = BleedBox (214 × 301 mm) ───────────┐
+│ ┌──────────── TrimBox: the A4 sheet (210 × 297 mm) ─────┐ │
+│ │                 margin (10 mm)                        │ │
+│ │   ┌────────────── board (190 × 277 mm) ───────────┐   │ │
+│ │   │ [QR]                                    [uid] │   │ │
+│ │   │                     blobs                     │   │ │
+│ │   │ [uid]                                   [uid] │   │ │
+│ │   └───────────────────────────────────────────────┘   │ │
+│ │                    id label                           │ │
+│ └───────────────────────────────────────────────────────┘ │
+│                  bleed (2 mm, white)                      │
+└───────────────────────────────────────────────────────────┘
+```
+
+- **What you pass is the finished size.** `"A4"` or `blob_board(1000mm, 1000mm; …)`
+  is the sheet after trimming; `margin` is measured from the trim. The bleed
+  adds a white strip outside it, so a cut that is slightly off never shows.
+- **What tools report.** A viewer's page size is the MediaBox: the 1 m board
+  with 2 mm bleed reads 1004 × 1004 mm. Preflight tools and RIPs show the
+  1000 × 1000 mm TrimBox and cut there. Tell the shop "finished size
+  1000 × 1000 mm, 2 mm bleed included".
+- **Bleed does not change the board.** It is a rendering option, like
+  `id_label`: the blobs, uid, QR code and file name are those of the same board
+  without bleed. The JSON's `render` block records it
+  (`"bleed": {"value": 2, "unit": "mm"}`), so `rebuild_board` prints the same
+  page. It is rounded to the layout grid (0.01 pt).
+- **PDF only.** A `Tiff` or `Png` is the sheet without bleed: a raster has no
+  page boxes.
+- **Size limit.** A page side (the canvas plus twice the bleed) may not exceed
+  9999.99 pt (about 3.53 m); a larger one is refused before placement.
+- **Do not fake it.** Enlarging the canvas and the margin yourself (a
+  214 × 301 mm canvas with a 12 mm margin) puts the TrimBox on the larger
+  sheet, and the board gets a different uid.
+
+Until 2026-10-16 the TrimBox marked the board inside the margins, so a shop
+trimming to it cut away the margin and the id label. Boards written before
+then still have that TrimBox; `rebuild_board` writes the corrected one.
 
 #### Blob encoding
 
@@ -441,14 +497,8 @@ every side"). Give it to the PDF, not to the board:
 blob_board("A4"; blob_sizes = suggest_blob_sizes(1200dpi, "A4"), output = Pdf(bleed = 2mm), dir = "./out")
 ```
 
-The page is then 214 × 301 mm (MediaBox = BleedBox), the TrimBox the A4 sheet
-2 mm in from every edge, and the board where it is on a plain A4 sheet: 10 mm
-`margin` from the trim. The bleed strip is white. Bleed is a rendering option,
-like `id_label`: the board, its uid, QR code and JSON definition are those of
-the same board without bleed, and the JSON's `render` block records it, so
-`rebuild_board` prints the same sheet. Do NOT enlarge the canvas and the margin
-yourself instead: the TrimBox would land on the larger sheet and the board
-would get a different uid.
+See [Page boxes and bleed](#Page-boxes-and-bleed) for what the boxes hold and
+what the shop sees.
 
 ## Reproducing a board
 
