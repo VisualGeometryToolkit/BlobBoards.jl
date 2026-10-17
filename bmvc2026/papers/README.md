@@ -1,7 +1,7 @@
 # Manuscript
 
 The camera-ready sources of the BlobBoards BMVC 2026 paper and its
-supplementary material.
+supplementary material, plus two technical notes.
 
 ## Build
 
@@ -11,6 +11,7 @@ make            # the supplement, then the paper
 make paper      # blob_boards_bmvc.pdf (builds the supplement first for its labels)
 make supp       # bmvc_supp.pdf
 make watch      # continuous rebuild of the paper on save
+make notes      # notes/dog_scale_bias.pdf
 make clean      # aux files only, keeps PDFs
 ```
 
@@ -29,6 +30,12 @@ after every supplement build), so build the supplement first when calling
 | `egbib.bib` | bibliography |
 | `figures/floorplan*/` | TikZ panels, assembly tables and macro files, GENERATED — see below |
 | `images/` | figure assets the `.tex` files reference (generated or declared static) |
+| `notes/dog_scale_bias.tex` | technical note: why the detected DoG σ underestimates the true blob scale |
+| `notes/whitened_linear_derivation.tex` | draft appendix fragment (not standalone): the whitened log-space linear solve equals intensity-space Gauss–Newton |
+
+The notes are not part of the camera-ready set: the reproducible-figures
+contract below covers only the paper and the supplement, and the numbers in
+the notes are typed by hand.
 
 ## What is tracked
 

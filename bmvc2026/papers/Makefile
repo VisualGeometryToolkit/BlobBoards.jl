@@ -5,6 +5,7 @@
 #   make supp       # build the supplement only
 #   make watch      # continuous rebuild of the paper on save
 #   make view       # build then open the paper
+#   make notes      # build the technical note (notes/dog_scale_bias)
 #   make figures    # regenerate every generated asset (scripts/regenerate_paper.jl)
 #   make figures-gpu  # ... plus the CUDA figures (teaser, adapted and pipeline panels)
 #   make check      # the reproducible-figures contract (REPRODUCE.md) + config tests
@@ -24,7 +25,7 @@ else
   OPEN := xdg-open
 endif
 
-.PHONY: all $(DOCS) paper supp watch view clean cleanall \
+.PHONY: all $(DOCS) paper supp watch view notes clean cleanall \
         figures figures-gpu check figcheck
 
 # Each document target is phony and always calls latexmk, which is
@@ -51,6 +52,10 @@ watch:
 
 view: blob_boards_bmvc
 	$(OPEN) blob_boards_bmvc.pdf
+
+# The technical note, outside the camera-ready set; it builds in notes/.
+notes:
+	cd notes && $(LATEXMK) $(LFLAGS) dog_scale_bias
 
 # ------------------------------------------------------------------------------
 # Figure regeneration — ONE entry point. `make figures` runs
@@ -91,7 +96,9 @@ check:
 
 clean:
 	$(LATEXMK) -c $(DOCS)
+	cd notes && $(LATEXMK) -c dog_scale_bias
 	rm -f supp_labels.aux
 
 cleanall: clean
 	$(LATEXMK) -C $(DOCS)
+	cd notes && $(LATEXMK) -C dog_scale_bias

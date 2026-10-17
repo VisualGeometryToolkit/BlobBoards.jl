@@ -1,0 +1,128 @@
+\TODO{put appendix below references?}
+
+\section{Equivalence of Whitened Log-Space Linear Solve and Intensity-Space Gauss--Newton}
+\label{app:whitened_linear}
+
+\subsection{Problem Setup}
+
+We observe pixel intensities $v_i$ at locations $(x_i, y_i)$ relative to
+a blob center, with background level $b$.  The inverted intensity is
+$f_i = b - v_i > 0$.  We model $f_i$ as a Gaussian blob in log-intensity:
+\begin{equation}\label{eq:model}
+  f_i = \exp(\vtheta^\top \va_i),
+\end{equation}
+where $\va_i = (1,\; x_i,\; y_i,\; x_i^2,\; 2x_i y_i,\; y_i^2)^\top$
+is the design vector and $\vtheta \in \mathbb{R}^P$ contains the
+log-peak, center offsets, and moment matrix entries of a 2D paraboloid.
+
+\subsection{Intensity-Space Objective (Gauss--Newton)}
+
+The natural least-squares objective in measurement space is
+\begin{equation}\label{eq:intensity_obj}
+  \mathcal{L}_{\mathrm{int}}(\vtheta)
+  = \sum_i w_i \bigl(f_i - \exp(\vtheta^\top \va_i)\bigr)^2
+  = \sum_i w_i\, r_i^2,
+\end{equation}
+where $w_i$ are IRLS weights (posterior $\times$ spatial) and
+$r_i = f_i - \hat{f}_i$ with $\hat{f}_i = \exp(\vtheta^\top \va_i)$.
+
+Gauss--Newton linearizes $\hat{f}_i(\vtheta + \Delta\vtheta)
+\approx \hat{f}_i(1 + \va_i^\top \Delta\vtheta)$, giving the
+Jacobian row $J_i = -\hat{f}_i\, \va_i^\top$ and the normal equations
+\begin{equation}\label{eq:gn}
+  \bigl(\textstyle\sum_i w_i \hat{f}_i^2\, \va_i \va_i^\top\bigr)
+  \Delta\vtheta
+  = \sum_i w_i \hat{f}_i\, r_i\, \va_i.
+\end{equation}
+Because $\hat{f}_i = \exp(\vtheta^\top \va_i)$ is highly nonlinear in
+$\vtheta$, the linearization is accurate only in a small neighborhood,
+and the step $\Delta\vtheta$ frequently increases the objective when
+applied at full length.
+
+\subsection{Log-Space Substitution}
+
+Define $z_i = \log f_i$.  Then the model~\eqref{eq:model} becomes
+\begin{equation}\label{eq:logmodel}
+  z_i = \vtheta^\top \va_i,
+\end{equation}
+which is \emph{exactly linear} in $\vtheta$.  The log-space residual is
+\[
+  \rho_i = z_i - \vtheta^\top \va_i = \log f_i - \vtheta^\top \va_i.
+\]
+
+\subsection{Change of Variables: From Intensity to Log-Space}
+
+The intensity-space residual and log-space residual are related by
+\[
+  r_i = f_i - \exp(\vtheta^\top \va_i)
+  = f_i\bigl(1 - \exp(\vtheta^\top \va_i - z_i)\bigr).
+\]
+For the \emph{true} model evaluated near the data ($\rho_i$ small),
+a first-order expansion of $\exp(-\rho_i)$ gives
+\[
+  r_i \approx f_i\, \rho_i.
+\]
+Therefore, to first order,
+\begin{equation}\label{eq:equiv}
+  r_i^2 \approx f_i^2\, \rho_i^2.
+\end{equation}
+This is exact at the optimum (where $\rho_i = 0$ for inliers) and
+accurate throughout the IRLS iteration.
+
+Substituting into~\eqref{eq:intensity_obj}:
+\begin{equation}\label{eq:whitened_obj}
+  \mathcal{L}_{\mathrm{int}}(\vtheta)
+  \approx \sum_i w_i\, f_i^2\, \rho_i^2
+  = \sum_i \underbrace{w_i f_i^2}_{\tilde{w}_i}
+    \bigl(\log f_i - \vtheta^\top \va_i\bigr)^2
+  \equiv \mathcal{L}_{\mathrm{wlog}}(\vtheta).
+\end{equation}
+The whitened log-space objective $\mathcal{L}_{\mathrm{wlog}}$ with
+weights $\tilde{w}_i = w_i f_i^2$ is the \emph{same objective} as the
+intensity-space $\mathcal{L}_{\mathrm{int}}$, up to the first-order
+approximation inherent in Gauss--Newton itself.
+
+\subsection{Exact Linear Solve}
+
+Since $\mathcal{L}_{\mathrm{wlog}}$ is quadratic in $\vtheta$, its
+minimum is obtained in closed form:
+\begin{equation}\label{eq:wls}
+  \vtheta^*
+  = \bigl(\textstyle\sum_i \tilde{w}_i\, \va_i \va_i^\top\bigr)^{-1}
+    \sum_i \tilde{w}_i\, z_i\, \va_i
+  = (\mathbf{A}^\top \tilde{\mathbf{W}} \mathbf{A})^{-1}\,
+    \mathbf{A}^\top \tilde{\mathbf{W}}\, \mathbf{z},
+\end{equation}
+where $\tilde{\mathbf{W}} = \operatorname{diag}(\tilde{w}_i)$.  This is
+a single weighted least-squares solve, with no iteration over $\vtheta$
+needed within each IRLS step.
+
+\subsection{Comparison}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lcc}
+\hline
+& \textbf{GN (intensity)} & \textbf{Whitened Linear (log)} \\
+\hline
+Objective & $\sum w_i(f_i - e^{\vtheta^\top\va_i})^2$
+          & $\sum w_i f_i^2(\log f_i - \vtheta^\top\va_i)^2$ \\
+Equivalence & \multicolumn{2}{c}{Same to $O(\rho_i^2)$, exact at optimum} \\
+Linearity in $\vtheta$ & No ($\exp$ nonlinearity) & Yes (exactly linear) \\
+Solve per IRLS step & Approximate (GN step) & Exact (WLS) \\
+Trust region needed & Yes (steps often rejected) & No (exact optimum) \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Summary}
+
+The $f_i^2$ weight in the whitened log-space solve is not ad hoc: it is
+the Jacobian-squared correction $(\partial f/\partial z)^2 = f^2$ that
+maps the log-space problem back to the intensity-space likelihood.  Both
+formulations optimize the same statistical objective.  The log-space
+parameterization simply removes the $\exp$ nonlinearity, converting each
+IRLS step from an approximate Gauss--Newton update into an exact
+weighted least-squares solve.  This explains why the whitened linear
+method converges reliably while GN and LM in intensity space struggle
+with step rejection and slow convergence.

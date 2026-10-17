@@ -12,3 +12,6 @@
 /*.out
 /*.synctex.gz
 /*.toc
+# notes/ holds no source PDFs: track only its sources.
+/notes/*
+!/notes/*.tex
