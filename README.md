@@ -3,6 +3,29 @@
 [![CI](https://github.com/VisualGeometryToolkit/BlobBoards.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/VisualGeometryToolkit/BlobBoards.jl/actions/workflows/CI.yml)
 [![Docs](https://img.shields.io/badge/docs-blobboards.github.io-blue.svg)](https://blobboards.github.io)
 
+## Abstract
+
+**[BlobBoards: Robust Markers for Accurate Pose](https://arxiv.org/abs/2608.28830)** — James Pritts, Till Sittart, Hendrik Sauer, Silja Janßen, Felix Seegräber, David Nakath and Kevin Köser. *BMVC 2026*. [Project page](https://blobboards.github.io).
+
+We propose BlobBoards, a fiducial marker system comprising a dense, multi-scale
+field of Gaussian blobs and a feature-based pipeline for joint detection,
+identification, and pose estimation. Each board is registered from hundreds of
+blob features whose dense spatial coverage constrains pose, while multiple
+scales preserve detectability across large changes in focal length, distance,
+and obliquity. Learned local descriptors are matched to the reference pattern
+and spatially verified, so the correspondences determine pose and certify
+identity. Against motion-capture ground truth, BlobBoards achieve median
+translation errors of 3.6-5.0 mm, reducing AprilTag's median translation error
+by 89% on small boards and 70% on large ones. They also produce far fewer
+large-rotation failures than state-of-the-art tag systems. BlobBoards achieve
+the highest detection rate, 80% versus 74% for AprilTag and 58% for ArUco, with
+the largest margin on the smallest markers. Under 50% occlusion, they still
+detect 69% of boards with essentially unchanged median translation error, while
+AprilTag and ArUco detect none. In experiments BlobBoards give state-of-the-art
+detection rate, pose accuracy and occlusion robustness.
+
+## Overview
+
 Generate deterministic, multi-scale blob patterns and printable calibration boards for computer vision tasks (feature evaluation, camera calibration). Patterns are rendered pixel-perfect from seeded configurations; boards include rulers, QR metadata, and a compact UID. All outputs are reproducible with JSON sidecars.
 
 ## Features
