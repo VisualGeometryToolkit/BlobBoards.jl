@@ -1,6 +1,6 @@
 #=
 import_cameras.jl — the ONE-TIME port of each session's upstream intrinsic
-calibration into VisualGeometryIo's native vgio/cameras/v3 (the camera of
+calibration into VisualGeometryToolkitIo's native vgio/cameras/v3 (the camera of
 record the inputs tier publishes).
 
     julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/import_cameras.jl [--config=<toml>]
@@ -10,10 +10,10 @@ The upstream export is BlobBoards-Evaluation `calibrate_pinhole`'s
 fourteen-coefficient `distortion_coefficients`, `reprojection_error` (a MEAN
 per-image error), `num_calibration_images`, `chessboard_size`, `square_size`,
 `flags`. This script reads it ONCE (src/cameras.jl `upstream_camera`): the
-camera is built in VisualGeometryCore (`CameraModel(K; lens = opencv_lens(k), image_origin =
+camera is built in VisualGeometryToolkitCore (`CameraModel(K; lens = opencv_lens(k), image_origin =
 :opencv)`, which moves the principal point into the canonical frame exactly),
 its calibration block is filled from the export, and it is written ONLY through
-VisualGeometryIo's `save`, read back, and checked equal.
+VisualGeometryToolkitIo's `save`, read back, and checked equal.
 
 Writes, add-only, under results_root()/import_cameras-<run key>/:
     <session>/calibration/<output>     vgio/cameras/v3, the camera of record
@@ -33,9 +33,9 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: run_dir, figure_config, upstream_camera
-import VisualGeometryIo as VGIo
-using VisualGeometryCore: BoundedCamera
-using VisualGeometryEval.Experiments: run_key, write_run_records
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitCore: BoundedCamera
+using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
 
 const CFG, CFG_PATH = figure_config("import_cameras"; default = projectdir("configs", "import_cameras.toml"))
 const KEY = run_key(CFG)

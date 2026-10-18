@@ -1,23 +1,25 @@
 module BlobBoardsPythonExt
+    import VisualGeometryToolkitCore as VgtkCore
+    import VisualGeometryToolkitIo as VgtkIo
 
 using BlobBoards
 using BlobBoards: BoardBundle, PatternBundle
 using PythonCall: PythonCall, Py, pybuiltins, pyconvert, pydict, pyhasattr,
     pyimport, pyisinstance, pylist
 using JSON3: JSON3
-import VisualGeometryIo
-import VisualGeometryCore
-using VisualGeometryCore: CameraModel   # dispatch token for VisualGeometryIo.load
-using VisualGeometryCore: ustrip, m, mm, cm, μm
-using VisualGeometryCore: px, dpi, pt, inch, Size2, parse_unit, strip_or_bare
+import VisualGeometryToolkitIo
+import VisualGeometryToolkitCore
+using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIo.load
+using VisualGeometryToolkitCore: ustrip, m, mm, cm, μm
+using VisualGeometryToolkitCore: px, dpi, pt, inch, Size2, parse_unit, strip_or_bare
 using FlexUnits: Quantity, dimension
-using VisualGeometryCore: EuclideanMap, PixelFrame  # pixel-origin frame maps (VGC 0.7)
+using VisualGeometryToolkitCore: EuclideanMap, PixelFrame  # pixel-origin frame maps (VGC 0.7)
 
 # Origin shift over the blob list: the labeled frame map acts on feature
-# frames directly (VisualGeometryCore 0.21.1 gave `EuclideanMap{2}` the
+# frames directly (VisualGeometryToolkitCore 0.21.1 gave `EuclideanMap{2}` the
 # primitive actions only `Translation` had, so the `.t` rewrap is gone).
 _origin_shift(from::Symbol, to::Symbol) = EuclideanMap(PixelFrame{from}, PixelFrame{to})
-using VisualGeometryFeatures: is_dark
+using VisualGeometryToolkitFeatures: is_dark
 using StaticArrays: SMatrix
 using Colors: Gray
 using FixedPointNumbers: N0f8
@@ -75,7 +77,7 @@ _py_pattern_config(pc; unit::String = "px") = (
 # =============================================================================
 
 
-# The JSON entry points' unit names, read by VisualGeometryCore's `parse_unit`
+# The JSON entry points' unit names, read by VisualGeometryToolkitCore's `parse_unit`
 # (the stack's one guarded `uparse`): one registered unit symbol of pixels or a
 # length ("px", "pd", "mm", "inch", "in", …).
 function _json_units(units::AbstractString)
@@ -503,7 +505,7 @@ end
 # =============================================================================
 
 # Device string → KernelAbstractions backend through the package's one
-# authority (VisualGeometryCore.default_device); "cuda" requires BlobBoardsCUDAExt to have
+# authority (VisualGeometryToolkitCore.default_device); "cuda" requires BlobBoardsCUDAExt to have
 # resolved a functional GPU. `caller` names the Python entry point in the errors.
 function _python_backend(device, caller::AbstractString)
     string(device) == "cpu" && return BlobBoards.KernelAbstractions.CPU()
@@ -618,7 +620,7 @@ function BlobBoards.find_boards_python(
     dev_name = backend isa BlobBoards.KernelAbstractions.CPU ? "cpu" : "cuda"
 
     cam = camera_json === nothing ? nothing :
-        VisualGeometryIo.load(CameraModel, string(camera_json))
+        VgtkIo.load(CameraModel, string(camera_json))
     geo_kw = _filter_kwargs(
         min_inliers = min_inliers === nothing ? nothing : Int(min_inliers),
         outlier_halfwidth = outlier_halfwidth === nothing ? nothing : Float64(outlier_halfwidth)
@@ -655,7 +657,7 @@ function BlobBoards.find_boards_python(
                 "uid" => uid,
                 "model" => model_py,
                 "quality" => Float64(q),
-                "n_inliers" => count(VisualGeometryCore.is_map_inlier, w),
+                "n_inliers" => count(VgtkCore.is_map_inlier, w),
                 "n_csponds" => length(sc),
                 "weights" => np.array(Float64.(w)),
                 "device" => dev_name,
@@ -689,7 +691,7 @@ function BlobBoards.track_boards_python(
     backend = _python_backend(device, "track_boards_python")
     model, board_feature_dict, board_bundles = _python_boards_cached(board_paths, model_path, gallery_path, backend)
     provider = string(model.session.execution_provider)
-    cam = camera_json === nothing ? nothing : VisualGeometryIo.load(CameraModel, string(camera_json))
+    cam = camera_json === nothing ? nothing : VgtkIo.load(CameraModel, string(camera_json))
     geometry = cam === nothing ? BlobBoards.HomographyGeometry() : BlobBoards.PoseGeometry(cam)
     config = BlobBoards.FindBoardsConfig(; geometry)
     # A video path streams; anything else is a sequence of grey frames.

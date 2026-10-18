@@ -41,7 +41,7 @@ end
     PipelineTrace
 
 A [`PipelineCapture`](@ref) with its OPTIONAL provenance attached as
-`Attributed` attributes — the idiom VisualGeometryCore uses to carry a record's
+`Attributed` attributes — the idiom VisualGeometryToolkitCore uses to carry a record's
 optional payload, and for the same reason: what a trace carries beyond the
 capture genuinely varies, and absence should be a fact about the TYPE rather
 than a `nothing` every reader has to test.
@@ -62,16 +62,16 @@ Field access forwards, so `trace.arms`, `trace.cutoff` and `trace.detections`
 read exactly as before. Use `_has_attr` / `_attr` for the optional three.
 
 NB no constructor is defined on this alias: it would be a method on
-VisualGeometryCore's `Attributed`, i.e. piracy. Build one with
+VisualGeometryToolkitCore's `Attributed`, i.e. piracy. Build one with
 `Attributed(PipelineCapture(...), attrs)`.
 """
-const PipelineTrace = VisualGeometryCore.Attributed{V, A} where {V <: PipelineCapture, A}
+const PipelineTrace = VgtkCore.Attributed{V, A} where {V <: PipelineCapture, A}
 
 # Presence is a COMPILE-TIME property of the attribute NamedTuple's type, so
 # both of these constant-fold: a reader's branch on an absent attribute is
 # eliminated rather than tested per call.
-@inline _has_attr(::VisualGeometryCore.Attributed{V, A}, s::Symbol) where {V, A} = s in fieldnames(A)
-@inline _attr(t::VisualGeometryCore.Attributed{V, A}, s::Symbol, default) where {V, A} =
+@inline _has_attr(::VgtkCore.Attributed{V, A}, s::Symbol) where {V, A} = s in fieldnames(A)
+@inline _attr(t::VgtkCore.Attributed{V, A}, s::Symbol, default) where {V, A} =
     s in fieldnames(A) ? getproperty(t, s) : default
 
 # The optional half, assembled from whatever was actually captured. Only the
@@ -100,7 +100,7 @@ the FIRST arm of `adapt_arms` — and that same config is what the trace records
 function trace_pipeline(
         # Typed so a call in the retired `(img, cam)` order is a MethodError.
         # Qualified: `CameraModel` is imported by pipeline.jl, after this file.
-        cam::Union{Nothing, VisualGeometryCore.CameraModel}, img::AbstractMatrix;
+        cam::Union{Nothing, VgtkCore.CameraModel}, img::AbstractMatrix;
         detect_config::DetectConfig = DetectConfig(),
         cutoff::Real = DEFAULT_CUTOFF,
         device = default_device(),
@@ -151,7 +151,7 @@ function trace_pipeline(
         (; accepted, bundles = board_bundles, cam)
     end
     net = descriptor_network === nothing ? nothing : _ensure_network(descriptor_network)
-    return VisualGeometryCore.Attributed(
+    return VgtkCore.Attributed(
         PipelineCapture(img, u8, detections, arms, Float64(cutoff)),
         _trace_attrs(;
             registration,
@@ -221,7 +221,7 @@ function _load_pipeline_trace(path::AbstractString)
     # so in its type, since the attribute is simply not attached.
     # `get` rather than indexing: traces written before configuration was
     # recorded still load, and those attributes stay absent too.
-    return VisualGeometryCore.Attributed(
+    return VgtkCore.Attributed(
         PipelineCapture(d["detect_img"], d["detect_img"], d["detections"], arms, d["cutoff"]),
         _trace_attrs(;
             config = get(d, "config", nothing),

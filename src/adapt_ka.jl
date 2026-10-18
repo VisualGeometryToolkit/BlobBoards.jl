@@ -86,9 +86,9 @@ samples effectively independent — which the sweep's Jeffreys score assumes.
 end
 
 # The clamped bilinear sample, the device-safe lgamma/digamma/trigamma series,
-# the in-register 6×6 LU and the workgroup tree reduction are VisualGeometryCore's
+# the in-register 6×6 LU and the workgroup tree reduction are VisualGeometryToolkitCore's
 # since 0.21.1 (hoisted verbatim from here — same op sequences).
-using VisualGeometryCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
+using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
     trigamma_stirling, lu_solve!, tree_sum!
 
 

@@ -1,13 +1,13 @@
 # =============================================================================
 # The design resolver: a board uid → its nominal plane points (pipeline.jl).
-# A stored target rig (VisualGeometryIo rig/v4) names a board by reference;
+# A stored target rig (VisualGeometryToolkitIo rig/v4) names a board by reference;
 # BlobBoards resolves it to the board's blob centres in its world frame, in the
 # bundle's blob order — the order a measurement's point index names.
 # =============================================================================
 using Test
 using StaticArrays: SVector
-using VisualGeometryCore: EuclideanMap, PlanarTarget, Mounted, Rig, BodyFrame, is_resolved, points, mm, dpi, Vec3
-import VisualGeometryIo as VGIo
+using VisualGeometryToolkitCore: EuclideanMap, PlanarTarget, Mounted, Rig, BodyFrame, is_resolved, points, mm, dpi, Vec3
+import VisualGeometryToolkitIo as VGIo
 using Rotations: QuatRotation
 
 @testset "board design resolver" begin
@@ -27,7 +27,7 @@ using Rotations: QuatRotation
         @test t == PlanarTarget(uid; nominal = pts) && points(t) == pts
 
         # a stored rig names the board by reference; the resolver gives its points back
-        # (a mount stored as its quaternion: the value VisualGeometryIo reads back, exactly)
+        # (a mount stored as its quaternion: the value VisualGeometryToolkitIo reads back, exactly)
         q = SVector(0.9, 0.1, -0.2, 0.3) / sqrt(0.95)
         X = EuclideanMap{3, Float64, QuatRotation{Float64}, Vec3{Float64}}(QuatRotation(q..., false), Vec3{Float64}(10.0, -5.0, 2.0))
         rig = Rig{BodyFrame{:board_rig}}(Dict(uid => Mounted(t, X)))

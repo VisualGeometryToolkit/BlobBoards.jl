@@ -106,7 +106,7 @@ src/                        (include order)
 ├── board_code.jl        # board_code / parse_board_code — the board definition its QR carries
 ├── authoring_stubs.jl   # Stubs for BlobBoards.Authoring (blob_board, rebuild_board, render_board)
 ├── media.jl             # Media enumeration — directory tree → ordered frame work list
-├── device.jl            # re-exports VisualGeometryCore.default_device (resolver lives upstream since 2026-09-07)
+├── device.jl            # re-exports VisualGeometryToolkitCore.default_device (resolver lives upstream since 2026-09-07)
 ├── detect_config.jl     # DetectConfig + NMS strategies
 ├── detect.jl            # Blob detection pipeline (detect_blobs, ASIFT tilts)
 ├── canonicalize.jl      # Canonical patch extraction (canonicalize)
@@ -237,7 +237,7 @@ math (Threads.@threads, plain sort — no bitonic needed).
 
 ## Unit System
 
-Units are FlexUnits with VisualGeometryCore's pixel dimension, checked at run
+Units are FlexUnits with VisualGeometryToolkitCore's pixel dimension, checked at run
 time (quantities are `VgcQuantity`; BlobBoards re-exports `mm`, `inch`, `px`,
 `dpi`, …). Lengths are held in metres, so strip in a named unit
 (`ustrip(mm, q)`, `ustrip(px, q)`); a bare `ustrip` of a length is metres. The
@@ -313,7 +313,7 @@ scenekw=(; camera=campixel!, yreversed=true)
 - **Poppler** (`Poppler_jll`): `pdftocairo` converts the master to its TIFF/PNG and gallery rasters
 - **GLMakie/CairoMakie**: Visualization and figure export
 - **QR encoding**: the board QR corner uses the QR encoder of QRCoders.jl 1.4.5, vendored in `src/authoring/qrencode/` (declared in `VENDORED.toml`; no QRCoders dependency)
-- **SpatialIndexing** (General 0.1.6): the detection R-tree; its allocation-free queries (`foreach_intersecting`, `nearest_neighbor!`) and in-place bulk load (`bulk_load!`) come from `VisualGeometryCore.SpatialQueries`
+- **SpatialIndexing** (General 0.1.6): the detection R-tree; its allocation-free queries (`foreach_intersecting`, `nearest_neighbor!`) and in-place bulk load (`bulk_load!`) come from `VisualGeometryToolkitCore.SpatialQueries`
 
 ## Code Conventions
 
@@ -357,7 +357,7 @@ Consequences:
 - **Every type argument is positional and leads the non-mutated inputs; never
   a keyword**: `blob_pattern(Gray{N0f16}, size)`,
   `undistort!(dst, Float32, camera, src)`, `relabel(Src, Dst, x)`,
-  `VisualGeometryIo.save(PixelFrame{:julia}, path, obs)`. Supplying `pixel_type =`
+  `VisualGeometryToolkitIo.save(PixelFrame{:julia}, path, obs)`. Supplying `pixel_type =`
   to a generation entry point is an `ArgumentError` naming the positional form.
   A config STRUCT keeps its type-valued field (`PatternConfig(; pixel_type)`) —
   that is data, not an argument.
@@ -404,16 +404,16 @@ keyword); a renamed function leaves the old name undefined.
 The conventions every stack package follows — naming and the estimator verbs,
 signatures, data arguments, coordinate frames and normalization ("frame in =
 frame out"), pixel origins, bearings, Jacobians, units and the stack
-contracts — live ONCE, in VisualGeometryCore's `conventions/` folder
+contracts — live ONCE, in VisualGeometryToolkitCore's `conventions/` folder
 (`conventions/README.md` indexes it). Read them before changing code here.
 This file carries no copy of them, only how they land in this package. Where
 the folder is:
 
-- in a checkout of the stack's monorepo: `../VisualGeometryCore/conventions/`
+- in a checkout of the stack's monorepo: `../VisualGeometryToolkitCore/conventions/`
   (the root CLAUDE.md imports it);
-- in VisualGeometryCore's own repository: `conventions/`;
-- from Julia, the installed copy: `VisualGeometryCore.conventions_dir()`, i.e.
-  `joinpath(pkgdir(VisualGeometryCore), "conventions")`.
+- in VisualGeometryToolkitCore's own repository: `conventions/`;
+- from Julia, the installed copy: `VisualGeometryToolkitCore.conventions_dir()`, i.e.
+  `joinpath(pkgdir(VisualGeometryToolkitCore), "conventions")`.
 
 The agent-docs test checks that this file points there and holds no copy.
 
@@ -423,7 +423,7 @@ The rule is the stack's (`conventions/frames.md`); how it lands here:
 
 **In this package:**
 
-Task verbs forward COLMAP pixels and pixel thresholds to RobustVisualGeometry
+Task verbs forward COLMAP pixels and pixel thresholds to VisualGeometryToolkitEstimation
 untouched and read results back in pixels. BlobBoards builds no normalization.
 `image_size` and `center` are sensor data (the distortion centre), never
 described as a normalization. The Python bindings state the pixel convention of
@@ -439,7 +439,7 @@ different things across files.
 
 | term | what it is |
 |------|------------|
-| `matches` | the RAW descriptor matches, BEFORE verification (VisualGeometryFeatures `match`) |
+| `matches` | the RAW descriptor matches, BEFORE verification (VisualGeometryToolkitFeatures `match`) |
 | `csponds` | feature correspondences: the verified, scored, weighted set the estimators consume |
 
 The distinction is a real pipeline stage, so both names stay — but nothing

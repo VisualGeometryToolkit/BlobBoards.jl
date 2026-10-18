@@ -1,7 +1,7 @@
 #=
 convert_formats.jl — stage 0: the motion-capture records of the absolute-pose
 evaluation, from the tracker's raw per-frame exports (inputs), onto
-VisualGeometryIo's kinds, verified.
+VisualGeometryToolkitIo's kinds, verified.
 
     julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/convert_formats.jl [--config=<toml>]
 
@@ -23,9 +23,9 @@ config of record (configs/convert_formats.toml):
 Every file carries its sources in `provenance`; the run writes `_config.toml`,
 `_provenance.toml` (config, commit, inputs), `_manifest.jsonl` (one line per
 source file: its sha256 and what it became) and `_report.json` at its root.
-Every file is the direct serialization of a VisualGeometryCore value
-(VisualGeometryIo `save`) and reads back to that value exactly. A mocap
-pose's column-major `rot_mat` is quaternion-encoded by VisualGeometryIo's one
+Every file is the direct serialization of a VisualGeometryToolkitCore value
+(VisualGeometryToolkitIo `save`) and reads back to that value exactly. A mocap
+pose's column-major `rot_mat` is quaternion-encoded by VisualGeometryToolkitIo's one
 writer; translations, and every scalar, are written as the shortest decimal
 that reads back to the same Float64.
 
@@ -42,14 +42,14 @@ if !isdefined(Main, :BlobBoardsEval)
 end
 using Main.BlobBoardsEval: data_root, figure_config, static_camera_recovery, run_dir, EVAL_TIERS
 include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the subsets' image predicate
-import VisualGeometryIo as VGIo
-using VisualGeometryIo: append_jsonl
-using VisualGeometryCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitIo: append_jsonl
+using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
     Mounted, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids
 using Rotations: QuatRotation, params
-using VisualGeometryEval.Experiments: run_key, write_run_records
+using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
 using DrWatson: gitdescribe
-import VisualGeometryCore
+import VisualGeometryToolkitCore
 using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix, rotation_angle
 using LinearAlgebra: norm
@@ -290,7 +290,7 @@ function convert_mocap(session)
                 provenance = (
                     body = String(b.id), run_key = KEY,
                     source = (markers = "markers.json", markers_sha256 = mhash, constellation = "../" * basename(cons_files[b.id]), constellation_sha256 = _sha(cons_files[b.id])),
-                    method = "reference re-solve: per frame, centred Kabsch (VisualGeometryCore `kabsch`) of the constellation onto the frame's observed markers (≥ 3 seen)",
+                    method = "reference re-solve: per frame, centred Kabsch (VisualGeometryToolkitCore `kabsch`) of the constellation onto the frame's observed markers (≥ 3 seen)",
                 ),
             )
             both = [t for t in keys(kab) if haskey(poses, t) && !(t in rec)]
@@ -312,7 +312,7 @@ function convert_mocap(session)
 end
 
 # The quaternion a pose computed as a rotation MATRIX is written as (w ≥ 0) —
-# the one encoding VisualGeometryIo's writer applies; the reader returns it as is.
+# the one encoding VisualGeometryToolkitIo's writer applies; the reader returns it as is.
 function _written_quaternion(X::EuclideanMap)
     q = SVector{4, Float64}(params(QuatRotation(RotMatrix{3, Float64}(X.R))))
     return q[1] < 0 ? -q : q
@@ -322,7 +322,7 @@ end
 # Run
 # =============================================================================
 
-# Every converted vgio file is the serialization of a VisualGeometryCore value:
+# Every converted vgio file is the serialization of a VisualGeometryToolkitCore value:
 # load → save → load gives the same value (rotations bit for bit). The kinds a
 # conversion writes, and the type each reads back as.
 const KIND_TYPES = Dict(
@@ -361,7 +361,7 @@ function main()
     end
     REPORT["roundtrip"] = roundtrip_all(OUT_ROOT)
 
-    # sizes: the payload threshold (VisualGeometryCore conventions/persisted-geometry.md, ~10 MB)
+    # sizes: the payload threshold (VisualGeometryToolkitCore conventions/persisted-geometry.md, ~10 MB)
     sizes = Dict{String, Int}()
     for (root, _, files) in walkdir(RUN_ROOT; follow_symlinks = false), f in files
         p = joinpath(root, f)
@@ -378,8 +378,8 @@ function main()
     # (the project's own tree, and the packages that own the kinds).
     REPORT["code"] = Dict(
         "bmvc2026" => something(gitdescribe(realpath(@__DIR__)), "?"),
-        "VisualGeometryIo" => something(gitdescribe(pkgdir(VGIo)), "?"),
-        "VisualGeometryCore" => something(gitdescribe(pkgdir(VisualGeometryCore)), "?"),
+        "VisualGeometryToolkitIo" => something(gitdescribe(pkgdir(VGIo)), "?"),
+        "VisualGeometryToolkitCore" => something(gitdescribe(pkgdir(VisualGeometryToolkitCore)), "?"),
     )
     open(joinpath(RUN_ROOT, "_report.json"), "w") do io
         JSON3.pretty(io, JSON3.write(REPORT))

@@ -203,7 +203,7 @@ BB4/210MM/297MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/A4/4.25196850394/26.92
 — the format, page size and margin, ruler width, corner size, padding, ruler
 ticks, seed (hex), the smallest and largest σ (pt), the ladder and placement
 settings, polarity, and the first 8 hex of the identity as a check. A length is
-a number and its unit, the unit symbol of VisualGeometryCore's FlexUnits
+a number and its unit, the unit symbol of VisualGeometryToolkitCore's FlexUnits
 registry upper-cased so the code stays in QR's alphanumeric set: `210MM`, or
 `8.5INCH` on Letter, whichever of mm and inch is shorter and reads back to the
 identical value. The reader lower-cases the symbol and resolves it through the

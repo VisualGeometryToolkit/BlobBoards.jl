@@ -15,7 +15,7 @@ def _jl_blobs_px(jl, expr, density):
     quantity —, COLMAP) as an (N, 3) array."""
     return np.asarray(jl.seval(f"""let b = {expr}
         d = BlobBoards.blobs(b, :pattern; density = {density})
-        V = BlobBoards.VisualGeometryCore
+        V = BlobBoards.VisualGeometryToolkitCore
         [Float64(V.ustrip(V.px, x)) for x in vcat(([q.center[1] q.center[2] q.σ] for q in d)...)]
     end"""))
 
@@ -36,13 +36,13 @@ def test_blob_board_matches_julia(jl):
     assert own.config_hash == py.config_hash
     np.testing.assert_array_equal(own.blobs, _jl_blobs_px(jl, b, "BlobBoards._default_density(b)"))
     assert own.density_dpi == float(jl.seval(
-        f"BlobBoards.VisualGeometryCore.ustrip(BlobBoards.dpi, BlobBoards._default_density({b}))"))
+        f"BlobBoards.VisualGeometryToolkitCore.ustrip(BlobBoards.dpi, BlobBoards._default_density({b}))"))
 
 
 def test_suggest_blob_sizes_matches_julia(jl):
     for dpi, extent, jl_extent in ((300, "A4", '"A4"'), (600, "A0", '"A0"'),
                                    (1200, (300, 200), "(300BlobBoards.mm, 200BlobBoards.mm)")):
-        jl_sizes = jl.seval(f"Tuple(Float64(BlobBoards.VisualGeometryCore.ustrip(BlobBoards.mm, s)) for s in "
+        jl_sizes = jl.seval(f"Tuple(Float64(BlobBoards.VisualGeometryToolkitCore.ustrip(BlobBoards.mm, s)) for s in "
                             f"BlobBoards.suggest_blob_sizes({dpi}BlobBoards.dpi, {jl_extent}))")
         assert suggest_blob_sizes(dpi, extent) == (float(jl_sizes[0]), float(jl_sizes[1]))
     assert suggest_blob_sizes(600, "A4") == pytest.approx((6.0, 38.0))     # 20% of the 190 mm board side
@@ -131,7 +131,7 @@ def test_load_board_matches_julia(jl, board_paths):
     np.testing.assert_array_equal(py.blobs, _jl_blobs_px(jl, f'BlobBoards.load_bundle("{p}")[1]', density))
     assert py.uid == os.path.basename(p)[11:14]
     assert py.density_dpi == float(jl.seval(
-        f"BlobBoards.VisualGeometryCore.ustrip(BlobBoards.dpi, {density})"))
+        f"BlobBoards.VisualGeometryToolkitCore.ustrip(BlobBoards.dpi, {density})"))
     with pytest.raises(TypeError):
         load_board(p, print_density=300)
 
@@ -184,14 +184,14 @@ def test_device_selection(has_gpu):
 def _julia_find(jl, board_paths, model_path, gallery_path, img_expr, camera=None):
     paths = "[" + ", ".join(f'"{p}"' for p in board_paths) + "]"
     geo = "BlobBoards.HomographyGeometry()" if camera is None else \
-        f'BlobBoards.PoseGeometry(BlobBoards.VisualGeometryIo.load(BlobBoards.VisualGeometryCore.CameraModel, "{camera}"))'
+        f'BlobBoards.PoseGeometry(BlobBoards.VisualGeometryToolkitIo.load(BlobBoards.VisualGeometryToolkitCore.CameraModel, "{camera}"))'
     return jl.seval(f"""let net = BlobBoards.DescriptorNetwork("{model_path}"),
             g = BlobBoards.BoardGallery("{gallery_path}.jl", net),
             feats = Dict(insert!(g, {paths}, net; progress = false)),
             bundles = Dict(b.uid => b.bundle for b in BlobBoards.load_board.({paths}))
         r = BlobBoards.find_boards(feats, net, {img_expr}; board_bundles = bundles,
                                    config = BlobBoards.FindBoardsConfig(geometry = {geo}))
-        [(u, count(BlobBoards.VisualGeometryCore.is_map_inlier, s.weights)) for (u, m, q, s) in r]
+        [(u, count(BlobBoards.VisualGeometryToolkitCore.is_map_inlier, s.weights)) for (u, m, q, s) in r]
     end""")
 
 

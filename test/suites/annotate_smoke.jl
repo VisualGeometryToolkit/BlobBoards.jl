@@ -1,3 +1,5 @@
+import VisualGeometryToolkitFeatures as VgtkFeatures
+import VisualGeometryToolkitIo as VgtkIo
 using Test
 using BlobBoards
 using BlobBoards: annotate_blobs, canonicalize, FindBoardsConfig,
@@ -16,11 +18,11 @@ using CUDA: CUDA, CUDABackend
 end
 import cuDNN
 import VideoIO
-import VisualGeometryIo
+import VisualGeometryToolkitIo
 using FileIO: load as load_image
 
-using VisualGeometryCore: CameraModel, EllipticFrame, Point2, Size2
-import VisualGeometryFeatures   # tilt-schedule guard reaches _imas_tilts_25
+using VisualGeometryToolkitCore: CameraModel, EllipticFrame, Point2, Size2
+import VisualGeometryToolkitFeatures   # tilt-schedule guard reaches _imas_tilts_25
 
 # =============================================================================
 # Data — the package's OWN example artifacts (Artifacts.toml, Zenodo):
@@ -143,7 +145,7 @@ _detect_cfg() = DetectConfig(
     # boundary) — assert both halves so a reduced schedule can't sneak back in
     # via either layer.
     @test isempty(_detect_cfg().tilts)
-    @test length(VisualGeometryFeatures._imas_tilts_25()) == 25
+    @test length(VgtkFeatures._imas_tilts_25()) == 25
 end
 
 @testset "board rasterization dpi (bare-ustrip density regression)" begin
@@ -153,7 +155,7 @@ end
     # coordinates → blank gallery patches → indiscriminate descriptors
     # (2026-07-29, masked for months by the gallery feature cache).
     # `_render_dpi` must use the target-unit form.
-    using VisualGeometryCore: dpi
+    using VisualGeometryToolkitCore: dpi
     @test BlobBoards._render_dpi(1200dpi) == 1200
     @test BlobBoards._render_dpi(300dpi) == 300
     @test_throws Exception BlobBoards._render_dpi(3.0)   # dimensionless is a bug
@@ -161,7 +163,7 @@ end
 
 # Cameras are vgio/cameras/v3 stores (the example artifacts ship them that
 # way); the store owns the reader.
-_load_camera(path) = VisualGeometryIo.load(CameraModel, path)
+_load_camera(path) = VgtkIo.load(CameraModel, path)
 
 function _setup_gallery()
     model = DescriptorNetwork(_MODEL_PATH)

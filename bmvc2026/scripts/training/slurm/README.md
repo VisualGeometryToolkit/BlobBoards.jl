@@ -56,7 +56,7 @@ The env at `$BB_PROJECT` lives outside this repo by convention
 
 ```bash
 mkdir -p /path/to/bb-slurm-env && cd /path/to/bb-slurm-env
-julia --project=. -e 'using Pkg; Pkg.add(["BlobBoards", "VisualGeometryCore", "VisualGeometryFeatures",
+julia --project=. -e 'using Pkg; Pkg.add(["BlobBoards", "VisualGeometryToolkitCore", "VisualGeometryToolkitFeatures",
     "CUDA", "cuDNN", "AcceleratedKernels", "NNlib", "Lux", "Optimisers", "Enzyme", "Reactant", "Zygote",
     "TensorBoardLogger", "SlurmClusterManager", "ClusterManagers", "CairoMakie", "FileIO", "ImageIO",
     "ImageMagick", "Images", "ImageDraw", "StaticArrays"]); Pkg.precompile()'

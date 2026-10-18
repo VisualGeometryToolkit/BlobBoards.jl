@@ -17,7 +17,7 @@ using Aqua
         # NB this list cannot protect you from the opposite error. Aqua asks
         # whether a dep is LOADED, so a dep pulled in transitively by another
         # dep reads as live no matter what: HDF5 sat in [deps] unused across
-        # several releases, kept alive by VisualGeometryFeatures, and was
+        # several releases, kept alive by VisualGeometryToolkitFeatures, and was
         # found by grepping import lines instead (at a release audit).
         # NB no :CUDA/:cuDNN here — they live in [weakdeps], which Aqua's
         # stale-deps check never inspects; listing them was inert (2026-09 audit).

@@ -12,9 +12,9 @@ using BlobBoards: data_dir, detect_blobs, DescriptorNetwork, BoardGallery, uid_f
                   cutoff, find_board, FindBoardsConfig, DetectConfig,
                   DEFAULT_CUTOFF, load_bundle, blobs, board!
 using BlobBoards: _ensure_network, canonicalize, describe, described_features
-using VisualGeometryFeatures: nn_match_stacked, MutualNN
-using VisualGeometryFeatures: Detection
-using VisualGeometryCore: is_map_inlier, imshow, HomographyMap, matches!, window!, ustrip, centroid, Rect
+using VisualGeometryToolkitFeatures: nn_match_stacked, MutualNN
+using VisualGeometryToolkitFeatures: Detection
+using VisualGeometryToolkitCore: is_map_inlier, imshow, HomographyMap, matches!, window!, ustrip, centroid, Rect
 using CoordinateTransformations: PerspectiveMap
 using GLMakie; GLMakie.activate!()
 using GeometryBasics: Point2, Point2f

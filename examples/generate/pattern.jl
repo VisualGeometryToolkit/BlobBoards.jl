@@ -24,7 +24,7 @@ Files Created:
 
 using BlobBoards
 using BlobBoards: PatternBundle, Size2, px
-using VisualGeometryCore: ustrip
+using VisualGeometryToolkitCore: ustrip
 
 # =============================================================================
 # Simple pattern generation

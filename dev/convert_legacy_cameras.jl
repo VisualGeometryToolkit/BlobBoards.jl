@@ -1,6 +1,6 @@
 # Convert legacy OpenCV-style camera JSONs ("camera_matrix" /
 # "distortion_coefficients" — no schema tag, no pixel frame) to the canonical
-# vgio/cameras store (v2 since VisualGeometryIo 7675965), IN PLACE, the way
+# vgio/cameras store (v2 since VisualGeometryToolkitIo 7675965), IN PLACE, the way
 # commit d767827 (2026-08-18) did for the primary dataset copy (to v1, then).
 # Older dataset copies can still hold ad-hoc camera files; this converts them
 # the same way. (The 2026-09-07 package-cleanup audit found 16 such files under
@@ -11,7 +11,7 @@
 # OpenCV pixel frame, so the CameraModel is built through the opencv→colmap
 # frame map (VGC converts on the way in, +0.5 on cx/cy). The record carries no
 # frame of its own — the model is canonical by construction and the store
-# writes that frame (VisualGeometryIo 0.11 retired the camera record's
+# writes that frame (VisualGeometryToolkitIo 0.11 retired the camera record's
 # `pixel_chart` keyword: a record labelled :opencv over a canonical K
 # double-shifted, the exact mistake the original conversion's field-exact
 # verification caught). The store is a name → `BoundedCamera` Dict.
@@ -21,7 +21,7 @@
 # BEFORE the original is replaced. Files that are not pinhole_radtan, or that
 # lack image_width/image_height, are listed and left untouched.
 #
-# Usage (the checkout's own env has VisualGeometryIo + VisualGeometryCore):
+# Usage (the checkout's own env has VisualGeometryToolkitIo + VisualGeometryToolkitCore):
 #
 #   cd BlobBoards.jl
 #   R=/path/to/20251028_BlobBoards_Office      # the dataset root, data_dir()
@@ -29,8 +29,8 @@
 #   julia --startup-file=no --project=. dev/convert_legacy_cameras.jl \
 #       "$R" "$R/_legacy_camera_backup_$(date +%F)" $FILES
 
-import VisualGeometryIo as VGIo
-using VisualGeometryCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, lens_parameters, BoundedCamera, Size2
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, lens_parameters, BoundedCamera, Size2
 using CoordinateTransformations: AffineMap
 using JSON3
 

@@ -8,7 +8,7 @@ member target's points in its own frame — a ``points`` target's ``points``, a
 ``planar`` target's ``nominal`` points — in the file's declared ``length_unit``; a
 planar target named only by its design reference carries no points here). This
 module resolves the references into per-frame point arrays — object points
-converted to millimetres from that declared unit, as VisualGeometryIo's
+converted to millimetres from that declared unit, as VisualGeometryToolkitIo's
 ``correspondences`` does — and moves the pixels into the requested convention,
 once, so no script redoes the half-pixel arithmetic:
 
@@ -24,7 +24,7 @@ import numpy as np
 
 CANONICAL = "colmap"
 SHIFT = {"colmap": 0.0, "opencv": -0.5, "matlab": 0.5, "julia": 0.5}
-# Millimetres per unit, for the LENGTH units VisualGeometryIo's unit table spells
+# Millimetres per unit, for the LENGTH units VisualGeometryToolkitIo's unit table spells
 # (``_UNITS`` in contract.jl). ``px`` is in that table too but is not a length, so
 # a target whose points declare it is refused, as a missing or unknown unit is.
 MM_PER_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "um": 1.0e-3, "inch": 25.4}
@@ -153,7 +153,7 @@ def calibrate_opencv(run_dir, model="default", fix_aspect=False, min_points=6):
                       for f, rv, tv in zip(frames, rvecs, tvecs)]}
 
 
-# --- native output (cameras v3, transforms v2), field for field what VisualGeometryIo.migrate_opencv writes -----------------
+# --- native output (cameras v3, transforms v2), field for field what VisualGeometryToolkitIo.migrate_opencv writes -----------------
 
 
 
@@ -169,7 +169,7 @@ def _rotation_from_rvec(rvec):
 
 
 def _quat_wxyz(R):
-    """A rotation's unit Hamilton quaternion (w, x, y, z), w ≥ 0 (VisualGeometryIo's sign)."""
+    """A rotation's unit Hamilton quaternion (w, x, y, z), w ≥ 0 (VisualGeometryToolkitIo's sign)."""
     m = np.asarray(R, dtype=np.float64)
     t = np.trace(m)
     if t > 0:
@@ -191,7 +191,7 @@ def _quat_wxyz(R):
 def opencv_lens_record(dist):
     """The vgio/cameras/v3 lens record of OpenCV's distortion vector ``dist`` = (k1, k2, p1, p2[, k3[,
     k4, k5, k6[, s1, s2, s3, s4[, tx, ty]]]]) — 4, 5, 8, 12 or 14 entries, the terms that length
-    evaluates, zeros included: VisualGeometryIo's ``opencv_lens`` written out (a perspective lens whose
+    evaluates, zeros included: VisualGeometryToolkitIo's ``opencv_lens`` written out (a perspective lens whose
     radial factor, tangential and thin-prism terms add at one point, the tilt after)."""
     v = [float(x) for x in np.asarray(dist, dtype=np.float64).ravel()]
     n = len(v)
@@ -208,7 +208,7 @@ def opencv_lens_record(dist):
 
 
 def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenance):
-    """Write an OpenCV calibration as the two native files VisualGeometryIo's ``migrate_opencv``
+    """Write an OpenCV calibration as the two native files VisualGeometryToolkitIo's ``migrate_opencv``
     writes: ``<stem>_cameras.json`` (vgio/cameras/v3, one camera named ``stem``, the lens record of
     OpenCV's model for ``dist``, ``opencv_lens_record``) and ``<stem>_poses.json`` (vgio/transforms/v3, one
     record per posed image, ``target:<target> → view:<image>``, millimetres).
@@ -249,7 +249,7 @@ def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenan
 def write_opencv_calibration(run_dir, model, out_dir, **kw):
     """Calibrate the run with OpenCV (``calibrate_opencv``) and write it natively as
     ``calibration_opencv_<model>_cameras.json`` + ``_poses.json`` in ``out_dir`` — the files
-    ``VisualGeometryIo.migrate_opencv`` makes of a third-party ``calibration_opencv_<model>.json``,
+    ``VisualGeometryToolkitIo.migrate_opencv`` makes of a third-party ``calibration_opencv_<model>.json``,
     so a BlobBoards fit and a migrated one are read the same way."""
     r = calibrate_opencv(run_dir, model, **kw)
     prov = {"source": "opencv", "fitted_by": r["source"], "fitted_on": os.path.join(os.path.abspath(run_dir), "observations.json"),

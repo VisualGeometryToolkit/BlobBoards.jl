@@ -9,7 +9,7 @@ Data: `absolute_pose_experiments/260527`, log-polar s96 detections.
 ## The mechanism (kept, off by default)
 
 After RANSAC converges, reflect the winner about the viewing ray
-(`VisualGeometryCore.mirror` — the planar two-fold ambiguity's second
+(`VisualGeometryToolkitCore.mirror` — the planar two-fold ambiguity's second
 branch, a PROPER rotation of the same board, separated by twice the
 viewing tilt), refine the reflection with the same seeded LO, select by
 a per-blob scale-field margin. The machinery verifiably works: on the

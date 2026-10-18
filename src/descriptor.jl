@@ -34,7 +34,7 @@ in power-of-two extents, and never shrinks. It is the only inelastic consumer,
 and therefore the only one that can FAIL rather than adapt — so it must be
 claimed first and the elastic budgets sized against the remainder.
 
-`VisualGeometryFeatures`' `_PYRAMID_BUDGET` already assumes exactly this
+`VisualGeometryToolkitFeatures`' `_PYRAMID_BUDGET` already assumes exactly this
 ("the descriptor session's arena is already allocated before the plan is
 built, so it is excluded from free"). That assumption was FALSE until this
 function existed: ONNXRuntime's `gpu_mem_limit` is a CAP, not a reservation, so
@@ -330,9 +330,9 @@ function DescriptorNetwork(
 end
 
 
-# The batching skeleton behind every describe backend is VisualGeometryFeatures'
+# The batching skeleton behind every describe backend is VisualGeometryToolkitFeatures'
 # `batched_rows` since 0.7.1 (the four drifting copies collapsed there).
-using VisualGeometryFeatures: batched_rows
+using VisualGeometryToolkitFeatures: batched_rows
 
 """
     describe(model::DescriptorNetwork, patches) -> Matrix{Float32}

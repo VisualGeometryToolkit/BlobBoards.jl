@@ -7,6 +7,7 @@
 # inspection grid and the TrackTrace viewers.
 
 module BlobBoardsMakieExt
+    import VisualGeometryToolkitCore as VgtkCore
 
 using Makie: Makie
 using BlobBoards
@@ -22,14 +23,14 @@ import BlobBoards: board_overlay!, inliers!, board_panel!, plot_comparison
 using BlobBoards: _clamp_patch
 import BlobBoards: view_angle_figure, save_view_angle_figure
 
-using VisualGeometryCore: VisualGeometryCore, imshow, ellipses!, matches!,
+using VisualGeometryToolkitCore: VisualGeometryToolkitCore, imshow, ellipses!, matches!,
     HomographyMap, Camera, project
 # `Colors` is a hard dep of the package, so an extension may use it directly.
 using Colors: Colors
 using StaticArrays: SMatrix, SVector
 using FlexUnits: Quantity
 using GeometryBasics: Point2, Point2f, Point3, Rect
-using VisualGeometryCore: EllipticFrame, Ellipse
+using VisualGeometryToolkitCore: EllipticFrame, Ellipse
 using CoordinateTransformations: PerspectiveMap
 
 include("makie/board_overlay_recipe.jl")
@@ -60,7 +61,7 @@ _n_inliers(t, threshold = 0.5) =
 
 
 function board_overlay!(
-        ax::Makie.Axis, camera::Union{Nothing, VisualGeometryCore.CameraModel},
+        ax::Makie.Axis, camera::Union{Nothing, VgtkCore.CameraModel},
         results, board_bundles::AbstractDict;
         colors = :auto, labels = true, outline_width = 3.0, blob_width = 1.5,
         show_frame = false, lens::Bool = true,
@@ -87,7 +88,7 @@ function board_overlay!(
             rc = Rect(b, :world)
             # Defensive identity-or-strip (audited): the :world frame is
             # unitless mm by contract. Anchor at the board frame's TOP-RIGHT.
-            tr = VisualGeometryCore.ustrip.(rc.origin .+ (rc.widths[1], zero(rc.widths[2])))
+            tr = VgtkCore.ustrip.(rc.origin .+ (rc.widths[1], zero(rc.widths[2])))
             # `CameraBoardProj` returns `nothing` for a corner the lens cannot
             # image (past the fold, behind the camera) — the same guard every
             # other call site has. A board with one off-field corner loses its
@@ -108,16 +109,16 @@ function board_overlay!(
     return ax
 end
 
-# HOIST CANDIDATE (VisualGeometryCore): `_inlier_frames` and the `Csponds`
+# HOIST CANDIDATE (VisualGeometryToolkitCore): `_inlier_frames` and the `Csponds`
 # method below touch NO BlobBoards type — they are weights + targets + frame +
 # ellipses!, all of which VGC owns. They belong beside VGC's `matches!`, which
 # is already the correspondence painter. Only the result-set method is ours,
 # because only the (uid, model, quality, scored) tuple is.
 _inlier_frames(sc; threshold = 0.5) =
-    [VisualGeometryCore.feature_frame(sc.targets[i]) for (i, w) in enumerate(sc.weights) if w > threshold]
+    [VgtkCore.feature_frame(sc.targets[i]) for (i, w) in enumerate(sc.weights) if w > threshold]
 
 function inliers!(
-        ax::Makie.Axis, sc::VisualGeometryCore.Csponds;
+        ax::Makie.Axis, sc::VgtkCore.Csponds;
         cutoff = DEFAULT_CUTOFF, color = :cyan, threshold = 0.5, kwargs...
     )
     ells = _inlier_frames(sc; threshold)
@@ -157,10 +158,10 @@ board_panel!(figpos, camera, img::AbstractMatrix, result, bundle; show_frame = t
 # overlay. Shared by plot_boards and the trace viewer's _registered_panels!
 # (character-identical twins that had drifted on ncols/show_frame).
 function _board_panel!(
-        figpos, camera::Union{Nothing, VisualGeometryCore.CameraModel}, img::AbstractMatrix,
+        figpos, camera::Union{Nothing, VgtkCore.CameraModel}, img::AbstractMatrix,
         uid, model, quality, weights, bundle; show_frame = true, lens::Bool = true,
     )
-    n_inl = count(VisualGeometryCore.is_map_inlier, weights)
+    n_inl = count(VgtkCore.is_map_inlier, weights)
     ax, _ = imshow(figpos, img; title = "$uid  q=$(round(quality; digits = 1))  n=$n_inl")
     _draw_board!(
         ax, _board_proj(camera, model; lens), Rect(bundle, :world), BlobBoards.blobs(bundle, :world);
@@ -183,7 +184,7 @@ function plot_boards(
         # on last. Typed so a call in either retired order —
         # `(img, results, board_bundles, camera)` or
         # `(camera, img, results, board_bundles)` — is a MethodError.
-        camera::Union{Nothing, VisualGeometryCore.CameraModel},
+        camera::Union{Nothing, VgtkCore.CameraModel},
         results::AbstractVector, board_bundles::AbstractDict, img::AbstractMatrix;
         n = min(10, length(results)),
         # `lens = true` (the default) draws through the FULL camera, for a RAW
@@ -233,7 +234,7 @@ function plot_board_poses(
         # last. Typed so a call in either retired order —
         # `(img, poses, board_bundles, camera)` or
         # `(camera, img, poses, board_bundles)` — is a MethodError.
-        camera::Union{Nothing, VisualGeometryCore.CameraModel},
+        camera::Union{Nothing, VgtkCore.CameraModel},
         poses, board_bundles::AbstractDict, img::AbstractMatrix;
         detections = nothing, detection_color = :cyan,
         detection_cutoff = DEFAULT_CUTOFF,
@@ -261,7 +262,7 @@ end
 _labelled(e) = e isa Pair ? (String(e.first), e.second) : (String(e[1]), e[2])
 
 function plot_comparison(
-        camera::Union{Nothing, VisualGeometryCore.CameraModel},
+        camera::Union{Nothing, VgtkCore.CameraModel},
         labelled, board_bundles::AbstractDict, img::AbstractMatrix;
         colors = :auto, labels = false, show_inliers = true,
         inlier_color = :cyan, inlier_cutoff = DEFAULT_CUTOFF, panel_size = 700,
@@ -299,8 +300,8 @@ function _crop(img, dets, xr, yr)
     sub = img[y0:y1, x0:x1]
     keep = [
         d for d in dets if _in_region(
-                VisualGeometryCore.centroid(
-                    VisualGeometryCore.feature_frame(d)
+                VgtkCore.centroid(
+                    VgtkCore.feature_frame(d)
                 ), (x0, x1), (y0, y1)
             )
     ]
@@ -308,8 +309,8 @@ function _crop(img, dets, xr, yr)
     # matrix; only the center moves.
     dx, dy = x0 - 1, y0 - 1
     shifted = map(keep) do d
-        f = VisualGeometryCore.feature_frame(d)
-        c = VisualGeometryCore.centroid(f)
+        f = VgtkCore.feature_frame(d)
+        c = VgtkCore.centroid(f)
         EllipticFrame(Point2(c[1] - dx, c[2] - dy), f.S)
     end
     return sub, shifted
@@ -336,7 +337,7 @@ function inspect_pipeline(trace::PipelineTrace; region = nothing)
 
     function panel(row, col, dets, title, color)
         im, shapes = region === nothing ?
-            (trace.detect_img, [VisualGeometryCore.feature_frame(d) for d in dets]) :
+            (trace.detect_img, [VgtkCore.feature_frame(d) for d in dets]) :
             _crop(trace.detect_img, dets, region[1], region[2])
         ax, _ = imshow(fig[row, col], im; title = "$title (n=$(length(shapes)))")
         ellipses!(ax, shapes; cutoff = trace.cutoff, strokecolor = color)
@@ -385,16 +386,16 @@ end
 # documented sixth spelling): plotting receives quantity-carrying poses that
 # the pipeline path never sees, and this defensive strip is the contract
 # difference (2026-09 audit).
-function _board_proj(camera_model::VisualGeometryCore.CameraModel, pose; lens::Bool = true)
+function _board_proj(camera_model::VgtkCore.CameraModel, pose; lens::Bool = true)
     # `lens = true` (the default): the FULL camera, raw pixels — what a board
     # overlaid on a captured frame needs. `lens = false` keeps the pinhole
     # plane homography below, for an image that has already been undistorted
     # (the trace viewer's `detect_img`).
-    lens && return CameraBoardProj(VisualGeometryCore.Camera(camera_model, pose))
+    lens && return CameraBoardProj(VgtkCore.Camera(camera_model, pose))
     K = SMatrix{3, 3, Float64}(camera_model.intrinsics.K)
     R = SMatrix{3, 3, Float64}(pose.R)
     # Extrinsics3.t is bare mm by convention; a quantity-carrying pose strips in mm.
-    t = SVector{3, Float64}(VisualGeometryCore.strip_or_bare.(VisualGeometryCore.mm, pose.t))
+    t = SVector{3, Float64}(VgtkCore.strip_or_bare.(VgtkCore.mm, pose.t))
     return PerspectiveMap() ∘ HomographyMap(K * hcat(R[:, 1], R[:, 2], t))
 end
 _board_proj(::Nothing, H; lens::Bool = true) = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H))
@@ -404,10 +405,10 @@ _board_proj(::Nothing, H; lens::Bool = true) = PerspectiveMap() ∘ HomographyMa
 # radial map a circle is no longer a conic and a rect edge no longer a line,
 # so shapes are transferred by boundary sampling; the recipe's `poly!` takes
 # the resulting polygons (one for the outline, one per blob).
-struct RadialBoardProj{M <: VisualGeometryCore.RadialHomography}
+struct RadialBoardProj{M <: VgtkCore.RadialHomography}
     m::M
 end
-(r::RadialBoardProj)(p::AbstractVector) = VisualGeometryCore.radial_transfer(r.m, Point2(p[1], p[2]))
+(r::RadialBoardProj)(p::AbstractVector) = VgtkCore.radial_transfer(r.m, Point2(p[1], p[2]))
 # The rect outline is BlobBoards' one radial sampler (`radial_outline`, the
 # same one `board_quad` uses); samples beyond the representable field are
 # dropped there and here — `radial_transfer` returns `nothing` for them.
@@ -415,7 +416,7 @@ function (r::RadialBoardProj)(rect::Rect)
     pts = Point2f.(BlobBoards.radial_outline(r.m, rect))
     return length(pts) < 3 ? nothing : pts       # nothing representable (board past the fold): no polygon
 end
-(r::RadialBoardProj)(c::VisualGeometryCore.Circle) = _sampled_polygon(r, VisualGeometryCore.boundary_points(c, 24))
+(r::RadialBoardProj)(c::VgtkCore.Circle) = _sampled_polygon(r, VgtkCore.boundary_points(c, 24))
 
 # A shape transferred by boundary SAMPLING, for the maps under which a rect
 # edge is not a line and a circle not a conic: every sample through `proj`,
@@ -428,7 +429,7 @@ function _sampled_polygon(proj, samples)
     end
     return length(pts) < 3 ? nothing : pts
 end
-_board_proj(::Nothing, m::VisualGeometryCore.RadialHomography; lens::Bool = true) = RadialBoardProj(m)
+_board_proj(::Nothing, m::VgtkCore.RadialHomography; lens::Bool = true) = RadialBoardProj(m)
 
 # The CALIBRATED camera and the board's pose — the board as the lens actually
 # images it, in RAW pixels. `_board_proj(::CameraModel, pose)` above is the
@@ -439,11 +440,11 @@ _board_proj(::Nothing, m::VisualGeometryCore.RadialHomography; lens::Bool = true
 # `RadialBoardProj` does — and samples the lens cannot image (past the fold,
 # behind the camera) are dropped rather than drawn at a fabricated pixel.
 struct CameraBoardProj{C}
-    cam::C          # VisualGeometryCore.Camera(model, pose): world plane → raw pixels
+    cam::C          # VisualGeometryToolkitCore.Camera(model, pose): world plane → raw pixels
 end
 
 function _cam_pt(p::CameraBoardProj, x, y)
-    u = VisualGeometryCore.project(p.cam, Point3{Float64}(Float64(x), Float64(y), 0.0))
+    u = VgtkCore.project(p.cam, Point3{Float64}(Float64(x), Float64(y), 0.0))
     return (isfinite(u[1]) && isfinite(u[2])) ? Point2f(u[1], u[2]) : nothing
 end
 (p::CameraBoardProj)(q::AbstractVector) = _cam_pt(p, q[1], q[2])
@@ -451,15 +452,15 @@ end
 # One rect walk for every outline: VGC's `boundary_points` (constant arc
 # length along the perimeter). Samples the lens cannot image are dropped.
 (p::CameraBoardProj)(rect::Rect; samples::Int = 80) =
-    _sampled_polygon(p, VisualGeometryCore.boundary_points(rect, samples))
-(p::CameraBoardProj)(c::VisualGeometryCore.Circle) =
-    _sampled_polygon(p, VisualGeometryCore.boundary_points(c, 24))
+    _sampled_polygon(p, VgtkCore.boundary_points(rect, samples))
+(p::CameraBoardProj)(c::VgtkCore.Circle) =
+    _sampled_polygon(p, VgtkCore.boundary_points(c, 24))
 
-# A radial camera (VisualGeometryCore's 1-D `RadialCamera`) is rows 1-2 of the
+# A radial camera (VisualGeometryToolkitCore's 1-D `RadialCamera`) is rows 1-2 of the
 # plane homography: it constrains the DIRECTION to a blob, not its position
 # along that ray, so there is no conic to draw and no quad to place. Refuse
 # loudly rather than return something wrong.
-_board_proj(::Nothing, m::VisualGeometryCore.RadialCamera; lens::Bool = true) = throw(
+_board_proj(::Nothing, m::VgtkCore.RadialCamera; lens::Bool = true) = throw(
     ArgumentError(
         "a RadialCamera fixes DIRECTIONS, not positions — it cannot place a board. " *
             "Plot through a camera and the board's pose instead " *
@@ -484,7 +485,7 @@ function _draw_board!(
     )
     if blob_width > 0
         polys = Vector{Point2f}[]
-        for c in VisualGeometryCore.Circle.(blobs, cutoff)
+        for c in VgtkCore.Circle.(blobs, cutoff)
             q = proj(c)
             q === nothing || push!(polys, q)
         end
@@ -522,11 +523,11 @@ function _registered_panels!(fig, trace, row0; ncols = 4)
         # a quantity strips in its named unit.
         pp = Point2f.(
             _project_pts(
-                proj, map(c -> VisualGeometryCore.strip_or_bare.(VisualGeometryCore.mm, c), VisualGeometryCore.centroid.(VisualGeometryCore.sources(csponds)))
+                proj, map(c -> VgtkCore.strip_or_bare.(VgtkCore.mm, c), VgtkCore.centroid.(VgtkCore.sources(csponds)))
             )
         )
         dp = Point2f.(
-            map(c -> VisualGeometryCore.strip_or_bare.(VisualGeometryCore.px, c), VisualGeometryCore.centroid.(VisualGeometryCore.targets(csponds)))
+            map(c -> VgtkCore.strip_or_bare.(VgtkCore.px, c), VgtkCore.centroid.(VgtkCore.targets(csponds)))
         )
         matches!(ax, pp, dp; weights = csponds.weights)
         push!(out, ax)

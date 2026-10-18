@@ -205,7 +205,7 @@ Convert between physical units and pixels:
 
 ```julia
 using BlobBoards                     # re-exports mm, px, dpi
-using VisualGeometryCore: uconvert
+using VisualGeometryToolkitCore: uconvert
 using GeometryBasics: Point2
 
 bundle, _ = BlobBoards.load("blob_board.json")

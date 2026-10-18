@@ -2,15 +2,15 @@
 # regeneration: the motion-capture records of the absolute-pose evaluation,
 # from the tracker's raw per-frame exports (inputs:
 # data_root()/absolute_pose_experiments/<session>/poses/motion_tracker) onto
-# VisualGeometryIo's kinds — target_points3d/v1, trajectory/v3, rig/v4 — each
-# the direct serialization of a VisualGeometryCore value. Written to
+# VisualGeometryToolkitIo's kinds — target_points3d/v1, trajectory/v3, rig/v4 — each
+# the direct serialization of a VisualGeometryToolkitCore value. Written to
 # results_root()/convert_formats-<run key of this config>/ (src/runs.jl
 # records_dir), with the run records and a manifest of source sha256 → output.
 
 [experiment]
 generator = "convert_formats"
-# The generation of VisualGeometryIo's kinds the copy is written in: "direct" —
-# every kind the serialization of a VisualGeometryCore value (2026-10-09; the
+# The generation of VisualGeometryToolkitIo's kinds the copy is written in: "direct" —
+# every kind the serialization of a VisualGeometryToolkitCore value (2026-10-09; the
 # measurement kinds renamed target_points2d/3d, target rigs rig/v4). The
 # previous conversion (run key fa5e3efa819e2094) wrote the record generation.
 formats = "direct"

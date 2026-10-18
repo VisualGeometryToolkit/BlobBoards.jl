@@ -13,7 +13,7 @@ using GLMakie; GLMakie.activate!()
 using VideoIO
 using Colors: Gray
 using GeometryBasics: Point2f, Polygon, coordinates
-using VisualGeometryCore: imshow, imshow!, HomographyMap, Ellipse, Circle,
+using VisualGeometryToolkitCore: imshow, imshow!, HomographyMap, Ellipse, Circle,
     boundary, centroid, is_ellipse, ustrip, Disc
 using CUDA  # triggers GPU extensions
 

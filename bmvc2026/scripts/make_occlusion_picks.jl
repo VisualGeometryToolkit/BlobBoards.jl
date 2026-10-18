@@ -32,7 +32,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, paper_images_dir, figure_config, write_figure_records
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 const CFG, CFG_PATH = figure_config("occlusion_picks"; default = projectdir("configs", "figures", "occlusion_picks.toml"))
 const EXP = CFG["experiment"]

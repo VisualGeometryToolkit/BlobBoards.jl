@@ -51,20 +51,20 @@ JpegTurbo = "b835a17e-a41a-41e7-81f0-2f016b05efe0"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
-RobustVisualGeometry = "48970fad-9a21-401c-bf6c-679fa4f2bd7f"
+VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-VisualGeometryCore = "297d53b8-c8d7-4cd7-a9af-68e656508a81"
-VisualGeometryFeatures = "9e05951d-65eb-41d6-b120-50dff4d82817"
-VisualGeometryIo = "d0441031-17df-4f07-bc88-8d8f5a818e7b"
+VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
+VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
+VisualGeometryToolkitIo = "2c312ccb-3050-452c-9523-414c480ba3da"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [sources]
 BlobBoards = {path = ".."}
 
 [compat]
-# No VisualGeometryIo entry: BlobBoards' own [compat] (dev'd via [sources])
+# No VisualGeometryToolkitIo entry: BlobBoards' own [compat] (dev'd via [sources])
 # already bounds it. A second copy here can only agree or break the resolve —
 # it broke it twice (a 0.7 cap, 80dfe97; a 0.10 cap under the root's 0.11).
 CUDA = "5.11.0"

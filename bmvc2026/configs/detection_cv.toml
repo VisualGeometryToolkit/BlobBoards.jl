@@ -16,20 +16,20 @@
 #                      matches (post-detection)
 #
 # Everything else is the run config of record (`inputs.run_config`), read,
-# never restated. The search is VisualGeometryEval's coarse-fine search
+# never restated. The search is VisualGeometryToolkitEval's coarse-fine search
 # (`joint_coarse_fine`, Evaluation `coarse_fine_search`): the coarse product
 # grid, each axis extended while the joint argmin lies within `edge_margin`
 # points of its face, then the product of each axis's fine bracket about the
 # joint argmin and its free argmin. `peak_threshold` is `expensive`: the
 # search asks for one value at a time and the driver runs one detection run
 # per value, reused by every (half-width, similarity) cell. Absent keys
-# inherit VisualGeometryEval configs/tuning.toml; unknown keys are refused.
+# inherit VisualGeometryToolkitEval configs/tuning.toml; unknown keys are refused.
 #
 # It replaces the factorial detection-threshold grid
 # (detection_thresholds_cv.jl) and the separate half-width CV
 # (outlier_halfwidth_cv.jl), which tuned these axes one at a time.
 #
-# The criterion is the INTER-BOARD INVARIANCE mAA (VisualGeometryEval
+# The criterion is the INTER-BOARD INVARIANCE mAA (VisualGeometryToolkitEval
 # `rigid_invariance_errors` under `eligible_maa`): in every frame the
 # relative pose T_m⁻¹ T_n of two boards is a constant of the rigid panel, so
 # its deviation from the leave-one-out reference over the other frames is pure
@@ -39,7 +39,7 @@
 # accuracy in one number.
 #
 # Data: the validation scene of the registered scene split
-# `blobboards_cross_session` (VisualGeometryEval configs/splits.toml) —
+# `blobboards_cross_session` (VisualGeometryToolkitEval configs/splits.toml) —
 # 260521/bb, a separate capture session (f/9.0 against 260527's f/22); the
 # reported session 260527 is the test side and is never read here.
 # =============================================================================
@@ -95,7 +95,7 @@ fine = { type = "linear_count", n = 5 }
 # The operating point in force (the configs of record, signed off 2026-10-09
 # and kept 2026-10-14): the search's selection replaces it only when the
 # paired frame bootstrap puts its mAA above the incumbent's with probability
-# ≥ `confidence` (VisualGeometryEval `fine_search`).
+# ≥ `confidence` (VisualGeometryToolkitEval `fine_search`).
 [tuning.detection.incumbent]
 values = { outlier_halfwidth = 0.9646329181191862, peak_threshold = 0.01, min_similarity = 0.6 }
 confidence = 0.95
@@ -103,7 +103,7 @@ confidence = 0.95
 [uncertainty]
 # Frame bootstrap of the joint selection: resample the 80 validation frames
 # with replacement and re-take the argmin over every evaluated cell
-# (VisualGeometryEval bootstrap_argmin over the cells' unit statistics); the
+# (VisualGeometryToolkitEval bootstrap_argmin over the cells' unit statistics); the
 # interval of each axis is the quantile of its coordinate.
 n_resamples = 1000
 seed = 20261009
@@ -111,5 +111,5 @@ interval = 0.9
 
 [tables]
 # The curve of each axis and the surface of each pair of axes through the
-# coarse argmin (VisualGeometryEval emit_tuning_table), supplementary tables.
+# coarse argmin (VisualGeometryToolkitEval emit_tuning_table), supplementary tables.
 labels = { outlier_halfwidth = "half-width [px]", peak_threshold = "peak threshold", min_similarity = "min.\\ similarity" }

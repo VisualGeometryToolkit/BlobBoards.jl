@@ -15,7 +15,7 @@ using Test
 using BlobBoards
 using BlobBoards.KernelAbstractions: CPU
 using CUDA: CUDA, CUDABackend
-using VisualGeometryCore: centroid, feature_frame
+using VisualGeometryToolkitCore: centroid, feature_frame
 using Random
 using Colors: Gray
 

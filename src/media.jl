@@ -10,7 +10,7 @@
 #
 #   The ASIFT detector caches one scale-space plan per distinct frame size, and
 #   the cache is bounded (LRU, one plan by default — see
-#   `VisualGeometryFeatures.set_max_cached_plans!`). Interleaved resolutions
+#   `VisualGeometryToolkitFeatures.set_max_cached_plans!`). Interleaved resolutions
 #   therefore rebuild a plan per medium; grouping makes it one rebuild per
 #   group. Measured on a 13-resolution corpus of stills: 32 s/frame interleaved
 #   versus ~2 s/frame when every frame shares a plan.
@@ -124,7 +124,7 @@ Group media by frame resolution, largest group first, order preserved within
 each group.
 
 Process each group together and call
-`VisualGeometryFeatures.clear_asift_plans!()` at the boundary: one plan build
+`VisualGeometryToolkitFeatures.clear_asift_plans!()` at the boundary: one plan build
 per group instead of one per resolution change. Also stage the gallery once
 (`GalleryIndex`) outside the loop and supply it as `gpu_index` — it is
 independent of resolution, so rebuilding it per medium re-uploads the whole

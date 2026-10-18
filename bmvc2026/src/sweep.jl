@@ -25,11 +25,13 @@ a GPU stack to aggregate a table.
     using .BoardSweep: SweepUnit, SweepContext, run_sweep
 =#
 module BoardSweep
+    import VisualGeometryToolkitCore as VgtkCore
+    import VisualGeometryToolkitIo as VgtkIo
 
 using BlobBoards
 
-import VisualGeometryIo   # canonical vgio/cameras/v3 camera stores
-import VisualGeometryCore
+import VisualGeometryToolkitIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitCore
 using BlobBoards: find_boards, load_bundle, uid_from_hash, blobs, cutoff,
     DescriptorNetwork, BoardGallery, Rect, board!,
     FindBoardsConfig, write_config
@@ -42,9 +44,9 @@ using Rotations: RotMatrix
 using CUDA: CUDABackend
 using JSON3
 import TOML
-using VisualGeometryEval.Experiments: read_provenance, warn_commit_drift
-using VisualGeometryFeatures: KnnMatch
-using VisualGeometryCore: ustrip, CameraModel, Pinhole, Camera, undistort, imshow, EuclideanMap, CameraFrame,
+using VisualGeometryToolkitEval.Experiments: read_provenance, warn_commit_drift
+using VisualGeometryToolkitFeatures: KnnMatch
+using VisualGeometryToolkitCore: ustrip, CameraModel, Pinhole, Camera, undistort, imshow, EuclideanMap, CameraFrame,
     BoundedCamera, TargetPoses
 
 # The repo whose commit `tag!` records into the provenance sidecar — same
@@ -115,10 +117,10 @@ function sweep_context(;
         config_path, run_config, network_path, gallery_path,
         boards_dir, camera_json, device = CUDABackend()
     )
-    store = VisualGeometryIo.load(Dict{Symbol, BoundedCamera}, camera_json)
+    store = VgtkIo.load(Dict{Symbol, BoundedCamera}, camera_json)
     length(store) == 1 || error("$(camera_json): a sweep runs on one camera; the store holds $(sort!(collect(keys(store))))")
     camera_name, bounded = only(store)
-    camera = VisualGeometryCore.model(bounded isa BoundedCamera ? bounded : bounded.value)        # raw K + OpenCV-model lens
+    camera = VgtkCore.model(bounded isa BoundedCamera ? bounded : bounded.value)        # raw K + OpenCV-model lens
     cam_pinhole = CameraModel(camera.intrinsics, Pinhole())  # undistorted-frame camera
     network = DescriptorNetwork(network_path)
     gallery = BoardGallery(gallery_path, network)
@@ -210,7 +212,7 @@ function write_target_poses(dir, ctx::SweepContext, frames::Dict{Int, Any}, imag
         Dict(t => Dict(Symbol(uid) => pose_value(model) for (uid, model, _, _) in acc) for (t, acc) in frames);
         images, sensors = ctx.camera_name,
     )
-    VisualGeometryIo.save(joinpath(dir, TARGET_POSES_FILE), tp)
+    VgtkIo.save(joinpath(dir, TARGET_POSES_FILE), tp)
     return nothing
 end
 
@@ -351,7 +353,7 @@ function _is_complete(unit::SweepUnit, limit::Integer)
     rec_limit = get(prov, "frame_limit", nothing)
     rec_limit !== nothing && Int(rec_limit) != Int(limit) && return false
     tpf = joinpath(unit.poses, TARGET_POSES_FILE)
-    n_out = isfile(tpf) ? length(VisualGeometryIo.load(TargetPoses, tpf)) : 0
+    n_out = isfile(tpf) ? length(VgtkIo.load(TargetPoses, tpf)) : 0
     rec_n = get(prov, "n_frames", nothing)
     complete = if rec_n !== nothing
         n_out > 0 && n_out == Int(rec_n)
@@ -427,7 +429,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
             )
             t = index[fn]
             detected[t], names[t] = accepted, fn
-            VisualGeometryIo.append_jsonl(
+            VgtkIo.append_jsonl(
                 joinpath(unit.poses, TELEMETRY_FILE),
                 (image = fn, t = t, elapsed_time_ms = round(elapsed_ms, digits = 3)),
             )

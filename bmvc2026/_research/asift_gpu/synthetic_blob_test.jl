@@ -9,7 +9,7 @@ using BlobBoards
 using Colors: Gray
 using FixedPointNumbers: N0f8
 using CUDA
-using VisualGeometryCore: ustrip, centroid, scale
+using VisualGeometryToolkitCore: ustrip, centroid, scale
 using StaticArrays: SVector
 import Statistics
 

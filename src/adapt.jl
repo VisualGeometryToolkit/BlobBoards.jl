@@ -1,4 +1,4 @@
-using VisualGeometryCore: EllipticFrame, feature_frame
+using VisualGeometryToolkitCore: EllipticFrame, feature_frame
 
 # =============================================================================
 # Blob Adaptation — Unified Interface

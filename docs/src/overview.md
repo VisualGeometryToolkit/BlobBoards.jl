@@ -37,7 +37,7 @@ b = blobs(bundle, :pattern; units=mm)
 ### Unit System
 
 Units are checked at run time via [FlexUnits.jl](https://github.com/Deduction42/FlexUnits.jl)
-with VisualGeometryCore's pixel dimension (quantities are `VgcQuantity`).
+with VisualGeometryToolkitCore's pixel dimension (quantities are `VgcQuantity`).
 BlobBoards re-exports `mm`, `cm`, `inch`, `px`, `dpi`, and friends, so
 `using BlobBoards` is all you need. Strip a quantity in a named unit,
 `ustrip(mm, q)`: lengths are held in metres.
@@ -136,9 +136,9 @@ BlobBoards provides **fiducial blob-board targets** for the
 [VisualGeometryToolkit](https://github.com/VisualGeometryToolkit) stack:
 deterministic pattern generation, printable boards, detection, and
 calibration-grade correspondence ground truth. It consumes
-[VisualGeometryCore.jl](https://github.com/VisualGeometryToolkit/VisualGeometryCore.jl)
+[VisualGeometryToolkitCore.jl](https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl/tree/main/VisualGeometryToolkitCore)
 (geometry, units, blob detection) and
-[RobustVisualGeometry.jl](https://github.com/VisualGeometryToolkit/RobustVisualGeometry.jl)
+[VisualGeometryToolkitEstimation.jl](https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl/tree/main/VisualGeometryToolkitEstimation)
 (robust correspondence/pose estimation).
 
 All toolkit documentation is aggregated at the portal:

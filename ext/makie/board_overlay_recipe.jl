@@ -7,7 +7,7 @@
 # to ANY Makie backend — CairoMakie for PDF/PNG export, GLMakie for interactive
 # display — without re-triggering on a specific backend.
 
-using VisualGeometryCore: Camera, Circle, project
+using VisualGeometryToolkitCore: Camera, Circle, project
 import LinearAlgebra: I
 using StaticArrays: SMatrix
 using GeometryBasics: Point2f, Point3f
@@ -20,7 +20,7 @@ Overlay projected board geometry on a 2D image axis.
 
 `mapping` is any callable that projects world geometry to image coordinates:
 - `Camera(model, pose)` — 3D→2D, supports points/circles/rects/etc. via
-  `VisualGeometryCore.project(camera, x)`. Used for the calibrated path.
+  `VisualGeometryToolkitCore.project(camera, x)`. Used for the calibrated path.
 - `PerspectiveMap() ∘ HomographyMap(H)` — 2D→2D projective. Used for the
   uncalibrated (homography) path.
 

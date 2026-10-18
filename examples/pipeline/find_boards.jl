@@ -36,12 +36,12 @@ using GeometryBasics: Point2, Point2f, Rect
 using StaticArrays: SVector, SMatrix
 using CUDA          # triggers GPU extensions
 import cuDNN        # ONNXRunTime :cuda execution provider
-using VisualGeometryCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
+using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
     HomographyMap, HomographyMat, Camera, undistort, CameraModel, Pinhole,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 using CUDA: CUDABackend   # the KA device token
-import VisualGeometryIo as VGIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIo as VGIo   # canonical vgio/cameras/v3 camera stores
 
 # =============================================================================
 # Config

@@ -8,6 +8,7 @@
 # papers/images (REPRODUCE.md, "Reviewing a regeneration").
 # =============================================================================
 
+import VisualGeometryToolkitEval as VgtkEval
 using DrWatson: projectdir, plotsdir
 
 """
@@ -35,7 +36,7 @@ paper_figures_dir(parts::AbstractString...) =
 # Every paper-figure generator reads ONE TOML config of record,
 # `configs/figures/<generator>.toml` (or `--config=<path>`), holding every
 # parameter it uses — frame picks, crops, seeds, panel lists, sizes, inputs,
-# output names — and writes a run record for each run: VisualGeometryEval's
+# output names — and writes a run record for each run: VisualGeometryToolkitEval's
 # `write_run_records` (`_config.toml` = the effective config,
 # `_provenance.toml` = DrWatson `tag!` gitcommit (+ `_dirty.patch`), config
 # source, run key, inputs) into the KEYED directory
@@ -45,7 +46,7 @@ paper_figures_dir(parts::AbstractString...) =
 # =============================================================================
 
 import TOML
-import VisualGeometryEval
+import VisualGeometryToolkitEval
 
 """
     figure_config(generator; args = ARGS, default) -> (cfg::Dict, path::String)
@@ -83,7 +84,7 @@ keyed record directory.
 """
 function write_figure_records(cfg::AbstractDict, path::AbstractString;
         driver::AbstractString, inputs::Vector{String} = String[], outputs::Vector{String} = String[])
-    E = VisualGeometryEval.Experiments
+    E = VgtkEval.Experiments
     key = E.run_key(cfg)
     dir = plotsdir("records", string(cfg["experiment"]["generator"], "-", key))
     E.write_run_records(dir, cfg; driver, config_source = path, key, inputs)

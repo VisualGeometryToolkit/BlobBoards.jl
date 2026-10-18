@@ -1,9 +1,10 @@
-# The paper-project conventions of the stack (VisualGeometryEval PaperProjects):
+# The paper-project conventions of the stack (VisualGeometryToolkitEval PaperProjects):
 # layout, data policy, the asset index, configs of record, provenance and the
 # stage runner, and the published-data catalog — one check, asserted empty.
+import VisualGeometryToolkitEval as VgtkEval
 using Test
 using DrWatson: projectdir
-import VisualGeometryEval
+import VisualGeometryToolkitEval
 
 # Deferred / justified exceptions, each with its reason (rule, file, match).
 const PAPER_PROJECT_ALLOW = [
@@ -14,17 +15,17 @@ const PAPER_PROJECT_ALLOW = [
 ]
 
 @testset "bmvc2026 paper-project conventions (PaperProjects)" begin
-    if isdefined(VisualGeometryEval, :PaperProjects)
-        vs = VisualGeometryEval.PaperProjects.paper_project_violations(projectdir();
+    if isdefined(VisualGeometryToolkitEval, :PaperProjects)
+        vs = VgtkEval.PaperProjects.paper_project_violations(projectdir();
             papers = ["papers/blob_boards_bmvc.tex", "papers/bmvc_supp.tex"],
             catalog_kinds = ["bb_tier"],
-            allow = [VisualGeometryEval.Experiments.DataPolicyAllow(a...) for a in PAPER_PROJECT_ALLOW])
+            allow = [VgtkEval.Experiments.DataPolicyAllow(a...) for a in PAPER_PROJECT_ALLOW])
         foreach(v -> @info(sprint(show, v)), vs)
         @test isempty(vs)
     else
-        # The resolved VisualGeometryEval predates PaperProjects (it lands with
+        # The resolved VisualGeometryToolkitEval predates PaperProjects (it lands with
         # the release after 1.0.0); the check runs once it resolves.
-        @info "VisualGeometryEval $(pkgversion(VisualGeometryEval)) has no PaperProjects — paper-project check skipped"
+        @info "VisualGeometryToolkitEval $(pkgversion(VisualGeometryToolkitEval)) has no PaperProjects — paper-project check skipped"
         @test_skip false
     end
 end

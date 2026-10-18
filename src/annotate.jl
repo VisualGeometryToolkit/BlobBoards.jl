@@ -27,15 +27,15 @@
 #
 # =============================================================================
 
-using VisualGeometryCore: Rect, region, Ellipse, EllipticFrame, transfer_ellipse,
+using VisualGeometryToolkitCore: Rect, region, Ellipse, EllipticFrame, transfer_ellipse,
     Camera, HomographyMap, iou, feature_frame
 using CoordinateTransformations: PerspectiveMap
 using GeometryBasics: GeometryBasics
 using VideoIO: VideoIO
 using JLD2: JLD2, jldopen, jldsave
 using JSON3: JSON3
-using VisualGeometryFeatures: CspondSet
-using VisualGeometryCore: bbox
+using VisualGeometryToolkitFeatures: CspondSet
+using VisualGeometryToolkitCore: bbox
 
 # =============================================================================
 # Annotation Config
@@ -166,7 +166,7 @@ function annotate_blobs(
         # world → image through the ONE spelling (`_model_to_homography`,
         # pipeline.jl). The radial arm hands back a guided TRANSFER, not a map,
         # and annotation has no wiring for it — refuse before dispatch.
-        model isa VisualGeometryCore.RadialHomography &&
+        model isa VgtkCore.RadialHomography &&
             throw(ArgumentError("annotate_blobs: the radial arm is not wired into annotation"))
         H = _model_to_homography(model, cam)
 
@@ -701,7 +701,7 @@ Append one line of structured stats for a processed source to
 each line is < PIPE_BUF, so concurrent writes interleave at line boundaries.
 """
 append_log(output_dir::AbstractString, meta::NamedTuple) =
-    VisualGeometryIo.append_jsonl(joinpath(output_dir, _LOG_FILE), meta)
+    VgtkIo.append_jsonl(joinpath(output_dir, _LOG_FILE), meta)
 
 """
     summarize_annotations(output_dir) -> Vector{NamedTuple}

@@ -27,7 +27,7 @@ using DrWatson
 @quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 
 
-using VisualGeometryCore: pose, ids
+using VisualGeometryToolkitCore: pose, ids
 using Rotations: RotMatrix
 using StaticArrays
 
@@ -76,7 +76,7 @@ for bt in BlobBoardsEval.BOARD_TYPES
     save_hand_eye(
         out, X, Dict(String(id) => pose(targets[id]) for id in ids(targets));
         provenance = (
-            method = "RobustVisualGeometry fit_robot_world_hand_eye (staged linear: " *
+            method = "VisualGeometryToolkitEstimation fit_robot_world_hand_eye (staged linear: " *
                 "Kabsch + chordal means + joint translation LSQ; RVG >= 0.14); covariance first order (the fit's)",
             calibration_subset = "calibration_" * bt.abbr,
             n_frames_tracked = n_tracked,

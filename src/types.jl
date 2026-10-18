@@ -3,18 +3,18 @@
 # =============================================================================
 
 # =============================================================================
-# Blob Types and Enums - Now imported from VisualGeometryCore
+# Blob Types and Enums - Now imported from VisualGeometryToolkitCore
 # =============================================================================
 
 # All basic blob types (AbstractDetection, Disc, DiscDetection,
-# FeaturePolarity, DEFAULT_PIXEL_TYPE) are now imported from VisualGeometryCore
+# FeaturePolarity, DEFAULT_PIXEL_TYPE) are now imported from VisualGeometryToolkitCore
 
 # =============================================================================
 # Detection Result Types
 # =============================================================================
 
-using VisualGeometryCore: EllipticFrame
-using VisualGeometryFeatures: Detection
+using VisualGeometryToolkitCore: EllipticFrame
+using VisualGeometryToolkitFeatures: Detection
 
 """
     BlobDetection{T}
@@ -1229,10 +1229,10 @@ function _plain(x)
 end
 
 # The canonical encoding itself (sorted keys, bare integral floats, Ryu for the
-# rest, loud on non-finite numbers) is VisualGeometryIo's `canonical_json` since
+# rest, loud on non-finite numbers) is VisualGeometryToolkitIo's `canonical_json` since
 # 0.7.6; the LOWERING of a config into that tree (`_plain`) stays here with the
 # schema. Board identities are `sha256_hex` over exactly that string.
-using VisualGeometryIo: canonical_json, sha256_hex
+using VisualGeometryToolkitIo: canonical_json, sha256_hex
 
 """
     canonical_config_json(config) -> String

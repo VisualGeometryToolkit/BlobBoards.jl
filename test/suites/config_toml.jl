@@ -2,15 +2,16 @@
 # FindBoardsConfig from TOML — round trip, refusal, and concreteness
 # =============================================================================
 
+import VisualGeometryToolkitCore as VgtkCore
 using TOML
 using Accessors: @set
 using BlobBoards: FindBoardsConfig, write_config, read_run_config, config_dict,
     DetectConfig, EllipseNms, MxmNms, PoseGeometry, HomographyGeometry,
     AdaptConfig, DetectConfig
-using RobustVisualGeometry: RansacConfig
+using VisualGeometryToolkitEstimation: RansacConfig
 using LocalOptimizationDoneRight: StudentTUniform, HQ, tuning_constant
-import VisualGeometryCore
-using VisualGeometryCore: CameraModel, CameraCalibrationMat, Lens, Perspective, Additive, Radial, Tangential, WelschShape
+import VisualGeometryToolkitCore
+using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, Lens, Perspective, Additive, Radial, Tangential, WelschShape
 using StaticArrays: SMatrix
 
 const _CAM = CameraModel(
@@ -667,7 +668,7 @@ end
 end
 
 @testset "TrackConfig: the tracker's knobs are in the config of record (2026-09)" begin
-    t = VisualGeometryCore.toml_table(BlobBoards.TrackConfig())
+    t = VgtkCore.toml_table(BlobBoards.TrackConfig())
     @test sort(collect(keys(t))) == sort(String.(collect(fieldnames(BlobBoards.TrackConfig))))
     # the file's values ARE the struct's (one authority), and a run config overrides per key
     dflt = TOML.parsefile(joinpath(pkgdir(BlobBoards), "configs", "default.toml"))["find_boards"]["track"]
@@ -712,10 +713,10 @@ struct _ForeignArm <: BlobBoards.GeometryConfig
     outlier_halfwidth::Float64
     min_inliers::Int
 end
-VisualGeometryCore.toml_skip_fields(::Type{_ForeignArm}) = (:image_size,)
+VgtkCore.toml_skip_fields(::Type{_ForeignArm}) = (:image_size,)
 BlobBoards.geometry_tag(::_ForeignArm) = "foreign_arm"
 function BlobBoards.geometry_from_toml(::Val{:foreign_arm}, d; camera = nothing, image_size = nothing)
-    VisualGeometryCore.check_keys(d, ["type", "outlier_halfwidth", "min_inliers"], "find_boards.geometry")
+    VgtkCore.check_keys(d, ["type", "outlier_halfwidth", "min_inliers"], "find_boards.geometry")
     return _ForeignArm(image_size, Float64(d["outlier_halfwidth"]), Int(d["min_inliers"]))
 end
 

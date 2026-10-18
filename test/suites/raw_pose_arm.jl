@@ -9,14 +9,14 @@ using Test, LinearAlgebra, Random
 using StaticArrays: SVector, SMatrix
 using StructArrays: StructArray
 using Rotations: RotMatrix, RotXYZ, rotation_angle
-import VisualGeometryCore
-using VisualGeometryCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
+import VisualGeometryToolkitCore
+using VisualGeometryToolkitCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
     EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, Camera, HomographyMap,
     centroid, moment_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points
 using RansacScoringDoneRight: StudentTUniformScoring
-using RobustVisualGeometry: AbsolutePoseProblem
+using VisualGeometryToolkitEstimation: AbsolutePoseProblem
 using LocalOptimizationDoneRight: HQ, tuning_constant
-using VisualGeometryCore: WelschShape
+using VisualGeometryToolkitCore: WelschShape
 using BlobBoards: PoseGeometry, HomographyGeometry, RadialHomographyGeometry, _estimation_camera,
     _model_to_homography, _guided_transfer, _undistort_detect, _camera, _project_blob_centers
 
@@ -83,7 +83,7 @@ end
     # The recipe this test pinned, stated (RVG's own default is now MSAC at a
     # threshold with least squares on the inliers): the Student-t + uniform
     # marginal at a 5 px half-width and the cross-validated Welsch-HQ lift.
-    est = BlobBoards.RobustVisualGeometry.find_absolute_pose(
+    est = BlobBoards.VisualGeometryToolkitEstimation.find_absolute_pose(
         _CAM, src .=> dst; rng = MersenneTwister(1),
         scoring = StudentTUniformScoring(AbsolutePoseProblem, 5.0),
         local_optimization = HQ{WelschShape}(; scale_multiple = tuning_constant(:absolute_pose, "welsch").scale_multiple)

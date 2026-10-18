@@ -260,7 +260,7 @@
 
     @testset "opencv export: OpenCV's pixels from the declared frame, native v2 out" begin
         import PythonCall
-        VGIo, VGC, Rot = BlobBoards.VisualGeometryIo, BlobBoards.VisualGeometryCore, BlobBoards.Rotations
+        VGIo, VGC, Rot = BlobBoards.VisualGeometryToolkitIo, BlobBoards.VisualGeometryToolkitCore, BlobBoards.Rotations
         corr = PythonCall.pyimport("blobboards.correspondences")
         np = PythonCall.pyimport("numpy")
         W, H, f, cx, cy = 1280, 960, 1000.0, 640.5, 480.5                       # canonical (COLMAP) principal point
@@ -310,7 +310,7 @@
         rec = only(values(store))
         @test only(keys(store)) == :calibration_opencv_default && VGC.extent(rec) == VGC.Size2(W, H)
         @test VGC.model(rec).intrinsics.K ≈ VGC.CameraCalibrationMat(f * px, [cx * px, cy * px]) atol = 1.0e-12   # canonical: OpenCV's cx + 0.5
-        # the writer's lens record IS VisualGeometryIo's opencv_lens, for every OpenCV vector length
+        # the writer's lens record IS VisualGeometryToolkitIo's opencv_lens, for every OpenCV vector length
         for n in (4, 5, 8, 12, 14)
             v = [1.0e-3 * (-1)^i * i for i in 1:n]
             pyrec = corr.opencv_lens_record(np.array(PythonCall.pylist(v)))

@@ -21,12 +21,13 @@
 #    angle/‖Δt‖ between the predicted and detected absolute poses.
 # =============================================================================
 
+import VisualGeometryToolkitIo as VgtkIo
 using Rotations: RotMatrix, rotation_angle
 using BlobBoards: load_bundle, uid_from_hash, Rect
-using VisualGeometryCore: ustrip, mm, parse_unit
+using VisualGeometryToolkitCore: ustrip, mm, parse_unit
 
 # A board JSON's `{value, unit}` field as a quantity, its unit read through
-# VisualGeometryCore's one guarded parse.
+# VisualGeometryToolkitCore's one guarded parse.
 _quantity(x) = Float64(x.value) * parse_unit(String(x.unit))
 
 """
@@ -42,7 +43,7 @@ order. A target's size is its definition's ([`marker_sizes`](@ref)), not the
 detection's.
 """
 function load_detected_poses(poses_dir::AbstractString)
-    tp = VisualGeometryIo.load(TargetPoses, joinpath(poses_dir, "target_poses.json"))
+    tp = VgtkIo.load(TargetPoses, joinpath(poses_dir, "target_poses.json"))
     out = Dict{String, Vector{@NamedTuple{id::String, R::SMatrix{3, 3, Float64, 9}, t::SVector{3, Float64}}}}()
     for (t, ps) in tp
         out[tp.images[t]] = [
@@ -61,7 +62,7 @@ Each printed target's size (mm) by id, from its DEFINITION in
 `aruco`, `blobboards`): a BlobBoards board's world extent (the largest side of
 `Rect(bundle, :world)`, as the sweep measures it), a tag board's detectable
 pattern (`detectable_pattern_resolution / print_density`, in mm through
-VisualGeometryCore's units).
+VisualGeometryToolkitCore's units).
 The sizes only RANK the targets into scale classes (`_scale_labels`).
 """
 function marker_sizes(dataset_dir::AbstractString, system::AbstractString)
@@ -76,7 +77,7 @@ function marker_sizes(dataset_dir::AbstractString, system::AbstractString)
             m === nothing && continue
             pre = JSON3.read(read(f, String)).preamble
             # the detectable pattern (a pixel count) at the print density (a
-            # pixel density) is a length: VisualGeometryCore's units convert it
+            # pixel density) is a length: VisualGeometryToolkitCore's units convert it
             out[String(m[1])] = ustrip(mm, _quantity(pre.pattern_config.detectable_pattern_resolution) / _quantity(pre.board_config.print_density))
         end
     end
@@ -125,7 +126,7 @@ end
         fit::FitResult{<:RobotWorldHandEyeCalibration, <:RobotWorldHandEyeMetadata}
 
 Solve `T_det(i,m) = X · T_rig(i) · Y_m` on a (calibration) sequence via
-RobustVisualGeometry's `fit_robot_world_hand_eye` — the staged linear robot-world
+VisualGeometryToolkitEstimation's `fit_robot_world_hand_eye` — the staged linear robot-world
 estimator (Kabsch → chordal means → joint translation LSQ → covariance;
 RVG ≥ 0.14). The NLLS refinement was removed upstream: on this dataset the
 pose-residual MLE absorbed an unmodeled systematic and extrapolated worse
@@ -207,10 +208,10 @@ end
 # `<file>` holds X, `body:camera_rig → camera_optical`;
 # `<file stem>_board_rig.json` holds the mount, one target per printed board,
 # `target:<id> → body:board_rig`. An estimate is written with its covariance
-# (VisualGeometryCore conventions/persisted-geometry.md): `save_hand_eye(file,
+# (VisualGeometryToolkitCore conventions/persisted-geometry.md): `save_hand_eye(file,
 # he)` of a fit always writes `Uncertain` poses.
 
-using VisualGeometryCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame
+using VisualGeometryToolkitCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame
 
 # The marker-mount file beside a hand-eye file.
 _mount_file(file::AbstractString) = string(splitext(file)[1], "_board_rig", splitext(file)[2])
@@ -238,8 +239,8 @@ save_hand_eye(file::AbstractString, he::NamedTuple; provenance::NamedTuple = (;)
 
 function save_hand_eye(file::AbstractString, X, Y::AbstractDict; provenance::NamedTuple = (;))
     mount = _mount_file(file)
-    VisualGeometryIo.save(file, [relabel(CameraRigFrame, CameraFrame, unlabel(X))]; provenance)
-    VisualGeometryIo.save(mount, _mount_rig(Y); provenance = (hand_eye = basename(file),))
+    VgtkIo.save(file, [relabel(CameraRigFrame, CameraFrame, unlabel(X))]; provenance)
+    VgtkIo.save(mount, _mount_rig(Y); provenance = (hand_eye = basename(file),))
     return file, mount
 end
 
@@ -253,11 +254,11 @@ BoardRigFrame`, minted on access) — each pose `Uncertain` where the record
 states its covariance.
 """
 function load_hand_eye(file::AbstractString)
-    poses = VisualGeometryIo.load(Vector{EuclideanMap}, file)
+    poses = VgtkIo.load(Vector{EuclideanMap}, file)
     ix = findfirst(X -> geom(X) isa EuclideanMap{3, <:Any, <:Any, <:Any, CameraRigFrame, CameraFrame}, poses)
     ix === nothing && error("no body:camera_rig -> camera_optical record in $file")
     X = relabel(CameraRigFrame, ViewFrame{:optical}, poses[ix])
-    targets = VisualGeometryIo.load(Rig, _mount_file(file))
+    targets = VgtkIo.load(Rig, _mount_file(file))
     targets isa Rig{BoardRigFrame} || error("$(_mount_file(file)): the marker mount is posed in body:board_rig, got $(typeof(targets))")
     return X, targets
 end

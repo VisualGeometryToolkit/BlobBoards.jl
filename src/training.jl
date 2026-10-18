@@ -19,11 +19,11 @@
 # =============================================================================
 
 # EXPLICIT IMPORTS ONLY. This block used to open with blanket `using Images`,
-# `using VisualGeometryCore`, `using StaticArrays`, `using Base`, and even
+# `using VisualGeometryToolkitCore`, `using StaticArrays`, `using Base`, and even
 # `using BlobBoards` (a self-import). Between them they pulled 14 names into
 # BlobBoards' namespace implicitly, which is what
 # test/test_explicit_imports.jl's `check_no_implicit_imports` gate fails on —
-# and `using VisualGeometryCore` additionally shadowed `model`, so JET read
+# and `using VisualGeometryToolkitCore` additionally shadowed `model`, so JET read
 # pipeline.jl's local `(uid, model, ...)` destructuring as a call to VGC's
 # `model`. Everything not listed below is already imported explicitly by
 # src/BlobBoards.jl; add names here, never a bare `using`.
@@ -36,7 +36,7 @@ using FileIO: load as load_image
 using ImageFiltering: KernelFactors, imfilter
 using ImageTransformations: ImageTransformations, imresize
 using Colors: RGB                   # overlay palette (blob_dataset viewer)
-using VisualGeometryCore: to_homogeneous, shape_matrix
+using VisualGeometryToolkitCore: to_homogeneous, shape_matrix
 
 # =============================================================================
 # Backend selection — no hard CUDA dependency
@@ -64,8 +64,8 @@ reclaim_pool!(::Any) = nothing
 # `CudaBackend()`) keep the CUDA default.
 _execution_provider(backend) = backend isa KA.CPU ? :cpu : :cuda
 
-# `best_iou_match` is VisualGeometryCore's since 0.21.1 (beside `iou`).
-using VisualGeometryCore: best_iou_match
+# `best_iou_match` is VisualGeometryToolkitCore's since 0.21.1 (beside `iou`).
+using VisualGeometryToolkitCore: best_iou_match
 
 # Detection pipeline is composed inline in detect_and_extract:
 #   detect_blobs → adapt → filter_blobs → canonicalize
@@ -246,14 +246,14 @@ end
 # sign of the homography's third coordinate; requiring the sign to agree with
 # the board centroid's keeps those (and any non-finite projection) out.
 function _n_gt_in_image(world_frames, H::SMatrix{3, 3}, cx::Real, cy::Real, img_size)
-    w_ref = VisualGeometryCore.homogeneous_w(H, SVector(Float64(cx), Float64(cy)))
+    w_ref = VgtkCore.homogeneous_w(H, SVector(Float64(cx), Float64(cy)))
     rows, cols = img_size
     n = 0
     for f in world_frames
         # (audited) defensive strip: adapted frames are EllipticFrame{Float64},
         # bare px by contract, so ustrip(px, ...) would throw on them.
         c = ustrip.(centroid(feature_frame(f)))
-        q = VisualGeometryCore.to_euclidean(H * SVector(Float64(c[1]), Float64(c[2]), 1.0), w_ref)
+        q = VgtkCore.to_euclidean(H * SVector(Float64(c[1]), Float64(c[2]), 1.0), w_ref)
         q === nothing && continue
         (1 <= q[1] <= cols && 1 <= q[2] <= rows) && (n += 1)
     end
@@ -878,9 +878,9 @@ end
 # they are unit-invariant. All homographies here are in detector (x=col, y=row)
 # pixel coordinates, matching `detect_blobs` / `H_wi`.
 
-# `normalize_map` / `perspective_augmentation` are VisualGeometryCore.Synthetic's
+# `normalize_map` / `perspective_augmentation` are VisualGeometryToolkitCore.Synthetic's
 # since 0.21.1; the RNG is explicit there — this builder draws from the task RNG.
-using VisualGeometryCore.Synthetic: perspective_augmentation
+using VisualGeometryToolkitCore.Synthetic: perspective_augmentation
 
 # Swap x↔y (col↔row): converts a homography in detector (x,y) coordinates into
 # array (row,col) coordinates for `warp`, which operates in array-index space.
@@ -1016,7 +1016,7 @@ function _sample_grid(frame, mode; patch_size, inner_extent, outer_extent, Minv,
     inf = falses(patch_size, patch_size)
     ctr = centroid(frame)   # (x=col, y=row), warped coords — bare px by the frame contract
     w_ref = Minv === nothing ? 1.0 :
-        VisualGeometryCore.homogeneous_w(Minv, SVector(Float64(ctr[2]), Float64(ctr[1])))
+        VgtkCore.homogeneous_w(Minv, SVector(Float64(ctr[2]), Float64(ctr[1])))
     @inbounds for j in 1:patch_size, i in 1:patch_size
         p = bm(SVector(Float64(i), Float64(j)))     # source (row, col)
         r, c = p[1], p[2]
@@ -1028,7 +1028,7 @@ function _sample_grid(frame, mode; patch_size, inner_extent, outer_extent, Minv,
             # projective, so beyond-horizon samples would wrap into bounds
             # and read warp gray-fill as in-frame (2026-09 review). w_ref
             # anchors on the blob's own centroid — a real, visible sample.
-            q = VisualGeometryCore.to_euclidean(Minv * SVector(r, c, 1.0), w_ref)
+            q = VgtkCore.to_euclidean(Minv * SVector(r, c, 1.0), w_ref)
             inf[i, j] = q !== nothing && (1.0 <= q[1] <= H) & (1.0 <= q[2] <= W)
         end
     end
@@ -1044,7 +1044,7 @@ end
 function _horizon_ref(H_wi, H_iw, world_rect)
     lo, hi = minimum(world_rect), maximum(world_rect)
     cx, cy = _project_pt(H_wi, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2)
-    return VisualGeometryCore.homogeneous_w(H_iw, SVector(cx, cy))
+    return VgtkCore.homogeneous_w(H_iw, SVector(cx, cy))
 end
 
 # Board∩in-frame mask for one patch: start from the (board-agnostic) `inframe`
@@ -1087,8 +1087,8 @@ end
 # array plotting (no Makie) so it works under any backend.
 
 # The raster overlays (`put_pixel!`, `draw_ellipse!`, `draw_projected_ellipse!`,
-# `draw_polyline!`) are VisualGeometryCore's since 0.21.1.
-using VisualGeometryCore: draw_ellipse!, draw_projected_ellipse!, draw_polyline!
+# `draw_polyline!`) are VisualGeometryToolkitCore's since 0.21.1.
+using VisualGeometryToolkitCore: draw_ellipse!, draw_projected_ellipse!, draw_polyline!
 
 @inline function _project_pt(H, x, y)
     w = H * SVector(x, y, 1.0)
@@ -1108,7 +1108,7 @@ end
 # 2×2 linear shape matrix of a frame primitive, unitless. World GT blobs are
 # isotropic `Disc`s (shape = radius·I); adapted detections are `EllipticFrame`s.
 _overlay_shape(f) = SMatrix{2, 2, Float64}(ustrip.(shape_matrix(f)))   # (audited) whole-frame strip: no target-unit form for a shape matrix
-_overlay_shape(d::Disc) = (r = ustrip(VisualGeometryCore.scale(d)); SMatrix{2, 2, Float64}(r, 0.0, 0.0, r))   # (audited) whole-Disc strip
+_overlay_shape(d::Disc) = (r = ustrip(VgtkCore.scale(d)); SMatrix{2, 2, Float64}(r, 0.0, 0.0, r))   # (audited) whole-Disc strip
 
 # Per-board overlay color, stable for a given board slot `k` across all frames.
 # Hues walk the circle by the golden angle starting at green (the single-board
@@ -1141,7 +1141,7 @@ const _DETECTION_COLOR = RGB{Float32}(1.0f0, 0.0f0, 1.0f0)
 # would otherwise wrap into the rectangle from behind the camera — requiring
 # agreement with `w_ref` keeps them out (the same guard `_n_gt_in_image` uses).
 _in_board(H_iw, w_ref, world_rect, x, y) =
-    VisualGeometryCore.maps_within(H_iw, world_rect, SVector(Float64(x), Float64(y)), w_ref)
+    VgtkCore.maps_within(H_iw, world_rect, SVector(Float64(x), Float64(y)), w_ref)
 
 # Which of the frame's detections land on this board — a mask over `det_frames`,
 # computed once per (board, frame). Over the raw detections it gives

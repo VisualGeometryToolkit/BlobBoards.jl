@@ -1,6 +1,6 @@
 #=
 cache.jl — derived artifacts through the stack's keyed result cache
-(VisualGeometryEval.Experiments `cached_result`: the file name DrWatson's
+(VisualGeometryToolkitEval.Experiments `cached_result`: the file name DrWatson's
 `produce_or_load(…; filename = hash, prefix)` builds, loaded with `wload`,
 saved with `tagsave` — but a save error PROPAGATES, where `produce_or_load`
 swallows it, DrWatson saving_files.jl:107-116).
@@ -33,12 +33,12 @@ whole keyed run directory of its own (src/runs.jl), the same layout for all
 three marker systems.
 =#
 
-using VisualGeometryEval.Experiments: cached_result
+using VisualGeometryToolkitEval.Experiments: cached_result
 
 """
     cached(f, prefix, cfg, subdir; force = false) -> (data, file)
 
-The keyed result cache (VisualGeometryEval.Experiments `cached_result`) with
+The keyed result cache (VisualGeometryToolkitEval.Experiments `cached_result`) with
 this project's conventions: artifacts under `results_root()/<subdir>` (the
 add-only outputs tree, never `data/exp_raw`), named `<prefix>_<hash(cfg)>.jld2`
 (the LEGACY Base.hash key, `legacy_hash_key`, until the next full

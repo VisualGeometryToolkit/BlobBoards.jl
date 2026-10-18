@@ -4,7 +4,7 @@
 # scripts/regenerate_paper.jl into results_root(), src/runs.jl):
 # what each Zenodo-hosted Julia artifact (bmvc2026/Artifacts.toml, lazy,
 # sha256-pinned) holds and where it mounts. The format and the checker are
-# VisualGeometryEval's DataArtifacts (load_catalog, catalog_violations); the
+# VisualGeometryToolkitEval's DataArtifacts (load_catalog, catalog_violations); the
 # tarballs are built and bound by scripts/make_zenodo_artifacts.jl, whose tier
 # filters are the authority on the file lists — this catalog names each tier's
 # root directory and filter (kind `bb_tier`, a project kind: `dir` plus a
@@ -192,9 +192,9 @@ provenance = "captured by the authors"
 [artifacts.bb_pipeline_figure]
 kind = "bb_tier"
 dir = "blobboard_training"
-filter = "images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG, images/dataset_sonyfx3_tamron20mm_f8_cameras.json (the session's OpenCV calibration as a VisualGeometryIo cameras/v3 record with its calibration block) and README_bb_pipeline_figure.md"
+filter = "images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG, images/dataset_sonyfx3_tamron20mm_f8_cameras.json (the session's OpenCV calibration as a VisualGeometryToolkitIo cameras/v3 record with its calibration block) and README_bb_pipeline_figure.md"
 mount = "data"
 record = "bb"
 required = false
-what = "the source frame of fig:pipeline (DSC02800.JPG, Sony FX3 + Tamron 20 mm f/8 corridor session) and that session's camera as a VisualGeometryIo cameras/v3 record"
+what = "the source frame of fig:pipeline (DSC02800.JPG, Sony FX3 + Tamron 20 mm f/8 corridor session) and that session's camera as a VisualGeometryToolkitIo cameras/v3 record"
 provenance = "captured by the authors (descriptor-training corridor session, 2026-01-19); the camera is that session's OpenCV calibrateCamera fit (36 images, RMS 0.159 px), converted exactly to the v3 record"

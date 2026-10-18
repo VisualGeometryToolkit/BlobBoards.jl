@@ -5,9 +5,9 @@
 # The detection operating point — the pose arm's outlier half-width, the
 # detector's peak threshold and the descriptor similarity gate — is selected
 # JOINTLY by the cross-validation of scripts/detection_cv.jl and stored in its
-# tuning artifact (VisualGeometryEval `save_coarse_fine_artifact`) in the run
+# tuning artifact (VisualGeometryToolkitEval `save_coarse_fine_artifact`) in the run
 # directory keyed by the run key of configs/detection_cv.toml. A consumer reads
-# a tuned value through VisualGeometryEval's one gated reader,
+# a tuned value through VisualGeometryToolkitEval's one gated reader,
 # `deployed_setting(path)`, never from a literal; test/operating_points_tests.jl
 # holds the configs of record to the artifacts they were adopted from
 # (`ADOPTED_OPERATING_POINTS`).
@@ -16,8 +16,9 @@
 # detection stack.
 # =============================================================================
 
-import VisualGeometryEval
-using VisualGeometryEval.Experiments: results_root
+import VisualGeometryToolkitEval as VgtkEval
+import VisualGeometryToolkitEval
+using VisualGeometryToolkitEval.Experiments: results_root
 
 """
     detection_cv_dir(cfg) -> String
@@ -27,7 +28,7 @@ parsed configs/detection_cv.toml): `results_root()/tuning/detection_cv-<run_key(
 — keyed, so a changed config is a new run.
 """
 detection_cv_dir(cfg::AbstractDict) =
-    joinpath(results_root(), "tuning", "detection_cv-" * VisualGeometryEval.Experiments.run_key(cfg))
+    joinpath(results_root(), "tuning", "detection_cv-" * VgtkEval.Experiments.run_key(cfg))
 
 "The tuning artifact inside a joint detection CV run directory."
 detection_cv_artifact(dir::AbstractString) = joinpath(dir, "detection.jld2")

@@ -21,7 +21,7 @@
 #   hand-eye records            the evaluation's [runs]          hand_eye-<key>/
 #   pose-error cells            the evaluation's [runs]          pose_results-<key>/
 #
-# A key is VisualGeometryEval's SHA-256 `run_key` of the config of record
+# A key is VisualGeometryToolkitEval's SHA-256 `run_key` of the config of record
 # together with what decides the result and is not in it: the descriptor
 # network's content (sha256) for a sweep, the upstream run keys for a
 # consumer. Code is provenance (DrWatson `tag!` in every run's records), not
@@ -30,7 +30,7 @@
 import TOML
 import SHA
 using DrWatson: projectdir
-using VisualGeometryEval.Experiments: run_key as config_run_key
+using VisualGeometryToolkitEval.Experiments: run_key as config_run_key
 
 """
     config_path(name) -> String

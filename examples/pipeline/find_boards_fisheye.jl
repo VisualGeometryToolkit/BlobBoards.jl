@@ -1,4 +1,5 @@
 #=
+import VisualGeometryToolkitCore as VgtkCore
 Find Boards on a FISHEYE image — the uncalibrated radial arm, side by side
 with the calibrated path.
 
@@ -41,12 +42,12 @@ using GeometryBasics: Point2, Point2f, Rect, widths
 using StaticArrays: SVector, SMatrix
 using CUDA          # triggers GPU extensions (CPU works too — see DEVICE)
 import cuDNN        # ONNXRunTime :cuda execution provider
-using VisualGeometryCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
+using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
     HomographyMap, HomographyMat, RadialHomography, radial_transfer,
     Camera, CameraModel, Pinhole, undistort, division_bounded,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
-import VisualGeometryIo as VGIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIo as VGIo   # canonical vgio/cameras/v3 camera stores
 
 # =============================================================================
 # Config
@@ -180,7 +181,7 @@ if best_radial !== nothing
     # periphery away. `undistorted_rect` sizes the output rect from the
     # undistorted frame boundary (clipped at 92% of the 90° circle when
     # unbounded); the rect form of `undistort` renders it, scale folded in.
-    ext = VisualGeometryCore.undistorted_rect(best_radial, (IMG_W, IMG_H))
+    ext = VgtkCore.undistorted_rect(best_radial, (IMG_W, IMG_H))
     σ = max(1.0, widths(ext)[1] / 5000)
     canvas_est = undistort(CameraModel(best_radial), img, ext; scale = σ)
     img_cal = undistort(cam, img)

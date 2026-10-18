@@ -17,7 +17,7 @@
 #   smallest σ / largest σ / scales per octave / max trials / α / cutoff /
 #   polarity / check
 #
-# A length is a number and its unit, the unit symbol of VisualGeometryCore's
+# A length is a number and its unit, the unit symbol of VisualGeometryToolkitCore's
 # FlexUnits registry (`PixelUnits`) upper-cased for QR's alphanumeric set:
 # `210MM`, `8.5INCH`. It is written in mm or in inches, whichever is shorter and
 # still decodes to the identical double (Letter's 8.5 inch is
@@ -64,7 +64,7 @@ function _code_length(q)
     return best
 end
 # A number, then an upper-cased unit symbol. The symbol is lower-cased and read
-# by VisualGeometryCore's `parse_unit` (the stack's one guarded `uparse`); it
+# by VisualGeometryToolkitCore's `parse_unit` (the stack's one guarded `uparse`); it
 # must be a unit of length. `nothing` for anything else.
 function _parse_length(s::AbstractString)
     m = Base.match(r"^([0-9.+\-]+(?:E[+\-]?[0-9]+)?)([A-Z]+)$", s)

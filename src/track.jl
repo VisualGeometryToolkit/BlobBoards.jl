@@ -41,7 +41,7 @@
 # whole sequence.
 # =============================================================================
 
-using VisualGeometryCore: iou, HomographyMat, HomographyMap, Camera, transfer_ellipse,
+using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, Camera, transfer_ellipse,
     Extrinsics3, Ellipse, region, centroid, feature_frame,
     EllipticFrame, planar_lift,  # #21 lazy endpoint lifts
     Point3   # the full-camera pose arm projects blob centres (`_project_blob_centers`)

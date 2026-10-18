@@ -1,4 +1,6 @@
 #=
+import VisualGeometryToolkitFeatures as VgtkFeatures
+import VisualGeometryToolkitIo as VgtkIo
 make_supp_tables.jl — the macros behind the supplement's two settings tables
 (and the main paper's prose that quotes them), generated from data instead of
 transcribed:
@@ -40,22 +42,22 @@ import TOML
 using Statistics: median
 using Printf: @sprintf
 using BlobBoards: FindBoardsConfig, config_dict
-using VisualGeometryCore: CameraModel, parse_unit, ustrip, mm, dpi
-import VisualGeometryIo
-import VisualGeometryFeatures
+using VisualGeometryToolkitCore: CameraModel, parse_unit, ustrip, mm, dpi
+import VisualGeometryToolkitIo
+import VisualGeometryToolkitFeatures
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, figure_config, write_figure_records, sweep_dir, camera_of_record
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 const CFG, CFG_PATH = figure_config("supp_tables"; default = projectdir("configs", "figures", "supp_tables.toml"))
 const DATASET = joinpath(data_root(; tiers = String.(CFG["experiment"]["tiers"])), "absolute_pose_experiments", CFG["experiment"]["dataset"])
 const INPUTS = CFG["inputs"]
 const RUN_CONFIG = joinpath(sweep_dir(INPUTS["run"]), "poses", "bb", "_config.toml")
 # A board JSON's `{value, unit}` field as a quantity, its unit read through
-# VisualGeometryCore's one guarded parse; lengths come out with `ustrip(mm, …)`.
+# VisualGeometryToolkitCore's one guarded parse; lengths come out with `ustrip(mm, …)`.
 _quantity(x) = Float64(x.value) * parse_unit(String(x.unit))
 
 _macro(io, name, value) = println(io, "\\newcommand{\\", name, "}{", value, "}")
@@ -122,7 +124,7 @@ _run_find_boards() = TOML.parsefile(RUN_CONFIG)["find_boards"]
 
 function _camera()
     # the session's camera of record (calibration/<camera>.json, vgio/cameras/v3)
-    return VisualGeometryIo.load(CameraModel, camera_of_record(DATASET))
+    return VgtkIo.load(CameraModel, camera_of_record(DATASET))
 end
 
 # 1e-6 → "10^{-6}", as the table prints a tolerance.
@@ -140,7 +142,7 @@ function write_run_settings(io)
     d = config_dict(cfg)
     det, ad, geo, ran = d["detect"], d["adapt"], d["geometry"], d["ransac"]
     isempty(det["tilts"]) || error("the run states an explicit tilt schedule; the table describes IMAS-25")
-    tilts = VisualGeometryFeatures._imas_tilts_25()    # what the empty `tilts` list stands for
+    tilts = VgtkFeatures._imas_tilts_25()    # what the empty `tilts` list stands for
     groups = [(t, count(x -> first(x) == t, tilts)) for t in sort(unique(first.(tilts))) if t != 1.0]
     length(groups) == 2 || error("unexpected IMAS schedule $groups")
     # the boards' cutoff (one across the gallery): the adaptation's scan window

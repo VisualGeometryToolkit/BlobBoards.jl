@@ -1,7 +1,7 @@
 # The stack's iterative-estimator vocabulary (CLAUDE.md, "Function Verb
-# Conventions"), checked by VisualGeometryCore's `check_naming`: every name
+# Conventions"), checked by VisualGeometryToolkitCore's `check_naming`: every name
 # BlobBoards binds, and every line of its stack text (paper trees excluded).
-using VisualGeometryCore: check_naming
+using VisualGeometryToolkitCore: check_naming
 
 @testset "naming" begin
     found = check_naming(pkgdir(BlobBoards))

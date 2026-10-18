@@ -1,4 +1,5 @@
 #=
+import VisualGeometryToolkitIo as VgtkIo
 Test script for annotate_blobs — visualize extracted patches and blob IDs
 
 Goal: Check if blob transformation is correct by visually inspecting
@@ -16,8 +17,8 @@ using FileIO, Colors
 using GLMakie
 using VideoIO
 
-import VisualGeometryIo   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryCore: CameraModel   # dispatch token for VisualGeometryIo.load
+import VisualGeometryToolkitIo   # canonical vgio/cameras/v3 camera stores
+using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIo.load
 
 # =============================================================================
 # Setup — load gallery, boards, descriptor model
@@ -65,7 +66,7 @@ uid_to_path = Dict(
 # =============================================================================
 
 # @info "Loading camera calibration..."
-# camera = VisualGeometryIo.load(CameraModel,
+# camera = VisualGeometryToolkitIo.load(CameraModel,
 #     joinpath(root, "images", "apple-iphone-13-mini_f1.6-1x_till.json"))
 # @info "Camera loaded: $(camera.intrinsics)"
 
@@ -82,7 +83,7 @@ uid_to_path = Dict(
 # Load video
 # =============================================================================
 video_path = joinpath(root, "videos/iphone_till/26-04-23 15-36-18 2200.mov")
-video_camera = VisualGeometryIo.load(
+video_camera = VgtkIo.load(
     CameraModel,
     joinpath(root, "videos", "apple-iphone-13-mini-till_f1.6-1x-video-fullhd.json")
 )

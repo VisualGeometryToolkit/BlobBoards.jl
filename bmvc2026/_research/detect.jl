@@ -10,11 +10,11 @@ Usage:
 
 using BlobBoards
 using BlobBoards: detect_blobs   # advanced API (unexported)
-using VisualGeometryCore: Circle, imshow!
+using VisualGeometryToolkitCore: Circle, imshow!
 using GLMakie; GLMakie.activate!()
 using FileIO: load as load_image
 using Colors: Gray
-using VisualGeometryCore: ustrip
+using VisualGeometryToolkitCore: ustrip
 using CUDA, NNlib, cuDNN  # triggers GPU extensions
 
 # Load a board image from test/data/

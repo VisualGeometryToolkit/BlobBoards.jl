@@ -112,7 +112,7 @@ end
         end
 
         @testset "Corners frame: no band, the pattern fills the board around the corner cells" begin
-            ustrip = BlobBoards.VisualGeometryCore.ustrip
+            ustrip = BlobBoards.VisualGeometryToolkitCore.ustrip
             footprints(b) = [
                 BlobBoards.Circle(BlobBoards.Disc(ustrip(px, d.center[1]), ustrip(px, d.center[2]), ustrip(px, d.σ)), b.preamble.pattern_config.cutoff)
                     for d in b.blobs
@@ -157,7 +157,7 @@ end
         end
 
         @testset "Frame marks: reserved areas on the board, corners and bands sized apart" begin
-            ustrip = BlobBoards.VisualGeometryCore.ustrip
+            ustrip = BlobBoards.VisualGeometryToolkitCore.ustrip
             kw = (; blob_sizes = (6mm, 0.2short_side), seed = 0x3A)
             for extra in ((;), (; corner_size = 0mm, ruler_width = 0mm), (; ruler_width = 0mm), (; corner_size = 0mm),
                           (; corner_size = 14mm, ruler_width = 6mm))

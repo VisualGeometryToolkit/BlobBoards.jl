@@ -40,8 +40,8 @@ network `execution_provider = :cpu`; nothing else changes.
 using CUDA, cuDNN                      # the GPU path (leave out for the CPU)
 using BlobBoards
 using FileIO, Colors                   # image loading
-import VisualGeometryIo as VGIo
-using VisualGeometryCore: CameraModel, is_map_inlier
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitCore: CameraModel, is_map_inlier
 
 boards_dir = BlobBoards.example_data(:boards)
 still = BlobBoards.example_data(:still)
@@ -146,7 +146,7 @@ outline and blobs through any map, on any Makie backend:
 
 ```julia
 using CairoMakie                      # or GLMakie, to open a window instead
-using VisualGeometryCore: imshow, HomographyMap
+using VisualGeometryToolkitCore: imshow, HomographyMap
 using CoordinateTransformations: PerspectiveMap
 using StaticArrays: SMatrix
 using GeometryBasics: Rect

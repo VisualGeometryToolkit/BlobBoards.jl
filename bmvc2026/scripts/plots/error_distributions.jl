@@ -38,7 +38,7 @@ using DrWatson
 
 include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval: pose_results, figure_config, write_figure_records, eval_sources, poses_dir
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
 using CairoMakie
 using DrWatson: plotsdir

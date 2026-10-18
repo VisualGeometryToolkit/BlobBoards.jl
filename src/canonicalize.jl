@@ -31,7 +31,7 @@
 # `BlobBoardsCUDAExt` is loaded. NOT VGF's `CpuBackend`/`CudaBackend`: those are
 # `ComputeBackend`s, not `KA.Backend`s, and match no `_canonicalize` method.
 
-using VisualGeometryCore: logpolar_map, canonical_map, image_warp,
+using VisualGeometryToolkitCore: logpolar_map, canonical_map, image_warp,
     image_warp_batch_to!, region, Circle
 
 # `_interpolant` is the host BSpline sampler shared with src/training.jl's

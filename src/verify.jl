@@ -69,19 +69,19 @@ board_quad(camera_model::CameraModel, model, bundle::BoardBundle) =
 # board's edges — so sample the rectangle boundary (as the calibrated path
 # does via `project(::Camera, rect, n)`) and transfer every sample through
 # the model. Samples whose ray leaves the representable field are dropped.
-board_quad(::Nothing, m::VisualGeometryCore.RadialHomography, bundle::BoardBundle) =
+board_quad(::Nothing, m::VgtkCore.RadialHomography, bundle::BoardBundle) =
     GeometryBasics.Polygon(radial_outline(m, Rect(bundle, :world)))
 
 # `radial_outline` (the rect boundary sampler through the radial model) is
-# VisualGeometryCore's since 0.21.1, beside `radial_transfer`.
-using VisualGeometryCore: radial_outline
+# VisualGeometryToolkitCore's since 0.21.1, beside `radial_transfer`.
+using VisualGeometryToolkitCore: radial_outline
 
 
 # =============================================================================
 # appearance verification — do the inliers LOOK like the board they claim?
 # =============================================================================
 
-using VisualGeometryFeatures: descriptor_matrix
+using VisualGeometryToolkitFeatures: descriptor_matrix
 
 
 # Core loop over prebuilt descriptor matrices (rows = features) — the form
@@ -119,7 +119,7 @@ evidence is corroborated by appearance rather than by geometry alone". The
 accept gate compares it against `FindBoardsConfig.min_appearance_support`.
 
 `verify_similarity`, deliberately NOT `min_similarity`: that name belongs to
-VisualGeometryFeatures, which takes it as the descriptor MATCHING gate on six
+VisualGeometryToolkitFeatures, which takes it as the descriptor MATCHING gate on six
 public functions, and `FindBoardsConfig` forwards it at 0.6. This is a
 different quantity, at a different stage, with a different value — sharing the
 name is how two independent knobs silently become one.

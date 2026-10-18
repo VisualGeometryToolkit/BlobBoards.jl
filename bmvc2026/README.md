@@ -49,14 +49,14 @@ not exist here — or reinvents one that does:
 | Mechanism | Origin | Where |
 |---|---|---|
 | `data/exp_raw` / `exp_pro` / `plots/` / `_research/` layout, `projectdir()`, `plotsdir()` | DrWatson | everywhere |
-| Tuning SEARCH: the joint coarse-fine search over the spec's axes | VisualGeometryEval `coarse_fine_search` | `detection_cv.jl` |
+| Tuning SEARCH: the joint coarse-fine search over the spec's axes | VisualGeometryToolkitEval `coarse_fine_search` | `detection_cv.jl` |
 | Grid APPLICATION: cell → config | custom — `Accessors.@set` over the deserialized `FindBoardsConfig` | `detection_cv.jl` |
-| Single-file derived caches (`cached`) | VisualGeometryEval `cached_result`: DrWatson's `produce_or_load(filename = hash)` file name, `wload`/`tagsave`, but a save error propagates (produce_or_load swallows it, saving_files.jl:107-116) | `src/cache.jl` |
-| Code provenance: gitcommit + dirty-tree patch | VisualGeometryEval `write_provenance`/`read_provenance`: DrWatson `tag!(storepatch = true)` as one flat TOML record | `src/cache.jl`, `src/sweep.jl` |
-| Run keys: the SHA-256 `run_key` of a stage's config of record (+ the network's sha256 for a sweep, the upstream run keys for a consumer) | VisualGeometryEval `run_key` | `src/runs.jl` |
+| Single-file derived caches (`cached`) | VisualGeometryToolkitEval `cached_result`: DrWatson's `produce_or_load(filename = hash)` file name, `wload`/`tagsave`, but a save error propagates (produce_or_load swallows it, saving_files.jl:107-116) | `src/cache.jl` |
+| Code provenance: gitcommit + dirty-tree patch | VisualGeometryToolkitEval `write_provenance`/`read_provenance`: DrWatson `tag!(storepatch = true)` as one flat TOML record | `src/cache.jl`, `src/sweep.jl` |
+| Run keys: the SHA-256 `run_key` of a stage's config of record (+ the network's sha256 for a sweep, the upstream run keys for a consumer) | VisualGeometryToolkitEval `run_key` | `src/runs.jl` |
 | Keyed run directories `<stage>-<key>/`, found through the config of record | DrWatson `produce_or_load` idea, for a directory | `src/runs.jl`, every stage |
 | Effective-config sidecar `_config.toml` | custom (`BlobBoards.write_config`) | `src/sweep.jl` |
-| Immutable-data distribution + root ladder | Julia **Artifacts** (Pkg stdlib) through VisualGeometryEval `ArtifactView`/`data_root` | `Artifacts.toml`, `src/data.jl` |
+| Immutable-data distribution + root ladder | Julia **Artifacts** (Pkg stdlib) through VisualGeometryToolkitEval `ArtifactView`/`data_root` | `Artifacts.toml`, `src/data.jl` |
 | Board-feature cache | custom (VGF FileCache; self-keyed on network sha + cutoff + patch geometry) | `BoardGallery` |
 
 Nearest DrWatson neighbours, deliberately NOT used (checked against
@@ -115,7 +115,7 @@ Two sidecars beside every run, answering different questions:
   `_provenance.toml`  WHAT ACTUALLY RAN — DrWatson's tagged dict as ONE flat
                       TOML table: gitcommit, gitpatch (the diff when the tree
                       is dirty), driver, timestamp, hostname, julia, the run
-                      key and the inputs. VisualGeometryEval.Experiments
+                      key and the inputs. VisualGeometryToolkitEval.Experiments
                       `write_provenance` / `write_run_records`.
 
 Every result stage writes both (the sweeps per subset, the other stages at
@@ -128,10 +128,10 @@ the axes searched over it and how to score them - it holds no knob the config
 already carries. Its `[tuning.detection]` is a `joint_coarse_fine` tuning spec
 (the half-width, peak-threshold and similarity axes, the invariance mAA
 criterion, and its cross-validation: the registered split
-`blobboards_cross_session` of VisualGeometryEval `configs/splits.toml` — the
+`blobboards_cross_session` of VisualGeometryToolkitEval `configs/splits.toml` — the
 session it tunes on and the one it reports — and the frame sampling) read by
-VisualGeometryEval's one `[tuning]` parser — the schema is documented once, in
-VisualGeometryEval `configs/tuning.toml`; `[inputs]` holds the run config,
+VisualGeometryToolkitEval's one `[tuning]` parser — the schema is documented once, in
+VisualGeometryToolkitEval `configs/tuning.toml`; `[inputs]` holds the run config,
 the session's camera and the invariance counts. The run's records carry the
 RESOLVED spec, and its directory is keyed by it.
 
@@ -139,7 +139,7 @@ RESOLVED spec, and its directory is keyed by it.
 
 Data is distributed via the Julia Artifacts system (`Artifacts.toml` here;
 Zenodo-hosted tiers, lazy per-tier download). The resolution ladder is the
-stack's one implementation (VisualGeometryEval.Experiments), bound in
+stack's one implementation (VisualGeometryToolkitEval.Experiments), bound in
 `src/data.jl`:
 
 1. `ENV["CAU_DATA_ROOT"]` — explicit override;
@@ -152,10 +152,10 @@ stack's one implementation (VisualGeometryEval.Experiments), bound in
 
 Expected download time: Zenodo served ~0.1–0.5 MB/s per single stream (measured 2026-10-09), so a multi-GB tier takes hours.
 
-The data policy (VisualGeometryEval `data_policy_violations`): D1 no machine paths in
+The data policy (VisualGeometryToolkitEval `data_policy_violations`): D1 no machine paths in
 code or launchers; D2 nothing writes under `data_root()`;
 D3 output directories are keyed (`<stage>-<run_key>`, `<prefix>_<hash>`).
-`test/paper_project_tests.jl` checks it (VisualGeometryEval PaperProjects).
+`test/paper_project_tests.jl` checks it (VisualGeometryToolkitEval PaperProjects).
 
 The descriptor's frozen training set ships as two further root-mounted tiers,
 `bb_descriptor_training_metadata` (boards, bootstrap network chain, recipe
@@ -224,13 +224,13 @@ the environment itself was never created.
 
 Hand-eye calibration (the fixed camera-rig→camera and marker→board-rig
 transforms) is estimated from the `calibration_*` subsets via
-RobustVisualGeometry's `fit_robot_world_hand_eye` (staged linear Kabsch estimator,
+VisualGeometryToolkitEstimation's `fit_robot_world_hand_eye` (staged linear Kabsch estimator,
 RVG ≥ 0.14) and applied to the evaluation sweep. See
 `bmvc2026/_research/findings/hand_eye.md` for the current calibrations.
 
 ### Conventions worth knowing
 
-- The evaluation reads VisualGeometryIo kinds only, every one a result of a
+- The evaluation reads VisualGeometryToolkitIo kinds only, every one a result of a
   keyed run: detections `<run>/poses/<system>/target_poses.json`
   (vgio/target_poses/v1) + `telemetry.jsonl` (the sweeps write them; the
   baseline stage converts the baselines' per-image exports); the motion-capture
@@ -248,7 +248,7 @@ RVG ≥ 0.14) and applied to the evaluation sweep. See
   vgio/transforms/v3 + vgio/rig/v4 (each printed board a pose-only
   PlanarTarget named by its id, `BlobBoards.board_resolver` resolves its
   points), with the fit's covariances. Every kind is the direct serialization
-  of a VisualGeometryCore value; rotations are stored, and read back, as unit
+  of a VisualGeometryToolkitCore value; rotations are stored, and read back, as unit
   quaternions. The raw per-frame exports stay the source of record.
 - The raw mocap export's `rot_mat` is **column-major**. The original
   Python pipeline read it row-major — invisible in distance norms and

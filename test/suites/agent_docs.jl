@@ -1,20 +1,20 @@
 # CLAUDE.md, AGENTS.md and anything tracked under .claude/ ship with the
 # package; they carry its conventions and nothing private. The check and its
-# patterns are VisualGeometryCore's; release tooling adds its own patterns
+# patterns are VisualGeometryToolkitCore's; release tooling adds its own patterns
 # through AGENT_DOC_PATTERNS (a file, one regular expression per line).
-using VisualGeometryCore: agent_doc_violations
+using VisualGeometryToolkitCore: agent_doc_violations
 violations = agent_doc_violations(pkgdir(BlobBoards); extra = get(ENV, "AGENT_DOC_PATTERNS", nothing))
 isempty(violations) || @error "agent docs carry private content" violations
 @test isempty(violations)
 
 @testset "conventions pointer" begin
-    # The stack conventions live once, in VisualGeometryCore's conventions/
+    # The stack conventions live once, in VisualGeometryToolkitCore's conventions/
     # folder. This CLAUDE.md points there and carries no copy of the shared
     # text: the copies drifted, a pointer cannot. No sibling checkout needed.
     claude = read(joinpath(pkgdir(BlobBoards), "CLAUDE.md"), String)
     @test occursin(r"^#+ Stack Conventions$"m, claude)
-    @test occursin("VisualGeometryCore/conventions/", claude)
-    @test occursin("VisualGeometryCore.conventions_dir()", claude)
+    @test occursin("VisualGeometryToolkitCore/conventions/", claude)
+    @test occursin("VisualGeometryToolkitCore.conventions_dir()", claude)
     for copied in ("<!-- shared:", "Frame in = frame out.", "The one exception is the benchmark pool",
                    "Iterative-estimator vocabulary", "Correspondences in, dicts for groups")
         @test !occursin(copied, claude)

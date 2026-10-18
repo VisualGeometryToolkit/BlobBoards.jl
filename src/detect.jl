@@ -6,12 +6,12 @@
 #
 # =============================================================================
 
-using VisualGeometryFeatures: VisualGeometryFeatures, Detection
-using VisualGeometryCore: EllipticFrame, feature_frame
+using VisualGeometryToolkitFeatures: VisualGeometryToolkitFeatures, Detection
+using VisualGeometryToolkitCore: EllipticFrame, feature_frame
 
-# The float-gray input ladder is VisualGeometryFeatures' `gray_f32` since 0.7.1
+# The float-gray input ladder is VisualGeometryToolkitFeatures' `gray_f32` since 0.7.1
 # (a Float32 device array is forwarded untouched).
-using VisualGeometryFeatures: gray_f32
+using VisualGeometryToolkitFeatures: gray_f32
 
 # =============================================================================
 # detect_blobs — Raw scale-space detection
@@ -83,7 +83,7 @@ function detect_blobs(
 end
 
 # =============================================================================
-# _detect — KernelAbstractions ASIFT backend (VisualGeometryFeatures)
+# _detect — KernelAbstractions ASIFT backend (VisualGeometryToolkitFeatures)
 # =============================================================================
 #
 # Routes detect_blobs through VGF's backend-agnostic KA IMAS-25 pipeline.
@@ -106,7 +106,7 @@ function _detect(
         cfg.nms isa EllipseNms ? (:ellipse, 3, cfg.nms.cutoff) :
         (:none, 3, 3.0f0)
     bo, br = cfg.nms === nothing ? (0.0f0, 1) : (cfg.nms.band_octaves, cfg.nms.band_reach)
-    return VisualGeometryFeatures.asift_detect(
+    return VgtkFeatures.asift_detect(
         img;
         device,
         nms = nms_sym, window_half = wh, cutoff = kc,
@@ -218,6 +218,6 @@ end
 
 # NOTE: the ASIFT tilt-warp helpers that lived here (_warp_tilt!,
 # _alloc_warp_buf, _warp_view, _to_raw) were dead code — detection routes
-# through VisualGeometryFeatures.asift_detect, which owns its warp kernels.
+# through VisualGeometryToolkitFeatures.asift_detect, which owns its warp kernels.
 # The CPU and CUDA copies had even diverged on the shear sign ((t-1) vs
 # (1-t)).  Deleted in the 2026-07 warp unification (#19).

@@ -6,7 +6,7 @@
 # extension. Included before them in BlobBoards.jl.
 # =============================================================================
 
-import RobustVisualGeometry
+import VisualGeometryToolkitEstimation
 
 # =============================================================================
 # Solve-type tags — select the per-blob solver/objective. Shared by the GPU
@@ -22,12 +22,12 @@ import RobustVisualGeometry
 # was not used. Removed 2026-08: the solver is the Student-t/uniform mixture
 # with the sort-and-sweep posterior partition, and it is not a choice.
 
-using VisualGeometryCore:
+using VisualGeometryToolkitCore:
     Disc, EllipticFrame, Paraboloid3D,
     moment_matrix, region, iou, coverage,
     is_valid_shape, is_peak, characteristic_scale, coeffs
 
-using VisualGeometryFeatures: Detection
+using VisualGeometryToolkitFeatures: Detection
 
 using LinearAlgebra: Symmetric, dot, norm
 using StaticArrays: SVector, SMatrix
@@ -42,8 +42,8 @@ const _MIN_POINTS_ANISOTROPIC = 20
 const _MIN_REGION_HALFWIDTH = 2
 
 # `saturation_bounds` — the pixel value range a measurement may trust — is
-# VisualGeometryCore's since 0.21.1.
-using VisualGeometryCore: saturation_bounds
+# VisualGeometryToolkitCore's since 0.21.1.
+using VisualGeometryToolkitCore: saturation_bounds
 
 # =============================================================================
 

@@ -32,7 +32,7 @@ Generate deterministic, multi-scale blob patterns and printable calibration boar
 
 **Authoring**
 - Deterministic patterns from seeded `PatternConfig`
-- Physical and logical units via FlexUnits (`mm`, `inch`, `px`, `dpi`), re-exported from VisualGeometryCore
+- Physical and logical units via FlexUnits (`mm`, `inch`, `px`, `dpi`), re-exported from VisualGeometryToolkitCore
 - Printable boards with rulers, QR code metadata, and UID
 - JSON serialization for round-trip equivalence
 
@@ -77,7 +77,7 @@ required, and a density belongs only to a raster output (`Tiff(600dpi)`,
 `Png(300dpi)`).
 
 The units (`mm`, `inch`, `px`, `dpi`) are
-FlexUnits units (VisualGeometryCore's registry, with a pixel dimension)
+FlexUnits units (VisualGeometryToolkitCore's registry, with a pixel dimension)
 re-exported by BlobBoards; do not import them from another units package.
 
 ## Blob Extraction
@@ -118,9 +118,9 @@ every board it located in the image.
 using BlobBoards, CUDA
 import cuDNN                                   # enables the ONNX CUDA provider
 using CUDA: CUDABackend
-using RobustVisualGeometry: RansacConfig
-using VisualGeometryCore: CameraModel
-import VisualGeometryIo as VGIo
+using VisualGeometryToolkitEstimation: RansacConfig
+using VisualGeometryToolkitCore: CameraModel
+import VisualGeometryToolkitIo as VGIo
 
 camera  = VGIo.load(CameraModel, "cameras.json")  # canonical vgio/cameras/v3 store
 network = DescriptorNetwork("descriptor.onnx") # patch size comes from the graph
@@ -267,7 +267,7 @@ Paper sizes: `"A4"`, `"A5"`, `"Letter"`, or custom `Size2(width, height)`
 
 The tunings of `bmvc2026/` (the detector/estimator factorial,
 `configs/detection_thresholds_cv.toml`) are `[tuning.<name>]` specs in the one schema
-VisualGeometryEval's `Tuning` module owns and documents (`Tuning.tuning_spec`). Their runs persist the resolved spec and its hash; tuning artifacts written
+VisualGeometryToolkitEval's `Tuning` module owns and documents (`Tuning.tuning_spec`). Their runs persist the resolved spec and its hash; tuning artifacts written
 before 2026-10-01 are refused and must be regenerated.
 
 ## Installation
@@ -283,8 +283,8 @@ Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
 Pkg.add("BlobBoards")
 ```
 
-Its upstream stack (VisualGeometryCore, VisualGeometryFeatures,
-RobustVisualGeometry, VisualGeometryIo) resolves automatically.
+Its upstream stack (VisualGeometryToolkitCore, VisualGeometryToolkitFeatures,
+VisualGeometryToolkitEstimation, VisualGeometryToolkitIo) resolves automatically.
 
 ### For development
 

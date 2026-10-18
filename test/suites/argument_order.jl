@@ -1,7 +1,7 @@
 # =============================================================================
 # The retired argument orders bind no method.
 #
-# The stack's argument-order rule (VisualGeometryCore's CLAUDE.md: the model or
+# The stack's argument-order rule (VisualGeometryToolkitCore's CLAUDE.md: the model or
 # shape first, then the data it acts on, then parameters) moved the given
 # camera or homography, the required tools (gallery, network) and the shapes
 # ahead of the images and detections. Many of those arguments were untyped, so
@@ -22,7 +22,7 @@
 # =============================================================================
 
 using StaticArrays: SMatrix
-using VisualGeometryCore: CameraModel, LogicalIntrinsics, CameraCalibrationMat, Pinhole, EllipticFrame, Point2, px
+using VisualGeometryToolkitCore: CameraModel, LogicalIntrinsics, CameraCalibrationMat, Pinhole, EllipticFrame, Point2, px
 
 @testset "retired argument orders bind no method" begin
     img = zeros(Float32, 16, 16)

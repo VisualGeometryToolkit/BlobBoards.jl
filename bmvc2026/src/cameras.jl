@@ -10,8 +10,8 @@
 # scripts/import_cameras.jl ports each ONCE into the native vgio/cameras/v3
 # camera of record through `upstream_camera`; nothing else reads the shape.
 
-using VisualGeometryIo: opencv_lens
-using VisualGeometryCore: CameraModel, BoundedCamera, Attributed, Size2
+using VisualGeometryToolkitIo: opencv_lens
+using VisualGeometryToolkitCore: CameraModel, BoundedCamera, Attributed, Size2
 
 _flag_names(flags::Integer, names::AbstractDict) = join(
     [name for (bit, name) in sort!([(parse(Int, k), v) for (k, v) in names]) if flags & bit != 0],

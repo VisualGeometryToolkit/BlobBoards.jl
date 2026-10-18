@@ -50,6 +50,11 @@ Blobs are stored internally in `:colmap` convention. Use
 """
 module BlobBoards
 
+import VisualGeometryToolkitCore as VgtkCore
+import VisualGeometryToolkitEstimation as VgtkEstimation
+import VisualGeometryToolkitFeatures as VgtkFeatures
+import VisualGeometryToolkitIo as VgtkIo
+
 # =============================================================================
 # Dependencies
 # =============================================================================
@@ -63,7 +68,7 @@ using Statistics: Statistics
 using Random: Random, MersenneTwister, RandomDevice, Xoshiro
 import Artifacts   # descriptor-network catalog lookups (config_toml.jl)
 import Pkg         # Pkg.Artifacts.ensure_artifact_installed — lazy artifact fetch
-import VisualGeometryIo   # append_jsonl — run logs / telemetry (one JSONL writer)
+import VisualGeometryToolkitIo   # append_jsonl — run logs / telemetry (one JSONL writer)
 using Scratch: @get_scratch!   # regenerated board-render cache (io.jl)
 using Base: ImmutableDict
 
@@ -75,13 +80,13 @@ using StructArrays: StructArrays, StructArray
 using GeometryBasics:
     GeometryBasics, Circle, Point2, Rect, Rect2, origin, widths
 using SpatialIndexing: SpatialIndexing   # RTree, SpatialElem, Rect, insert!, id
-using VisualGeometryCore.SpatialQueries: foreach_intersecting, nearest_neighbor!, NearestNeighborState, bulk_load!
+using VisualGeometryToolkitCore.SpatialQueries: foreach_intersecting, nearest_neighbor!, NearestNeighborState, bulk_load!
 
-# Units and physical quantities: FlexUnits with VisualGeometryCore's pixel
+# Units and physical quantities: FlexUnits with VisualGeometryToolkitCore's pixel
 # dimension (values in base units — name the unit at every `ustrip`)
 using FlexUnits: Quantity, Units, dimension, ubase
-using VisualGeometryCore:
-    VisualGeometryCore, # for qualified access (e.g., VisualGeometryCore.estimate)
+using VisualGeometryToolkitCore:
+    VisualGeometryToolkitCore, # for qualified access (e.g., VisualGeometryToolkitCore.estimate)
     px,
     dpi,
     pt,
@@ -96,8 +101,8 @@ using VisualGeometryCore:
     is_map_inlier,                # the posterior > ½ MAP inlier decision (every `weights` read)
     PlanarTarget                  # a board as a target model (board_target, pipeline.jl)
 
-using VisualGeometryCore: Size2, parse_unit, strip_or_bare
-using VisualGeometryFeatures: _getfield, ScalarOrQuantity
+using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare
+using VisualGeometryToolkitFeatures: _getfield, ScalarOrQuantity
 
 # Image processing and visualization
 using Colors: Colors, Gray

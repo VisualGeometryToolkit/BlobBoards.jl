@@ -26,7 +26,7 @@
 # trajectory (`rig_sequence`) and never re-runs the gates, so a reader of the
 # published record gets the same frames as the producer did.
 
-using VisualGeometryCore: chordal_mean, EuclideanMap
+using VisualGeometryToolkitCore: chordal_mean, EuclideanMap
 using Rotations: RotMatrix, rotation_angle
 using Colors: Gray
 import FileIO

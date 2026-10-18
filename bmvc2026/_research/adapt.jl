@@ -14,11 +14,11 @@ Usage:
 
 using BlobBoards
 using BlobBoards: adapt, detect_blobs, filter_blobs   # advanced API (unexported)
-using VisualGeometryCore: Circle, Ellipse, imshow, boundary, centroid
+using VisualGeometryToolkitCore: Circle, Ellipse, imshow, boundary, centroid
 using GLMakie; GLMakie.activate!()
 using FileIO: load as load_image
 using Colors: Gray
-using VisualGeometryCore: ustrip
+using VisualGeometryToolkitCore: ustrip
 
 # Load image and convert to grayscale
 image_path = joinpath(data_dir(),

@@ -43,7 +43,7 @@ using BlobBoards: mm, dpi, px, ustrip
 using FileIO: FileIO
 using StaticArrays: SMatrix, SVector
 using Statistics: mean, median
-using VisualGeometryCore: is_map_inlier
+using VisualGeometryToolkitCore: is_map_inlier
 
 const TEST_BOARD = (paper = "A4", density = 1200dpi, blob_sizes = (0.4mm, 12mm), seed = 0x7E57)
 const FIND_DPI = 150          # find_boards runs on the scan block-averaged to about this density

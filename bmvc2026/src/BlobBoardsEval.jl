@@ -19,9 +19,9 @@ using LinearAlgebra
 using Rotations
 using StaticArrays
 using Statistics
-using VisualGeometryCore: EuclideanMap, Frame, ViewFrame, TargetFrame, Rig, Mounted, PlanarTarget,
+using VisualGeometryToolkitCore: EuclideanMap, Frame, ViewFrame, TargetFrame, Rig, Mounted, PlanarTarget,
     relabel, unlabel, pose, ids
-using RobustVisualGeometry: fit_robot_world_hand_eye
+using VisualGeometryToolkitEstimation: fit_robot_world_hand_eye
 using BlobBoards
 
 include("data.jl")
@@ -34,9 +34,9 @@ include("pose_error.jl")
 include("error_table.jl")
 include("recovery.jl")
 # The provenance record (write_provenance / read_provenance) is the stack's
-# one implementation, VisualGeometryEval.Experiments; cache.jl wraps its keyed
+# one implementation, VisualGeometryToolkitEval.Experiments; cache.jl wraps its keyed
 # result cache.
-using VisualGeometryEval.Experiments: write_provenance, read_provenance
+using VisualGeometryToolkitEval.Experiments: write_provenance, read_provenance
 include("cache.jl")
 # After cache.jl (uses `cached`) and error_table.jl (uses `evaluate_dataset`).
 include("results.jl")

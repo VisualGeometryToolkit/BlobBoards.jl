@@ -37,12 +37,12 @@ end
 
 @testitem "bundle serialization" begin
     using JSON3
-    using VisualGeometryCore: mm, px
+    using VisualGeometryToolkitCore: mm, px
     include("suites/serialization.jl")
 end
 
 @testitem "units convention" begin
-    using VisualGeometryCore: mm, px, dpi
+    using VisualGeometryToolkitCore: mm, px, dpi
     include("suites/units_convention.jl")
 end
 
@@ -63,12 +63,12 @@ end
 end
 
 @testitem "raw pose arm" begin
-    using VisualGeometryCore: px
+    using VisualGeometryToolkitCore: px
     include("suites/raw_pose_arm.jl")
 end
 
 @testitem "serial oracle ≡ engine" begin
-    using VisualGeometryCore: mm, px
+    using VisualGeometryToolkitCore: mm, px
     include("suites/oracle.jl")
 end
 
@@ -80,7 +80,7 @@ end
 @testitem "boards" begin
     using TiffImages: TiffImages          # reads the TIFF back (test-only)
     using JSON3
-    using VisualGeometryCore: mm, dpi, px, inch, ustrip, uconvert, VgcQuantity
+    using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert, VgcQuantity
     include("suites/boards.jl")
 end
 
@@ -91,11 +91,11 @@ end
 end
 
 @testitem "adapt CPU ≡ GPU" tags=[:gpu] begin
-    using VisualGeometryCore: px
+    using VisualGeometryToolkitCore: px
     include("suites/adapt_parity.jl")
 end
 
 @testitem "annotate smoke (detection on the device)" tags=[:gpu] begin
-    using VisualGeometryCore: mm, px, dpi
+    using VisualGeometryToolkitCore: mm, px, dpi
     include("suites/annotate_smoke.jl")
 end

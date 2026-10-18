@@ -15,7 +15,7 @@ T = BlobBoards.Translation(board_config, :pattern, :canvas)   # BoardConfig: :pa
 # Coordinate-system transforms (pixel ↔ physical ↔ world)
 H = BlobBoards.AffineMap(bundle, :pixel, :world; density = 300dpi)   # :pixel/:physical/:world
 
-# Image-origin conventions (from VisualGeometryCore), on plain pixel coordinates
+# Image-origin conventions (from VisualGeometryToolkitCore), on plain pixel coordinates
 to_julia = BlobBoards.EuclideanMap(BlobBoards.PixelFrame{:colmap}, BlobBoards.PixelFrame{:julia})   # :colmap/:julia/:opencv
 ```
 

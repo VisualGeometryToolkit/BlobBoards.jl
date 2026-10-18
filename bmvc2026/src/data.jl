@@ -1,12 +1,12 @@
 # =============================================================================
 # Data root — the EVAL-CONVENTIONS.md (cau-tooling) contract, bound through
-# VisualGeometryEval.Experiments (the ladder is spelled out at the
+# VisualGeometryToolkitEval.Experiments (the ladder is spelled out at the
 # `set_project_root!` call below). This file keeps only what is THIS
 # project's: its tiers, their mounts, and the derived-artifact layout.
 # =============================================================================
 
 using DrWatson: projectdir
-using VisualGeometryEval.Experiments: set_project_root!, ArtifactView, data_root, results_root
+using VisualGeometryToolkitEval.Experiments: set_project_root!, ArtifactView, data_root, results_root
 import TOML
 
 # projectdir(), not joinpath(@__DIR__, ".."): @__DIR__ is relative to THIS
@@ -64,7 +64,7 @@ const _ROOT_TIERS = (
 )
 _tier_mount(t) = t in _ROOT_TIERS ? "" : "absolute_pose_experiments"
 
-# THE data binding (VisualGeometryEval.Experiments, the stack's one
+# THE data binding (VisualGeometryToolkitEval.Experiments, the stack's one
 # implementation). `data_root(; tiers)`:
 #
 #   1. ENV["CAU_DATA_ROOT"]        explicit override

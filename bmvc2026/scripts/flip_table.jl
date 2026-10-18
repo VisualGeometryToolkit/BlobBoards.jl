@@ -36,7 +36,7 @@ include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval
 using .BlobBoardsEval: rig_sequence, load_detected_poses, pose_error_table, hand_eye,
     detected_marker_sizes, static_recovery_accepted, figure_config, write_figure_records, eval_sources, poses_dir
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: plotsdir, projectdir
 using Statistics
 

@@ -14,13 +14,13 @@ Usage:
 
 using BlobBoards
 using BlobBoards: adapt, detect_blobs, filter_blobs   # advanced API (unexported)
-using VisualGeometryCore: Circle, Ellipse, Disc, imshow, boundary, centroid
-using VisualGeometryCore.Features: fit_moments, Detection
+using VisualGeometryToolkitCore: Circle, Ellipse, Disc, imshow, boundary, centroid
+using VisualGeometryToolkitCore.Features: fit_moments, Detection
 using GeometryBasics: Point2
 using GLMakie
 using FileIO: load as load_image
 using Colors: Gray
-using VisualGeometryCore: ustrip
+using VisualGeometryToolkitCore: ustrip
 
 # Load image and convert to grayscale
 image_path = joinpath(data_dir(),

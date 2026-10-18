@@ -27,8 +27,9 @@
 # BoardRigFrame` (a target-rig pose), `T_cb : BoardRigFrame → CameraRigFrame`
 # (mocap, per frame), `X : CameraRigFrame → ViewFrame{:optical}` (the
 # hand-eye); a mislabeled junction is a MethodError, not a wrong pose.
-using VisualGeometryCore: BodyFrame, WorldFrame, geom, Trajectory, TargetPoses
-using VisualGeometryIo: VisualGeometryIo
+import VisualGeometryToolkitIo as VgtkIo
+using VisualGeometryToolkitCore: BodyFrame, WorldFrame, geom, Trajectory, TargetPoses
+using VisualGeometryToolkitIo: VisualGeometryToolkitIo
 
 const CameraRigFrame = BodyFrame{:camera_rig}
 const BoardRigFrame = BodyFrame{:board_rig}
@@ -59,7 +60,7 @@ end
 
 # One body's trajectory of a subset, checked to be that body in the tracker's world.
 function _body_trajectory(dir::AbstractString, body::Symbol)
-    tr = VisualGeometryIo.load(Trajectory, joinpath(dir, "$(body).json"))
+    tr = VgtkIo.load(Trajectory, joinpath(dir, "$(body).json"))
     tr isa Trajectory{BodyFrame{body}, WorldFrame} ||
         error("$(dir)/$(body).json: expected the trajectory body:$(body) → world, got $(typeof(tr).parameters[1]) → $(typeof(tr).parameters[2])")
     return tr

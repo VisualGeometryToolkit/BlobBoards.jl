@@ -1,4 +1,6 @@
 #=
+import VisualGeometryToolkitEval as VgtkEval
+import VisualGeometryToolkitIo as VgtkIo
 Build Annotation Database — annotate all data sources into a per-frame
 JLD2 directory. See summarize_annotations(output_dir) for after-run stats.
 
@@ -15,10 +17,10 @@ using BlobBoards
 using BlobBoards: build_annotations   # advanced API (unexported)
 using CUDA, cuDNN
 
-import VisualGeometryIo   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryCore: CameraModel   # dispatch token for VisualGeometryIo.load
+import VisualGeometryToolkitIo   # canonical vgio/cameras/v3 camera stores
+using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIo.load
 using Logging, Dates
-import VisualGeometryEval
+import VisualGeometryToolkitEval
 using Infiltrator
 
 
@@ -51,7 +53,7 @@ if QUICK_TEST
 end
 _take(v, n) = v[1:min(n, length(v))]
 
-# The run directory is KEYED by the annotation settings (VisualGeometryEval
+# The run directory is KEYED by the annotation settings (VisualGeometryToolkitEval
 # Experiments `run_key`: SHA-256 of their sorted TOML), not by the wall clock:
 # the same settings land in the same directory, which `_is_source_processed`
 # then resumes; changed settings are a new directory. RESUME_DIR still points
@@ -64,7 +66,7 @@ const ANNOTATION_SETTINGS = Dict{String, Any}(
 )
 run_dir = let env_dir = get(ENV, "RESUME_DIR", "")
     isempty(env_dir) ?
-        joinpath(root, "training", "annotations-" * VisualGeometryEval.Experiments.run_key(ANNOTATION_SETTINGS)) :
+        joinpath(root, "training", "annotations-" * VgtkEval.Experiments.run_key(ANNOTATION_SETTINGS)) :
         env_dir
 end
 mkpath(run_dir)
@@ -190,7 +192,7 @@ n_vid_frames = QUICK_TEST ? 5 : 30
 @info "=== Annotation ==="
 @info "Annotate videos..."
 for (videos, calib_file) in videos_calibrated
-    video_camera = isnothing(calib_file) ? nothing : VisualGeometryIo.load(CameraModel, calib_file)
+    video_camera = isnothing(calib_file) ? nothing : VgtkIo.load(CameraModel, calib_file)
     build_annotations(
         board_feature_dict, descriptor_network, videos;
         common_kw..., n_frames = n_vid_frames, config = _config_for(video_camera)
@@ -199,7 +201,7 @@ end
 
 @info "Annotate images..."
 for (images, calib_file) in images_calibrated
-    image_camera = isnothing(calib_file) ? nothing : VisualGeometryIo.load(CameraModel, calib_file)
+    image_camera = isnothing(calib_file) ? nothing : VgtkIo.load(CameraModel, calib_file)
     build_annotations(
         board_feature_dict, descriptor_network, images;
         common_kw..., config = _config_for(image_camera)

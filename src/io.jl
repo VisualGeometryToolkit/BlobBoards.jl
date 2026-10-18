@@ -2,11 +2,11 @@
 using Poppler_jll: pdftocairo
 
 # NOTE: `load_camera` (the ad-hoc "camera_matrix"/"distortion_coefficients"
-# JSON reader) is GONE (2026-08-18). Cameras are stored in VisualGeometryIo's
+# JSON reader) is GONE (2026-08-18). Cameras are stored in VisualGeometryToolkitIo's
 # canonical `vgio/cameras` schema (v3: a store of named `BoundedCamera`s; the
 # retired v1/v2 files were migrated once, 2026-10). Read them with
 #
-#     import VisualGeometryIo as VGIo
+#     import VisualGeometryToolkitIo as VGIo
 #     cam = VGIo.load(CameraModel, path)                 # single-camera store
 #     cam = VGIo.load(CameraModel, path; name = "…")     # multi-camera store
 #

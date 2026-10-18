@@ -18,8 +18,8 @@ using StructArrays: StructArray
 using GLMakie; GLMakie.activate!()
 using GeometryBasics: Point2f
 using CoordinateTransformations: PerspectiveMap
-using VisualGeometryCore: HomographyMap, matches!
-using RobustVisualGeometry: fit_homography
+using VisualGeometryToolkitCore: HomographyMap, matches!
+using VisualGeometryToolkitEstimation: fit_homography
 using Statistics: mean
 
 using Infiltrator

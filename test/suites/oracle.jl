@@ -14,11 +14,11 @@
 
 using Random: Random, MersenneTwister
 using LinearAlgebra: normalize
-using VisualGeometryCore: is_map_inlier
+using VisualGeometryToolkitCore: is_map_inlier
 
 @testset "serial oracle ≡ engine" begin
-    VGF = BlobBoards.VisualGeometryFeatures
-    VGC = BlobBoards.VisualGeometryCore
+    VGF = BlobBoards.VisualGeometryToolkitFeatures
+    VGC = BlobBoards.VisualGeometryToolkitCore
 
     rng = MersenneTwister(0xB10B)
     randdesc() = Float32.(normalize(randn(rng, Float32, 128)))

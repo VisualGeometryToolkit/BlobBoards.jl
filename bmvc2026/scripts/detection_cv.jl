@@ -1,9 +1,11 @@
 #=
+import VisualGeometryToolkitEval as VgtkEval
+import VisualGeometryToolkitIo as VgtkIo
 detection_cv.jl — cross-validate the detection operating point JOINTLY:
 (outlier_halfwidth, peak_threshold, min_similarity) of the pose arm, against
 the inter-board invariance mAA.
 
-The search is VisualGeometryEval's coarse-fine search over the product of the
+The search is VisualGeometryToolkitEval's coarse-fine search over the product of the
 three axes (`coarse_fine_search` under the `joint_coarse_fine` spec of
 configs/detection_cv.toml): the coarse product grid, an axis extended while
 the joint argmin lies within the margin of its face, then the product of each
@@ -17,7 +19,7 @@ similarity gate are post-detection: everything they touch runs per cell inside
 the RANSAC scorer, the local optimization, the pose-ambiguity refine and the
 guided association, whose band IS the half-width).
 
-The criterion (VisualGeometryEval `rigid_invariance_errors`): in every frame
+The criterion (VisualGeometryToolkitEval `rigid_invariance_errors`): in every frame
 the relative pose of two detected boards is a constant of the rigid panel, so
 its deviation from the leave-one-out reference over the other frames is
 estimation error. Errors are the translation of that relative pose, mm, one
@@ -27,13 +29,13 @@ the continuous mAA@10 mm.
 
 Outputs, in the keyed run directory `results_root()/tuning/detection_cv-<run_key>`
 (src/operating_points.jl): the tuning artifact `detection.jld2`
-(VisualGeometryEval `save_coarse_fine_artifact`: the spec, the coarse and fine
+(VisualGeometryToolkitEval `save_coarse_fine_artifact`: the spec, the coarse and fine
 grids of every axis, the objective over both product grids, every evaluated
 cell with its per-frame sufficient statistics, the selection and its boundary
 flags) with the frame bootstrap of the joint selection (`bootstrap_argmin`),
 the run records, and (stage `tables`) the curve of each axis and the surface
 of each pair of axes (`emit_tuning_table`). Consumers read the selection
-through VisualGeometryEval `deployed_setting`.
+through VisualGeometryToolkitEval `deployed_setting`.
 
 Usage:
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/detection_cv.jl [--plan] [--force]
@@ -48,22 +50,22 @@ using BlobBoards: FindBoardsConfig, DescriptorNetwork, BoardGallery, uid_from_ha
 using CUDA
 import cuDNN
 using CUDA: CUDABackend
-import VisualGeometryIo
-import VisualGeometryCore
-using VisualGeometryCore: CameraModel
+import VisualGeometryToolkitIo
+import VisualGeometryToolkitCore
+using VisualGeometryToolkitCore: CameraModel
 using Accessors: @set
 using Colors: Gray
 using FileIO: load as load_image
 using Random: Xoshiro
 using Statistics: quantile
 using TOML: TOML
-import VisualGeometryEval
-using VisualGeometryEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy, CrossValidation,
+import VisualGeometryToolkitEval
+using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy, CrossValidation,
     QueryUnit, validation_units, validation_scenes, grid_spec, bootstrap_argmin, unit_statistics
-using VisualGeometryEval.Evaluation: coarse_fine_search, rigid_invariance_errors,
+using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, rigid_invariance_errors,
     save_coarse_fine_artifact, deployed_setting
-using VisualGeometryEval.Render: emit_tuning_table
-using VisualGeometryEval.Experiments: Stage, run_stages, run_complete, write_run_records
+using VisualGeometryToolkitEval.Render: emit_tuning_table
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, write_run_records
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
@@ -102,7 +104,7 @@ end
 function run_cv()
     image_dir, frames = validation_frames(SPEC.scheme.cross_validation)
     root = data_root()
-    camera = VisualGeometryIo.load(CameraModel, joinpath(root, INP["camera"]))
+    camera = VgtkIo.load(CameraModel, joinpath(root, INP["camera"]))
     run_config = projectdir("configs", INP["run_config"])
     base = FindBoardsConfig(run_config; camera)
     # the run config names the network data_root()-relative (the bb_assets tier mounts models/ at the root)
@@ -160,7 +162,7 @@ function run_cv()
     rec = coarse_fine_search(errorsfn, cells, SPEC.scheme; label = _ -> "detection")[:pose]
 
     # Frame bootstrap of the joint selection over every evaluated cell
-    # (VisualGeometryEval `bootstrap_argmin` over the cells' unit statistics:
+    # (VisualGeometryToolkitEval `bootstrap_argmin` over the cells' unit statistics:
     # per frame the mAA score sum and pair count, exact for the mAA).
     unc = CFG["uncertainty"]
     stats = [unit_statistics(SPEC.scheme.criterion, E) for E in last.(rec.evaluated)]
@@ -171,7 +173,7 @@ function run_cv()
                                 for n in names)
     mkpath(OUTDIR)
     save_coarse_fine_artifact(detection_cv_artifact(OUTDIR), SPEC, rec;
-        unit = QueryUnit(), code = (BlobBoards, VisualGeometryCore), frames = stems,
+        unit = QueryUnit(), code = (BlobBoards, VisualGeometryToolkitCore), frames = stems,
         pairs = [collect(p) for p in pairs[]], detection_runs = first.(detections),
         bootstrap_cells = [Float64(b[Symbol(n)]) for b in boot, n in names], bootstrap_interval = interval,
         objective = "mean_average_accuracy of the inter-board invariance translation errors [mm] over (frame, board pair); undetected = failure",
@@ -179,13 +181,13 @@ function run_cv()
     # the read-side gate, before anything is recorded complete
     @info "selected" deployed_setting(detection_cv_artifact(OUTDIR); context = "joint detection CV") interval
     write_run_records(OUTDIR, CFG; driver = "bmvc2026/scripts/detection_cv.jl",
-        config_source = CFG_PATH, key = VisualGeometryEval.Experiments.run_key(CFG),
+        config_source = CFG_PATH, key = VgtkEval.Experiments.run_key(CFG),
         inputs = [image_dir, joinpath(root, INP["camera"]), joinpath(root, INP["boards_dir"]), run_config])
     return OUTDIR
 end
 
 # The curve of each axis and the surface of each pair of axes through the
-# coarse argmin (VisualGeometryEval `emit_tuning_table`): supplementary tables.
+# coarse argmin (VisualGeometryToolkitEval `emit_tuning_table`): supplementary tables.
 const AXES = sort!(collect(keys(SPEC.scheme.axes)))
 const TABLES = vcat([[n] for n in AXES], [[AXES[i], AXES[j]] for i in eachindex(AXES) for j in i+1:length(AXES)])
 table_path(ax) = joinpath(OUTDIR, "table_" * join(ax, "__") * ".tex")

@@ -29,7 +29,7 @@
 # =============================================================================
 
 using TOML: TOML
-using VisualGeometryCore: toml_default
+using VisualGeometryToolkitCore: toml_default
 
 """
     default_config_path() -> String
@@ -102,7 +102,7 @@ _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
 
 
 # The RANSAC local-optimization strategy, selected by TOML tag through
-# RobustVisualGeometry's loader over its strategies and LocalOptimizationDoneRight's
+# VisualGeometryToolkitEstimation's loader over its strategies and LocalOptimizationDoneRight's
 # (`student_t_uniform`, `hq`, … are LocalOptimizationDoneRight's):
 # `{ type = "student_t_uniform" }`, or e.g.
 # `{ type = "hq", loss = "welsch", scale_multiple = "cross_validated" }`, where
@@ -111,9 +111,9 @@ _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
 # for the geometry structs' defaults AND config_toml.jl's loader. `class` is
 # the RVG pipeline class of the arm (:homography, :absolute_pose,
 # :radial_homography); `section` only names the table in error messages.
-using RobustVisualGeometry: RobustVisualGeometry, local_optimization_from_toml
+using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, local_optimization_from_toml
 import LocalOptimizationDoneRight
-const _LO_TAGS = merge(RobustVisualGeometry.LO_TAGS, LocalOptimizationDoneRight.LO_TAGS)
+const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.LO_TAGS)
 _local_optimization_from_toml(d, class::Symbol) = local_optimization_from_toml(
     d; class, section = "find_boards.geometry.local_optimization", tags = _LO_TAGS
 )

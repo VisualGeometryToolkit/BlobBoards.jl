@@ -6,7 +6,7 @@
 # this test suite. `blob_board` is a stub whose implementation lives in that
 # extension, and the extension only activates on `using CairoMakie` — which
 # nothing here did; CairoMakie merely arrived transitively via
-# VisualGeometryCore, and VGC 0.4 dropped it. Consequence: none of the
+# VisualGeometryToolkitCore, and VGC 0.4 dropped it. Consequence: none of the
 # extension's bindings had ever been validated. Fourteen missing imports and
 # one commented-out-but-still-called function (`compute_logical_saddle_points`)
 # had accumulated silently, and `blob_board` was broken for anyone using it in

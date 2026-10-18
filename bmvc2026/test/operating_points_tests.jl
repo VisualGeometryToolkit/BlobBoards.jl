@@ -1,14 +1,15 @@
 # The tuned operating points (src/operating_points.jl): the joint detection
 # CV's config is well-formed and its artifact clears the gate, and every tuned
 # value of the configs of record IS the value of the artifact it was adopted
-# from, read through VisualGeometryEval's one gated reader (`deployed_setting`)
+# from, read through VisualGeometryToolkitEval's one gated reader (`deployed_setting`)
 # — never a literal that drifted from its tuning.
+import VisualGeometryToolkitEval as VgtkEval
 using Test
 using DrWatson: projectdir
 import TOML
-import VisualGeometryEval
-using VisualGeometryEval.Evaluation: deployed_setting
-using VisualGeometryEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy
+import VisualGeometryToolkitEval
+using VisualGeometryToolkitEval.Evaluation: deployed_setting
+using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy
 
 module OperatingPoints
     include(joinpath(@__DIR__, "..", "src", "operating_points.jl"))
@@ -24,7 +25,7 @@ const RUN_CONFIGS = ["bmvc2026_260527.toml", "bmvc2026_260527_noflip.toml"]
     @test s isa JointCoarseFine && s.criterion == MeanAverageAccuracy(10.0)
     @test sort!(collect(keys(s.axes))) == ["min_similarity", "outlier_halfwidth", "peak_threshold"]
     @test [n for (n, a) in s.axes if a.expensive] == ["peak_threshold"]
-    key = VisualGeometryEval.Experiments.run_key(cfg)
+    key = VgtkEval.Experiments.run_key(cfg)
     dir = OperatingPoints.detection_cv_dir(cfg)
     @test endswith(dir, "detection_cv-" * key)
     # the record of this config is the one the configs of record deploy

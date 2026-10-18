@@ -45,7 +45,7 @@ using BlobBoards
 using BlobBoards: walk_media, media_resolution, group_by_resolution,
                   DescriptorNetwork, BoardGallery, load_bundle, uid_from_hash,
                   descriptor_network_path
-using VisualGeometryFeatures: clear_asift_plans!
+using VisualGeometryToolkitFeatures: clear_asift_plans!
 using Colors: Gray
 using FileIO: load as load_image
 using CUDA: CUDABackend            # any KA backend; KA.CPU() also works

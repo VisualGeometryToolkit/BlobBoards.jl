@@ -12,9 +12,9 @@
 using Test
 using DrWatson: projectdir
 import TOML
-import VisualGeometryIo as VGIo
-using VisualGeometryCore: BoundedCamera, CameraModel, Size2
-using VisualGeometryIo: opencv_lens
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitCore: BoundedCamera, CameraModel, Size2
+using VisualGeometryToolkitIo: opencv_lens
 using StaticArrays: SMatrix
 
 # The previous cameras of record (canonical frame), by value.

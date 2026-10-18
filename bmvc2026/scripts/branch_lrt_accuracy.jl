@@ -38,10 +38,10 @@ using DrWatson
 include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval
 using .BlobBoardsEval: rig_sequence, load_detected_poses, eval_sources, load_config, poses_dir
-using VisualGeometryCore: pose, ids
+using VisualGeometryToolkitCore: pose, ids
 using JSON3
 using LinearAlgebra
-import VisualGeometryCore
+import VisualGeometryToolkitCore
 import Rotations
 using StaticArrays
 using Statistics
@@ -51,7 +51,7 @@ logpath = get(() -> error("set BB_BRANCH_LOG to a sweep's branch telemetry (json
 
 _stem(f) = splitext(basename(f))[1]
 # Rotations.jl's rotation_angle of the relative rotation, not a local
-# guarded-trace copy: the invariance criterion (now VisualGeometryEval rigid_invariance_errors) already retired one such hand-roll, and
+# guarded-trace copy: the invariance criterion (now VisualGeometryToolkitEval rigid_invariance_errors) already retired one such hand-roll, and
 # a third spelling of the same formula is a third place for the clamp to drift.
 _rotang(A, B) = Rotations.rotation_angle(Rotations.RotMatrix{3}(A' * B))
 

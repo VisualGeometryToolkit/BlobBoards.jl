@@ -11,9 +11,9 @@ if !isdefined(Main, :BlobBoardsEval)
     include(projectdir("src", "BlobBoardsEval.jl"))
 end
 using .BlobBoardsEval
-import VisualGeometryIo as VGIo
-using VisualGeometryCore: Trajectory, TargetPoses, Mounted, PlanarTarget, is_resolved
-using VisualGeometryCore: EuclideanMap, BodyFrame, WorldFrame, CameraFrame, TargetFrame, ViewFrame, Uncertain, CovMat,
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitCore: Trajectory, TargetPoses, Mounted, PlanarTarget, is_resolved
+using VisualGeometryToolkitCore: EuclideanMap, BodyFrame, WorldFrame, CameraFrame, TargetFrame, ViewFrame, Uncertain, CovMat,
     geom, relabel, unlabel, pose, ids, Rig
 import Rotations
 using Rotations: RotMatrix, RotXYZ, rotation_angle

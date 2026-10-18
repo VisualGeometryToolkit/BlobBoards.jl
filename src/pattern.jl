@@ -621,7 +621,7 @@ end
 
 function calc_scale_counts(
         pattern_size::Size2, scales; α = Float64(_pattern_dflt("alpha")), cutoff::Float64,
-        free_area = VisualGeometryCore.area(pattern_size)
+        free_area = VgtkCore.area(pattern_size)
     )
     isempty(scales) && throw(ArgumentError("Empty candidate scale list; check blob scale parameters (see calc_blob_scales diagnostics)."))
     @assert all(scales .>= zero(eltype(scales))) @error "Candidate scales must be positive"
@@ -692,7 +692,7 @@ function _place_pattern_blobs(
         α = config.α,
         cutoff = config.cutoff,
         # the area blobs may fill: the pattern less the keep-outs (inside it; they may overlap)
-        free_area = VisualGeometryCore.area(pattern_resolution) - _union_area(keepouts)
+        free_area = VgtkCore.area(pattern_resolution) - _union_area(keepouts)
     )
     placed_blobs = _place_blobs(
         rng,
@@ -853,7 +853,7 @@ Returns `(pattern, blobs, config)`.
 
 # Example
 ```julia
-using VisualGeometryCore: Size2, px
+using VisualGeometryToolkitCore: Size2, px
 pattern, blobs, config = blob_pattern(Size2(width=800px, height=600px); blob_sizes=(12px, 120px), cutoff=2.0)
 ```
 """

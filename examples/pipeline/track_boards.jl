@@ -33,8 +33,8 @@ import VideoIO
 using CUDA: CUDABackend            # any KA backend; KA.CPU() also works
 import cuDNN                       # ONNXRunTime :cuda execution provider
 using Statistics: mean
-import VisualGeometryIo as VGIo   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryCore: BoundedCamera, model, extent
+import VisualGeometryToolkitIo as VGIo   # canonical vgio/cameras/v3 camera stores
+using VisualGeometryToolkitCore: BoundedCamera, model, extent
 
 const VIDEO = length(ARGS) >= 1 ? ARGS[1] :
     joinpath(BlobBoards.example_data(:video), "blobboards_handheld.mov")

@@ -9,7 +9,7 @@
 using BlobBoards: PatternConfig, PatternBundle, BoardBundle,
     hash_config, canonical_config_json, uid_from_hash,
     save_json
-using VisualGeometryCore: Disc, Point2, px, mm, ustrip
+using VisualGeometryToolkitCore: Disc, Point2, px, mm, ustrip
 
 # Fully explicit config — the golden must not depend on any default drifting.
 _golden_config() = PatternConfig(

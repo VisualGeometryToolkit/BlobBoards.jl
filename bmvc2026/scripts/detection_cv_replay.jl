@@ -1,4 +1,5 @@
 #=
+import VisualGeometryToolkitEval as VgtkEval
 detection_cv_replay.jl — the record of configs/detection_cv.toml produced from
 the saved evaluations of earlier runs, without running detection.
 
@@ -33,13 +34,13 @@ using TOML: TOML
 using SHA: sha256
 using Random: Xoshiro
 using Statistics: quantile
-import VisualGeometryEval
-using VisualGeometryEval.Tuning: tuning_spec, tuning_table, load_tuning_artifact, grid_spec, bootstrap_argmin,
+import VisualGeometryToolkitEval
+using VisualGeometryToolkitEval.Tuning: tuning_spec, tuning_table, load_tuning_artifact, grid_spec, bootstrap_argmin,
     unit_statistics, QueryUnit
-using VisualGeometryEval.Evaluation: coarse_fine_search, save_coarse_fine_artifact, deployed_setting
-using VisualGeometryEval.Experiments: Stage, run_stages, run_complete, results_root, write_provenance
-using VisualGeometryEval.Render: emit_tuning_table
-import VisualGeometryCore
+using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, save_coarse_fine_artifact, deployed_setting
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, results_root, write_provenance
+using VisualGeometryToolkitEval.Render: emit_tuning_table
+import VisualGeometryToolkitCore
 
 module ReplayOperatingPoints
     include(joinpath(@__DIR__, "..", "src", "operating_points.jl"))
@@ -110,21 +111,21 @@ function replay()
     sha(p) = bytes2hex(open(sha256, joinpath(results_root(), p)))
     mkpath(OUTDIR)
     save_coarse_fine_artifact(OP.detection_cv_artifact(OUTDIR), SPEC, rec;
-        unit = QueryUnit(), code = (VisualGeometryCore,), frames = src["frames"], pairs = src["pairs"],
+        unit = QueryUnit(), code = (VisualGeometryToolkitCore,), frames = src["frames"], pairs = src["pairs"],
         detection_runs = src["detection_runs"], bootstrap_cells = [Float64(b[Symbol(n)]) for b in boot, n in ns],
         bootstrap_interval = interval, objective = src["objective"], arm = "pose",
         replayed_from = Dict{String,Any}(SEARCH => sha(SEARCH), INCUMBENT => sha(INCUMBENT)))
     sel = deployed_setting(OP.detection_cv_artifact(OUTDIR); context = "joint detection CV (replay)")
     open(joinpath(OUTDIR, "_config.toml"), "w") do io
         println(io, "# EFFECTIVE configuration of this run. Source: bmvc2026/configs/detection_cv.toml")
-        TOML.print(io, VisualGeometryEval.Tuning.resolve_tuning!(deepcopy(CFG)); sorted = true)
+        TOML.print(io, VgtkEval.Tuning.resolve_tuning!(deepcopy(CFG)); sorted = true)
     end
     write_provenance(OUTDIR, Dict{String,Any}(
             "run_key" => basename(OUTDIR)[length("detection_cv-")+1:end],
             "config" => merge(_repo(REPO), Dict{String,Any}("path" => "bmvc2026/configs/detection_cv.toml")),
             "code" => Dict{String,Any}("BlobBoards" => _repo(REPO),
-                                       "VisualGeometryEval" => _repo(VisualGeometryEval),
-                                       "VisualGeometryCore" => _repo(VisualGeometryCore)),
+                                       "VisualGeometryToolkitEval" => _repo(VisualGeometryToolkitEval),
+                                       "VisualGeometryToolkitCore" => _repo(VisualGeometryToolkitCore)),
             "data" => Dict{String,Any}("results_root_relative" => Dict{String,Any}(SEARCH => sha(SEARCH), INCUMBENT => sha(INCUMBENT))),
             "method" => "replay of the joint search from the saved evaluations (no detection run)");
         driver = "bmvc2026/scripts/detection_cv_replay.jl", gitpath = REPO)

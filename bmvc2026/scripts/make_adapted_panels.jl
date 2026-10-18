@@ -75,14 +75,14 @@ using Images: imresize
 using StaticArrays: SMatrix
 using GeometryBasics: Point2, Point2f, Rect
 using CoordinateTransformations: PerspectiveMap
-using VisualGeometryCore: is_map_inlier, imshow, ellipses!, HomographyMap, feature_frame, centroid,
+using VisualGeometryToolkitCore: is_map_inlier, imshow, ellipses!, HomographyMap, feature_frame, centroid,
     ustrip, targets, sources, EllipticFrame
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, results_root, paper_images_dir, figure_config, write_figure_records, network_path, load_config
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
 
 const BB = BlobBoards

@@ -15,7 +15,7 @@
 
 using Colors: Gray
 using StaticArrays: SVector
-using VisualGeometryCore: centroid
+using VisualGeometryToolkitCore: centroid
 using BlobBoards: FindBoardsConfig, HomographyGeometry, detect_blobs, rescale_detections,
     adapt_detections, DEFAULT_CUTOFF, _undistorted_pair
 import KernelAbstractions as KA

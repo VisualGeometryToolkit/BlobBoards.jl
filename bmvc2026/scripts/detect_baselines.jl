@@ -13,8 +13,8 @@ scripts/baselines/detect_markers.py and run in the pinned pixi environment
 
   1. writes the camera of record (calibration/<camera>.json, an input) in
      OpenCV's convention — K with the principal point in OpenCV's pixel frame
-     (VisualGeometryCore's frame map), the distortion vector by name
-     (VisualGeometryIo `opencv_coefficients`) — as `camera_opencv.json`;
+     (VisualGeometryToolkitCore's frame map), the distortion vector by name
+     (VisualGeometryToolkitIo `opencv_coefficients`) — as `camera_opencv.json`;
   2. runs the driver, which writes one export per image under `exports/` and
      the overlays under `val/` (and `occlusion/<LL>/val/`);
   3. turns each export directory into the evaluation's kind,
@@ -35,10 +35,10 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, figure_config, run_dir, camera_of_record, export_target_poses, EVAL_TIERS
-import VisualGeometryIo as VGIo
-using VisualGeometryIo: opencv_coefficients
-using VisualGeometryCore: BoundedCamera, EuclideanMap, PixelFrame
-using VisualGeometryEval.Experiments: run_key, write_run_records
+import VisualGeometryToolkitIo as VGIo
+using VisualGeometryToolkitIo: opencv_coefficients
+using VisualGeometryToolkitCore: BoundedCamera, EuclideanMap, PixelFrame
+using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
 import JSON3
 
 const CFG, CFG_PATH = figure_config("baselines"; default = projectdir("configs", "baselines.toml"))
@@ -57,7 +57,7 @@ function write_opencv_camera(path)
     store = VGIo.load(Dict{Symbol, BoundedCamera}, camera_of_record(SESSION))
     name, c = only(store)
     bc = c isa BoundedCamera ? c : c.value
-    K = bc.camera.intrinsics.K                        # canonical frame (VisualGeometryIo's CANONICAL_PIXEL_FRAME)
+    K = bc.camera.intrinsics.K                        # canonical frame (VisualGeometryToolkitIo's CANONICAL_PIXEL_FRAME)
     iszero(K[1, 2]) || error("the camera of record has skew; OpenCV's camera matrix has none")
     shift = EuclideanMap(VGIo.CANONICAL_PIXEL_FRAME, PixelFrame{:opencv}).t
     k = opencv_coefficients(bc.camera.lens)

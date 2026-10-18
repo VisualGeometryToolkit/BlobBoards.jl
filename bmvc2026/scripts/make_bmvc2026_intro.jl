@@ -41,7 +41,7 @@ using Colors: Gray, distinguishable_colors, RGB
 using CUDA            # GPU extensions
 using CUDA: CUDABackend
 import cuDNN          # ONNXRunTime :cuda EP
-using VisualGeometryCore: imshow, HomographyMap, Rect
+using VisualGeometryToolkitCore: imshow, HomographyMap, Rect
 using CoordinateTransformations: PerspectiveMap
 
 if !isdefined(Main, :BlobBoardsEval)
@@ -49,7 +49,7 @@ if !isdefined(Main, :BlobBoardsEval)
 end
 using DrWatson: projectdir
 using Main.BlobBoardsEval: data_root, results_root, paper_images_dir, figure_config, write_figure_records, network_path, load_config
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 # ---- config of record --------------------------------------------------------
 const CFG, CFG_PATH = figure_config("intro"; default = projectdir("configs", "figures", "intro.toml"))

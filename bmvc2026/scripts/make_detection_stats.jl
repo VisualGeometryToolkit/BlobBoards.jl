@@ -33,7 +33,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: figure_config, write_figure_records, load_detected_poses, eval_sources, poses_dir
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
 
 const EVAL, EVAL_PATH = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))

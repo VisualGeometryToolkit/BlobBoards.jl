@@ -6,7 +6,7 @@ network — see `bmvc2026/scripts/go_bmvc2026.jl`).
 Data: `absolute_pose_experiments/260527/results/hand_eye_{bb,apriltags,aruco}.json`.
 
 One robot-world fit per marker system, `T_det(i,m) = X · T_cb(i) · Y_m`,
-solved on the system's calibration subset by RobustVisualGeometry's
+solved on the system's calibration subset by VisualGeometryToolkitEstimation's
 `fit_robot_world_hand_eye` (staged linear estimator: Kabsch on pooled relative-motion
 axes → chordal marker means → joint translation least squares; RVG ≥ 0.14).
 Camera-untracked calibration frames are first recovered by the

@@ -22,13 +22,13 @@ gate — so a different input set is a different artifact rather than an
 overwrite, and a re-run with unchanged inputs is a cache hit instead of a
 fourth fit.
 
-WHAT IS STORED. Two VisualGeometryIo files, the same shapes the published
+WHAT IS STORED. Two VisualGeometryToolkitIo files, the same shapes the published
 `hand_eye_<name>.json` records take: a `vgio/transforms/v3` file holding X,
 `body:camera_rig → camera_optical`, and beside it (`<name>_board_rig.json`) a
 `vgio/rig/v4` file holding the marker mount — one target per printed board,
 its pose `target:<id> → body:board_rig`. Every pose is UNCERTAIN: the fit states
 its 6×6 covariance (rad, mm; the `RigidExpManifold6` chart, rotation first —
-VisualGeometryCore conventions/persisted-geometry.md), an estimator's estimate
+VisualGeometryToolkitCore conventions/persisted-geometry.md), an estimator's estimate
 is never written without one. The fit's scalar diagnostics and the keying
 config ride in the transforms file's provenance — never RVG's fit object and
 never a private matrix layout: an artifact that embeds an upstream package's
@@ -55,7 +55,7 @@ provenance.
 Supply `force = true` to refit and overwrite.
 """
 # THE ARTIFACT IS a `vgio/transforms/v3` file (X) and a `vgio/rig/v4` file
-# (the Y_m), written by VisualGeometryIo's `save` from the labeled poses and
+# (the Y_m), written by VisualGeometryToolkitIo's `save` from the labeled poses and
 # read back through `load`, the labels minted from the files' typed frames.
 # Keyed like every `cached` artifact — `<prefix>_<hash(cfg)>.json` under
 # `results_root()/calibration`, `force` preserving the outgoing files as `#<n>`
@@ -66,7 +66,7 @@ using DrWatson: gitdescribe
 # DrWatson's `safesave` semantics for the vgio JSON about to be overwritten:
 # move it aside to the next free `x#1.json`, `x#2.json`, … Kept here because
 # `safesave` writes through `wsave` (FileIO), which cannot write a
-# VisualGeometryIo record; returns the new name, or `nothing`.
+# VisualGeometryToolkitIo record; returns the new name, or `nothing`.
 function _backup!(file::AbstractString)
     isfile(file) || return nothing
     base, ext = splitext(file)

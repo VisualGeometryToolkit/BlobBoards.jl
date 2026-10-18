@@ -1,5 +1,5 @@
 #!/usr/bin/env julia
-# Development helper script for BlobBoards.jl + VisualGeometryCore
+# Development helper script for BlobBoards.jl + VisualGeometryToolkitCore
 #
 # Usage:
 #   julia --project=. dev.jl              # Start REPL with Revise
@@ -100,7 +100,7 @@ if length(ARGS) > 0
 
     elseif cmd == "clean"
         println("Cleaning precompilation cache...")
-        rm(joinpath(homedir(), ".julia/compiled/v1.12/VisualGeometryCore"),
+        rm(joinpath(homedir(), ".julia/compiled/v1.12/VisualGeometryToolkitCore"),
            recursive=true, force=true)
         rm(joinpath(homedir(), ".julia/compiled/v1.12/BlobBoards"),
            recursive=true, force=true)
@@ -127,7 +127,7 @@ else
 
     println("Loading BlobBoards...")
     @eval using BlobBoards
-    @eval using VisualGeometryCore: dpi, mm, cm, Size2
+    @eval using VisualGeometryToolkitCore: dpi, mm, cm, Size2
 
     println("\n" * "="^60)
     println("Development environment ready!")
@@ -135,6 +135,6 @@ else
     println("\nQuick commands:")
     println("  blob_pattern(200, 150; blob_sizes=(12px, nothing))")
     println("  blob_board(\"A4\"; blob_sizes = suggest_blob_sizes(600dpi, \"A4\"), dir = \"./out\")")
-    println("\nEdit VisualGeometryCore files - changes auto-reload with Revise")
+    println("\nEdit VisualGeometryToolkitCore files - changes auto-reload with Revise")
     println("="^60 * "\n")
 end

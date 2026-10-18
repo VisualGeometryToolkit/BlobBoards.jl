@@ -10,14 +10,14 @@
 #
 # =============================================================================
 
-using VisualGeometryCore:
+using VisualGeometryToolkitCore:
     centroid, feature_frame,
     Extrinsics3, CameraModel, AbstractIntrinsics, Pinhole, AbstractLensModel,
     undistort, undistort!, Camera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
     sources, Attributed, withattrs, planar_lift, lift, exact   # #21 correspondence layer; `exact`: the board side of a 2D fit
 
-using VisualGeometryFeatures:
+using VisualGeometryToolkitFeatures:
     MutualNN, KnnMatch, NNStrategy,
     described_features,
     match, csponds,
@@ -25,14 +25,14 @@ using VisualGeometryFeatures:
     # one-to-one reduction. BB owned both until they proved general.
     StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one
 
-using RobustVisualGeometry: RobustVisualGeometry, find_homography, find_absolute_pose, RansacConfig,
+using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_homography, find_absolute_pose, RansacConfig,
     locally_optimize, AbsolutePoseProblem, HomographyProblem, BoundedProblem,
     # The radial arm's OWN search. `find_*` is RANSAC and lives here by the
-    # verb table; `fit_*` (inliers given) lives in VisualGeometryCore.
+    # verb table; `fit_*` (inliers given) lives in VisualGeometryToolkitCore.
     find_radial_homography, RadialHomographyProblem
-# The constraint-problem protocol is VisualGeometryCore's; RVG's problems add
+# The constraint-problem protocol is VisualGeometryToolkitCore's; RVG's problems add
 # methods to it.
-using VisualGeometryCore: residuals!
+using VisualGeometryToolkitCore: residuals!
 # Every fit scores with the Student-t + uniform marginal (Jeffreys scale
 # prior) at the geometry's `outlier_halfwidth` — RansacScoringDoneRight's
 # scorer, stated explicitly: RVG's own default is MSAC at a threshold.
@@ -91,7 +91,7 @@ end
 # =============================================================================
 #
 # A board is a CONTENT-ADDRESSED design: its uid names its geometry, so a
-# stored target rig (VisualGeometryIo's rig/v4) names a board by reference and
+# stored target rig (VisualGeometryToolkitIo's rig/v4) names a board by reference and
 # never restates its points. BlobBoards owns the design, so it resolves the
 # reference: the nominal points are the board's blob centres in its world
 # frame (`blobs(bundle, :world)`: centred on the board, y up, millimetres,
@@ -139,7 +139,7 @@ end
     board_resolver(boards) -> (design::Symbol -> Vector{SVector{2, Float64}} | nothing)
 
 The resolver a stored target rig takes for its referenced board designs:
-`VisualGeometryIo.load(Rig, path; resolve = board_resolver(boards_dir))`.
+`VisualGeometryToolkitIo.load(Rig, path; resolve = board_resolver(boards_dir))`.
 A design the library does not hold resolves to `nothing` (it stays an
 unresolved, pose-only target). `boards` is a directory or a uid → bundle
 dictionary; a directory is read once.
@@ -150,7 +150,7 @@ board_resolver(lib::AbstractDict) = uid -> haskey(lib, uid) ? board_points(lib[u
 """
     board_target(uid::Symbol, boards) -> PlanarTarget
 
-The board as a resolved VisualGeometryCore `PlanarTarget`: its design named by
+The board as a resolved VisualGeometryToolkitCore `PlanarTarget`: its design named by
 `uid`, its nominal points [`board_points`](@ref), the `Rigid` warp.
 """
 board_target(uid::Symbol, boards) = PlanarTarget(uid; nominal = board_points(uid, boards))
@@ -365,7 +365,7 @@ _scoring(::Type{P}, outlier_halfwidth) where {P} = StudentTUniformScoring(P, out
 # inter-board invariance mAA@10 mm 0.0466-0.0495 over 1-16 px (0.0480 at
 # 4.9 px), a spread of 0.003 (an earlier run, on a separately built gallery,
 # moved single points by 3e-4). Flat, so the fallback is the package's 5.0
-# rather than RobustVisualGeometry 1.0's per-class 20. The radial arm keeps 20
+# rather than VisualGeometryToolkitEstimation 1.0's per-class 20. The radial arm keeps 20
 # (not cross-validated).
 const _FIT_HALFWIDTH_FALLBACK = (homography = 5.0, absolute_pose = 5.0, radial_homography = 20.0)
 _find_model(
@@ -409,7 +409,7 @@ _refine(
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
 # z=0-lifts them to world points. (The radial arm's method — 2D, like H —
 # lives below the GeometryConfig definitions.) The board side of a 2D fit is
-# `exact` (VisualGeometryCore conventions/measurement-noise.md): board points are
+# `exact` (VisualGeometryToolkitCore conventions/measurement-noise.md): board points are
 # known, not measured, so the H residual is the transfer error in image pixels —
 # as a plain (unit isotropic) point in board mm it was scored in board mm.
 _fit_endpoints(::Nothing, scored) = _board_exact(scored)
@@ -442,8 +442,8 @@ _undistort_detect(::KA.Backend, img, ::CameraModel{<:AbstractIntrinsics, <:Pinho
 # Host UInt8 view of an image: N0f8 storage reinterprets, anything else
 # quantizes through Gray{N0f8} — the same coercion VGF's `_asift_input`
 # applies. One helper, two call sites (here and `_undistorted_pair`).
-# The byte-gray input ladder is VisualGeometryFeatures' `gray_u8` since 0.7.1.
-using VisualGeometryFeatures: gray_u8
+# The byte-gray input ladder is VisualGeometryToolkitFeatures' `gray_u8` since 0.7.1.
+using VisualGeometryToolkitFeatures: gray_u8
 
 # Any lens with a distortion map — OpenCV's model (the metadata calibration) or
 # the division model:
@@ -509,7 +509,7 @@ function detection_rtree(detc::AbstractVector; skip::Union{Nothing, BitVector} =
     return bulk_load!(rt, elems)
 end
 
-# Nearest detection to `(px, py)` within `radius`: VisualGeometryCore's
+# Nearest detection to `(px, py)` within `radius`: VisualGeometryToolkitCore's
 # branch-and-bound `nearest_neighbor!` (SpatialQueries, written for this call
 # site) — subtree pruning by MBR min-distance, no candidate materialization, no
 # callback closure. `(dist², index)`, `(Inf, 0)` when nothing is within radius.
@@ -564,7 +564,7 @@ _model_to_homography(H::HomographyMat, _) = HomographyMap(H)
 # guided transfer needs (H, k, centre) together — the conic goes through H
 # exactly, only the undistortion is linearised. Named `_model_to_homography`
 # for continuity; what it really returns is the guided TRANSFER.
-_model_to_homography(m::VisualGeometryCore.RadialHomography, _) = m
+_model_to_homography(m::VgtkCore.RadialHomography, _) = m
 
 
 # =============================================================================
@@ -610,9 +610,9 @@ _model_to_homography(m::VisualGeometryCore.RadialHomography, _) = m
 
 # Forward: undistorted image point -> distorted pixel. Exact (the model's own
 # map); `nothing` outside the representable field, as `project` reports.
-@inline function _radial_distort(m::VisualGeometryCore.RadialHomography{T}, u) where {T}
+@inline function _radial_distort(m::VgtkCore.RadialHomography{T}, u) where {T}
     ray = SVector{3, T}(T(u[1]) - T(m.center[1]), T(u[2]) - T(m.center[2]), one(T))
-    p = VisualGeometryCore.project(m, ray)
+    p = VgtkCore.project(m, ray)
     return p
 end
 
@@ -620,8 +620,8 @@ end
 # about `center` — so the local affinity is `transform_deriv` (the chain rule
 # through the translation, the lens inverse and the translation back), the
 # same derivative every other undistortion in the stack uses.
-@inline _radial_undistortion_map(m::VisualGeometryCore.RadialHomography{T}) where {T} =
-    Translation(SVector{2, T}(m.center[1], m.center[2])) ∘ inv(VisualGeometryCore.Division(m.k)) ∘
+@inline _radial_undistortion_map(m::VgtkCore.RadialHomography{T}) where {T} =
+    Translation(SVector{2, T}(m.center[1], m.center[2])) ∘ inv(VgtkCore.Division(m.k)) ∘
     Translation(SVector{2, T}(-m.center[1], -m.center[2]))
 
 # One detection ellipse carried into the undistorted domain by that affinity —
@@ -633,7 +633,7 @@ end
 # copy it replaces (2026-09-21) threw `ArgumentError` from `Ellipse` there;
 # `_guided_accept!` reads `nothing` as a rejected candidate. Elsewhere the
 # result is unchanged (measured: centre and axes identical, θ within an ulp).
-@inline _undistort_ellipse(m::VisualGeometryCore.RadialHomography, e) =
+@inline _undistort_ellipse(m::VgtkCore.RadialHomography, e) =
     transfer_ellipse(_radial_undistortion_map(m), e)
 
 # The two operands guided association needs, per projected blob:
@@ -647,7 +647,7 @@ end
     ep === nothing && return nothing
     return (ep, ep.center)
 end
-@inline function _guided_transfer(m::VisualGeometryCore.RadialHomography, wreg)
+@inline function _guided_transfer(m::VgtkCore.RadialHomography, wreg)
     ep = transfer_ellipse(HomographyMap(m.H), wreg)
     ep === nothing && return nothing
     q = _radial_distort(m, ep.center)
@@ -669,7 +669,7 @@ end
 # centre. One Jacobian per accepted candidate, not per detection per board.
 @inline _guided_detell(::HomographyMap, det_ells, j) = det_ells[j]
 @inline _guided_detell(::Camera, det_ells, j) = det_ells[j]
-@inline _guided_detell(m::VisualGeometryCore.RadialHomography, det_ells, j) =
+@inline _guided_detell(m::VgtkCore.RadialHomography, det_ells, j) =
     _undistort_ellipse(m, det_ells[j])
 
 """
@@ -699,7 +699,7 @@ the descriptor matcher missed without admitting smears.
 `H` is the guided TRANSFER: a `HomographyMap` on the projective arms, a
 `RadialHomography` on the radial one, where the conic goes through the
 homography exactly and only the undistortion is linearised (`_guided_transfer`),
-or a VisualGeometryCore `Camera` (a camera model and a board pose), where the
+or a VisualGeometryToolkitCore `Camera` (a camera model and a board pose), where the
 conic goes through the plane homography exactly and the lens's affinity is
 taken at the transferred centre.
 
@@ -733,7 +733,7 @@ world→image map is not projective at all, and no conic transfer is exact —
 that case would need a local linearisation at each blob centre.
 """
 function guided_search(
-        H::Union{HomographyMap, VisualGeometryCore.RadialHomography, Camera}, bundle, image_features;
+        H::Union{HomographyMap, VgtkCore.RadialHomography, Camera}, bundle, image_features;
         max_px::Real, min_iou::Real,
         keep::AbstractVector{Pair{Int, Int}} = Pair{Int, Int}[],
         detc::Union{Nothing, Vector} = nothing,
@@ -1077,7 +1077,7 @@ _refit_skip_log(t) = t === nothing ? "" : t.refit_skip_log
 # vs 0.77% — that was a JOIN ARTIFACT, not a bail. See the BRANCH_LOG comment.
 # One writer for every telemetry channel: VGIo's append_jsonl (per-path
 # lock registry + single-write append) replaced the per-channel locks.
-_append_jsonl(path::String, row) = VisualGeometryIo.append_jsonl(path, row)
+_append_jsonl(path::String, row) = VgtkIo.append_jsonl(path, row)
 
 function _log_branch_bail(
         telemetry, reason; sep_deg = nothing, inc_conv = nothing,
@@ -1114,7 +1114,7 @@ function _resolve_pose_ambiguity(
 
     # VGC mirror_pose is total; a near-frontal view returns ~the same pose —
     # gate on the branch separation (= twice the viewing tilt)
-    θm = VisualGeometryCore.mirror(res.estimate, sum(Xw) / length(Xw))
+    θm = VgtkCore.mirror(res.estimate, sum(Xw) / length(Xw))
     sep = rad2deg(Rotations.rotation_angle(Rotations.RotMatrix{3}(θm.R' * res.estimate.R)))
     sep > 4.0 ||
         (_log_branch_bail(telemetry, :separation_below_gate; sep_deg = sep, n = length(Xw)); return res)
@@ -1176,7 +1176,7 @@ function _resolve_pose_ambiguity(
     blog = telemetry === nothing ? "" : telemetry.branch_log
     if !isempty(blog)
         # discriminability d: inter-branch residual gap over the noise floor
-        prob = RobustVisualGeometry.AbsolutePoseProblem(camera, pt_csponds)
+        prob = VgtkEstimation.AbsolutePoseProblem(camera, pt_csponds)
         n = length(pt_csponds)
         rA = zeros(n); rB = zeros(n)
         residuals!(rA, prob, inc.estimate)
@@ -1343,7 +1343,7 @@ end
 # NNMatch is used for the guided-search csponds below and rides the agenda's
 # `resolved` field. The stacked gallery matcher that used to build these
 # dictionaries here now lives in VGF (`nn_match_stacked`).
-using VisualGeometryFeatures: NNMatch
+using VisualGeometryToolkitFeatures: NNMatch
 
 # The gallery, concatenated ONCE: the board set is ONE gallery, not 51.
 #
@@ -1562,7 +1562,7 @@ one place and illegal camera/geometry mismatches are unrepresentable.
 detects, adapts and describes on the RAW image and the estimator verifies
 through the FULL camera — RANSAC scoring, the Student-t M-step and the
 Welsch lift all measure the reprojection through the lens in the pixels the
-detector produced (RobustVisualGeometry ≥ 0.19.9), and guided association
+detector produced (VisualGeometryToolkitEstimation ≥ 0.19.9), and guided association
 transfers each blob's conic through the plane homography exactly and the
 lens's affinity at its centre (`transfer_ellipse(::Camera, _)`). `:global`
 undistorts the IMAGE (VGC's fused warp) and runs the whole pipeline on the
@@ -1716,7 +1716,7 @@ _guided_enabled(::RadialHomographyGeometry) = true
 # `prepare_image_features` for its features — also detects on the raw image.
 _undistort_detect(::KA.Backend, img, ::GeometryConfig) = img
 board_quad(::RadialHomographyGeometry, m::HomographyMat, bundle::BoardBundle) = board_quad(nothing, m, bundle)
-board_quad(::RadialHomographyGeometry, m::VisualGeometryCore.RadialHomography, bundle::BoardBundle) =
+board_quad(::RadialHomographyGeometry, m::VgtkCore.RadialHomography, bundle::BoardBundle) =
     board_quad(nothing, m, bundle)
 
 # Radially distorted homography: the one-sided division model (H, k), k free
@@ -1739,14 +1739,14 @@ const _RadialProblem5 = RadialHomographyProblem{Float64, 5}
 
 # The radial arm's distortion centre: the middle of the sensor the pixels were
 # measured in (its `image_size`), in those pixels' COLMAP convention.
-_distortion_center(g) = VisualGeometryCore.Point2{Float64}(g.image_size[1] / 2, g.image_size[2] / 2)
+_distortion_center(g) = VgtkCore.Point2{Float64}(g.image_size[1] / 2, g.image_size[2] / 2)
 
 _refine(g::RadialHomographyGeometry, pt_csponds, θ₀::HomographyMat; local_optimization = g.local_optimization, kw...) =
     _refine(nothing, pt_csponds, θ₀; local_optimization, kw...)
 # The radial homography is its own manifold (sl(3) ⊕ k) — polish it there, not
 # through a plain homography.
 _refine(
-    g::RadialHomographyGeometry, pt_csponds, θ₀::VisualGeometryCore.RadialHomography;
+    g::RadialHomographyGeometry, pt_csponds, θ₀::VgtkCore.RadialHomography;
     outlier_halfwidth, local_optimization = g.local_optimization,
     extent = nothing, workspace = nothing,
 ) =
@@ -1950,7 +1950,7 @@ end
 # find_boards — multi-board pipeline with verification
 # =============================================================================
 
-using VisualGeometryFeatures: DescribedFeature
+using VisualGeometryToolkitFeatures: DescribedFeature
 using StructArrays: StructArray
 
 # =============================================================================
@@ -2523,9 +2523,9 @@ end
 # A workspace is built for the scorer and the local optimizer it serves
 # (`outlier_halfwidth`, `local_optimization`: the geometry's).
 _fit_workspace_builder(::Nothing, a, lo) =
-    n -> RobustVisualGeometry.RansacWorkspace(HomographyProblem{Float64}, n, _scoring(HomographyProblem{Float64}, a), lo)
+    n -> VgtkEstimation.RansacWorkspace(HomographyProblem{Float64}, n, _scoring(HomographyProblem{Float64}, a), lo)
 _fit_workspace_builder(::CameraModel, a, lo) =
-    n -> RobustVisualGeometry.RansacWorkspace(AbsolutePoseProblem, n, _scoring(AbsolutePoseProblem, a), lo)
+    n -> VgtkEstimation.RansacWorkspace(AbsolutePoseProblem, n, _scoring(AbsolutePoseProblem, a), lo)
 # Radial arm: no pooled workspace yet (it would need K=5 /
 # RadialHomography-shaped buffers) — RVG sizes fresh ones per fit.
 _fit_workspace_builder(::RadialHomographyGeometry, _a, _lo) = nothing

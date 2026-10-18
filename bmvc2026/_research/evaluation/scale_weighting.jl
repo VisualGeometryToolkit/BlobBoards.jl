@@ -15,13 +15,13 @@ Usage:
 
 using BlobBoards
 using BlobBoards: adapt, detect_blobs, filter_blobs   # advanced API (unexported)
-using VisualGeometryCore:
+using VisualGeometryToolkitCore:
     Circle, Ellipse, Disc, EllipticFrame,
     boundary, imshow!
 using GeometryBasics: Point2
 using GLMakie
 import FileIO
-using VisualGeometryCore: ustrip
+using VisualGeometryToolkitCore: ustrip
 using Colors: Gray
 using Statistics: median
 

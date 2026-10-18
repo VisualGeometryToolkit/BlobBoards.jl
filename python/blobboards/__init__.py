@@ -588,7 +588,7 @@ def suggest_blob_sizes(density, extent) -> tuple:
             raise ValueError(f"extent must be a paper name or a (width, height) pair, got {extent!r}")
         w, h = (float(x.to("mm").magnitude) if hasattr(x, "to") else float(x) for x in extent)
         jl_extent = _jl.seval("(w, h) -> (w * BlobBoards.mm, h * BlobBoards.mm)")(w, h)
-    sizes = _jl.seval("""let V = BlobBoards.VisualGeometryCore
+    sizes = _jl.seval("""let V = BlobBoards.VisualGeometryToolkitCore
                              (d, e) -> Tuple(Float64(V.ustrip(V.mm, s)) for s in BlobBoards.suggest_blob_sizes(d * V.dpi, e))
                          end""")(float(density), jl_extent)
     return (float(sizes[0]), float(sizes[1]))
@@ -968,7 +968,7 @@ def __getattr__(name):
     # PRINT_SIZES: read from Julia on first access (module attribute, PEP 562)
     if name == "PRINT_SIZES":
         _init()
-        sizes = _jl.seval("""let V = BlobBoards.VisualGeometryCore
+        sizes = _jl.seval("""let V = BlobBoards.VisualGeometryToolkitCore
                                  Dict(k => (Float64(V.ustrip(V.mm, v.width)), Float64(V.ustrip(V.mm, v.height)))
                                       for (k, v) in BlobBoards.PRINT_SIZES)
                              end""")

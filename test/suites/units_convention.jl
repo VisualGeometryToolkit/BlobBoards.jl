@@ -8,7 +8,7 @@
 # the old (mm, px) basis) and boards silently rasterized at ~47 dpi instead of
 # 1200 (see `_render_dpi` in io.jl).
 #
-# Convention (matches VisualGeometryIo): every dimension-boundary crossing
+# Convention (matches VisualGeometryToolkitIo): every dimension-boundary crossing
 # uses the target-unit form `ustrip(u, x)` — frames, Size2 and Rects included.
 # Bare strips are allowed only for audited cases — defensive identity-or-strip
 # over bare-by-contract or px data (:world rects and blobs, Extrinsics3.t,
@@ -29,7 +29,7 @@
         # pipeline strip and every whole-Disc strip in pattern/adapt/coordinates).
         "src/pipeline.jl" => 1,
         # the :world rect identity (the bare-or-strip helpers are
-        # VisualGeometryCore's `strip_or_bare` since 2026-10-15)
+        # VisualGeometryToolkitCore's `strip_or_bare` since 2026-10-15)
         "ext/BlobBoardsMakieExt.jl" => 1,
         "ext/BlobBoardsPythonExt.jl" => 9, # export loops over values already stripped in the requested unit
         # Training pipeline. Audited 2026-08-19: `shape_matrix` strips and

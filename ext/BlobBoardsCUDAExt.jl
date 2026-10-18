@@ -5,8 +5,8 @@ using Colors: Gray
 using FixedPointNumbers: N0f8
 
 using BlobBoards
-using VisualGeometryFeatures: gray_f32, batched_rows
-using VisualGeometryCore: logpolar_map, image_warp, image_warp_batch_to!, region, undistort!,
+using VisualGeometryToolkitFeatures: gray_f32, batched_rows
+using VisualGeometryToolkitCore: logpolar_map, image_warp, image_warp_batch_to!, region, undistort!,
     CameraModel, AbstractIntrinsics, AbstractLensModel, Pinhole
 using CUDA: CUDABackend   # the KA device token — BB's sole GPU dispatch tag
 import KernelAbstractions as KA
@@ -15,14 +15,14 @@ const _OCAPI = ONNXRunTime.CAPI
 
 import BlobBoards: _undistort_adapt
 
-# The default-device resolver is registered by VisualGeometryCoreCUDAExt
+# The default-device resolver is registered by VisualGeometryToolkitCoreCUDAExt
 # (2026-09-07); this extension no longer needs an `__init__`.
 
 # =============================================================================
 # GPU canonicalize→describe fast path (ORT device tensors)
 # =============================================================================
 #
-# The kernel and bilinear sampler live in `VisualGeometryCoreCUDAExt`
+# The kernel and bilinear sampler live in `VisualGeometryToolkitCoreCUDAExt`
 # (`image_warp_batch_to!` for `CuArray`). This file keeps only the DEVICE core
 # below — the (P,P,N) patch cube that `_canon_describe` hands to ORT without a
 # download. The host-facing `_canonicalize` is the backend-generic one in

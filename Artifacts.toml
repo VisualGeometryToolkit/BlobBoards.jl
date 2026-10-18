@@ -41,7 +41,7 @@ lazy = true
     url = "https://zenodo.org/records/23243553/files/bb_example_boards_v3.tar.gz?download=1"
 
 # The still and the clip with their cameras.json in vgio/cameras/v3 (the lens
-# families' lens records), produced by VisualGeometryIo's one-shot lens
+# families' lens records), produced by VisualGeometryToolkitIo's one-shot lens
 # migration (migrate/v3, run 5be29639b85ec047), each lens proven to compute the
 # same function; media unchanged.
 [bb_example_still_v3]

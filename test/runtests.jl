@@ -28,7 +28,7 @@ const RUN_PYTHON = get(ENV, "BB_TEST_SKIP_PYTHON", "0") != "1" && haskey(ENV, "J
 if RUN_PYTHON
     @testset "python interface" begin
         using JSON3
-        using VisualGeometryCore: mm, px, dpi
+        using VisualGeometryToolkitCore: mm, px, dpi
         using PythonCall: pyconvert, pyimport
         include("suites/python_interface.jl")
     end

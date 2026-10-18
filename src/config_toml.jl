@@ -41,15 +41,15 @@ using TOML: TOML
 # Then the struct literals themselves: they duplicated the file and were kept
 # in step only by a test, so "the default" still had two spellings and the test
 # was the safety net rather than the design.
-# The generic loader/writer machinery lives in VisualGeometryCore since
-# 2026-09-07 (hoisted from this file and RobustVisualGeometry's fork of it):
+# The generic loader/writer machinery lives in VisualGeometryToolkitCore since
+# 2026-09-07 (hoisted from this file and VisualGeometryToolkitEstimation's fork of it):
 # present-keys-only keyword overrides, refuse-unknown-keys with retirement, the
 # fieldnames-derived table walk with its per-type hooks, the dotted default
 # lookup and the sorted writer. What stays here is BlobBoards': the retired-key
 # set, the tag registries and the hook methods for its own types.
-using VisualGeometryCore: present_kwargs, check_keys, toml_table,
+using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table,
     allowed_keys, write_toml
-import VisualGeometryCore: toml_key, toml_skip_fields, toml_field
+import VisualGeometryToolkitCore: toml_key, toml_skip_fields, toml_field
 
 _present_kwargs(d::AbstractDict, spec::Pair{String}...; fallback = nothing) =
     present_kwargs(d, spec...; fallback)
@@ -255,7 +255,7 @@ function _geometry_from_toml(d, camera, image_size = nothing)
     camera === nothing && throw(
         ArgumentError(
             "[find_boards.geometry] type = \"pose\" needs a camera: " *
-                "FindBoardsConfig(path; camera = VisualGeometryIo.load(CameraModel, ...))"
+                "FindBoardsConfig(path; camera = VisualGeometryToolkitIo.load(CameraModel, ...))"
         )
     )
     return PoseGeometry(
@@ -491,7 +491,7 @@ toml_field(c::DetectConfig, ::Val{:tilts}) = [[t[1], t[2]] for t in c.tilts]
 # The LO strategy writes as RVG's tagged table (`{ type = ..., ... }`), the
 # same shape its loader reads — RVG owns that round trip.
 toml_field(g::GeometryConfig, ::Val{:local_optimization}) =
-    RobustVisualGeometry.config_dict(g.local_optimization)
+    VgtkEstimation.config_dict(g.local_optimization)
 
 # Tagged unions: the discriminator plus the type's own fields, so a new field
 # on either NMS strategy or either geometry is picked up automatically.

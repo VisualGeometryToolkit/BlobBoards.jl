@@ -63,7 +63,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: paper_figures_dir, figure_config, write_figure_records
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 const CFG, CFG_PATH = figure_config("regenerate_paper"; default = projectdir("configs", "figures", "regenerate_paper.toml"))
 

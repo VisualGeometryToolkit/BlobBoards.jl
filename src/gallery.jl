@@ -13,11 +13,11 @@
 #
 # =============================================================================
 
-using JLD2: JLD2  # Triggers VisualGeometryFeaturesJLD2Ext for open_cache
+using JLD2: JLD2  # Triggers VisualGeometryToolkitFeaturesJLD2Ext for open_cache
 using Colors: RGB, distinguishable_colors
-using VisualGeometryFeatures:
+using VisualGeometryToolkitFeatures:
     open_cache, close_cache, cache_key    # the get-or-compute is `Base.get!(f, cache, key)` (VGF's JLD2 ext)
-using VisualGeometryFeatures:
+using VisualGeometryToolkitFeatures:
     described_features
 
 # v4: invalidates every entry extracted while `_load_image` rasterized at

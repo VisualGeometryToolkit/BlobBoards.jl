@@ -57,13 +57,13 @@ using DrWatson: projectdir
 
 using BlobBoards
 using BlobBoards: PatternConfig
-using VisualGeometryCore: ustrip, px, mm, dpi
+using VisualGeometryToolkitCore: ustrip, px, mm, dpi
 import JSON3
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: paper_images_dir, figure_config, write_figure_records
-using VisualGeometryEval.Experiments: Stage, run_stages
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: plotsdir
 
 const StructTypes = BlobBoards.StructTypes
