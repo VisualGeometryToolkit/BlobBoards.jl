@@ -27,7 +27,7 @@ Config of record: configs/figures/evaluation.toml.
 using DrWatson
 @quickactivate
 
-import JSON3
+import JSON
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
@@ -51,7 +51,7 @@ function _min_spacing_mm()
     for cand in (joinpath(DATASET, "panel_layout.json"),
                  joinpath(DATASET, "boards", "panel_layout.json"))
         isfile(cand) || continue
-        c = JSON3.read(read(cand, String))
+        c = JSON.parse(read(cand, String))
         pts = [(Float64(p.x), Float64(p.y)) for p in c.centres]
         d = minimum(hypot(a[1] - b[1], a[2] - b[2]) for a in pts, b in pts if a !== b)
         return round(d; digits = 1)

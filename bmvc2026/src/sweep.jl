@@ -42,7 +42,7 @@ using Colors: Gray, RGB
 using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix
 using CUDA: CUDABackend
-using JSON3
+using JSON
 import TOML
 using VisualGeometryToolkitEval.Experiments: read_provenance, warn_commit_drift
 using VisualGeometryToolkitFeatures: KnnMatch

@@ -37,7 +37,7 @@ using DrWatson
 @quickactivate
 using DrWatson: projectdir
 
-import JSON3
+import JSON
 import TOML
 using Statistics: median
 using Printf: @sprintf
@@ -66,7 +66,7 @@ _macro(io, name, value) = println(io, "\\newcommand{\\", name, "}{", value, "}")
 
 # A board JSON's pattern extent in mm (pattern resolution at the print density).
 function _pattern(path)
-    j = JSON3.read(read(path, String))
+    j = JSON.parse(read(path, String))
     pc, bc = j.preamble.pattern_config, j.preamble.board_config
     density = _quantity(bc.print_density)
     extent_mm = round(Int, ustrip(mm, _quantity(pc.pattern_resolution.width) / density))

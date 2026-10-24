@@ -12,7 +12,7 @@ Nothing here re-runs detection.
 =#
 module BlobBoardsEval
 
-using JSON3
+using JSON
 using DataFrames
 using Glob
 using LinearAlgebra

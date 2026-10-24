@@ -103,7 +103,7 @@ recorded in the provenance of its camera-rig trajectory.
 """
 function static_recovery_accepted(mocap_dir::AbstractString, subset::AbstractString)
     f = joinpath(mocap_dir, subset, "camera_rig.json")
-    rec = get(JSON3.read(read(f, String)), :provenance, nothing)
+    rec = get(JSON.parse(read(f, String)), :provenance, nothing)
     status = rec === nothing ? nothing : get(get(rec, :recovery, Dict()), :status, nothing)
     status in RECOVERY_STATUSES || error("$(f): provenance.recovery.status is $(repr(status)), not one of $(RECOVERY_STATUSES)")
     return status != "refused"

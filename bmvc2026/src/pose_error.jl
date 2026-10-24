@@ -75,7 +75,7 @@ function marker_sizes(dataset_dir::AbstractString, system::AbstractString)
         else
             m = match(r"^board_[A-Z]+_(\d+)\.json$", basename(f))
             m === nothing && continue
-            pre = JSON3.read(read(f, String)).preamble
+            pre = JSON.parse(read(f, String)).preamble
             # the detectable pattern (a pixel count) at the print density (a
             # pixel density) is a length: VisualGeometryToolkitCore's units convert it
             out[String(m[1])] = ustrip(mm, _quantity(pre.pattern_config.detectable_pattern_resolution) / _quantity(pre.board_config.print_density))

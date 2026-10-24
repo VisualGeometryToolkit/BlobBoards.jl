@@ -151,7 +151,7 @@ function hand_eye(
     X, targets = load_hand_eye(file)
     # `load` hands back the records only; the diagnostics ride in the file's
     # `provenance`, which VgtkIO never reads.
-    prov = JSON3.read(read(file, String)).provenance
+    prov = JSON.parse(read(file, String)).provenance
     diagnostics = (
         n_frames = Int(prov.n_frames), n_markers = Int(prov.n_markers),
         sigma_rot_rad = prov.sigma_rot_rad, sigma_trans_mm = prov.sigma_trans_mm,

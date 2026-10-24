@@ -27,7 +27,7 @@ Config of record: configs/figures/evaluation.toml.
 using DrWatson
 @quickactivate
 
-import JSON3
+import JSON
 using Printf: @sprintf
 
 if !isdefined(Main, :BlobBoardsEval)
@@ -48,7 +48,7 @@ const SYSTEMS = [
     ("ArUco", "aruco", "uco"),
 ]
 
-_meta(stem) = JSON3.read(read(joinpath(CALIB, "hand_eye_$(stem).json"), String)).provenance   # vgio/transforms/v3
+_meta(stem) = JSON.parse(read(joinpath(CALIB, "hand_eye_$(stem).json"), String)).provenance   # vgio/transforms/v3
 
 rad2deg_(x) = x * 180 / pi
 

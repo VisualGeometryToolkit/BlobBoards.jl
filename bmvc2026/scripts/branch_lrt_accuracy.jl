@@ -39,7 +39,7 @@ include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval
 using .BlobBoardsEval: rig_sequence, load_detected_poses, eval_sources, load_config, poses_dir
 using VisualGeometryToolkitCore: pose, ids
-using JSON3
+using JSON
 using LinearAlgebra
 import VisualGeometryToolkitCore
 import Rotations
@@ -75,7 +75,7 @@ for (stem, T) in Tcb
     gt_by_frame[stem] = gts
 end
 
-records = [JSON3.read(l) for l in eachline(logpath) if !isempty(l)]
+records = [JSON.parse(l) for l in eachline(logpath) if !isempty(l)]
 println("$(length(records)) telemetry records from $logpath")
 
 rows = NamedTuple[]

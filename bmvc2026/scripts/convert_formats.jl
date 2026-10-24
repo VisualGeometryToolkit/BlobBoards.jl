@@ -54,7 +54,7 @@ using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix, rotation_angle
 using LinearAlgebra: norm
 using Statistics: mean, median
-import JSON3, SHA, TOML
+import JSON, SHA, TOML
 
 const CFG, CFG_PATH = figure_config("convert_formats"; default = projectdir("configs", "convert_formats.toml"))
 const KEY = run_key(CFG)
@@ -65,7 +65,7 @@ const MANIFEST = joinpath(RUN_ROOT, "_manifest.jsonl")
 const REPORT = Dict{String, Any}()
 
 _sha(path) = bytes2hex(open(SHA.sha256, path))
-_read(path) = JSON3.read(read(path, String); allow_inf = true)
+_read(path) = JSON.parse(read(path, String); allownan = true)
 _rel(path, root) = relpath(path, root)
 
 # One manifest line per consumed source file.
@@ -382,7 +382,7 @@ function main()
         "VisualGeometryToolkitCore" => something(gitdescribe(pkgdir(VisualGeometryToolkitCore)), "?"),
     )
     open(joinpath(RUN_ROOT, "_report.json"), "w") do io
-        JSON3.pretty(io, JSON3.write(REPORT))
+        JSON.json(io, REPORT; pretty = 4, sort_keys = false)
     end
     println("converted -> ", RUN_ROOT)
     return nothing

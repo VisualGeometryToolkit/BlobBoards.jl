@@ -20,7 +20,7 @@ using Rotations: RotMatrix, RotXYZ, rotation_angle
 using StaticArrays: SVector, SMatrix
 using LinearAlgebra: norm, I
 using Statistics: cov
-import JSON3
+import JSON
 
 const BBE = BlobBoardsEval
 
@@ -78,9 +78,9 @@ end
             file = joinpath(dir, "hand_eye_bb.json")
             BBE.save_hand_eye(file, he)
             # every pose of the record is Uncertain: X in the transforms file, each Y_m in the mount
-            d = JSON3.read(read(file, String))
+            d = JSON.parse(read(file, String))
             @test d.schema == "vgio/transforms/v3" && only(d.transforms).from == "body:camera_rig" && haskey(only(d.transforms), :covariance)
-            m = JSON3.read(read(joinpath(dir, "hand_eye_bb_board_rig.json"), String))
+            m = JSON.parse(read(joinpath(dir, "hand_eye_bb_board_rig.json"), String))
             @test m.schema == "vgio/rig/v4" && m.frame == "body:board_rig" && all(t -> haskey(t.pose, :covariance), m.targets)
             @test all(t -> t.target.type == "planar" && t.target.design == t.id, m.targets)   # pose-only boards, named by id
             X, mount = BBE.load_hand_eye(file)

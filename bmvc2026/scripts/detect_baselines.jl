@@ -39,7 +39,7 @@ import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: opencv_coefficients
 using VisualGeometryToolkitCore: BoundedCamera, EuclideanMap, PixelFrame
 using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
-import JSON3
+import JSON
 
 const CFG, CFG_PATH = figure_config("baselines"; default = projectdir("configs", "baselines.toml"))
 const KEY = run_key(CFG)
@@ -66,7 +66,7 @@ function write_opencv_camera(path)
         NamedTuple{Tuple(Symbol.(OPENCV_KEYS[1:length(k)]))}(Tuple(k)),
         (image_origin = "opencv", camera = String(name), source = basename(camera_of_record(SESSION))),
     )
-    open(io -> JSON3.pretty(io, JSON3.write(body)), path, "w")
+    open(io -> JSON.json(io, body; pretty = 4), path, "w")
     return (; name = String(name), K)
 end
 

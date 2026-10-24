@@ -44,7 +44,7 @@ function upstream_camera(entry::AbstractDict, UP::AbstractDict)
     src = upstream_source(entry)
     sha = _sha256(src)
     sha == entry["sha256"] || error("$(src): sha256 $(sha), the config of record states $(entry["sha256"])")
-    d = JSON3.read(read(src, String))
+    d = JSON.parse(read(src, String))
     d.model == "pinhole_radtan" || error("$(src): model $(d.model), expected pinhole_radtan")
     M = d.camera_matrix
     (M[1][2] == 0 && M[2][1] == 0 && M[3][1] == 0 && M[3][2] == 0 && M[3][3] == 1) ||

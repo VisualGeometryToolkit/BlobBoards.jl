@@ -46,7 +46,7 @@ function export_target_poses(
     rows = Tuple{Int, NamedTuple}[]
     files = sort(filter(f -> endswith(f, ".json") && !startswith(f, "_"), readdir(export_dir)))
     for f in files
-        d = JSON3.read(read(joinpath(export_dir, f), String))
+        d = JSON.parse(read(joinpath(export_dir, f), String))
         stem = splitext(f)[1]
         haskey(index, stem) || error("$(export_dir)/$(f): no image $(stem).* in $(image_dir)")
         t, img = index[stem]

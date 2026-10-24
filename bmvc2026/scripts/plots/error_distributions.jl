@@ -1096,7 +1096,7 @@ end
 # emitted alongside mean/std because the first frame of a run can absorb
 # residual compile the warm-up misses (observed: one 18 s outlier against a
 # 1.9 s median on 260527/bb, inflating std past the mean).
-import JSON3
+import JSON
 
 function write_timing_stats(sources; out_dir)
     io = IOBuffer()
@@ -1110,7 +1110,7 @@ function write_timing_stats(sources; out_dir)
         if isfile(tel)
             # one line per detected image, in run order (sorted here by frame
             # index, the order the per-image exports were read in)
-            rows = [JSON3.read(l) for l in eachline(tel) if !isempty(strip(l))]
+            rows = [JSON.parse(l) for l in eachline(tel) if !isempty(strip(l))]
             for j in sort(rows; by = r -> Int(r.t))
                 haskey(j, :elapsed_time_ms) && push!(ts, Float64(j.elapsed_time_ms) / 1000)
             end

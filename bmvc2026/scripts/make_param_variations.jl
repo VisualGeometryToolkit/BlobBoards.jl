@@ -58,7 +58,7 @@ using DrWatson: projectdir
 using BlobBoards
 using BlobBoards: PatternConfig
 using VisualGeometryToolkitCore: ustrip, px, mm, dpi
-import JSON3
+import JSON
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
@@ -66,7 +66,6 @@ using Main.BlobBoardsEval: paper_images_dir, figure_config, write_figure_records
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: plotsdir
 
-const StructTypes = BlobBoards.StructTypes
 const CFG, CFG_PATH = figure_config("param_variations"; default = projectdir("configs", "figures", "param_variations.toml"))
 const PAT = CFG["pattern"]
 
@@ -83,7 +82,7 @@ function panel_config(p)
         "max_trials" => PAT["max_trials"], "alpha" => p["alpha"], "cutoff" => p["cutoff"],
         "raster_aligned" => PAT["raster_aligned"], "polarity" => PAT["polarity"],
     )
-    return StructTypes.construct(PatternConfig, JSON3.read(JSON3.write(v1)))
+    return JSON.parse(JSON.json(v1), PatternConfig)
 end
 
 function main()
