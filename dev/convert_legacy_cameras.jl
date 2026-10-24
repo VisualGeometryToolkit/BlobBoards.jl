@@ -32,7 +32,7 @@
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, lens_parameters, BoundedCamera, Size2
 using CoordinateTransformations: AffineMap
-using JSON3
+using JSON
 
 length(ARGS) >= 3 || error("usage: convert_legacy_cameras.jl <root> <backup_root> <relative json paths...>")
 root, backup_root = ARGS[1], ARGS[2]
@@ -42,7 +42,7 @@ converted = String[]
 skipped = String[]
 for rel in files
     f = joinpath(root, rel)
-    p = JSON3.read(read(f, String))
+    p = JSON.parse(read(f, String))
     legacy = haskey(p, :camera_matrix) && haskey(p, :distortion_coefficients)
     model_tag = String(get(p, :model, "pinhole_radtan"))
     sized = haskey(p, :image_width) && haskey(p, :image_height)

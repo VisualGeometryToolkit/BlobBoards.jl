@@ -95,11 +95,11 @@ end
             # a sidecar written before still carries an (empty) `saddle_points`: it loads
             mktempdir() do dir
                 blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir)
-                obj = JSON3.read(read(onlyjson(dir), String), Dict{String, Any})
+                obj = JSON.parse(read(onlyjson(dir), String); dicttype = Dict{String, Any})
                 @test !haskey(obj, "saddle_points")              # no longer written
                 obj["saddle_points"] = []
-                back = JSON3.read(JSON3.write(obj), BlobBoards.BoardBundle)
-                @test back.blobs == JSON3.read(read(onlyjson(dir), String), BlobBoards.BoardBundle).blobs
+                back = JSON.parse(JSON.json(obj), BlobBoards.BoardBundle)
+                @test back.blobs == JSON.parse(read(onlyjson(dir), String), BlobBoards.BoardBundle).blobs
             end
         end
 
@@ -177,7 +177,7 @@ end
                 @test !in(:blank, kinds)
                 # stored and coded, and rebuilt from either (the bundle's code needs no placement)
                 @test hash_config(BlobBoards.parse_board_code(BlobBoards.board_code(b))) == BlobBoards._bundle_identity(b)
-                back = JSON3.read(JSON3.write(b), BlobBoards.BoardBundle)
+                back = JSON.parse(JSON.json(b), BlobBoards.BoardBundle)
                 @test hash_config(back.preamble) == hash_config(b.preamble) && back.preamble.board_config.corner_size == bc.corner_size
             end
             # corner cells and band are sized apart: a 6 mm band runs between 14 mm cells
@@ -189,7 +189,7 @@ end
             @test grid_mm(m[:top].h) ≈ 6 atol = 0.01
             @test m[:top].x == m[:qr].w                          # the band starts where the cell ends
             # a v4 board records its corner cells; its pattern size is the board's, not recorded
-            obj = JSON3.read(JSON3.write(b), Dict{String, Any})
+            obj = JSON.parse(JSON.json(b); dicttype = Dict{String, Any})
             @test haskey(obj["preamble"]["board_config"], "corner_size")
             @test !haskey(obj["preamble"]["pattern_config"], "pattern_resolution")
             # a keyword the style draws nothing with is refused, not stored in the identity
@@ -274,7 +274,7 @@ end
         mktempdir() do dir
             bundle = blob_board("A5"; blob_sizes = (9.0mm, 0.2short_side), seed = 0x1234, ruler_width = 20mm, dir, output = Png(400dpi))
             json = only(filter(endswith(".json"), readdir(dir; join = true)))
-            d = JSON3.read(read(json, String), Dict{String, Any})
+            d = JSON.parse(read(json, String); dicttype = Dict{String, Any})
             rs = d["preamble"]["board_config"]["ruler_spec"]
             half(t) = Dict("spacing" => t["spacing"], "width" => Dict("value" => t["width"]["value"] / 2, "unit" => t["width"]["unit"]))
             d["preamble"]["board_config"]["ruler_spec"] = Dict(
@@ -284,7 +284,7 @@ end
             d["schema"] = "blobboards/board/v1"
             d["hashes"] = Dict("config" => "0123456789abcdef" ^ 4)   # a stored identity, never recomputed
             legacy = joinpath(mktempdir(), "blob_board_legacy.json")
-            open(io -> JSON3.write(io, d), legacy, "w")
+            open(io -> JSON.json(io, d), legacy, "w")
             cp(only(filter(endswith(".png"), readdir(dir; join = true))), replace(legacy, ".json" => ".png"))
             b, _, h = BlobBoards.load_bundle(legacy)
             @test b.preamble.board_config.ruler_spec == bundle.preamble.board_config.ruler_spec
@@ -334,7 +334,7 @@ end
         end
         @test isempty(readdir(root))                          # every rejection came before writing
         bundle = blob_board("A5"; kw...)                       # in memory: no output keyword, no file
-        json = JSON3.write(bundle)
+        json = JSON.json(bundle)
         @test_throws ArgumentError BlobBoards.rebuild_board(json; output = Png(400dpi))      # no dir
         @test_throws ArgumentError BlobBoards.rebuild_board(json; dir = root, format = "png")
         @test_throws ArgumentError BlobBoards.rebuild_board(json; dir = root, frame_style = :none)   # a rebuild takes the output only
@@ -420,7 +420,7 @@ end
             @test !isdir(joinpath(root, "low"))                # refused before placement
             @test_throws ArgumentError BlobBoards.render_board(a; output = Tiff(100dpi), dir = joinpath(root, "low"))
             # one board, whatever it is written as
-            ids = [JSON3.read(read(onlyjson(joinpath(root, k)), String)).hashes.config for k in ("pdf", "ok")]
+            ids = [JSON.parse(read(onlyjson(joinpath(root, k)), String)).hashes.config for k in ("pdf", "ok")]
             @test all(==(hash_config(a.preamble)), ids)
         end
         # a side beyond 9999.99 pt (3.53 m) cannot keep 0.01 pt in the print master
@@ -471,11 +471,11 @@ end
             b2 = BlobBoards.rebuild_board(json_str; dir = dir2)
 
             # Compare JSONs (excluding file hash which varies)
-            json1 = JSON3.read(read(only(filter(f -> endswith(f, ".json"), readdir(dir1; join = true))), String))
-            json2 = JSON3.read(read(only(filter(f -> endswith(f, ".json"), readdir(dir2; join = true))), String))
+            json1 = JSON.parse(read(only(filter(f -> endswith(f, ".json"), readdir(dir1; join = true))), String))
+            json2 = JSON.parse(read(only(filter(f -> endswith(f, ".json"), readdir(dir2; join = true))), String))
 
-            @test JSON3.write(json1.preamble) == JSON3.write(json2.preamble)
-            @test JSON3.write(json1.blobs) == JSON3.write(json2.blobs)
+            @test JSON.json(json1.preamble) == JSON.json(json2.preamble)
+            @test JSON.json(json1.blobs) == JSON.json(json2.blobs)
             @test json1.hashes.config == json2.hashes.config
         end
     end
@@ -537,7 +537,7 @@ end
         rm(joinpath(dir, base * ".pdf"))
         # purge any cached render from a previous test run — this asserts
         # REGENERATION, not a cache hit
-        h = String(JSON3.read(read(json, String)).hashes.config)
+        h = String(JSON.parse(read(json, String)).hashes.config)
         cache = BlobBoards._render_cache_dir(h, true)            # the sheet was written with its id label
         isdir(cache) && rm(cache; recursive = true)
 
@@ -608,10 +608,10 @@ pdf_boxes(s::AbstractString) = Dict(
         # the one standard: a board recorded under another (X-3, X-1a, a plain PDF:
         # they went with Ghostscript, 2026-10) is rebuilt as PDF/X-4, which is
         # not recorded (`pdf_standard`, written until 2026-10-14, is not read)
-        obj = JSON3.read(read(onlyjson(dir), String), Dict{String, Any})
+        obj = JSON.parse(read(onlyjson(dir), String); dicttype = Dict{String, Any})
         obj["render"]["pdf_standard"] = "x3"
-        BlobBoards.rebuild_board(JSON3.write(obj); dir = joinpath(root, "re"))
-        @test !haskey(JSON3.read(read(onlyjson(joinpath(root, "re")), String)).render, :pdf_standard)
+        BlobBoards.rebuild_board(JSON.json(obj); dir = joinpath(root, "re"))
+        @test !haskey(JSON.parse(read(onlyjson(joinpath(root, "re")), String)).render, :pdf_standard)
     end
 end
 
@@ -632,7 +632,7 @@ end
         @test isapprox(only(boxes["MediaBox"]), [0, 0, pt(152), pt(214)]; atol = 0.02)
         @test only(boxes["BleedBox"]) == only(boxes["MediaBox"])
         @test isapprox(only(boxes["TrimBox"]), [pt(2), pt(2), pt(150), pt(212)]; atol = 0.02)
-        rec = JSON3.read(read(onlyjson(joinpath(root, "bleed")), String)).render
+        rec = JSON.parse(read(onlyjson(joinpath(root, "bleed")), String)).render
         @test rec.bleed.value == 2 && rec.bleed.unit == "mm"
         # the rebuild prints what was printed: the same boxes
         BlobBoards.rebuild_board(onlyjson(joinpath(root, "bleed")); dir = joinpath(root, "re"))
@@ -767,13 +767,13 @@ end
     )
     mktempdir() do root
         mk(joinpath(root, "on")); mk(joinpath(root, "off"); id_label = false)
-        jon = JSON3.read(read(onlyjson(joinpath(root, "on")), String))
-        joff = JSON3.read(read(onlyjson(joinpath(root, "off")), String))
+        jon = JSON.parse(read(onlyjson(joinpath(root, "on")), String))
+        joff = JSON.parse(read(onlyjson(joinpath(root, "off")), String))
         @test jon.render.format == "pdf" && !haskey(jon.render, :pdf_standard) && jon.render.id_label === true
         @test jon.render.icc_profile == "linear"
         @test joff.render.id_label === false
         @test jon.hashes.config == joff.hashes.config                 # one identity either way
-        @test JSON3.write(jon.preamble) == JSON3.write(joff.preamble)
+        @test JSON.json(jon.preamble) == JSON.json(joff.preamble)
 
         # rebuild_board reproduces the sheet as recorded; a keyword overrides it
         str_on, str_off = read(onlyjson(joinpath(root, "on")), String), read(onlyjson(joinpath(root, "off")), String)
@@ -790,7 +790,7 @@ end
             (format = "pdf", icc_profile = nothing, id_label = true, shading_function = :calculator, density = nothing, bleed = 0mm)
         @test BlobBoards._recorded_output(BlobBoards._render_options(jon)) == Pdf()
         mk(joinpath(root, "png"); output = Png(300dpi))
-        jpng = JSON3.read(read(onlyjson(joinpath(root, "png")), String))
+        jpng = JSON.parse(read(onlyjson(joinpath(root, "png")), String))
         @test jpng.render.format == "png" && jpng.render.density.value == 300 && jpng.render.density.unit == "dpi"
         @test !haskey(jpng.render, :pdf_standard) && jpng.render.icc_profile === nothing
         @test BlobBoards._recorded_output(BlobBoards._render_options(jpng)) == Png(300dpi)
@@ -804,22 +804,22 @@ end
         # a record written before 2026-10-14 names a raster's density `print_density`,
         # and carries one for a PDF too (the density the board was "made for"): read
         # for the raster, nothing to the PDF
-        old = JSON3.read(read(onlyjson(joinpath(root, "png")), String), Dict{String, Any})
+        old = JSON.parse(read(onlyjson(joinpath(root, "png")), String); dicttype = Dict{String, Any})
         old["render"]["print_density"] = pop!(old["render"], "density")
-        @test BlobBoards._render_options(JSON3.read(JSON3.write(old))).density == 300dpi
-        oldpdf = JSON3.read(str_on, Dict{String, Any})
+        @test BlobBoards._render_options(JSON.parse(JSON.json(old))).density == 300dpi
+        oldpdf = JSON.parse(str_on; dicttype = Dict{String, Any})
         oldpdf["render"]["print_density"] = Dict("value" => 300, "unit" => "dpi")
-        @test BlobBoards._render_options(JSON3.read(JSON3.write(oldpdf))).density === nothing
+        @test BlobBoards._render_options(JSON.parse(JSON.json(oldpdf))).density === nothing
         # a raster record with no density cannot be reproduced: the caller names the output
         delete!(old["render"], "print_density")
-        @test_throws ArgumentError BlobBoards.rebuild_board(JSON3.write(old); dir = joinpath(root, "re_nodensity"))
-        BlobBoards.rebuild_board(JSON3.write(old); dir = joinpath(root, "re_nodensity"), output = Png(300dpi))
+        @test_throws ArgumentError BlobBoards.rebuild_board(JSON.json(old); dir = joinpath(root, "re_nodensity"))
+        BlobBoards.rebuild_board(JSON.json(old); dir = joinpath(root, "re_nodensity"), output = Png(300dpi))
 
         # a file without a render block: the as-printed defaults (a PDF, no label)
-        legacy = JSON3.read(str_on, Dict{String, Any}); delete!(legacy, "render")
-        @test BlobBoards._render_options(JSON3.read(JSON3.write(legacy))) ==
+        legacy = JSON.parse(str_on; dicttype = Dict{String, Any}); delete!(legacy, "render")
+        @test BlobBoards._render_options(JSON.parse(JSON.json(legacy))) ==
             (format = "pdf", icc_profile = nothing, id_label = false, shading_function = :calculator, density = nothing, bleed = nothing)
-        BlobBoards.rebuild_board(JSON3.write(legacy); dir = joinpath(root, "re_legacy"))
+        BlobBoards.rebuild_board(JSON.json(legacy); dir = joinpath(root, "re_legacy"))
         @test !labelled(onlypdf(joinpath(root, "re_legacy")))
 
         # the gallery's regeneration path (a JSON with no render beside it) honours the label too
@@ -840,8 +840,8 @@ end
     AE = BlobBoards.Authoring
     # a sidecar's preamble, read back, equals the bundle's — same schema, same values
     sidecar_matches(bundle, json_path) =
-        JSON3.read(JSON3.write(bundle.preamble), Dict{String, Any}) ==
-        JSON3.read(read(json_path, String), Dict{String, Any})["preamble"]
+        JSON.parse(JSON.json(bundle.preamble); dicttype = Dict{String, Any}) ==
+        JSON.parse(read(json_path, String); dicttype = Dict{String, Any})["preamble"]
     # what a board's QR carries (`make_qr_code`)
     qr_text(bundle, h) = AE._qr_text(AE._code_or_nothing(bundle.preamble, bundle.blobs, h), h)
     mktempdir() do root
@@ -852,11 +852,11 @@ end
         fresh_json = only(filter(endswith(".json"), readdir(joinpath(root, "fresh"); join = true)))
         @test sidecar_matches(fresh, fresh_json)
         # a fresh board's QR is its board code, which decodes to the sidecar's identity
-        h_fresh = String(JSON3.read(read(fresh_json, String)).hashes.config)
+        h_fresh = String(JSON.parse(read(fresh_json, String)).hashes.config)
         @test qr_text(fresh, h_fresh) == BlobBoards.board_code(fresh.preamble)
         @test hash_config(BlobBoards.parse_board_code(qr_text(fresh, h_fresh))) == h_fresh
 
-        obj = JSON3.read(read(fresh_json, String), Dict{String, Any})
+        obj = JSON.parse(read(fresh_json, String); dicttype = Dict{String, Any})
         pc = obj["preamble"]["pattern_config"]
         delete!(pc, "max_scale"); pc["max_diameter_fraction"] = 0.2
         rs = obj["preamble"]["board_config"]["ruler_spec"]
@@ -868,7 +868,7 @@ end
         stored = "abcdef" * "0"^58
         obj["hashes"] = Dict("config" => stored)
         delete!(obj, "render")
-        v1 = JSON3.write(obj)
+        v1 = JSON.json(obj)
 
         # (a synthetic file: a point-grid layout under the v1 spellings, so it
         # records no density and the rebuild names one)
@@ -876,7 +876,7 @@ end
         files = readdir(joinpath(root, "rebuilt"))
         @test "blob_board_abc_def00.json" in files && "blob_board_abc_def00.pdf" in files
         rebuilt_json = joinpath(root, "rebuilt", "blob_board_abc_def00.json")
-        side = JSON3.read(read(rebuilt_json, String))
+        side = JSON.parse(read(rebuilt_json, String))
         @test side.hashes.config == stored                       # the stored identity
         @test side.schema == BlobBoards.BOARD_SCHEMA             # written in the current schema
         @test sidecar_matches(rebuilt, rebuilt_json)
@@ -904,14 +904,14 @@ end
         )
         # a TIFF embeds its profile and records it, with its density; it has no PDF standard
         mk(; output = Tiff(300dpi), dir = joinpath(root, "t"))
-        r = JSON3.read(read(only(filter(endswith(".json"), readdir(joinpath(root, "t"); join = true))), String)).render
+        r = JSON.parse(read(only(filter(endswith(".json"), readdir(joinpath(root, "t"); join = true))), String)).render
         @test r.format == "tiff" && !haskey(r, :pdf_standard) && r.icc_profile == "linear" && r.density.value == 300
         # the render block records whether the label was DRAWN: a frameless board
         # filling its sheet has no room for it
         @test_logs (:warn, r"id_label skipped") match_mode = :any blob_board(
             "A5"; corner_size = 0mm, ruler_width = 0mm, board_size = BlobBoards.PRINT_SIZES["A5"], blob_sizes = (4mm, 0.2short_side), seed = 0x6, dir = joinpath(root, "full")
         )
-        rf = JSON3.read(read(only(filter(endswith(".json"), readdir(joinpath(root, "full"); join = true))), String)).render
+        rf = JSON.parse(read(only(filter(endswith(".json"), readdir(joinpath(root, "full"); join = true))), String)).render
         @test rf.id_label === false
     end
 end
@@ -929,11 +929,11 @@ end
     # records nothing rebuilds as :calculator. Every raster of a board is the PDF
     # converted, and it agrees with the profile sampled exactly (`render_pattern`)
     # to one 8-bit level.
-    recorded(d) = JSON3.read(read(onlyjson(d), String)).render.shading_function
+    recorded(d) = JSON.parse(read(onlyjson(d), String)).render.shading_function
     rendered(d, res) = Int16.(reinterpret(UInt8, BlobBoards.rasterize_pdf(onlypdf(d), res)))
     # the converted pattern against the exact sampler, max |difference| in 8-bit levels
     sheet_vs_sampler(d) = vs_sampler(
-        BlobBoards.rasterize_pdf(onlypdf(d), 300), JSON3.read(read(onlyjson(d), String), BlobBoards.BoardBundle), 300
+        BlobBoards.rasterize_pdf(onlypdf(d), 300), JSON.parse(read(onlyjson(d), String), BlobBoards.BoardBundle), 300
     )
     mk(dir; kw...) = blob_board(
         "A5"; blob_sizes = (1.6mm, 0.2short_side), seed = 0x42, dir, id_label = false, kw...
@@ -997,14 +997,14 @@ end
         BlobBoards.rebuild_board(json_v; dir = d("re_override"), output = Pdf(shading_function = :sampled))
         @test recorded(d("re_override")) == "sampled"
         # a JSON recording no encoding rebuilds as :calculator
-        legacy = JSON3.read(json_v, Dict{String, Any}); delete!(legacy["render"], "shading_function")
-        @test BlobBoards._render_options(JSON3.read(JSON3.write(legacy))).shading_function === :calculator
-        BlobBoards.rebuild_board(JSON3.write(legacy); dir = d("re_legacy"))
+        legacy = JSON.parse(json_v; dicttype = Dict{String, Any}); delete!(legacy["render"], "shading_function")
+        @test BlobBoards._render_options(JSON.parse(JSON.json(legacy))).shading_function === :calculator
+        BlobBoards.rebuild_board(JSON.json(legacy); dir = d("re_legacy"))
         @test recorded(d("re_legacy")) == "calculator" && rendered(d("re_legacy"), 300) == rv
         # a record written before 2026-10-13 names it `blob_encoding`
         for (old, new) in ("vector" => :calculator, "vector_sampled" => :sampled)
             legacy["render"]["blob_encoding"] = old
-            @test BlobBoards._render_options(JSON3.read(JSON3.write(legacy))).shading_function === new
+            @test BlobBoards._render_options(JSON.parse(JSON.json(legacy))).shading_function === new
         end
         # and the old values are refused, naming the new ones
         err = try; Pdf(shading_function = :vector_sampled); nothing; catch e; e; end
@@ -1014,7 +1014,7 @@ end
         # and a record without one reads as the calculator function
         blob_board("A5"; blob_sizes = (4mm, 0.2short_side), seed = 0x44, dir = d("tiff"), output = Tiff(100dpi))
         @test recorded(d("tiff")) === nothing
-        @test BlobBoards._render_options(JSON3.read(read(onlyjson(d("tiff")), String))).shading_function === :calculator
+        @test BlobBoards._render_options(JSON.parse(read(onlyjson(d("tiff")), String))).shading_function === :calculator
     end
 end
 
@@ -1030,7 +1030,7 @@ end
         s = String(read(onlypdf(d("icc_pdf"))))
         @test occursin("/OutputCondition (my-grey)", s) && count("/DestOutputProfile", s) == 2
         # recorded with its bytes, not its path: the rebuild needs the original file no more
-        rec = JSON3.read(read(onlyjson(d("icc_pdf")), String)).render.icc_profile
+        rec = JSON.parse(read(onlyjson(d("icc_pdf")), String)).render.icc_profile
         @test rec.name == "my-grey.icc" && rec.sha256 == bytes2hex(BlobBoards.sha256(read(icc)))
         blob_board("A5"; kw..., dir = d("icc_tiff"), output = Tiff(100dpi; icc_profile = icc))
         rm(icc)
@@ -1045,7 +1045,7 @@ end
         blob_board(148mm, 210mm; kw..., ruler_width = 0mm, dir = d("wh"))
         c = page_content(onlypdf(d("wh")))
         @test count("2 Tr", c) == 3 && count("0 Tr", c) == 1 && !occursin(" l\nS", c)   # three uid characters, the label, no ticks
-        @test JSON3.read(read(onlyjson(d("wh")), String)).render.id_label === true
+        @test JSON.parse(read(onlyjson(d("wh")), String)).render.id_label === true
         # a v4 PNG is read back linear, as written: the pixels its PDF converts to (a PNG reader's
         # default applies a display gamma to a linear file)
         bp = blob_board("A5"; kw..., dir = d("png"), output = Png(100dpi))
@@ -1190,7 +1190,7 @@ end
         rows, cols = findall(vec(any(dark; dims = 2))), findall(vec(any(dark; dims = 1)))
         inset = (rows[1] - 1, size(dark, 1) - rows[end], cols[1] - 1, size(dark, 2) - cols[end]) .* (25.4 / 300)
         @test minimum(inset) > 6
-        @test JSON3.read(read(onlyjson(dir), String)).render.id_label === true
+        @test JSON.parse(read(onlyjson(dir), String)).render.id_label === true
     end
 end
 
@@ -1234,7 +1234,7 @@ end
         @test all(in(alnum), code) && startswith(code, "BB4/")
         p = BlobBoards.parse_board_code(code)
         @test hash_config(p) == hash_config(b.preamble)
-        @test JSON3.write(p) == JSON3.write(b.preamble)
+        @test JSON.json(p) == JSON.json(b.preamble)
         @test BlobBoards._place_board_blobs(p) == b.blobs                       # the same board
     end
     code = BlobBoards.board_code(boards[1].preamble)
@@ -1329,16 +1329,16 @@ end
     mktempdir() do dir
         blob_board("A5"; blob_sizes = (9.0mm, 0.2short_side), seed = 0x7, dir)
         json = onlyjson(dir)
-        obj = JSON3.read(read(json, String), Dict{String, Any})
+        obj = JSON.parse(read(json, String); dicttype = Dict{String, Any})
         obj["preamble"]["pattern_config"]["pixel_type"] = "gray8"
         delete!(obj["render"], "shading_function")
         obj["render"]["blob_encoding"] = "raster"                 # a TIFF/PNG of 2026-10-10/11
-        write(json, JSON3.write(obj))
+        write(json, JSON.json(obj))
         b, _, h = BlobBoards.load_bundle(json)
         @test h == obj["hashes"]["config"]
-        @test BlobBoards._render_options(JSON3.read(read(json, String))).shading_function === :calculator
+        @test BlobBoards._render_options(JSON.parse(read(json, String))).shading_function === :calculator
         obj["preamble"]["pattern_config"]["pixel_type"] = "gray16"     # never a board's
-        write(json, JSON3.write(obj))
+        write(json, JSON.json(obj))
         @test_throws ArgumentError BlobBoards.load_bundle(json)
     end
 end
@@ -1358,9 +1358,9 @@ end
         @test Float64(img[ceil(Int, y), ceil(Int, x)]) < 0.1
         # … else at the board's own: its smallest disc (12 mm) 16 px across, 34 dpi —
         # no render record needed, a PDF records no density
-        obj = JSON3.read(read(json, String), Dict{String, Any})
+        obj = JSON.parse(read(json, String); dicttype = Dict{String, Any})
         delete!(obj, "render")
-        write(json, JSON3.write(obj))
+        write(json, JSON.json(obj))
         own = load_board(json)
         @test ustrip(dpi, own.density) == 34
         small = BlobBoards._board_raster(own.image_path, own.bundle, own.config_hash; density = own.density)
@@ -1372,9 +1372,9 @@ end
         blob_board("A5"; blob_sizes = (12mm, 0.2short_side), seed = 5, dir = png, output = Png(150dpi))
         @test ustrip(dpi, load_board(onlyjson(png)).density) == 150
         @test_throws ArgumentError load_board(onlyjson(png); density = 300dpi)
-        obj = JSON3.read(read(onlyjson(png), String), Dict{String, Any})
+        obj = JSON.parse(read(onlyjson(png), String); dicttype = Dict{String, Any})
         delete!(obj, "render")
-        write(onlyjson(png), JSON3.write(obj))
+        write(onlyjson(png), JSON.json(obj))
         @test_throws ErrorException load_board(onlyjson(png))
     end
 end
@@ -1405,7 +1405,7 @@ end
         mktempdir() do dir
             BlobBoards.rebuild_board(read(json, String); dir)
             @test same(masters(dir), want)
-            @test JSON3.read(read(onlyjson(dir), String)).schema == "blobboards/board/v3"
+            @test JSON.parse(read(onlyjson(dir), String)).schema == "blobboards/board/v3"
         end
         mktempdir() do dir
             BlobBoards.render_board(b; output = Pdf(), dir, config_hash = h)
@@ -1425,13 +1425,13 @@ end
         @test err isa ArgumentError && occursin("rebuild_board", err.msg)
         @test_throws ArgumentError BlobBoards.rebuild_board("no/such/file.json")
         # a JSON whose blobs its configuration does not place is refused, not reprinted otherwise
-        obj = JSON3.read(json, Dict{String, Any})
+        obj = JSON.parse(json; dicttype = Dict{String, Any})
         obj["blobs"]["centers"][1][1] += 1.0
-        @test_throws ArgumentError BlobBoards.rebuild_board(JSON3.write(obj))
+        @test_throws ArgumentError BlobBoards.rebuild_board(JSON.json(obj))
     end
     # a stored v3 board is drawn from its JSON's blobs, never re-placed
     v3json = read(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"), String)
-    @test BlobBoards.rebuild_board(v3json).blobs == JSON3.read(v3json, BlobBoards.BoardBundle).blobs
+    @test BlobBoards.rebuild_board(v3json).blobs == JSON.parse(v3json, BlobBoards.BoardBundle).blobs
 end
 
 @testset "SOURCE_DATE_EPOCH: byte-identical print masters" begin

@@ -373,9 +373,9 @@ function rebuild_board(
     # (no output keyword without a dir); the recorded options then fill in
     _check_writer(dir, output, id_label)
     # Try to read as BoardBundle first (the common case), extract preamble
-    bundle = JSON3.read(json_config, BoardBundle)
+    obj = JSON.parse(json_config)::BlobBoards._ParsedObject
+    bundle = JSON.lift(BoardBundle, obj)
     preamble = bundle.preamble
-    obj = JSON3.read(json_config)::JSON3.Object
     rec = BlobBoards._render_options(obj)
     # a v3 board's rasters are at its printer's density; its writers recorded none
     g = preamble.board_config.layout_grid

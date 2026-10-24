@@ -14,6 +14,6 @@ using ExplicitImports
     # NB deliberately NOT enforced: check_all_qualified_accesses_are_public —
     # the package knowingly reaches into non-public upstream names
     # (KernelAbstractions.zeros/supports_float64, SpatialIndexing.Rect/id,
-    # JSON3.read/write, Threads.maxthreadid, …). That list is an accepted
+    # Threads.maxthreadid, …). That list is an accepted
     # risk inventory, not an error class; see the package-cleanup notes.
 end

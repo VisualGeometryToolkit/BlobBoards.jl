@@ -6,7 +6,7 @@ using BlobBoards
 using BlobBoards: BoardBundle, PatternBundle
 using PythonCall: PythonCall, Py, pybuiltins, pyconvert, pydict, pyhasattr,
     pyimport, pyisinstance, pylist
-using JSON3: JSON3
+using JSON: JSON
 import VisualGeometryToolkitIO
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
@@ -415,7 +415,7 @@ function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "patt
     json_str = read(string(filepath), String)
 
     if occursin("\"board_config\"", json_str)
-        bundle = JSON3.read(json_str, BoardBundle)
+        bundle = JSON.lift(BoardBundle, JSON.parse(json_str))
         reference_frame_sym = Symbol(reference_frame)
 
         units_jl = _json_units(units)
@@ -424,7 +424,7 @@ function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "patt
 
         blob_list = BlobBoards.blobs(bundle, reference_frame_sym; units = units_jl, density)
     else
-        bundle = JSON3.read(json_str, PatternBundle)
+        bundle = JSON.lift(PatternBundle, JSON.parse(json_str))
         if units != "px" && units != "pd"
             error("PatternBundle only supports pixel units. Use 'px'.")
         end

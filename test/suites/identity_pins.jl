@@ -77,6 +77,19 @@ const PINNED_PATTERN_JSON = """
 
 @testset "identity and byte pins" begin
 
+    @testset "the writer's layout is JSON3.pretty's, quirks included" begin
+        # expected strings as JSON3.pretty printed these values (2026-10-24)
+        pretty(x) = sprint(io -> BlobBoards._write_json(io, x))
+        @test pretty(Any[3.0, 4.5, 5.0]) == "[\n    3,\n    4.5,\n    5\n]"
+        @test pretty(Any[1.5, nothing, 2.0, 2]) == "[\n    1.5,\n    null,\n    2.0,\n    2.0\n]"
+        @test pretty(Any[nothing, 2.0]) == "[\n    null,\n    2\n]"
+        @test pretty(Any[2.5, "a", 3.0]) == "[\n    2.5,\n    \"a\",\n    3\n]"
+        @test pretty((a = 3.0, b = Any[], c = Dict{String, Any}(), d = -0.0, e = 1.0e16, f = Any[Any[1.0], 2.5, 3])) ==
+            "{\n    \"a\": 3,\n    \"b\": [\n    ],\n    \"c\": {\n    },\n    \"d\": 0,\n    \"e\": 10000000000000000,\n" *
+            "    \"f\": [\n        [\n            1\n        ],\n        2.5,\n        3\n    ]\n}"
+        @test sprint(io -> BlobBoards._write_json(io, (a = 3.0, b = Any[1.5, 2]); pretty = false)) == "{\"a\":3.0,\"b\":[1.5,2]}"
+    end
+
     @testset "pattern bundle JSON bytes" begin
         pc = BlobBoards.PatternConfig(
             pattern_resolution = BlobBoards.Size2(width = 64.0px, height = 64.0px),

@@ -58,7 +58,7 @@ using JET
     #  * `blob`, `s`: `@index(Group, Linear)` results inside KernelAbstractions
     #    `@kernel` bodies; JET cannot see through the macro.
     #  * haskey/getindex/String over Union{Nothing,Bool,Float64,...}: dynamic
-    #    JSON3 access, which JET cannot narrow.
+    #    JSON access (a parsed JSON value is a wide union), which JET cannot narrow.
     # RATCHET: only ever DECREASES. Lowered 25 -> 15 on 2026-08-16; a baseline
     # sitting 10 above the real count is 10 reports of headroom in which a
     # regression lands silently and still succeeds.

@@ -34,7 +34,7 @@ using VisualGeometryToolkitCore: filter_kwargs, px, validate_dir
 using FlexUnits: Quantity, dimension
 using GeometryBasics: GeometryBasics
 using CoordinateTransformations: Translation
-using JSON3: JSON3
+using JSON: JSON
 using FileIO: FileIO
 using VisualGeometryToolkitCore: ustrip, mm, pt
 using VisualGeometryToolkitCore: dpi

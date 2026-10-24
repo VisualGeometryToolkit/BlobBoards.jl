@@ -232,7 +232,7 @@ function save_trace(dir::AbstractString, trace::TrackTrace)
         "frame_indices" => [r.frame_idx for r in trace.records],
     )
     open(joinpath(dir, "trace.json"), "w") do io
-        JSON3.pretty(io, manifest)
+        _write_json(io, manifest)
     end
     return dir
 end
@@ -248,7 +248,7 @@ load_trace(path::AbstractString) =
     isdir(path) ? _load_track_trace(path) : _load_pipeline_trace(path)
 
 function _load_track_trace(dir::AbstractString)
-    manifest = JSON3.read(read(joinpath(dir, "trace.json"), String))::JSON3.Object
+    manifest = JSON.parse(read(joinpath(dir, "trace.json"), String))::_ParsedObject
     schema = manifest["schema_version"]::Int64
     schema == _TRACE_SCHEMA_VERSION ||
         error("trace schema version $schema ≠ $_TRACE_SCHEMA_VERSION")
@@ -270,12 +270,12 @@ function _load_track_trace(dir::AbstractString)
         trace.network_hash = h === nothing ? "" : String(h)
     end
     let fs = get(manifest, :frame_size, nothing)
-        # `isa`, not `=== nothing`: JSON3 types the value as a wide union and
+        # `isa`, not `=== nothing`: JSON.parse types the value as a wide union and
         # JET union-splits the getindex — the typed check narrows it.
-        trace.frame_size = fs isa JSON3.Object ?
-            Size2(fs["width"]::Int64, fs["height"]::Int64) : Size2(0, 0)
+        trace.frame_size = fs isa _ParsedObject ?
+            Size2(Int(fs["width"]::Real), Int(fs["height"]::Real)) : Size2(0, 0)
     end
-    for idx in manifest["frame_indices"]::JSON3.Array
+    for idx in manifest["frame_indices"]::Vector{Any}
         p = _trace_frame_path(dir, Int(idx))
         push!(trace.records, JLD2.load(p, "record"))
     end

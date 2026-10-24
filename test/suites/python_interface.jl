@@ -38,14 +38,14 @@
                 jfile = only(filter(f -> endswith(f, ".json"), readdir(jdir; join = true)))
                 pfile = only(filter(f -> endswith(f, ".json"), readdir(pdir; join = true)))
 
-                jjson = JSON3.read(read(jfile, String))
-                pjson = JSON3.read(read(pfile, String))
+                jjson = JSON.parse(read(jfile, String))
+                pjson = JSON.parse(read(pfile, String))
 
                 # Compare pattern_config
-                @test JSON3.write(jjson.pattern_config) == JSON3.write(pjson.pattern_config)
+                @test JSON.json(jjson.pattern_config) == JSON.json(pjson.pattern_config)
 
                 # Compare blobs
-                @test JSON3.write(jjson.blobs) == JSON3.write(pjson.blobs)
+                @test JSON.json(jjson.blobs) == JSON.json(pjson.blobs)
 
                 # Compare UID (from filename)
                 j_uid = match(r"blob_pattern_([^_]+)_", basename(jfile)).captures[1]
@@ -100,14 +100,14 @@
                 jfile = only(filter(f -> endswith(f, ".json"), readdir(jdir; join = true)))
                 pfile = only(filter(f -> endswith(f, ".json"), readdir(pdir; join = true)))
 
-                jjson = JSON3.read(read(jfile, String))
-                pjson = JSON3.read(read(pfile, String))
+                jjson = JSON.parse(read(jfile, String))
+                pjson = JSON.parse(read(pfile, String))
 
                 # Compare preamble
-                @test JSON3.write(jjson.preamble) == JSON3.write(pjson.preamble)
+                @test JSON.json(jjson.preamble) == JSON.json(pjson.preamble)
 
                 # Compare blobs
-                @test JSON3.write(jjson.blobs) == JSON3.write(pjson.blobs)
+                @test JSON.json(jjson.blobs) == JSON.json(pjson.blobs)
 
                 # Compare config hash
                 @test jjson.hashes.config == pjson.hashes.config
@@ -140,15 +140,15 @@
             (50, 40); corner_size = 0, ruler_width = 0, cutoff = c, seed = 0x1200,     # bare numbers: mm
             blob_sizes = (2c * 0.0025 * ureg.inch, 0.2 * ss), dir = pdir
         )
-        jjson = JSON3.read(read(only(filter(endswith(".json"), readdir(jdir; join = true))), String))
-        pjson = JSON3.read(read(only(filter(endswith(".json"), readdir(pdir; join = true))), String))
+        jjson = JSON.parse(read(only(filter(endswith(".json"), readdir(jdir; join = true))), String))
+        pjson = JSON.parse(read(only(filter(endswith(".json"), readdir(pdir; join = true))), String))
         @test jjson.schema == "blobboards/board/v4"
         @test jjson.preamble.pattern_config.min_scale.value ≈ 0.18                # σ = 0.0025 inch, in points
         @test jjson.preamble.pattern_config.min_scale.unit == "pt"
         @test jjson.render.density === nothing                                   # a PDF has no density
         @test !haskey(jjson.preamble.pattern_config, :max_diameter_fraction)
-        @test JSON3.write(jjson.preamble) == JSON3.write(pjson.preamble)
-        @test JSON3.write(jjson.blobs) == JSON3.write(pjson.blobs)
+        @test JSON.json(jjson.preamble) == JSON.json(pjson.preamble)
+        @test JSON.json(jjson.blobs) == JSON.json(pjson.blobs)
         @test jjson.hashes.config == pjson.hashes.config == pyconvert(String, presult.config_hash)
         # id_label crosses the boundary: on by default (dark glyphs in the margin
         # under the board), off on request; the identity is unchanged either way
@@ -167,7 +167,7 @@
         end
         @test pyconvert(String, oresult.config_hash) == pyconvert(String, lresult.config_hash)
         # the render block records how each sheet was made, from Python too
-        rblock(d) = JSON3.read(read(only(filter(endswith(".json"), readdir(d; join = true))), String)).render
+        rblock(d) = JSON.parse(read(only(filter(endswith(".json"), readdir(d; join = true))), String)).render
         @test rblock(odir).id_label === false && rblock(ldir).id_label === true
         @test rblock(ldir).format == "pdf" && !haskey(rblock(ldir), :pdf_standard)
         @test minimum(margin(odir)) > 0.99
@@ -255,7 +255,7 @@
         @test pyconvert(Float64, BlobBoards.load_board_python(png_json).density_dpi) == 300
         pdf = mktempdir()
         BlobBoards.render_board_python(json_file; dir = pdf, shading_function = "sampled")
-        @test JSON3.read(read(only(filter(endswith(".json"), readdir(pdf; join = true))), String)).render.shading_function == "sampled"
+        @test JSON.parse(read(only(filter(endswith(".json"), readdir(pdf; join = true))), String)).render.shading_function == "sampled"
     end
 
     @testset "opencv export: OpenCV's pixels from the declared frame, native v2 out" begin
@@ -314,7 +314,7 @@
         for n in (4, 5, 8, 12, 14)
             v = [1.0e-3 * (-1)^i * i for i in 1:n]
             pyrec = corr.opencv_lens_record(np.array(PythonCall.pylist(v)))
-            rec_jl = JSON3.read(pyconvert(String, PythonCall.pyimport("json").dumps(pyrec)), Dict{String, Any})
+            rec_jl = JSON.parse(pyconvert(String, PythonCall.pyimport("json").dumps(pyrec)); dicttype = Dict{String, Any})
             @test VGC.lens_from_record(rec_jl) === VgtkIO.opencv_lens(v)
         end
         @test_throws PythonCall.PyException corr.opencv_lens_record(np.zeros(6))

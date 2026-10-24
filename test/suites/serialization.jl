@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # The golden constants below are the point of this file: if a change to the
-# serializer (or a JSON3/StructTypes upgrade) would silently re-mint board
+# serializer (or a JSON library upgrade) would silently re-mint board
 # identities, these tests fail loudly instead.
 
 using BlobBoards: PatternConfig, PatternBundle, BoardBundle,
@@ -88,7 +88,7 @@ const V0_FIXTURE = """
             @test occursin("0.18", err)
         end
         # direct typed parse of v0 spellings: also refused, not misparsed
-        @test_throws Exception JSON3.read(V0_FIXTURE, PatternBundle)
+        @test_throws Exception JSON.parse(V0_FIXTURE, PatternBundle)
     end
 
     @testset "v1 files load: fraction → max_scale, stored hash kept" begin
@@ -154,7 +154,7 @@ const V0_FIXTURE = """
             save_json(path, pb)
             read(path, String)
         end
-        obj = JSON3.read(str)
+        obj = JSON.parse(str)
         @test obj.schema == "blobboards/pattern/v2"
         @test haskey(obj.pattern_config, :max_scale) && !haskey(obj.pattern_config, :max_diameter_fraction)
         @test String(obj.hashes.config) == GOLDEN_HASH                    # canonical mint
@@ -163,7 +163,7 @@ const V0_FIXTURE = """
         @test haskey(obj.pattern_config, :alpha)                          # v1 spelling
         @test obj.pattern_config.pixel_type == "gray8"
 
-        pb2 = JSON3.read(str, PatternBundle)
+        pb2 = JSON.parse(str, PatternBundle)
         @test pb2.blobs == pb.blobs
         @test hash_config(pb2.pattern_config) == hash_config(pb.pattern_config)
     end

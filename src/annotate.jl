@@ -33,7 +33,7 @@ using CoordinateTransformations: PerspectiveMap
 using GeometryBasics: GeometryBasics
 using VideoIO: VideoIO
 using JLD2: JLD2, jldopen, jldsave
-using JSON3: JSON3
+using JSON: JSON
 using VisualGeometryToolkitFeatures: CspondSet
 using VisualGeometryToolkitCore: bbox
 
@@ -66,7 +66,7 @@ the board-acceptance gates decide which boards get annotated, so changing
 them changed the output while the directory still read as consistent.)
 
 The encoding is the canonical config JSON (sorted keys, Ryu floats), so the
-hash is stable across Julia/JSON3 versions — a `string(::Tuple)` was not.
+hash is stable across Julia and JSON library versions — a `string(::Tuple)` was not.
 
 Changing any hashed setting invalidates the existing per-frame JLD2 files in
 the output directory (they must be rebuilt). The 2026-09-07 change itself
@@ -715,7 +715,7 @@ Falls back to scanning per-file metas if the JSONL log is missing.
 function summarize_annotations(output_dir::AbstractString)
     log = joinpath(output_dir, _LOG_FILE)
     if isfile(log)
-        return [JSON3.read(line, NamedTuple) for line in eachline(log) if !isempty(line)]
+        return [(; (Symbol(k) => v for (k, v) in JSON.parse(line))...) for line in eachline(log) if !isempty(line)]
     end
     metas = NamedTuple[]
     for p in readdir(output_dir; join = true)

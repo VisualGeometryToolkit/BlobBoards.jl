@@ -56,7 +56,7 @@ end
 # board v3 (0.37): the ruler is its ticks — `ruler_spec.width` is gone and the
 # tick widths are FULL lengths across the frame band. A v1/v2 board's ruler is
 # migrated in memory on read (drop `width`, double the half-extent tick widths;
-# `StructTypes.construct(::Type{RulerSpec}, _)`), drawing the same ruler; files
+# `JSON.lift(::Type{<:RulerSpec}, _)`), drawing the same ruler; files
 # are never rewritten by loading, and the stored hash stays the identity.
 # Patterns are unaffected and stay at v2.
 #
@@ -105,16 +105,15 @@ function save_json(
     # re-save of a loaded bundle gives its stored `config_hash`, which stays the
     # identity across format migrations (a migrated v1 board re-saved as the
     # current schema keeps its uid).
-    lowered = StructTypes.lower(bundle)
+    lowered = _lower(bundle)
     output = (
         schema = _bundle_schema(bundle), lowered...,
         hashes = (config = String(config_hash),),
     )
     render === nothing || (output = merge(output, (; render)))
 
-    writefn = pretty_json ? JSON3.pretty : JSON3.write
     open(json_path, "w") do io
-        writefn(io, output)
+        _write_json(io, output; pretty = pretty_json)
     end
     return @info "Saved metadata" metadata = json_path
 end
@@ -319,8 +318,8 @@ content-addressed scratch file for the rebuild.
 `bleed` is a PDF's trim allowance (`Pdf(; bleed)`), a length; `nothing` when
 none is recorded (every board written before it existed: no bleed).
 """
-function _render_options(json_obj::JSON3.Object)
-    # isa-narrowed field by field: dynamic JSON3 access is a union JET cannot
+function _render_options(json_obj::_ParsedObject)
+    # isa-narrowed field by field: dynamic JSON access is a union JET cannot
     # narrow (the core ratchet). A wrong-TYPED entry falls back to the default; a
     # well-typed but unknown value (`"shading_function": "x"`) is refused, loudly,
     # by the output it reaches.
@@ -331,12 +330,12 @@ function _render_options(json_obj::JSON3.Object)
     density = nothing
     bleed = nothing                         # a PDF's trim allowance; none recorded: no bleed
     r = get(json_obj, :render, nothing)
-    if r isa JSON3.Object
+    if r isa _ParsedObject
         f = get(r, :format, nothing)
         f isa AbstractString && (format = String(f))
         c = get(r, :icc_profile, nothing)
         c isa AbstractString && c != "linear" && (icc_profile = String(c))     # (a path: recorded before 2026-10-14)
-        c isa JSON3.Object && (icc_profile = _icc_from_record(c))
+        c isa _ParsedObject && (icc_profile = _icc_from_record(c))
         l = get(r, :id_label, nothing)
         l isa Bool && (id_label = l)
         e = get(r, :shading_function, nothing)
@@ -345,10 +344,10 @@ function _render_options(json_obj::JSON3.Object)
         e === nothing && legacy isa AbstractString &&
             (shading_function = get(_LEGACY_SHADING_FUNCTIONS, legacy, Symbol(legacy)))
         d = get(r, :density, nothing)
-        d isa JSON3.Object || (d = get(r, :print_density, nothing))
-        d isa JSON3.Object && lowercase(format) != "pdf" && (density = _density_record(d))
+        d isa _ParsedObject || (d = get(r, :print_density, nothing))
+        d isa _ParsedObject && lowercase(format) != "pdf" && (density = _density_record(d))
         b = get(r, :bleed, nothing)
-        b isa JSON3.Object && lowercase(format) == "pdf" && (bleed = _bleed_record(b))
+        b isa _ParsedObject && lowercase(format) == "pdf" && (bleed = _bleed_record(b))
     end
     return (; format, icc_profile, id_label, shading_function, density, bleed)
 end
@@ -356,7 +355,7 @@ end
 # An embedded ICC profile (`_icc_record`) as a file the output can name: its
 # bytes, checked against the recorded sha256, under a content-addressed scratch
 # directory and the profile's own file name.
-function _icc_from_record(c::JSON3.Object)
+function _icc_from_record(c::_ParsedObject)
     data, recorded, name = get(c, :data, nothing), get(c, :sha256, nothing), get(c, :name, nothing)
     (data isa AbstractString && recorded isa AbstractString && name isa AbstractString) ||
         throw(ArgumentError("render.icc_profile: an embedded profile records its name, sha256 and data (base64), got $(c)"))
@@ -375,14 +374,14 @@ end
 
 # A recorded bleed, `{value, unit}` a length; anything else is refused.
 function _bleed_record(b)
-    q = StructTypes.construct(ScalarOrQuantity, b)
+    q = JSON.lift(ScalarOrQuantity, b)
     (q isa Quantity && dimension(q) == dimension(mm)) || throw(ArgumentError("render.bleed must be a length, got $(b)"))
     return q
 end
 
 # A recorded density, `{value, unit}` in dpi; anything else is refused.
 function _density_record(d)
-    q = StructTypes.construct(ScalarOrQuantity, d)
+    q = JSON.lift(ScalarOrQuantity, d)
     (q isa Quantity && dimension(q) == dimension(dpi)) || throw(ArgumentError("render.density must be a density, got $(d)"))
     return q
 end
@@ -458,7 +457,7 @@ function _image_density(image_path::AbstractString, bundle::BoardBundle; density
     # (a PDF is converted on Poppler's pixel grid, at a whole number of dpi)
     lowercase(splitext(image_path)[2]) == ".pdf" && return density === nothing ? _default_density(bundle) : _output_density(density)
     json_path = splitext(image_path)[1] * ".json"
-    rec = isfile(json_path) ? _render_options(JSON3.read(read(json_path, String))::JSON3.Object) : nothing
+    rec = isfile(json_path) ? _render_options(JSON.parse(read(json_path, String))::_ParsedObject) : nothing
     # the record describes the board's LAST output: its density is this raster's
     # only if that output was this format (a PNG and a TIFF share one JSON)
     ext = lowercase(splitext(image_path)[2])
@@ -563,7 +562,7 @@ function load_bundle(path::AbstractString)
     bundle, config_hash = _parse_bundle(json_path)
 
     if image_path === nothing
-        id_label = _render_options(JSON3.read(read(json_path, String))::JSON3.Object).id_label
+        id_label = _render_options(JSON.parse(read(json_path, String))::_ParsedObject).id_label
         image_path = _regenerate_render(json_path, bundle, config_hash; id_label)
     end
 
@@ -575,10 +574,10 @@ end
 # geometry only).
 function _parse_bundle(json_path::AbstractString)
     json_str = read(json_path, String)
-    # Top-level typeassert pins the JSON schema — JSON3.read infers as a
-    # 7-way union otherwise and every haskey/getindex below union-splits
+    # Top-level typeassert pins the JSON schema — JSON.parse infers as a
+    # wide union otherwise and every haskey/getindex below union-splits
     # (the 6 JET reports that broke the ratchet, 2026-08-06).
-    json_obj = JSON3.read(json_str)::JSON3.Object
+    json_obj = JSON.parse(json_str)::_ParsedObject
 
     schema = get(json_obj, :schema, nothing)
     schema in READABLE_SCHEMAS || error(
@@ -591,9 +590,9 @@ function _parse_bundle(json_path::AbstractString)
             "this BlobBoards reads $(join(READABLE_SCHEMAS, ", "))"
     )
     bundle = if haskey(json_obj, :preamble)
-        JSON3.read(json_str, BoardBundle)
+        JSON.lift(BoardBundle, json_obj)
     elseif haskey(json_obj, :pattern_config)
-        JSON3.read(json_str, PatternBundle)
+        JSON.lift(PatternBundle, json_obj)
     else
         error("Unknown bundle format in $json_path (missing both :preamble and :pattern_config)")
     end
@@ -610,9 +609,9 @@ end
 # format versions (a v1 board's recomputed hash is not its identity); `nothing`
 # when the file stores none. isa-narrowing instead of bare getindex: a
 # malformed `hashes` value is "none stored", not a MethodError.
-function _stored_config_hash(json_obj::JSON3.Object)
+function _stored_config_hash(json_obj::_ParsedObject)
     hashes = get(json_obj, :hashes, nothing)
-    h = hashes isa JSON3.Object ? get(hashes, :config, nothing) : nothing
+    h = hashes isa _ParsedObject ? get(hashes, :config, nothing) : nothing
     return h isa AbstractString ? String(h) : nothing
 end
 

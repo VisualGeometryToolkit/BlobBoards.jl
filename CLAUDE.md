@@ -98,6 +98,7 @@ BlobBoards generates deterministic multi-scale blob patterns and printable calib
 src/                        (include order)
 ├── BlobBoards.jl        # Entry point, includes all files in order
 ├── config_defaults.jl   # Defaults read from configs/default.toml (run) and configs/authoring.toml (boards, patterns), before every config struct
+├── json.jl              # JSON field access and the one (byte-pinned) JSON writer
 ├── types.jl             # PatternConfig, BoardConfig, PatternBundle, BoardBundle
 ├── coordinates.jl       # Coordinate maps, reference frames, unit conversion
 ├── pattern.jl           # blob_pattern() — level-grid collision placement, blob rendering
@@ -268,7 +269,21 @@ Both `image_origin` and `reference_frame` are **positional arguments with no def
 
 ## Serialization
 
-Uses JSON3 + StructTypes with custom `lower()`/`construct()` methods. Configuration captures everything needed for bit-exact reproduction. SHA-256 hashes ensure deterministic IDs.
+JSON.jl 1.x: each serialized type has `JSON.lower(::JSON.JSONStyle, x)` /
+`JSON.lift(::Type{T}, obj)` and `StructUtils.structlike(::Type{T}) = false`
+(src/types.jl; VisualGeometryToolkitFeatures does the same for `Size2` and
+quantities). Configuration captures everything needed for bit-exact
+reproduction. Board identities are SHA-256 over a canonical encoding
+independent of any JSON library (`canonical_config_json`, VisualGeometryToolkitIO's
+`canonical_json`).
+
+Every JSON file is written by ONE writer, `_write_json` (src/json.jl), which
+reproduces byte for byte what the retired JSON3 writer (`JSON3.pretty`) wrote,
+quirks included (integral floats printed as integers except late in an all-float
+array; two-line empty containers). `test/suites/identity_pins.jl` pins board
+uids, the annotation config hash, the render-cache key and the saved bytes of
+patterns, v4 boards and the stored v3 fixtures; a serializer change that moves
+any of them is a bug, never a re-pin.
 
 ## GLMakie off the main thread — thread 1
 

@@ -18,7 +18,7 @@
 end
 
 @testitem "explicit imports" begin
-    using JSON3
+    using JSON
     include("suites/explicit_imports.jl")
 end
 
@@ -31,12 +31,12 @@ end
 end
 
 @testitem "JET static analysis" begin
-    using JSON3
+    using JSON
     include("suites/jet.jl")
 end
 
 @testitem "bundle serialization" begin
-    using JSON3
+    using JSON
     using VisualGeometryToolkitCore: mm, px
     include("suites/serialization.jl")
 end
@@ -77,13 +77,13 @@ end
 end
 
 @testitem "patterns" begin
-    using JSON3
+    using JSON
     include("suites/patterns.jl")
 end
 
 @testitem "boards" begin
     using TiffImages: TiffImages          # reads the TIFF back (test-only)
-    using JSON3
+    using JSON
     using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert, VgcQuantity
     include("suites/boards.jl")
 end

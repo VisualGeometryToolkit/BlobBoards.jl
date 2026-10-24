@@ -55,14 +55,16 @@ struct RulerTick{T} <: FieldVector{2, T}
     width::T
 end
 
-# JSON3 serialization support for RulerTick
-StructTypes.StructType(::Type{<:RulerTick}) = StructTypes.CustomStruct()
+# JSON: an object {spacing, width}, though a RulerTick is a vector (the
+# `JSON.JSONStyle` method is more specific than JSON.jl's AbstractVector one)
+StructUtils.structlike(::Type{<:RulerTick}) = false
+StructUtils.arraylike(::Type{<:RulerTick}) = false
 
-StructTypes.lower(rt::RulerTick) = (spacing = rt.spacing, width = rt.width)
+JSON.lower(::JSON.JSONStyle, rt::RulerTick) = (spacing = rt.spacing, width = rt.width)
 
-function StructTypes.construct(::Type{RulerTick}, x)
-    spacing = StructTypes.construct(ScalarOrQuantity, _getfield(x, "spacing"))
-    width = StructTypes.construct(ScalarOrQuantity, _getfield(x, "width"))
+function JSON.lift(::Type{<:RulerTick}, x::_JSONObject)
+    spacing = JSON.lift(ScalarOrQuantity, _getfield(x, "spacing"))
+    width = JSON.lift(ScalarOrQuantity, _getfield(x, "width"))
     return RulerTick(spacing, width)
 end
 
@@ -88,7 +90,7 @@ ticks. Requires `0 < minor ≤ major ≤ ruler_width − 2·frame_padding` (chec
 
 Schema: board bundles before `blobboards/board/v3` stored a third field,
 `width` (the "ruler width"), and HALF-extent tick widths; the reader drops that
-field and doubles the tick widths (`StructTypes.construct` below), which
+field and doubles the tick widths (`JSON.lift` below), which
 reproduces exactly the ruler those boards were drawn with. The stored
 `hashes.config` stays their identity.
 """
@@ -97,14 +99,13 @@ struct RulerSpec{RT <: RulerTick}
     minor_tick::RT
 end
 
-# JSON3 serialization support for RulerSpec
-StructTypes.StructType(::Type{<:RulerSpec}) = StructTypes.CustomStruct()
+StructUtils.structlike(::Type{<:RulerSpec}) = false
 
-StructTypes.lower(rs::RulerSpec) = (major_tick = rs.major_tick, minor_tick = rs.minor_tick)
+JSON.lower(::JSON.JSONStyle, rs::RulerSpec) = (major_tick = rs.major_tick, minor_tick = rs.minor_tick)
 
-function StructTypes.construct(::Type{RulerSpec}, x)
-    major_tick = StructTypes.construct(RulerTick, _getfield(x, "major_tick"))
-    minor_tick = StructTypes.construct(RulerTick, _getfield(x, "minor_tick"))
+function JSON.lift(::Type{<:RulerSpec}, x::_JSONObject)
+    major_tick = JSON.lift(RulerTick, _getfield(x, "major_tick"))
+    minor_tick = JSON.lift(RulerTick, _getfield(x, "minor_tick"))
     # A pre-v3 ruler (board schema v1/v2) carries `width` and half-extent tick
     # widths: drop the one, double the others (see the docstring). Detected by
     # the field itself, so a bare preamble (a QR payload) migrates the same way.
@@ -235,13 +236,13 @@ struct PatternConfig{U <: VgcQuantity, U2, PT}
     end
 end
 
-StructTypes.StructType(::Type{<:PatternConfig}) = StructTypes.CustomStruct()
+StructUtils.structlike(::Type{<:PatternConfig}) = false
 
 # Custom serialization to handle the Type field. v1 spellings are
 # language-neutral: `alpha` (not `α`) and `gray8`/`gray16` (not Julia type
 # names) — these live in the preamble, so they only affect newly MINTED
 # identities; stored hashes stay authoritative for existing boards.
-StructTypes.lower(pc::PatternConfig) = (
+JSON.lower(::JSON.JSONStyle, pc::PatternConfig) = (
     pattern_resolution = pc.pattern_resolution,
     min_scale = pc.min_scale,
     seed = string(pc.seed),
@@ -281,11 +282,11 @@ function _parse_pixel_type(s::AbstractString)
     return pt
 end
 
-function StructTypes.construct(::Type{PatternConfig}, x)
+function JSON.lift(::Type{<:PatternConfig}, x::_JSONObject)
     pixel_type = _pixel_type_from_name(String(_getfield(x, "pixel_type")))
 
-    pattern_resolution = StructTypes.construct(Size2, _getfield(x, "pattern_resolution"))
-    min_scale = StructTypes.construct(ScalarOrQuantity, _getfield(x, "min_scale"))
+    pattern_resolution = JSON.lift(Size2, _getfield(x, "pattern_resolution"))
+    min_scale = JSON.lift(ScalarOrQuantity, _getfield(x, "min_scale"))
 
     # Handle seed as either number or string (for full UInt64 precision)
     seed_raw = _getfield(x, "seed")
@@ -305,7 +306,7 @@ function StructTypes.construct(::Type{PatternConfig}, x)
     cutoff = Float64(something(_getfield(x, "cutoff", _getfield(x, "sigma_cutoff", nothing)), DEFAULT_CUTOFF))
     scales_per_octave = Int(_getfield(x, "scales_per_octave"))
     max_scale = if max_scale_raw !== nothing
-        StructTypes.construct(ScalarOrQuantity, max_scale_raw)
+        JSON.lift(ScalarOrQuantity, max_scale_raw)
     else
         σ_min = Float64(ustrip(px, min_scale))
         k = _ladder_top_from_fraction(ustrip.(px, pattern_resolution), σ_min, Float64(max_fraction_raw), scales_per_octave, cutoff)
@@ -396,7 +397,7 @@ b_julia = Translation(EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia}).t).(
 """
 blobs(pb::PatternBundle) = pb.blobs
 
-StructTypes.StructType(::Type{<:PatternBundle}) = StructTypes.CustomStruct()
+StructUtils.structlike(::Type{<:PatternBundle}) = false
 
 # v1 blob encoding: columnar with ONE unit declaration — blobs are bulk
 # derived data (never identity-bearing; the hash covers only the config), so
@@ -427,12 +428,12 @@ function _construct_blobs(data; unit::String = "px")
     ]
 end
 
-function StructTypes.lower(pb::PatternBundle)
+function JSON.lower(::JSON.JSONStyle, pb::PatternBundle)
     return (pattern_config = pb.pattern_config, blobs = _lower_blobs(pb.blobs))
 end
 
-function StructTypes.construct(::Type{<:PatternBundle}, x)
-    pc = StructTypes.construct(PatternConfig, _getfield(x, "pattern_config"))
+function JSON.lift(::Type{<:PatternBundle}, x::_JSONObject)
+    pc = JSON.lift(PatternConfig, _getfield(x, "pattern_config"))
     blobs_vec = _construct_blobs(_getfield(x, "blobs"))
     return PatternBundle(pc, blobs_vec)
 end
@@ -592,8 +593,6 @@ struct BoardLayout
         )
     end
 end
-
-StructTypes.StructType(::Type{BoardLayout}) = StructTypes.Struct()
 
 # The white margin the default board leaves on every side of the page (see
 # `BoardConfig`): clears printers' unprintable borders (≤ 6.35 mm) and leaves
@@ -954,7 +953,7 @@ function _check_side(::PointGrid, canvas_size)
     return nothing
 end
 
-StructTypes.StructType(::Type{<:BoardConfig}) = StructTypes.CustomStruct()
+StructUtils.structlike(::Type{<:BoardConfig}) = false
 
 # The grid's record: a v3 board's density, under the key it was stored with
 # (`print_density`: part of the stored v3 record, so it stays); a v4 board's
@@ -963,7 +962,7 @@ StructTypes.StructType(::Type{<:BoardConfig}) = StructTypes.CustomStruct()
 _grid_record(g::PixelGrid) = (; print_density = g.density)
 _grid_record(g::PointGrid) = (; layout_grid = (value = 1 / _grid_per_stored(g), unit = _blob_unit(g)))
 
-StructTypes.lower(bc::BoardConfig) = (;
+JSON.lower(::JSON.JSONStyle, bc::BoardConfig) = (;
     canvas_size = bc.canvas_size,
     _board_record(bc.layout_grid, bc)...,
     _grid_record(bc.layout_grid)...,
@@ -989,7 +988,7 @@ function _construct_grid(x)
             throw(ArgumentError("board_config.layout_grid must be {value: $(want.value), unit: \"$(want.unit)\"}, got $(g)"))
         return PointGrid()
     end
-    return PixelGrid(StructTypes.construct(ScalarOrQuantity, _getfield(x, "print_density")))
+    return PixelGrid(JSON.lift(ScalarOrQuantity, _getfield(x, "print_density")))
 end
 
 # The ruler's ticks, as keywords: what a stored board is rebuilt with while its
@@ -999,15 +998,15 @@ _tick_kwargs(rs) = (;
     major_tick_width = rs.major_tick.width, minor_tick_width = rs.minor_tick.width,
 )
 
-function StructTypes.construct(::Type{BoardConfig}, x)
-    canvas_size = StructTypes.construct(Size2, _getfield(x, "canvas_size"))
+function JSON.lift(::Type{<:BoardConfig}, x::_JSONObject)
+    canvas_size = JSON.lift(Size2, _getfield(x, "canvas_size"))
     layout_grid = _construct_grid(x)
     # a v4 board's margin (its board derived from it); a v3 board's board, as recorded
-    sized = layout_grid isa PixelGrid ? (; board_size = StructTypes.construct(Size2, _getfield(x, "board_size"))) :
-        (; margin = StructTypes.construct(Size2, _getfield(x, "margin")))
-    q(k) = StructTypes.construct(ScalarOrQuantity, _getfield(x, k))
+    sized = layout_grid isa PixelGrid ? (; board_size = JSON.lift(Size2, _getfield(x, "board_size"))) :
+        (; margin = JSON.lift(Size2, _getfield(x, "margin")))
+    q(k) = JSON.lift(ScalarOrQuantity, _getfield(x, k))
     frame_padding = q("frame_padding")
-    ruler_spec = StructTypes.construct(RulerSpec, _getfield(x, "ruler_spec"))
+    ruler_spec = JSON.lift(RulerSpec, _getfield(x, "ruler_spec"))
     marks = if layout_grid isa PixelGrid
         # a v3 board: its band and every tick as recorded, ruled or blank
         (; ruler_width = q("frame_width"), frame_style = Symbol(_getfield(x, "frame_style")), _tick_kwargs(ruler_spec)...)
@@ -1032,9 +1031,9 @@ struct BoardPreamble{B <: BoardConfig, P <: PatternConfig}
     pattern_config::P
 end
 
-StructTypes.StructType(::Type{<:BoardPreamble}) = StructTypes.CustomStruct()
+StructUtils.structlike(::Type{<:BoardPreamble}) = false
 
-StructTypes.lower(bp::BoardPreamble) =
+JSON.lower(::JSON.JSONStyle, bp::BoardPreamble) =
     (board_config = bp.board_config, pattern_config = _lower_pattern(bp.pattern_config, bp.board_config.layout_grid))
 
 # The pattern config in the board's stored unit: px (v3) as `PatternConfig`
@@ -1050,7 +1049,7 @@ function _lower_pattern(pc::PatternConfig, g::PointGrid)
         throw(ArgumentError("a point-grid board has no pixel type; got a pattern config with $(pc.pixel_type)"))
     pt(q) = (value = Float64(ustrip(px, q)), unit = _blob_unit(g))
     return Base.structdiff(
-        merge(StructTypes.lower(pc), (min_scale = pt(pc.min_scale), max_scale = pt(pc.max_scale))),
+        merge(_lower(pc), (min_scale = pt(pc.min_scale), max_scale = pt(pc.max_scale))),
         NamedTuple{(:pixel_type, :pattern_resolution, :raster_aligned)}
     )
 end
@@ -1089,10 +1088,10 @@ function _pattern_from_points(x, bc::BoardConfig)
     return d
 end
 
-function StructTypes.construct(::Type{<:BoardPreamble}, x)
-    bc = StructTypes.construct(BoardConfig, _getfield(x, "board_config"))
+function JSON.lift(::Type{<:BoardPreamble}, x::_JSONObject)
+    bc = JSON.lift(BoardConfig, _getfield(x, "board_config"))
     raw = _getfield(x, "pattern_config")
-    pc = StructTypes.construct(PatternConfig, bc.layout_grid isa PointGrid ? _pattern_from_points(raw, bc) : raw)
+    pc = JSON.lift(PatternConfig, bc.layout_grid isa PointGrid ? _pattern_from_points(raw, bc) : raw)
     return BoardPreamble(bc, pc)
 end
 
@@ -1129,18 +1128,18 @@ frame's marks and the layout grid.
 board_config(bb::BoardBundle) = bb.preamble.board_config
 cutoff(bb::BoardBundle) = bb.preamble.pattern_config.cutoff
 
-StructTypes.StructType(::Type{<:BoardBundle}) = StructTypes.CustomStruct()
+StructUtils.structlike(::Type{<:BoardBundle}) = false
 
 # The blobs' declared unit: the board's stored unit.
 _blob_unit(::PixelGrid) = "px"
 _blob_unit(::PointGrid) = "pt"
 
-function StructTypes.lower(bb::BoardBundle)
+function JSON.lower(::JSON.JSONStyle, bb::BoardBundle)
     return (preamble = bb.preamble, blobs = _lower_blobs(bb.blobs; unit = _blob_unit(bb.preamble.board_config.layout_grid)))
 end
 
-function StructTypes.construct(::Type{<:BoardBundle}, x)
-    preamble = StructTypes.construct(BoardPreamble, _getfield(x, "preamble"))
+function JSON.lift(::Type{<:BoardBundle}, x::_JSONObject)
+    preamble = JSON.lift(BoardPreamble, _getfield(x, "preamble"))
     grid = preamble.board_config.layout_grid
     blobs = _construct_blobs(_getfield(x, "blobs"); unit = _blob_unit(grid))
 
@@ -1197,8 +1196,8 @@ end
 # =============================================================================
 
 # --- blobboards canonical form v1 --------------------------------------------
-# hash_config used to hash JSON3.write(config) verbatim, so board identity was
-# hostage to JSON3's key order and float printing — a serializer upgrade could
+# hash_config used to hash the JSON3 text of a config verbatim, so board identity was
+# hostage to the serializer's key order and float printing — a serializer upgrade could
 # silently re-uid every board. v1 mints from a canonical encoding independent
 # of any JSON library: keys sorted bytewise, no whitespace, integers bare,
 # integral Float64s printed as integers, other floats via Base's shortest
@@ -1214,18 +1213,15 @@ function _plain(x)
         return Dict{String, Any}(string(k) => _plain(v) for (k, v) in pairs(x))
     x isa AbstractDict &&
         return Dict{String, Any}(string(k) => _plain(v) for (k, v) in x)
-    # A custom StructTypes.lower takes precedence over container-ness, so the
+    # A type's JSON lowering takes precedence over container-ness, so the
     # canonical tree mirrors the serialized structure (Size2 is an
     # AbstractVector but serializes as {width, height}; quantities as
-    # {value, unit}).
-    # `StructTypes.lower` has no fallback method: a plain Vector{Any} (a
-    # config_dict value, e.g. a tilt schedule) has none, so ask first.
-    if hasmethod(StructTypes.lower, Tuple{typeof(x)})
-        l = StructTypes.lower(x)
-        l !== x && return _plain(l)
-    end
+    # {value, unit}). A type without one lowers to itself (a plain Vector{Any},
+    # a config_dict value such as a tilt schedule, is then a container).
+    l = _lower(x)
+    l !== x && return _plain(l)
     x isa Union{AbstractVector, Tuple} && return Any[_plain(v) for v in x]
-    throw(ArgumentError("cannot canonicalize $(typeof(x)): no StructTypes.lower"))
+    throw(ArgumentError("cannot canonicalize $(typeof(x)): it has no JSON lowering"))
 end
 
 # The canonical encoding itself (sorted keys, bare integral floats, Ryu for the
@@ -1238,7 +1234,7 @@ using VisualGeometryToolkitIO: canonical_json, sha256_hex
     canonical_config_json(config) -> String
 
 The blobboards canonical (v1) encoding of a config's lowered tree — the byte
-string board identities are minted from. Stable across JSON3/serializer
+string board identities are minted from. Stable across JSON library/serializer
 versions by construction.
 """
 canonical_config_json(config) = canonical_json(_plain(config))

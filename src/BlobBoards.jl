@@ -102,7 +102,7 @@ using VisualGeometryToolkitCore:
     PlanarTarget                  # a board as a target model (board_target, pipeline.jl)
 
 using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare
-using VisualGeometryToolkitFeatures: _getfield, ScalarOrQuantity
+using VisualGeometryToolkitFeatures: ScalarOrQuantity
 
 # Image processing and visualization
 using Colors: Colors, Gray
@@ -111,8 +111,8 @@ using FixedPointNumbers: Normed, N0f16, N0f8
 import KernelAbstractions as KA   # KA devices are the backend dispatch tokens
 
 # Serialization and I/O
-using JSON3: JSON3
-using StructTypes: StructTypes
+using JSON: JSON             # every JSON file (src/json.jl: the writer, byte-pinned)
+using StructUtils: StructUtils   # `structlike(T) = false`: `JSON.parse(str, T)` lifts the whole object
 using Preferences: @load_preference
 using SHA: SHA, sha256
 using Base64: base64encode, base64decode   # an ICC profile embedded in a sidecar
@@ -207,7 +207,8 @@ end
 
 # Core includes in dependency order (flat, consolidated)
 include("config_defaults.jl") # configs/default.toml -> the keyword defaults of every config struct below
-include("types.jl")        # Structs and StructTypes
+include("json.jl")         # JSON field access and the one JSON writer
+include("types.jl")        # Structs and their JSON lowering/lifting
 include("coordinates.jl")  # Coordinate maps, reference frames, unit conversion
 include("pattern.jl")      # Pattern subsystem (placement, rendering, API)
 include("board_output.jl") # Pdf / Tiff / Png — what a board is written as
