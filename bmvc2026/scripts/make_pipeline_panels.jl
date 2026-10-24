@@ -1,5 +1,5 @@
 #=
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 make_pipeline_panels.jl — Fig. `fig:pipeline` of the BMVC paper: the four
 stages of the detection-to-pose pipeline on ONE detected board.
 
@@ -78,7 +78,7 @@ using Statistics: mean
 using CoordinateTransformations: PerspectiveMap
 using VisualGeometryToolkitCore: VisualGeometryToolkitCore, imshow, ellipses!, HomographyMap, feature_frame,
     centroid, ustrip, targets, sources, EllipticFrame, CameraModel, Pinhole
-import VisualGeometryToolkitIo
+import VisualGeometryToolkitIO
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 if !isdefined(Main, :BlobBoardsEval)
@@ -151,7 +151,7 @@ pin!(ax, lims) = (limits!(ax, lims[1], lims[2], lims[4], lims[3]); ax)
 
 function main()
     device = CUDABackend()
-    camera = VgtkIo.load(CameraModel, CAMERA_JSON)
+    camera = VgtkIO.load(CameraModel, CAMERA_JSON)
     cam_pinhole = CameraModel(camera.intrinsics, Pinhole())
     # Detection, adaptation, matching and verification: the run config of
     # record of the evaluation, BY REFERENCE (the figure and the evaluation

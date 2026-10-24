@@ -1,5 +1,5 @@
 #=
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 Distributed annotation driver — runs INSIDE an sbatch allocation,
 spawns SLURM_NTASKS-1 workers via SlurmClusterManager.
 
@@ -25,8 +25,8 @@ using SlurmClusterManager
 # via the @everywhere block below.
 using CUDA, cuDNN
 
-import VisualGeometryToolkitIo   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIo.load
+import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
+using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
 
 # ── Master-side config ────────────────────────────────────────────────
 const SOURCES_FILE = ENV["BB_SOURCES_FILE"]
@@ -119,7 +119,7 @@ end
         nothing
     else
         get!(s.camera_cache, camera_path) do;
-            VgtkIo.load(CameraModel, camera_path)
+            VgtkIO.load(CameraModel, camera_path)
         end
     end
     # Camera lives in config.geometry — PoseGeometry(camera) for calibrated

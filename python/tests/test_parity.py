@@ -184,7 +184,7 @@ def test_device_selection(has_gpu):
 def _julia_find(jl, board_paths, model_path, gallery_path, img_expr, camera=None):
     paths = "[" + ", ".join(f'"{p}"' for p in board_paths) + "]"
     geo = "BlobBoards.HomographyGeometry()" if camera is None else \
-        f'BlobBoards.PoseGeometry(BlobBoards.VisualGeometryToolkitIo.load(BlobBoards.VisualGeometryToolkitCore.CameraModel, "{camera}"))'
+        f'BlobBoards.PoseGeometry(BlobBoards.VisualGeometryToolkitIO.load(BlobBoards.VisualGeometryToolkitCore.CameraModel, "{camera}"))'
     return jl.seval(f"""let net = BlobBoards.DescriptorNetwork("{model_path}"),
             g = BlobBoards.BoardGallery("{gallery_path}.jl", net),
             feats = Dict(insert!(g, {paths}, net; progress = false)),

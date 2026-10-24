@@ -34,7 +34,7 @@ VideoIO = "d6d074c3-1acf-5d4c-9a43-ef38773959a2"
 VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
 VisualGeometryToolkitEval = "86c88899-11c8-4b8e-8d7a-f01a8ab99b28"
 VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
-VisualGeometryToolkitIo = "2c312ccb-3050-452c-9523-414c480ba3da"
+VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [compat]

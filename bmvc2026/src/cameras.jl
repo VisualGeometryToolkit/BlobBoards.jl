@@ -10,7 +10,7 @@
 # scripts/import_cameras.jl ports each ONCE into the native vgio/cameras/v3
 # camera of record through `upstream_camera`; nothing else reads the shape.
 
-using VisualGeometryToolkitIo: opencv_lens
+using VisualGeometryToolkitIO: opencv_lens
 using VisualGeometryToolkitCore: CameraModel, BoundedCamera, Attributed, Size2
 
 _flag_names(flags::Integer, names::AbstractDict) = join(

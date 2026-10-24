@@ -1,15 +1,15 @@
 module BlobBoardsPythonExt
     import VisualGeometryToolkitCore as VgtkCore
-    import VisualGeometryToolkitIo as VgtkIo
+    import VisualGeometryToolkitIO as VgtkIO
 
 using BlobBoards
 using BlobBoards: BoardBundle, PatternBundle
 using PythonCall: PythonCall, Py, pybuiltins, pyconvert, pydict, pyhasattr,
     pyimport, pyisinstance, pylist
 using JSON3: JSON3
-import VisualGeometryToolkitIo
+import VisualGeometryToolkitIO
 import VisualGeometryToolkitCore
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIo.load
+using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
 using VisualGeometryToolkitCore: ustrip, m, mm, cm, μm
 using VisualGeometryToolkitCore: px, dpi, pt, inch, Size2, parse_unit, strip_or_bare
 using FlexUnits: Quantity, dimension
@@ -620,7 +620,7 @@ function BlobBoards.find_boards_python(
     dev_name = backend isa BlobBoards.KernelAbstractions.CPU ? "cpu" : "cuda"
 
     cam = camera_json === nothing ? nothing :
-        VgtkIo.load(CameraModel, string(camera_json))
+        VgtkIO.load(CameraModel, string(camera_json))
     geo_kw = _filter_kwargs(
         min_inliers = min_inliers === nothing ? nothing : Int(min_inliers),
         outlier_halfwidth = outlier_halfwidth === nothing ? nothing : Float64(outlier_halfwidth)
@@ -691,7 +691,7 @@ function BlobBoards.track_boards_python(
     backend = _python_backend(device, "track_boards_python")
     model, board_feature_dict, board_bundles = _python_boards_cached(board_paths, model_path, gallery_path, backend)
     provider = string(model.session.execution_provider)
-    cam = camera_json === nothing ? nothing : VgtkIo.load(CameraModel, string(camera_json))
+    cam = camera_json === nothing ? nothing : VgtkIO.load(CameraModel, string(camera_json))
     geometry = cam === nothing ? BlobBoards.HomographyGeometry() : BlobBoards.PoseGeometry(cam)
     config = BlobBoards.FindBoardsConfig(; geometry)
     # A video path streams; anything else is a sequence of grey frames.

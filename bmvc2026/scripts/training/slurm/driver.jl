@@ -1,5 +1,5 @@
 #=
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 Distributed annotation driver. Run from a login-node Julia (or `tmux`); it
 allocates SLURM workers via ClusterManagers.SlurmManager, dispatches per-
 source annotation work, and tears the workers down on exit.
@@ -31,8 +31,8 @@ The sources file supplied as ARGS[1] has one entry per line:
 using Distributed
 using ClusterManagers
 
-import VisualGeometryToolkitIo   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIo.load
+import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
+using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
 
 # ── Master-side config ────────────────────────────────────────────────
 const SOURCES_FILE = ARGS[1]
@@ -135,7 +135,7 @@ end
         nothing
     else
         get!(s.camera_cache, camera_path) do;
-            VgtkIo.load(CameraModel, camera_path)
+            VgtkIO.load(CameraModel, camera_path)
         end
     end
     # Camera lives in config.geometry — PoseGeometry(camera) for calibrated

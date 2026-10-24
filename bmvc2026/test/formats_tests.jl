@@ -11,7 +11,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(projectdir("src", "BlobBoardsEval.jl"))
 end
 using .BlobBoardsEval
-import VisualGeometryToolkitIo as VGIo
+import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: Trajectory, TargetPoses, Mounted, PlanarTarget, is_resolved
 using VisualGeometryToolkitCore: EuclideanMap, BodyFrame, WorldFrame, CameraFrame, TargetFrame, ViewFrame, Uncertain, CovMat,
     geom, relabel, unlabel, pose, ids, Rig
@@ -36,7 +36,7 @@ function synthetic_capture(dir; n = 12)
     images = Dict(t => "DSC$(lpad(t, 4, '0')).JPG" for t in 1:n)
     mt = mkpath(joinpath(dir, "poses", "motion_tracker", "calibration_bb"))
     for (body, P) in ((:board_rig, Twb), (:camera_rig, Twc))
-        VGIo.save(joinpath(mt, "$(body).json"), Trajectory(BodyFrame{body}, WorldFrame, P; images);
+        VgtkIO.save(joinpath(mt, "$(body).json"), Trajectory(BodyFrame{body}, WorldFrame, P; images);
             provenance = (recovery = (status = "not needed",),))
     end
     # detections with a small deterministic error, so the fit has a residual
@@ -46,7 +46,7 @@ function synthetic_capture(dir; n = 12)
         t => Dict(Symbol(k) => X ∘ inv(Twc[t]) ∘ Twb[t] ∘ Y ∘ jitter(t, i) for (i, (k, Y)) in enumerate(sort!(collect(Ys); by = first))) for t in 1:n
     )
     pd = mkpath(joinpath(dir, "poses", "calibration", "bb"))
-    VGIo.save(joinpath(pd, "target_poses.json"), TargetPoses{CameraFrame}(det; images, sensors = "cam"))
+    VgtkIO.save(joinpath(pd, "target_poses.json"), TargetPoses{CameraFrame}(det; images, sensors = "cam"))
     return (; X, Ys, Twc, Twb, images)
 end
 

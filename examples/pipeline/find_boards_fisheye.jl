@@ -47,7 +47,7 @@ using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustri
     Camera, CameraModel, Pinhole, undistort, division_bounded,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
-import VisualGeometryToolkitIo as VGIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v3 camera stores
 
 # =============================================================================
 # Config
@@ -102,7 +102,7 @@ end
 # =============================================================================
 
 img = Gray.(load_image(image_path))
-cam = VGIo.load(CameraModel, camera_json)
+cam = VgtkIO.load(CameraModel, camera_json)
 
 # The descriptor's default constructor DEMANDS the CUDA execution provider
 # (silent CPU fallback misreports throughput ~34x). On a CPU device, opt

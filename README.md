@@ -120,9 +120,9 @@ import cuDNN                                   # enables the ONNX CUDA provider
 using CUDA: CUDABackend
 using VisualGeometryToolkitEstimation: RansacConfig
 using VisualGeometryToolkitCore: CameraModel
-import VisualGeometryToolkitIo as VGIo
+import VisualGeometryToolkitIO as VgtkIO
 
-camera  = VGIo.load(CameraModel, "cameras.json")  # canonical vgio/cameras/v3 store
+camera  = VgtkIO.load(CameraModel, "cameras.json")  # canonical vgio/cameras/v3 store
 network = DescriptorNetwork("descriptor.onnx") # patch size comes from the graph
 
 # The gallery caches per-board features. Keyed on the network hash, the
@@ -284,7 +284,7 @@ Pkg.add("BlobBoards")
 ```
 
 Its upstream stack (VisualGeometryToolkitCore, VisualGeometryToolkitFeatures,
-VisualGeometryToolkitEstimation, VisualGeometryToolkitIo) resolves automatically.
+VisualGeometryToolkitEstimation, VisualGeometryToolkitIO) resolves automatically.
 
 ### For development
 

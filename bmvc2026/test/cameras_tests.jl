@@ -12,9 +12,9 @@
 using Test
 using DrWatson: projectdir
 import TOML
-import VisualGeometryToolkitIo as VGIo
+import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: BoundedCamera, CameraModel, Size2
-using VisualGeometryToolkitIo: opencv_lens
+using VisualGeometryToolkitIO: opencv_lens
 using StaticArrays: SMatrix
 
 # The previous cameras of record (canonical frame), by value.
@@ -53,8 +53,8 @@ using .BlobBoardsEval: upstream_camera, upstream_source
         # the native file reads back to the same camera
         mktempdir() do dir
             f = joinpath(dir, "c.json")
-            VGIo.save(f, Dict(name => camera))
-            @test VGIo.load(Dict{Symbol, BoundedCamera}, f) == Dict(name => camera)
+            VgtkIO.save(f, Dict(name => camera))
+            @test VgtkIO.load(Dict{Symbol, BoundedCamera}, f) == Dict(name => camera)
         end
     end
 end

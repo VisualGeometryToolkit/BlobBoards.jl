@@ -41,7 +41,7 @@ using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustri
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 using CUDA: CUDABackend   # the KA device token
-import VisualGeometryToolkitIo as VGIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v3 camera stores
 
 # =============================================================================
 # Config
@@ -106,7 +106,7 @@ end
 # =============================================================================
 
 img = Gray.(load_image(image_path))
-cam = VGIo.load(CameraModel, camera_json)
+cam = VgtkIO.load(CameraModel, camera_json)
 
 descriptor_network = DescriptorNetwork(model_path)
 gallery = BoardGallery(gallery_path, descriptor_network)

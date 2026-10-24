@@ -2,7 +2,7 @@
 # session's upstream intrinsic calibration (BlobBoards-Evaluation
 # pose_estimators/calibrate_camera.py `calibrate_pinhole`: OpenCV
 # calibrateCamera on a chessboard, exported as `pinhole_radtan` JSON) into
-# VisualGeometryToolkitIo's native vgio/cameras/v3, with the v3 calibration block
+# VisualGeometryToolkitIO's native vgio/cameras/v3, with the v3 calibration block
 # filled from the export. The native file is the camera of record published in
 # the inputs tier (<session>/calibration/<file>); the upstream export is
 # published beside the BlobBoards-Evaluation archive as this conversion's

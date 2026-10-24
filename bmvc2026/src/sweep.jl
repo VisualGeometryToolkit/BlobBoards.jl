@@ -26,11 +26,11 @@ a GPU stack to aggregate a table.
 =#
 module BoardSweep
     import VisualGeometryToolkitCore as VgtkCore
-    import VisualGeometryToolkitIo as VgtkIo
+    import VisualGeometryToolkitIO as VgtkIO
 
 using BlobBoards
 
-import VisualGeometryToolkitIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
 import VisualGeometryToolkitCore
 using BlobBoards: find_boards, load_bundle, uid_from_hash, blobs, cutoff,
     DescriptorNetwork, BoardGallery, Rect, board!,
@@ -117,7 +117,7 @@ function sweep_context(;
         config_path, run_config, network_path, gallery_path,
         boards_dir, camera_json, device = CUDABackend()
     )
-    store = VgtkIo.load(Dict{Symbol, BoundedCamera}, camera_json)
+    store = VgtkIO.load(Dict{Symbol, BoundedCamera}, camera_json)
     length(store) == 1 || error("$(camera_json): a sweep runs on one camera; the store holds $(sort!(collect(keys(store))))")
     camera_name, bounded = only(store)
     camera = VgtkCore.model(bounded isa BoundedCamera ? bounded : bounded.value)        # raw K + OpenCV-model lens
@@ -212,7 +212,7 @@ function write_target_poses(dir, ctx::SweepContext, frames::Dict{Int, Any}, imag
         Dict(t => Dict(Symbol(uid) => pose_value(model) for (uid, model, _, _) in acc) for (t, acc) in frames);
         images, sensors = ctx.camera_name,
     )
-    VgtkIo.save(joinpath(dir, TARGET_POSES_FILE), tp)
+    VgtkIO.save(joinpath(dir, TARGET_POSES_FILE), tp)
     return nothing
 end
 
@@ -353,7 +353,7 @@ function _is_complete(unit::SweepUnit, limit::Integer)
     rec_limit = get(prov, "frame_limit", nothing)
     rec_limit !== nothing && Int(rec_limit) != Int(limit) && return false
     tpf = joinpath(unit.poses, TARGET_POSES_FILE)
-    n_out = isfile(tpf) ? length(VgtkIo.load(TargetPoses, tpf)) : 0
+    n_out = isfile(tpf) ? length(VgtkIO.load(TargetPoses, tpf)) : 0
     rec_n = get(prov, "n_frames", nothing)
     complete = if rec_n !== nothing
         n_out > 0 && n_out == Int(rec_n)
@@ -429,7 +429,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
             )
             t = index[fn]
             detected[t], names[t] = accepted, fn
-            VgtkIo.append_jsonl(
+            VgtkIO.append_jsonl(
                 joinpath(unit.poses, TELEMETRY_FILE),
                 (image = fn, t = t, elapsed_time_ms = round(elapsed_ms, digits = 3)),
             )

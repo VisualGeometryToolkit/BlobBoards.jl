@@ -40,7 +40,7 @@ network `execution_provider = :cpu`; nothing else changes.
 using CUDA, cuDNN                      # the GPU path (leave out for the CPU)
 using BlobBoards
 using FileIO, Colors                   # image loading
-import VisualGeometryToolkitIo as VGIo
+import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: CameraModel, is_map_inlier
 
 boards_dir = BlobBoards.example_data(:boards)
@@ -112,7 +112,7 @@ choice selects the estimator:
 | [`RadialHomographyGeometry`](@ref)`((width, height))` | the image size | homography plus a one-parameter division-model distortion, for an unknown camera whose lens bends lines |
 
 ```julia
-camera = VGIo.load(CameraModel, joinpath(still, "cameras.json"))
+camera = VgtkIO.load(CameraModel, joinpath(still, "cameras.json"))
 config = FindBoardsConfig(geometry = PoseGeometry(camera))
 posed = find_boards(board_features, network, img; board_bundles, config)
 

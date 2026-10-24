@@ -1,6 +1,6 @@
 #=
 import VisualGeometryToolkitEval as VgtkEval
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 detection_cv.jl — cross-validate the detection operating point JOINTLY:
 (outlier_halfwidth, peak_threshold, min_similarity) of the pose arm, against
 the inter-board invariance mAA.
@@ -50,7 +50,7 @@ using BlobBoards: FindBoardsConfig, DescriptorNetwork, BoardGallery, uid_from_ha
 using CUDA
 import cuDNN
 using CUDA: CUDABackend
-import VisualGeometryToolkitIo
+import VisualGeometryToolkitIO
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel
 using Accessors: @set
@@ -104,7 +104,7 @@ end
 function run_cv()
     image_dir, frames = validation_frames(SPEC.scheme.cross_validation)
     root = data_root()
-    camera = VgtkIo.load(CameraModel, joinpath(root, INP["camera"]))
+    camera = VgtkIO.load(CameraModel, joinpath(root, INP["camera"]))
     run_config = projectdir("configs", INP["run_config"])
     base = FindBoardsConfig(run_config; camera)
     # the run config names the network data_root()-relative (the bb_assets tier mounts models/ at the root)

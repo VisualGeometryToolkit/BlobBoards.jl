@@ -1,5 +1,5 @@
 import VisualGeometryToolkitFeatures as VgtkFeatures
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 using Test
 using BlobBoards
 using BlobBoards: annotate_blobs, canonicalize, FindBoardsConfig,
@@ -18,7 +18,7 @@ using CUDA: CUDA, CUDABackend
 end
 import cuDNN
 import VideoIO
-import VisualGeometryToolkitIo
+import VisualGeometryToolkitIO
 using FileIO: load as load_image
 
 using VisualGeometryToolkitCore: CameraModel, EllipticFrame, Point2, Size2
@@ -163,7 +163,7 @@ end
 
 # Cameras are vgio/cameras/v3 stores (the example artifacts ship them that
 # way); the store owns the reader.
-_load_camera(path) = VgtkIo.load(CameraModel, path)
+_load_camera(path) = VgtkIO.load(CameraModel, path)
 
 function _setup_gallery()
     model = DescriptorNetwork(_MODEL_PATH)

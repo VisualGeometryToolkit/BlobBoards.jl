@@ -701,7 +701,7 @@ Append one line of structured stats for a processed source to
 each line is < PIPE_BUF, so concurrent writes interleave at line boundaries.
 """
 append_log(output_dir::AbstractString, meta::NamedTuple) =
-    VgtkIo.append_jsonl(joinpath(output_dir, _LOG_FILE), meta)
+    VgtkIO.append_jsonl(joinpath(output_dir, _LOG_FILE), meta)
 
 """
     summarize_annotations(output_dir) -> Vector{NamedTuple}

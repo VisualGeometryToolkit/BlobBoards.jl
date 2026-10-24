@@ -11,9 +11,9 @@
 # turns each export directory into that kind here, ONCE, in its own run
 # directory. The per-image files stay beside it as the driver wrote them.
 
-import VisualGeometryToolkitIo as VgtkIo
-import VisualGeometryToolkitIo
-using VisualGeometryToolkitIo: append_jsonl
+import VisualGeometryToolkitIO as VgtkIO
+import VisualGeometryToolkitIO
+using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: TargetPoses, CameraFrame, EuclideanMap, geom
 using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix
@@ -72,7 +72,7 @@ function export_target_poses(
     end
     tp = TargetPoses{CameraFrame}(frames; images = names, sensors = String(camera_name))
     out = joinpath(out_dir, "target_poses.json")
-    VgtkIo.save(
+    VgtkIO.save(
         out, tp;
         provenance = merge(
             (
@@ -86,7 +86,7 @@ function export_target_poses(
             provenance,
         ),
     )
-    back = VgtkIo.load(TargetPoses, out)
+    back = VgtkIO.load(TargetPoses, out)
     for (t, ps) in frames, (id, X) in ps
         Y = geom(back[t][id])
         Y.t == X.t || error("$(out): frame $(t) target $(id) translation does not read back")

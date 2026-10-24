@@ -21,7 +21,7 @@
 #    angle/‖Δt‖ between the predicted and detected absolute poses.
 # =============================================================================
 
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 using Rotations: RotMatrix, rotation_angle
 using BlobBoards: load_bundle, uid_from_hash, Rect
 using VisualGeometryToolkitCore: ustrip, mm, parse_unit
@@ -43,7 +43,7 @@ order. A target's size is its definition's ([`marker_sizes`](@ref)), not the
 detection's.
 """
 function load_detected_poses(poses_dir::AbstractString)
-    tp = VgtkIo.load(TargetPoses, joinpath(poses_dir, "target_poses.json"))
+    tp = VgtkIO.load(TargetPoses, joinpath(poses_dir, "target_poses.json"))
     out = Dict{String, Vector{@NamedTuple{id::String, R::SMatrix{3, 3, Float64, 9}, t::SVector{3, Float64}}}}()
     for (t, ps) in tp
         out[tp.images[t]] = [
@@ -239,8 +239,8 @@ save_hand_eye(file::AbstractString, he::NamedTuple; provenance::NamedTuple = (;)
 
 function save_hand_eye(file::AbstractString, X, Y::AbstractDict; provenance::NamedTuple = (;))
     mount = _mount_file(file)
-    VgtkIo.save(file, [relabel(CameraRigFrame, CameraFrame, unlabel(X))]; provenance)
-    VgtkIo.save(mount, _mount_rig(Y); provenance = (hand_eye = basename(file),))
+    VgtkIO.save(file, [relabel(CameraRigFrame, CameraFrame, unlabel(X))]; provenance)
+    VgtkIO.save(mount, _mount_rig(Y); provenance = (hand_eye = basename(file),))
     return file, mount
 end
 
@@ -254,11 +254,11 @@ BoardRigFrame`, minted on access) — each pose `Uncertain` where the record
 states its covariance.
 """
 function load_hand_eye(file::AbstractString)
-    poses = VgtkIo.load(Vector{EuclideanMap}, file)
+    poses = VgtkIO.load(Vector{EuclideanMap}, file)
     ix = findfirst(X -> geom(X) isa EuclideanMap{3, <:Any, <:Any, <:Any, CameraRigFrame, CameraFrame}, poses)
     ix === nothing && error("no body:camera_rig -> camera_optical record in $file")
     X = relabel(CameraRigFrame, ViewFrame{:optical}, poses[ix])
-    targets = VgtkIo.load(Rig, _mount_file(file))
+    targets = VgtkIO.load(Rig, _mount_file(file))
     targets isa Rig{BoardRigFrame} || error("$(_mount_file(file)): the marker mount is posed in body:board_rig, got $(typeof(targets))")
     return X, targets
 end

@@ -22,7 +22,7 @@ gate — so a different input set is a different artifact rather than an
 overwrite, and a re-run with unchanged inputs is a cache hit instead of a
 fourth fit.
 
-WHAT IS STORED. Two VisualGeometryToolkitIo files, the same shapes the published
+WHAT IS STORED. Two VisualGeometryToolkitIO files, the same shapes the published
 `hand_eye_<name>.json` records take: a `vgio/transforms/v3` file holding X,
 `body:camera_rig → camera_optical`, and beside it (`<name>_board_rig.json`) a
 `vgio/rig/v4` file holding the marker mount — one target per printed board,
@@ -55,7 +55,7 @@ provenance.
 Supply `force = true` to refit and overwrite.
 """
 # THE ARTIFACT IS a `vgio/transforms/v3` file (X) and a `vgio/rig/v4` file
-# (the Y_m), written by VisualGeometryToolkitIo's `save` from the labeled poses and
+# (the Y_m), written by VisualGeometryToolkitIO's `save` from the labeled poses and
 # read back through `load`, the labels minted from the files' typed frames.
 # Keyed like every `cached` artifact — `<prefix>_<hash(cfg)>.json` under
 # `results_root()/calibration`, `force` preserving the outgoing files as `#<n>`
@@ -66,7 +66,7 @@ using DrWatson: gitdescribe
 # DrWatson's `safesave` semantics for the vgio JSON about to be overwritten:
 # move it aside to the next free `x#1.json`, `x#2.json`, … Kept here because
 # `safesave` writes through `wsave` (FileIO), which cannot write a
-# VisualGeometryToolkitIo record; returns the new name, or `nothing`.
+# VisualGeometryToolkitIO record; returns the new name, or `nothing`.
 function _backup!(file::AbstractString)
     isfile(file) || return nothing
     base, ext = splitext(file)
@@ -150,7 +150,7 @@ function hand_eye(
 
     X, targets = load_hand_eye(file)
     # `load` hands back the records only; the diagnostics ride in the file's
-    # `provenance`, which VGIo never reads.
+    # `provenance`, which VgtkIO never reads.
     prov = JSON3.read(read(file, String)).provenance
     diagnostics = (
         n_frames = Int(prov.n_frames), n_markers = Int(prov.n_markers),

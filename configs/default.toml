@@ -33,7 +33,7 @@
 # It is the uniform OUTLIER component's per-axis half-width in the
 # Student-t/uniform mixture — NOT a gate. It implies no threshold directly:
 # the decision is the Bayes rule on the posterior, and its boundary
-# (RansacScoringDoneRight's `decision_threshold`)
+# (RANSACScoringDoneRight's `decision_threshold`)
 # derives the radius from the half-width and the solve's own residual scale.
 #
 # They need fitting because the detection-stage E-step holds the inlier prior
@@ -198,7 +198,7 @@ outlier_halfwidth = 5.0
 # from the Welsch-HQ arm, 2026-07-28); the Welsch-HQ arm would be
 # `{ type = "hq", loss = "welsch", scale_multiple = "cross_validated" }` here.
 # The fits score with the Student-t + uniform marginal at `outlier_halfwidth`
-# (RansacScoringDoneRight's `StudentTUniformScoring`), stated in the code, not
+# (RANSACScoringDoneRight's `StudentTUniformScoring`), stated in the code, not
 # VisualGeometryToolkitEstimation's MSAC default.
 local_optimization = { type = "student_t_uniform" }
 # NB no `resolve_pose_ambiguity` here: it is pose-only, and the loader

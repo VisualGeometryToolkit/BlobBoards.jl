@@ -34,9 +34,9 @@ using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_hom
 # methods to it.
 using VisualGeometryToolkitCore: residuals!
 # Every fit scores with the Student-t + uniform marginal (Jeffreys scale
-# prior) at the geometry's `outlier_halfwidth` — RansacScoringDoneRight's
+# prior) at the geometry's `outlier_halfwidth` — RANSACScoringDoneRight's
 # scorer, stated explicitly: RVG's own default is MSAC at a threshold.
-using RansacScoringDoneRight: StudentTUniformScoring
+using RANSACScoringDoneRight: StudentTUniformScoring
 
 # =============================================================================
 # load_board — parse JSON metadata only (no rasterization)
@@ -91,7 +91,7 @@ end
 # =============================================================================
 #
 # A board is a CONTENT-ADDRESSED design: its uid names its geometry, so a
-# stored target rig (VisualGeometryToolkitIo's rig/v4) names a board by reference and
+# stored target rig (VisualGeometryToolkitIO's rig/v4) names a board by reference and
 # never restates its points. BlobBoards owns the design, so it resolves the
 # reference: the nominal points are the board's blob centres in its world
 # frame (`blobs(bundle, :world)`: centred on the board, y up, millimetres,
@@ -139,7 +139,7 @@ end
     board_resolver(boards) -> (design::Symbol -> Vector{SVector{2, Float64}} | nothing)
 
 The resolver a stored target rig takes for its referenced board designs:
-`VisualGeometryToolkitIo.load(Rig, path; resolve = board_resolver(boards_dir))`.
+`VisualGeometryToolkitIO.load(Rig, path; resolve = board_resolver(boards_dir))`.
 A design the library does not hold resolves to `nothing` (it stays an
 unresolved, pose-only target). `boards` is a directory or a uid → bundle
 dictionary; a directory is read once.
@@ -1075,9 +1075,9 @@ _refit_skip_log(t) = t === nothing ? "" : t.refit_skip_log
 #
 # An earlier reading of this data reported unadjudicated boards flipping at 9.9%
 # vs 0.77% — that was a JOIN ARTIFACT, not a bail. See the BRANCH_LOG comment.
-# One writer for every telemetry channel: VGIo's append_jsonl (per-path
+# One writer for every telemetry channel: VgtkIO's append_jsonl (per-path
 # lock registry + single-write append) replaced the per-channel locks.
-_append_jsonl(path::String, row) = VgtkIo.append_jsonl(path, row)
+_append_jsonl(path::String, row) = VgtkIO.append_jsonl(path, row)
 
 function _log_branch_bail(
         telemetry, reason; sep_deg = nothing, inc_conv = nothing,

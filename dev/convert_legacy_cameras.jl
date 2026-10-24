@@ -1,6 +1,6 @@
 # Convert legacy OpenCV-style camera JSONs ("camera_matrix" /
 # "distortion_coefficients" — no schema tag, no pixel frame) to the canonical
-# vgio/cameras store (v2 since VisualGeometryToolkitIo 7675965), IN PLACE, the way
+# vgio/cameras store (v2 since VisualGeometryToolkitIO 7675965), IN PLACE, the way
 # commit d767827 (2026-08-18) did for the primary dataset copy (to v1, then).
 # Older dataset copies can still hold ad-hoc camera files; this converts them
 # the same way. (The 2026-09-07 package-cleanup audit found 16 such files under
@@ -11,7 +11,7 @@
 # OpenCV pixel frame, so the CameraModel is built through the opencv→colmap
 # frame map (VGC converts on the way in, +0.5 on cx/cy). The record carries no
 # frame of its own — the model is canonical by construction and the store
-# writes that frame (VisualGeometryToolkitIo 0.11 retired the camera record's
+# writes that frame (VisualGeometryToolkitIO 0.11 retired the camera record's
 # `pixel_chart` keyword: a record labelled :opencv over a canonical K
 # double-shifted, the exact mistake the original conversion's field-exact
 # verification caught). The store is a name → `BoundedCamera` Dict.
@@ -21,7 +21,7 @@
 # BEFORE the original is replaced. Files that are not pinhole_radtan, or that
 # lack image_width/image_height, are listed and left untouched.
 #
-# Usage (the checkout's own env has VisualGeometryToolkitIo + VisualGeometryToolkitCore):
+# Usage (the checkout's own env has VisualGeometryToolkitIO + VisualGeometryToolkitCore):
 #
 #   cd BlobBoards.jl
 #   R=/path/to/20251028_BlobBoards_Office      # the dataset root, data_dir()
@@ -29,7 +29,7 @@
 #   julia --startup-file=no --project=. dev/convert_legacy_cameras.jl \
 #       "$R" "$R/_legacy_camera_backup_$(date +%F)" $FILES
 
-import VisualGeometryToolkitIo as VGIo
+import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, lens_parameters, BoundedCamera, Size2
 using CoordinateTransformations: AffineMap
 using JSON3
@@ -52,18 +52,18 @@ for rel in files
         continue
     end
     K = CameraCalibrationMat(stack(p.camera_matrix)')          # row-major 3×3 → matrix
-    coeffs = collect(Float64, p.distortion_coefficients)       # OpenCV order; VGIo.opencv_lens knows it
+    coeffs = collect(Float64, p.distortion_coefficients)       # OpenCV order; VgtkIO.opencv_lens knows it
     model = CameraModel(
         EuclideanMap(PixelFrame{:opencv}, PixelFrame{:colmap}) ∘ AffineMap(K);
-        lens = VGIo.opencv_lens(coeffs)
+        lens = VgtkIO.opencv_lens(coeffs)
     )
     name = join(filter(!isempty, [String(get(p, :camera_id, "")), String(get(p, :lens_id, ""))]), " / ")
     isempty(name) && (name = splitext(basename(f))[1])
     store = Dict(Symbol(name) => BoundedCamera(model, Size2(Int(p.image_width), Int(p.image_height))))
 
     tmp = f * ".v3.tmp"
-    VGIo.save(tmp, store)
-    back = VGIo.load(CameraModel, tmp)
+    VgtkIO.save(tmp, store)
+    back = VgtkIO.load(CameraModel, tmp)
     back.intrinsics.K == model.intrinsics.K || error("K mismatch after reload: $rel")
     lens_parameters(back.lens) == lens_parameters(model.lens) || error("lens mismatch after reload: $rel")
 

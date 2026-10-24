@@ -1229,10 +1229,10 @@ function _plain(x)
 end
 
 # The canonical encoding itself (sorted keys, bare integral floats, Ryu for the
-# rest, loud on non-finite numbers) is VisualGeometryToolkitIo's `canonical_json` since
+# rest, loud on non-finite numbers) is VisualGeometryToolkitIO's `canonical_json` since
 # 0.7.6; the LOWERING of a config into that tree (`_plain`) stays here with the
 # schema. Board identities are `sha256_hex` over exactly that string.
-using VisualGeometryToolkitIo: canonical_json, sha256_hex
+using VisualGeometryToolkitIO: canonical_json, sha256_hex
 
 """
     canonical_config_json(config) -> String

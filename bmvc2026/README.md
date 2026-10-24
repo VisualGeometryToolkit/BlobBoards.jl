@@ -230,7 +230,7 @@ RVG ≥ 0.14) and applied to the evaluation sweep. See
 
 ### Conventions worth knowing
 
-- The evaluation reads VisualGeometryToolkitIo kinds only, every one a result of a
+- The evaluation reads VisualGeometryToolkitIO kinds only, every one a result of a
   keyed run: detections `<run>/poses/<system>/target_poses.json`
   (vgio/target_poses/v1) + `telemetry.jsonl` (the sweeps write them; the
   baseline stage converts the baselines' per-image exports); the motion-capture

@@ -260,7 +260,7 @@
 
     @testset "opencv export: OpenCV's pixels from the declared frame, native v2 out" begin
         import PythonCall
-        VGIo, VGC, Rot = BlobBoards.VisualGeometryToolkitIo, BlobBoards.VisualGeometryToolkitCore, BlobBoards.Rotations
+        VgtkIO, VGC, Rot = BlobBoards.VisualGeometryToolkitIO, BlobBoards.VisualGeometryToolkitCore, BlobBoards.Rotations
         corr = PythonCall.pyimport("blobboards.correspondences")
         np = PythonCall.pyimport("numpy")
         W, H, f, cx, cy = 1280, 960, 1000.0, 640.5, 480.5                       # canonical (COLMAP) principal point
@@ -274,17 +274,17 @@
             plane = [VGC.Vec2{Float64}(X[1], X[2]) for X in grid]
             rig = VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.Mounted(VGC.PlanarTarget(plane), idpose) for id in ids))
             tp = joinpath(dir, "targets_1.json")
-            VGIo.save(tp, rig)
+            VgtkIO.save(tp, rig)
             obs = VGC.TargetPoints2D{VGC.PixelFrame{:colmap}}(
                 Dict(
                     k => [(target = id, index = i, xy = pix(R, t, grid[i]), weight = 1.0) for id in ids for i in eachindex(grid)]
                         for (k, (R, t)) in enumerate(poses)
                 );
-                images = Dict(k => "f$(k).png" for k in eachindex(poses)), sensors = "cam", targets = [VGIo.content_id(tp)],
+                images = Dict(k => "f$(k).png" for k in eachindex(poses)), sensors = "cam", targets = [VgtkIO.content_id(tp)],
             )
-            VGIo.save(joinpath(dir, "observations.json"), obs)
+            VgtkIO.save(joinpath(dir, "observations.json"), obs)
             cam = VGC.CameraModel(VGC.LogicalIntrinsics(VGC.CameraCalibrationMat(f * px, [cx * px, cy * px])), VGC.Pinhole())
-            VGIo.save(joinpath(dir, "camera_mocap.json"), Dict(:cam => VGC.BoundedCamera(cam, VGC.Size2(W, H))))
+            VgtkIO.save(joinpath(dir, "camera_mocap.json"), Dict(:cam => VGC.BoundedCamera(cam, VGC.Size2(W, H))))
             return dir
         end
         run = run_dir(false)
@@ -305,20 +305,20 @@
         out = mktempdir()
         paths = corr.write_native_calibration(out, "calibration_opencv_default", K_cv, np.zeros(5), pp, PythonCall.pytuple((W, H)), PythonCall.pydict(Dict("source" => "opencv", "reprojection_error" => 0.0, "error_statistic" => "rms")))
         cams, posesf = pyconvert(String, paths[0]), pyconvert(String, paths[1])
-        @test VGIo.validate(cams) == "cameras" && VGIo.validate(posesf) == "transforms"
-        store = VGIo.load(Dict{Symbol, VGC.BoundedCamera}, cams)
+        @test VgtkIO.validate(cams) == "cameras" && VgtkIO.validate(posesf) == "transforms"
+        store = VgtkIO.load(Dict{Symbol, VGC.BoundedCamera}, cams)
         rec = only(values(store))
         @test only(keys(store)) == :calibration_opencv_default && VGC.extent(rec) == VGC.Size2(W, H)
         @test VGC.model(rec).intrinsics.K ≈ VGC.CameraCalibrationMat(f * px, [cx * px, cy * px]) atol = 1.0e-12   # canonical: OpenCV's cx + 0.5
-        # the writer's lens record IS VisualGeometryToolkitIo's opencv_lens, for every OpenCV vector length
+        # the writer's lens record IS VisualGeometryToolkitIO's opencv_lens, for every OpenCV vector length
         for n in (4, 5, 8, 12, 14)
             v = [1.0e-3 * (-1)^i * i for i in 1:n]
             pyrec = corr.opencv_lens_record(np.array(PythonCall.pylist(v)))
             rec_jl = JSON3.read(pyconvert(String, PythonCall.pyimport("json").dumps(pyrec)), Dict{String, Any})
-            @test VGC.lens_from_record(rec_jl) === VGIo.opencv_lens(v)
+            @test VGC.lens_from_record(rec_jl) === VgtkIO.opencv_lens(v)
         end
         @test_throws PythonCall.PyException corr.opencv_lens_record(np.zeros(6))
-        recs = VGIo.load(Vector{VGC.EuclideanMap}, posesf)
+        recs = VgtkIO.load(Vector{VGC.EuclideanMap}, posesf)
         @test all(((r, k),) -> VGC.geom(r) isa VGC.EuclideanMap{3, Float64, <:Any, <:Any, VGC.TargetFrame{:b1}, VGC.ViewFrame{Symbol("f$(k).png")}}, zip(recs, eachindex(poses)))
         @test all(VGC.geom(r).R ≈ R && VGC.geom(r).t ≈ t for (r, (R, t)) in zip(recs, poses))
     end

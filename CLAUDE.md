@@ -224,7 +224,7 @@ The adaptation's sort-and-sweep posterior seed no longer calls RVG's
 host-side `sweep!`/`ScoringWorkspace` (those imports were removed): each
 blob's sweep runs inside the per-blob device kernel (bitonic sort of r² in
 shared memory → outlier_halfwidth median → marginal sweep, `_sort_sweep_ka!`).
-The device formula is pinned to RansacScoringDoneRight's Jeffreys
+The device formula is pinned to RANSACScoringDoneRight's Jeffreys
 `_sweep_score` algebra — `S = lgamma(j/2) − (j/2)·log(π·RSS) − (n−k)·log_two_outlier_halfwidth`
 is RSDR's score at `alpha0 = beta0 = 0`. RVG/RSDR ship no generic device
 sweep (RSDR's KA files are eval-harness drivers), so this hand-rolled kernel
@@ -357,7 +357,7 @@ Consequences:
 - **Every type argument is positional and leads the non-mutated inputs; never
   a keyword**: `blob_pattern(Gray{N0f16}, size)`,
   `undistort!(dst, Float32, camera, src)`, `relabel(Src, Dst, x)`,
-  `VisualGeometryToolkitIo.save(PixelFrame{:julia}, path, obs)`. Supplying `pixel_type =`
+  `VisualGeometryToolkitIO.save(PixelFrame{:julia}, path, obs)`. Supplying `pixel_type =`
   to a generation entry point is an `ArgumentError` naming the positional form.
   A config STRUCT keeps its type-valued field (`PatternConfig(; pixel_type)`) —
   that is data, not an argument.

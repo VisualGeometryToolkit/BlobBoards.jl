@@ -255,7 +255,7 @@ function _geometry_from_toml(d, camera, image_size = nothing)
     camera === nothing && throw(
         ArgumentError(
             "[find_boards.geometry] type = \"pose\" needs a camera: " *
-                "FindBoardsConfig(path; camera = VisualGeometryToolkitIo.load(CameraModel, ...))"
+                "FindBoardsConfig(path; camera = VisualGeometryToolkitIO.load(CameraModel, ...))"
         )
     )
     return PoseGeometry(

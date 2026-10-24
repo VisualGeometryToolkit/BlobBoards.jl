@@ -33,7 +33,7 @@ import VideoIO
 using CUDA: CUDABackend            # any KA backend; KA.CPU() also works
 import cuDNN                       # ONNXRunTime :cuda execution provider
 using Statistics: mean
-import VisualGeometryToolkitIo as VGIo   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v3 camera stores
 using VisualGeometryToolkitCore: BoundedCamera, model, extent
 
 const VIDEO = length(ARGS) >= 1 ? ARGS[1] :
@@ -68,7 +68,7 @@ board_bundles = Dict(
 )
 @info "gallery" boards = length(board_features)
 
-cam_bounded = VGIo.load(BoundedCamera, CAMERA_JSON)
+cam_bounded = VgtkIO.load(BoundedCamera, CAMERA_JSON)
 cam = model(cam_bounded)
 
 # Sanity: intrinsics are resolution-specific. A mismatch here means the pose

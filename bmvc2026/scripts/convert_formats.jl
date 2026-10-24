@@ -1,7 +1,7 @@
 #=
 convert_formats.jl — stage 0: the motion-capture records of the absolute-pose
 evaluation, from the tracker's raw per-frame exports (inputs), onto
-VisualGeometryToolkitIo's kinds, verified.
+VisualGeometryToolkitIO's kinds, verified.
 
     julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/convert_formats.jl [--config=<toml>]
 
@@ -24,8 +24,8 @@ Every file carries its sources in `provenance`; the run writes `_config.toml`,
 `_provenance.toml` (config, commit, inputs), `_manifest.jsonl` (one line per
 source file: its sha256 and what it became) and `_report.json` at its root.
 Every file is the direct serialization of a VisualGeometryToolkitCore value
-(VisualGeometryToolkitIo `save`) and reads back to that value exactly. A mocap
-pose's column-major `rot_mat` is quaternion-encoded by VisualGeometryToolkitIo's one
+(VisualGeometryToolkitIO `save`) and reads back to that value exactly. A mocap
+pose's column-major `rot_mat` is quaternion-encoded by VisualGeometryToolkitIO's one
 writer; translations, and every scalar, are written as the shortest decimal
 that reads back to the same Float64.
 
@@ -42,8 +42,8 @@ if !isdefined(Main, :BlobBoardsEval)
 end
 using Main.BlobBoardsEval: data_root, figure_config, static_camera_recovery, run_dir, EVAL_TIERS
 include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the subsets' image predicate
-import VisualGeometryToolkitIo as VGIo
-using VisualGeometryToolkitIo: append_jsonl
+import VisualGeometryToolkitIO as VgtkIO
+using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
     Mounted, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids
 using Rotations: QuatRotation, params
@@ -171,7 +171,7 @@ function convert_mocap(session)
         file = joinpath(out_root, "constellation_$(b.id).json")
         F = BodyFrame{b.id}
         rig = Rig{F}(Dict(b.id => Mounted(PointTarget(c.points), EuclideanMap(one(RotMatrix{3, Float64}), zero(SVector{3, Float64}); check = false))))
-        VGIo.save(
+        VgtkIO.save(
             file, rig;
             provenance = (
                 body = String(b.id), run_key = KEY,
@@ -202,7 +202,7 @@ function convert_mocap(session)
             ] for fr in s.frames
         )
         mfile = joinpath(odir, "markers.json")
-        VGIo.save(
+        VgtkIO.save(
             mfile, TargetPoints3D{WorldFrame}(obs; sensors = MOCAP["sensor"], images, times, time_origin = origin);
             provenance = (
                 source = joinpath("poses", "motion_tracker", sub), n_files = length(s.files), run_key = KEY,
@@ -254,7 +254,7 @@ function convert_mocap(session)
                 time_origin = origin, recovered = rec,
             )
             file = joinpath(odir, "$(b.id).json")
-            VGIo.save(
+            VgtkIO.save(
                 file, tr;
                 provenance = merge(
                     (
@@ -271,7 +271,7 @@ function convert_mocap(session)
                 ),
             )
             # the reader returns exactly the quaternion written for each pose
-            back = VGIo.load(Trajectory, file)
+            back = VgtkIO.load(Trajectory, file)
             for (t, X) in poses
                 Y = geom(back[t])
                 (Y.R isa QuatRotation && SVector{4, Float64}(params(Y.R)) == _written_quaternion(X) && Y.t == X.t) ||
@@ -285,7 +285,7 @@ function convert_mocap(session)
                 X === nothing || (kab[fr.t] = X)
             end
             kfile = joinpath(odir, "$(b.id).kabsch.json")
-            VGIo.save(
+            VgtkIO.save(
                 kfile, Trajectory(BodyFrame{b.id}, WorldFrame, kab; images = Dict(t => images[t] for t in keys(kab)), times = Dict(t => times[t] for t in keys(kab)), time_origin = origin);
                 provenance = (
                     body = String(b.id), run_key = KEY,
@@ -312,7 +312,7 @@ function convert_mocap(session)
 end
 
 # The quaternion a pose computed as a rotation MATRIX is written as (w ≥ 0) —
-# the one encoding VisualGeometryToolkitIo's writer applies; the reader returns it as is.
+# the one encoding VisualGeometryToolkitIO's writer applies; the reader returns it as is.
 function _written_quaternion(X::EuclideanMap)
     q = SVector{4, Float64}(params(QuatRotation(RotMatrix{3, Float64}(X.R))))
     return q[1] < 0 ? -q : q
@@ -337,16 +337,16 @@ function roundtrip_all(root)
         p = joinpath(dir, f)
         (islink(p) || !endswith(f, ".json") || startswith(f, "_")) && continue
         kind = try
-            VGIo.validate(p)
+            VgtkIO.validate(p)
         catch e
             e isa ArgumentError || rethrow()
             continue                                     # not a vgio file (a copied sidecar)
         end
         T = KIND_TYPES[kind]
-        v = VGIo.load(T, p)
+        v = VgtkIO.load(T, p)
         tmp = tempname() * ".json"
-        VGIo.save(tmp, v)
-        _same(VGIo.load(T, tmp), v) || error("$p: does not round-trip as a $(T)")
+        VgtkIO.save(tmp, v)
+        _same(VgtkIO.load(T, tmp), v) || error("$p: does not round-trip as a $(T)")
         rm(tmp)
         counts[kind] = get(counts, kind, 0) + 1
     end
@@ -378,7 +378,7 @@ function main()
     # (the project's own tree, and the packages that own the kinds).
     REPORT["code"] = Dict(
         "bmvc2026" => something(gitdescribe(realpath(@__DIR__)), "?"),
-        "VisualGeometryToolkitIo" => something(gitdescribe(pkgdir(VGIo)), "?"),
+        "VisualGeometryToolkitIO" => something(gitdescribe(pkgdir(VgtkIO)), "?"),
         "VisualGeometryToolkitCore" => something(gitdescribe(pkgdir(VisualGeometryToolkitCore)), "?"),
     )
     open(joinpath(RUN_ROOT, "_report.json"), "w") do io

@@ -1,6 +1,6 @@
 #=
 import VisualGeometryToolkitFeatures as VgtkFeatures
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 make_supp_tables.jl — the macros behind the supplement's two settings tables
 (and the main paper's prose that quotes them), generated from data instead of
 transcribed:
@@ -43,7 +43,7 @@ using Statistics: median
 using Printf: @sprintf
 using BlobBoards: FindBoardsConfig, config_dict
 using VisualGeometryToolkitCore: CameraModel, parse_unit, ustrip, mm, dpi
-import VisualGeometryToolkitIo
+import VisualGeometryToolkitIO
 import VisualGeometryToolkitFeatures
 
 if !isdefined(Main, :BlobBoardsEval)
@@ -124,7 +124,7 @@ _run_find_boards() = TOML.parsefile(RUN_CONFIG)["find_boards"]
 
 function _camera()
     # the session's camera of record (calibration/<camera>.json, vgio/cameras/v3)
-    return VgtkIo.load(CameraModel, camera_of_record(DATASET))
+    return VgtkIO.load(CameraModel, camera_of_record(DATASET))
 end
 
 # 1e-6 → "10^{-6}", as the table prints a tolerance.

@@ -53,7 +53,7 @@ module BlobBoards
 import VisualGeometryToolkitCore as VgtkCore
 import VisualGeometryToolkitEstimation as VgtkEstimation
 import VisualGeometryToolkitFeatures as VgtkFeatures
-import VisualGeometryToolkitIo as VgtkIo
+import VisualGeometryToolkitIO as VgtkIO
 
 # =============================================================================
 # Dependencies
@@ -68,7 +68,7 @@ using Statistics: Statistics
 using Random: Random, MersenneTwister, RandomDevice, Xoshiro
 import Artifacts   # descriptor-network catalog lookups (config_toml.jl)
 import Pkg         # Pkg.Artifacts.ensure_artifact_installed — lazy artifact fetch
-import VisualGeometryToolkitIo   # append_jsonl — run logs / telemetry (one JSONL writer)
+import VisualGeometryToolkitIO   # append_jsonl — run logs / telemetry (one JSONL writer)
 using Scratch: @get_scratch!   # regenerated board-render cache (io.jl)
 using Base: ImmutableDict
 

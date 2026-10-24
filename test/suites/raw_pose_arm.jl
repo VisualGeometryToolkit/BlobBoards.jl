@@ -13,7 +13,7 @@ import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
     EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, Camera, HomographyMap,
     centroid, moment_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points
-using RansacScoringDoneRight: StudentTUniformScoring
+using RANSACScoringDoneRight: StudentTUniformScoring
 using VisualGeometryToolkitEstimation: AbsolutePoseProblem
 using LocalOptimizationDoneRight: HQ, tuning_constant
 using VisualGeometryToolkitCore: WelschShape

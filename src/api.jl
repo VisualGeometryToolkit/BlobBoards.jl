@@ -51,7 +51,7 @@ public geometry_from_toml, geometry_tag    # the TOML tag of a GeometryConfig de
 export DetectConfig, MxmNms, EllipseNms
 export AbstractDescriptorNetwork, DescriptorNetwork, LuxDescriptorNetwork
 export BoardGallery                        # Cached per-board feature extraction
-export load_board                          # Board JSON loading (cameras: VisualGeometryToolkitIo.load)
+export load_board                          # Board JSON loading (cameras: VisualGeometryToolkitIO.load)
 export board_points, board_library, board_resolver, board_target   # the design resolver: a board uid → its nominal plane points
 export extract_board_features, extract_image_features  # Pre-extraction for multi-frame reuse
 export Disc, EllipticFrame, BlobDetection  # Result/geometry types
