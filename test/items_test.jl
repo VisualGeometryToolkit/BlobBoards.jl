@@ -41,6 +41,10 @@ end
     include("suites/serialization.jl")
 end
 
+@testitem "identity and byte pins" begin
+    include("suites/identity_pins.jl")
+end
+
 @testitem "units convention" begin
     using VisualGeometryToolkitCore: mm, px, dpi
     include("suites/units_convention.jl")
