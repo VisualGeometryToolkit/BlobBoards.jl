@@ -22,7 +22,7 @@
 #
 # The CUDA_Runtime_jll pin at the bottom lives here rather than in a
 # LocalPreferences.toml because .gitignore excludes those — same reason the root
-# Project.toml carries its own copy. ORT's CUDA provider takes a runtime >= 12.0
+# Project.toml carries its own copy. ORT's CUDA provider takes a runtime >= 12.8
 # and < 13.0; the machine default is newer, and without the pin
 # `load_inference(...; execution_provider = :cuda)` errors into the CPU fallback.
 
