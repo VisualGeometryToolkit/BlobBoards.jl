@@ -270,8 +270,8 @@
         function run_dir(two_targets)
             dir = mktempdir()
             ids = two_targets ? (:b1, :b2) : (:b1,)
-            idpose = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0))
-            plane = [VGC.Vec2{Float64}(X[1], X[2]) for X in grid]
+            idpose = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0) .* VGC.m)   # a saved rig holds lengths as quantities
+            plane = [VGC.Vec2{Float64}(X[1], X[2]) .* VGC.mm for X in grid]
             rig = VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.PosedTarget(VGC.PlanarTarget(plane), idpose) for id in ids))
             tp = joinpath(dir, "targets_1.json")
             VgtkIO.save(tp, rig)
@@ -320,7 +320,8 @@
         @test_throws PythonCall.PyException corr.opencv_lens_record(np.zeros(6))
         recs = VgtkIO.load(Vector{VGC.EuclideanMap}, posesf)
         @test all(((r, k),) -> VGC.geom(r) isa VGC.EuclideanMap{3, Float64, <:Any, <:Any, VGC.TargetFrame{:b1}, VGC.ViewFrame{Symbol("f$(k).png")}}, zip(recs, eachindex(poses)))
-        @test all(VGC.geom(r).R ≈ R && VGC.geom(r).t ≈ t for (r, (R, t)) in zip(recs, poses))
+        # the loaded pose holds metres (a length is a quantity); the poses above are millimetres
+        @test all(VGC.geom(r).R ≈ R && VGC.ustrip.(VGC.mm, VGC.geom(r).t) ≈ t for (r, (R, t)) in zip(recs, poses))
     end
 
     @testset "find_boards_python: the homography's pixel convention is stated" begin
