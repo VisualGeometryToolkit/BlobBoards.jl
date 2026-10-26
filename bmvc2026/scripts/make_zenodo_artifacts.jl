@@ -271,7 +271,7 @@ elseif TIER == "assets"
         base_root = dirname(DS_ROOT)
     )
 elseif TIER == "training"
-    # DATASET-ROOT tier pair (see the header). Mounted at the view root like
+    # DATASET-ROOT tier pair (see the header). Placed at the view root like
     # bb_assets, so `data_root()/descriptor_training/...` resolves identically
     # on primary copy and artifact view. The primary copy is an rsync of
     # the frozen `BlobBoardTrainingFootage/final/` training footage (2026-08-28):
