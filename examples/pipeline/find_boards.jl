@@ -37,7 +37,7 @@ using StaticArrays: SVector, SMatrix
 using CUDA          # triggers GPU extensions
 import cuDNN        # ONNXRunTime :cuda execution provider
 using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
-    HomographyMap, HomographyMat, Camera, undistort, CameraModel, Pinhole,
+    HomographyMap, HomographyMat, PosedCamera, undistort, CameraModel, Pinhole,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 using CUDA: CUDABackend   # the KA device token
@@ -70,12 +70,12 @@ camera_json = joinpath(BlobBoards.example_data(:still), "cameras.json")
 # through `PerspectiveMap ∘ HomographyMap` into the image.
 # =============================================================================
 
-# Homography path: model IS the world→image H. Pose path: VGC's Camera
+# Homography path: model IS the world→image H. Pose path: VGC's PosedCamera
 # composes pose + intrinsics — same idiom as src/verify.jl, no hand-rolled
 # K·[r1|r2|t].
 _to_homography(H_mat, ::Nothing) = SMatrix{3, 3, Float64}(H_mat)
 _to_homography(pose, cam::CameraModel) =
-    SMatrix{3, 3, Float64}(HomographyMat(Camera(cam, pose)))
+    SMatrix{3, 3, Float64}(HomographyMat(PosedCamera(cam, pose)))
 
 function plot_results(img, results, board_bundles, cam, label; n = min(10, length(results)))
     top = results[1:n]

@@ -14,7 +14,7 @@ Convert a density to pixels per millimeter.
 px_per_mm(density::Quantity) = ustrip(px / mm, density)   # a ConversionError unless a density
 
 """
-    mm_per_px(density) -> VgcQuantity
+    mm_per_px(density) -> Quantity
 
 The pixel pitch of a density, as a length-per-pixel quantity — the inverse
 of the density (`ustrip(mm / px, mm_per_px(300dpi)) ≈ 0.0847`). Until 2026-09

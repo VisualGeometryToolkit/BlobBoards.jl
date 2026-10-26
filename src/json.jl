@@ -41,12 +41,51 @@ _getfield(x, key::String, default) = _hasfield(x, key) ? _getfield(x, key) : def
 
 const _JSONObject = Union{AbstractDict, NamedTuple}
 
-# A value's JSON lowering (types.jl, VisualGeometryToolkitFeatures' for `Size2` and
-# quantities), the value itself when it has none: what the writer serializes
-# and what the canonical identity encoding (`_plain`) is computed over. The
-# style is private; every lowering method takes any `JSON.JSONStyle`.
+# A value's JSON lowering (types.jl: each BlobBoards type's `JSON.lower`; a
+# quantity or a `Size2` through `_lower`/`_quantity_json` below), the value itself
+# when it has none: what the writer serializes and what the canonical identity
+# encoding (`_plain`) is computed over. The style is private; every lowering
+# method takes any `JSON.JSONStyle`.
 struct _LowerStyle <: JSON.JSONStyle end
 _lower(x) = JSON.lower(_LowerStyle(), x)
+
+# A board file's quantity is a `{value, unit}` object in the unit its dimension
+# names: a length in "mm", a density in "dpi", a pixel count (dimensionless) in
+# "px"; a pixel count or a density snaps to an integer when it is one. The
+# stack's own quantity format (a number in the record's declared unit) is not
+# written here: board files keep the form every stored board has, and
+# VisualGeometryToolkitIO reads it (`read_quantity` accepts the object).
+function _quantity_json(q::Quantity)
+    d = dimension(q)
+    u = d == dimension(mm) ? mm : d == dimension(dpi) ? dpi : d == dimension(px) ? px :
+        throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
+    v = ustrip(u, q)
+    return (value = u === mm ? Float64(v) : _snap_integer(v), unit = unit_string(u))
+end
+_snap_integer(v::Integer) = Int(v)
+_snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
+_snap_integer(v) = v
+
+# a board file's number or quantity, as the writer writes it
+_json_scalar(q::Quantity) = _quantity_json(q)
+_json_scalar(x) = x
+_json_size2(s::Size2) = (width = _json_scalar(s.width), height = _json_scalar(s.height))
+
+_lower(q::Quantity) = _quantity_json(q)
+_lower(s::Size2) = _json_size2(s)
+_jv(s::Size2) = _json_size2(s)   # a field's value as the writer writes it
+_jv(x) = _json_scalar(x)
+
+# A board file's number or `{value, unit}` object, read: a number as it is, an
+# object as the quantity (any unit name `parse_unit` reads, so every string a
+# stored board holds loads: mm, px, dpi, pd, pt).
+function _lift_scalar(x)
+    x isa _JSONObject || return x
+    u = parse_unit(String(_getfield(x, "unit")); compound = true)
+    v = _getfield(x, "value")
+    return (dimension(u) == dimension(mm) ? Float64(v) : _snap_integer(v)) * u
+end
+_lift_size2(x) = Size2(width = _lift_scalar(_getfield(x, "width")), height = _lift_scalar(_getfield(x, "height")))
 
 # The type `JSON.parse(str)` returns for an object.
 const _ParsedObject = JSON.Object{String, Any}

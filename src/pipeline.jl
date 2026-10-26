@@ -13,7 +13,7 @@
 using VisualGeometryToolkitCore:
     centroid, feature_frame,
     Extrinsics3, CameraModel, AbstractIntrinsics, Pinhole, AbstractLensModel,
-    undistort, undistort!, Camera, HomographyMat, HomographyMap, EllipticFrame,
+    undistort, undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
     sources, Attributed, withattrs, planar_lift, lift, exact   # #21 correspondence layer; `exact`: the board side of a 2D fit
 
@@ -527,7 +527,7 @@ end
 # A pose model never pairs with the radial token or with `nothing` (those
 # geometries fit homographies), so those combinations refuse loudly. Both
 # arms exist so JET sees every union member covered — VGC 0.18's
-# `Camera(model::AbstractCameraModel, …)` turned the old silent
+# `PosedCamera(model::AbstractCameraModel, …)` turned the old silent
 # StackOverflow on a wrong model into a static MethodError.
 """
     _model_to_homography(model, cam) -> HomographyMap
@@ -545,15 +545,15 @@ pose ∘ K on the z = 0 plane and returns it LABELED
 `cam` is the ESTIMATION camera (`_estimation_camera`): under `:global` the
 pinhole twin, whose plane homography is the exact map; under `:none` the
 full camera, for which no homography exists — the guided transfer is then
-the `Camera` itself (`transfer_ellipse(::Camera, _)`: the conic through the
+the `PosedCamera` itself (`transfer_ellipse(::PosedCamera, _)`: the conic through the
 plane homography exactly, the lens's affinity at the transferred centre),
 and the name stays for continuity with the two radial arms, which also forward
 their MODEL through.
 """
 _model_to_homography(pose::Extrinsics3, cam::CameraModel{<:AbstractIntrinsics, Pinhole}) =
-    HomographyMap(Camera(cam, pose))
+    HomographyMap(PosedCamera(cam, pose))
 _model_to_homography(pose::Extrinsics3, cam::CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}) =
-    Camera(cam, pose)
+    PosedCamera(cam, pose)
 # Untyped on purpose: RadialHomographyGeometry is defined further down this
 # file, and a signature naming it here would not precompile.
 _model_to_homography(::Extrinsics3, cam) = throw(
@@ -656,9 +656,9 @@ end
 end
 # Full camera (the :none policy): the transferred conic already lives in the
 # RAW image — the plane homography exactly, the lens's affinity at the
-# centre (VGC `transfer_ellipse(::Camera, _)`) — so it is compared where
+# centre (VGC `transfer_ellipse(::PosedCamera, _)`) — so it is compared where
 # the detections are and searched at its own centre.
-@inline function _guided_transfer(camera::Camera, wreg)
+@inline function _guided_transfer(camera::PosedCamera, wreg)
     ep = transfer_ellipse(camera, wreg)
     ep === nothing && return nothing
     return (ep, ep.center)
@@ -668,7 +668,7 @@ end
 # Radial: carried into undistorted coordinates by the local affinity at its own
 # centre. One Jacobian per accepted candidate, not per detection per board.
 @inline _guided_detell(::HomographyMap, det_ells, j) = det_ells[j]
-@inline _guided_detell(::Camera, det_ells, j) = det_ells[j]
+@inline _guided_detell(::PosedCamera, det_ells, j) = det_ells[j]
 @inline _guided_detell(m::VgtkCore.RadialHomography, det_ells, j) =
     _undistort_ellipse(m, det_ells[j])
 
@@ -699,7 +699,7 @@ the descriptor matcher missed without admitting smears.
 `H` is the guided TRANSFER: a `HomographyMap` on the projective arms, a
 `RadialHomography` on the radial one, where the conic goes through the
 homography exactly and only the undistortion is linearised (`_guided_transfer`),
-or a VisualGeometryToolkitCore `Camera` (a camera model and a board pose), where the
+or a VisualGeometryToolkitCore `PosedCamera` (a camera model and a board pose), where the
 conic goes through the plane homography exactly and the lens's affinity is
 taken at the transferred centre.
 
@@ -733,7 +733,7 @@ world→image map is not projective at all, and no conic transfer is exact —
 that case would need a local linearisation at each blob centre.
 """
 function guided_search(
-        H::Union{HomographyMap, VgtkCore.RadialHomography, Camera}, bundle, image_features;
+        H::Union{HomographyMap, VgtkCore.RadialHomography, PosedCamera}, bundle, image_features;
         max_px::Real, min_iou::Real,
         keep::AbstractVector{Pair{Int, Int}} = Pair{Int, Int}[],
         detc::Union{Nothing, Vector} = nothing,
@@ -1564,7 +1564,7 @@ through the FULL camera — RANSAC scoring, the Student-t M-step and the
 Welsch lift all measure the reprojection through the lens in the pixels the
 detector produced (VisualGeometryToolkitEstimation ≥ 0.19.9), and guided association
 transfers each blob's conic through the plane homography exactly and the
-lens's affinity at its centre (`transfer_ellipse(::Camera, _)`). `:global`
+lens's affinity at its centre (`transfer_ellipse(::PosedCamera, _)`). `:global`
 undistorts the IMAGE (VGC's fused warp) and runs the whole pipeline on the
 result through the pinhole twin — the historical path, and what the BMVC
 runs used (their configs state it). Why `:none`: a residual in the
@@ -1676,7 +1676,7 @@ struct BoardDetection{M}
     source::Symbol       # :detect | :init | :track
 end
 
-# Camera lives inside PoseGeometry; HomographyGeometry is the no-camera path.
+# PosedCamera lives inside PoseGeometry; HomographyGeometry is the no-camera path.
 _camera(g::PoseGeometry) = g.camera
 _camera(::HomographyGeometry) = nothing
 # The geometry itself is the token: uncalibrated, but carrying the image

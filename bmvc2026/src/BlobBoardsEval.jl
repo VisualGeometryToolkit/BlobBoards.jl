@@ -19,8 +19,8 @@ using LinearAlgebra
 using Rotations
 using StaticArrays
 using Statistics
-using VisualGeometryToolkitCore: EuclideanMap, Frame, ViewFrame, TargetFrame, Rig, Mounted, PlanarTarget,
-    relabel, unlabel, pose, ids
+using VisualGeometryToolkitCore: EuclideanMap, Frame, ViewFrame, TargetFrame, Rig, PosedTarget, PlanarTarget,
+    relabel, unlabel, pose, model, ids
 using VisualGeometryToolkitEstimation: fit_robot_world_hand_eye
 using BlobBoards
 

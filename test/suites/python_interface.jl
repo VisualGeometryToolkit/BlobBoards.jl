@@ -272,7 +272,7 @@
             ids = two_targets ? (:b1, :b2) : (:b1,)
             idpose = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0))
             plane = [VGC.Vec2{Float64}(X[1], X[2]) for X in grid]
-            rig = VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.Mounted(VGC.PlanarTarget(plane), idpose) for id in ids))
+            rig = VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.PosedTarget(VGC.PlanarTarget(plane), idpose) for id in ids))
             tp = joinpath(dir, "targets_1.json")
             VgtkIO.save(tp, rig)
             obs = VGC.TargetPoints2D{VGC.PixelFrame{:colmap}}(

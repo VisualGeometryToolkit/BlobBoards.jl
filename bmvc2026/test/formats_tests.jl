@@ -12,7 +12,7 @@ if !isdefined(Main, :BlobBoardsEval)
 end
 using .BlobBoardsEval
 import VisualGeometryToolkitIO as VgtkIO
-using VisualGeometryToolkitCore: Trajectory, TargetPoses, Mounted, PlanarTarget, is_resolved
+using VisualGeometryToolkitCore: Trajectory, TargetPoses, PosedTarget, PlanarTarget, is_resolved, model
 using VisualGeometryToolkitCore: EuclideanMap, BodyFrame, WorldFrame, CameraFrame, TargetFrame, ViewFrame, Uncertain, CovMat,
     geom, relabel, unlabel, pose, ids, Rig
 import Rotations
@@ -86,7 +86,7 @@ end
             X, mount = BBE.load_hand_eye(file)
             @test X isa Uncertain && geom(X) isa EuclideanMap{3, Float64, <:Any, <:Any, BodyFrame{:camera_rig}, ViewFrame{:optical}}
             @test mount isa Rig{BodyFrame{:board_rig}} && all(id -> pose(mount, id) isa Uncertain, ids(mount))
-            @test all(id -> mount[id] isa Mounted && mount[id].target == PlanarTarget(id) && !is_resolved(mount[id].target), ids(mount))
+            @test all(id -> mount[id] isa PosedTarget && model(mount[id]) == PlanarTarget(id) && !is_resolved(model(mount[id])), ids(mount))
             @test rotation_angle(RotMatrix{3}(SMatrix{3, 3}(geom(X).R)' * SMatrix{3, 3}(cap.X.R))) < 1.0e-2
             @test all(isfinite, cov(X)) && !iszero(cov(X))
             # the covariance of X is the fit's Y_rvg block pushed through the inverse

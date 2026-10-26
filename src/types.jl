@@ -60,11 +60,11 @@ end
 StructUtils.structlike(::Type{<:RulerTick}) = false
 StructUtils.arraylike(::Type{<:RulerTick}) = false
 
-JSON.lower(::JSON.JSONStyle, rt::RulerTick) = (spacing = rt.spacing, width = rt.width)
+JSON.lower(::JSON.JSONStyle, rt::RulerTick) = (spacing = _jv(rt.spacing), width = _jv(rt.width))
 
 function JSON.lift(::Type{<:RulerTick}, x::_JSONObject)
-    spacing = JSON.lift(ScalarOrQuantity, _getfield(x, "spacing"))
-    width = JSON.lift(ScalarOrQuantity, _getfield(x, "width"))
+    spacing = _lift_scalar(_getfield(x, "spacing"))
+    width = _lift_scalar(_getfield(x, "width"))
     return RulerTick(spacing, width)
 end
 
@@ -154,7 +154,7 @@ Fields (selected)
 - `polarity::Symbol`: blob polarity (`:dark` for dark blobs on light background,
   `:light` for light blobs on dark background)
 """
-struct PatternConfig{U <: VgcQuantity, U2, PT}
+struct PatternConfig{U <: Quantity, U2, PT}
     pattern_resolution::Size2{U}
     min_scale::U2
     seed::UInt64
@@ -243,11 +243,11 @@ StructUtils.structlike(::Type{<:PatternConfig}) = false
 # names) — these live in the preamble, so they only affect newly MINTED
 # identities; stored hashes stay authoritative for existing boards.
 JSON.lower(::JSON.JSONStyle, pc::PatternConfig) = (
-    pattern_resolution = pc.pattern_resolution,
-    min_scale = pc.min_scale,
+    pattern_resolution = _jv(pc.pattern_resolution),
+    min_scale = _jv(pc.min_scale),
     seed = string(pc.seed),
     pixel_type = _pixel_type_name(pc.pixel_type),
-    max_scale = pc.max_scale,
+    max_scale = _jv(pc.max_scale),
     scales_per_octave = pc.scales_per_octave,
     max_trials = pc.max_trials,
     alpha = pc.α,
@@ -285,8 +285,8 @@ end
 function JSON.lift(::Type{<:PatternConfig}, x::_JSONObject)
     pixel_type = _pixel_type_from_name(String(_getfield(x, "pixel_type")))
 
-    pattern_resolution = JSON.lift(Size2, _getfield(x, "pattern_resolution"))
-    min_scale = JSON.lift(ScalarOrQuantity, _getfield(x, "min_scale"))
+    pattern_resolution = _lift_size2(_getfield(x, "pattern_resolution"))
+    min_scale = _lift_scalar(_getfield(x, "min_scale"))
 
     # Handle seed as either number or string (for full UInt64 precision)
     seed_raw = _getfield(x, "seed")
@@ -306,7 +306,7 @@ function JSON.lift(::Type{<:PatternConfig}, x::_JSONObject)
     cutoff = Float64(something(_getfield(x, "cutoff", _getfield(x, "sigma_cutoff", nothing)), DEFAULT_CUTOFF))
     scales_per_octave = Int(_getfield(x, "scales_per_octave"))
     max_scale = if max_scale_raw !== nothing
-        JSON.lift(ScalarOrQuantity, max_scale_raw)
+        _lift_scalar(max_scale_raw)
     else
         σ_min = Float64(ustrip(px, min_scale))
         k = _ladder_top_from_fraction(ustrip.(px, pattern_resolution), σ_min, Float64(max_fraction_raw), scales_per_octave, cutoff)
@@ -471,7 +471,7 @@ abstract type LayoutGrid end
 struct PointGrid <: LayoutGrid end
 
 "The pixel grid of a board stored in schema ≤ v3, at the density it was printed at."
-struct PixelGrid{D <: VgcQuantity} <: LayoutGrid
+struct PixelGrid{D <: Quantity} <: LayoutGrid
     density::D
 end
 
@@ -686,7 +686,7 @@ on.
 _vgc(::Nothing) = nothing
 _vgc(x) = ubase.(x)
 
-struct BoardConfig{L <: VgcQuantity, G <: LayoutGrid, F <: VgcQuantity, P <: VgcQuantity, RS <: RulerSpec}
+struct BoardConfig{L <: Quantity, G <: LayoutGrid, F <: Quantity, P <: Quantity, RS <: RulerSpec}
     canvas_size::Size2{L}
     board_size::Size2{L}
     margin::Size2{L}
@@ -959,26 +959,26 @@ StructUtils.structlike(::Type{<:BoardConfig}) = false
 # (`print_density`: part of the stored v3 record, so it stays); a v4 board's
 # declared grid. The key order is the v3 sidecar's, so a stored v3 board
 # re-saves unchanged.
-_grid_record(g::PixelGrid) = (; print_density = g.density)
+_grid_record(g::PixelGrid) = (; print_density = _jv(g.density))
 _grid_record(g::PointGrid) = (; layout_grid = (value = 1 / _grid_per_stored(g), unit = _blob_unit(g)))
 
 JSON.lower(::JSON.JSONStyle, bc::BoardConfig) = (;
-    canvas_size = bc.canvas_size,
+    canvas_size = _jv(bc.canvas_size),
     _board_record(bc.layout_grid, bc)...,
     _grid_record(bc.layout_grid)...,
     _frame_record(bc.layout_grid, bc)...,
 )
 # A v4 board records its margin (its board is derived: `_board_from_margin`); a
 # v3 board, the board size it was laid out with.
-_board_record(::PointGrid, bc) = (; margin = bc.margin)
-_board_record(::PixelGrid, bc) = (; board_size = bc.board_size)
+_board_record(::PointGrid, bc) = (; margin = _jv(bc.margin))
+_board_record(::PixelGrid, bc) = (; board_size = _jv(bc.board_size))
 # A v4 board records its marks' sizes (a zero turns one off) and the ruler's
 # ticks; a v3 board, as it was written: its band (`frame_width`, whose crossings
 # are its corner cells), its ticks and whether the band was ruled.
 _frame_record(::PointGrid, bc) =
-    (; ruler_width = bc.ruler_width, corner_size = bc.corner_size, frame_padding = bc.frame_padding, ruler_spec = bc.ruler_spec)
+    (; ruler_width = _jv(bc.ruler_width), corner_size = _jv(bc.corner_size), frame_padding = _jv(bc.frame_padding), ruler_spec = bc.ruler_spec)
 _frame_record(::PixelGrid, bc) =
-    (; frame_width = bc.ruler_width, frame_padding = bc.frame_padding, ruler_spec = bc.ruler_spec, frame_style = string(bc.frame_style))
+    (; frame_width = _jv(bc.ruler_width), frame_padding = _jv(bc.frame_padding), ruler_spec = bc.ruler_spec, frame_style = string(bc.frame_style))
 
 function _construct_grid(x)
     g = _getfield(x, "layout_grid", nothing)
@@ -988,7 +988,7 @@ function _construct_grid(x)
             throw(ArgumentError("board_config.layout_grid must be {value: $(want.value), unit: \"$(want.unit)\"}, got $(g)"))
         return PointGrid()
     end
-    return PixelGrid(JSON.lift(ScalarOrQuantity, _getfield(x, "print_density")))
+    return PixelGrid(_lift_scalar(_getfield(x, "print_density")))
 end
 
 # The ruler's ticks, as keywords: what a stored board is rebuilt with while its
@@ -999,12 +999,12 @@ _tick_kwargs(rs) = (;
 )
 
 function JSON.lift(::Type{<:BoardConfig}, x::_JSONObject)
-    canvas_size = JSON.lift(Size2, _getfield(x, "canvas_size"))
+    canvas_size = _lift_size2(_getfield(x, "canvas_size"))
     layout_grid = _construct_grid(x)
     # a v4 board's margin (its board derived from it); a v3 board's board, as recorded
-    sized = layout_grid isa PixelGrid ? (; board_size = JSON.lift(Size2, _getfield(x, "board_size"))) :
-        (; margin = JSON.lift(Size2, _getfield(x, "margin")))
-    q(k) = JSON.lift(ScalarOrQuantity, _getfield(x, k))
+    sized = layout_grid isa PixelGrid ? (; board_size = _lift_size2(_getfield(x, "board_size"))) :
+        (; margin = _lift_size2(_getfield(x, "margin")))
+    q(k) = _lift_scalar(_getfield(x, k))
     frame_padding = q("frame_padding")
     ruler_spec = JSON.lift(RulerSpec, _getfield(x, "ruler_spec"))
     marks = if layout_grid isa PixelGrid

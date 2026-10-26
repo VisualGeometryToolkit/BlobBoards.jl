@@ -44,7 +44,7 @@ using CUDA          # triggers GPU extensions (CPU works too — see DEVICE)
 import cuDNN        # ONNXRunTime :cuda execution provider
 using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
     HomographyMap, HomographyMat, RadialHomography, radial_transfer,
-    Camera, CameraModel, Pinhole, undistort, division_bounded,
+    PosedCamera, CameraModel, Pinhole, undistort, division_bounded,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v3 camera stores
@@ -78,7 +78,7 @@ _transfer_pt(m::RadialHomography, ::Nothing, p) =
 _transfer_pt(H, ::Nothing, p) =
     (PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H)))(p)
 _transfer_pt(pose, cam::CameraModel, p) =
-    (PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(HomographyMat(Camera(cam, pose)))))(p)
+    (PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(HomographyMat(PosedCamera(cam, pose)))))(p)
 
 function plot_results(img, results, board_bundles, cam, label; n = min(10, length(results)))
     top = results[1:n]

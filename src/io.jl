@@ -374,14 +374,14 @@ end
 
 # A recorded bleed, `{value, unit}` a length; anything else is refused.
 function _bleed_record(b)
-    q = JSON.lift(ScalarOrQuantity, b)
+    q = _lift_scalar(b)
     (q isa Quantity && dimension(q) == dimension(mm)) || throw(ArgumentError("render.bleed must be a length, got $(b)"))
     return q
 end
 
 # A recorded density, `{value, unit}` in dpi; anything else is refused.
 function _density_record(d)
-    q = JSON.lift(ScalarOrQuantity, d)
+    q = _lift_scalar(d)
     (q isa Quantity && dimension(q) == dimension(dpi)) || throw(ArgumentError("render.density must be a density, got $(d)"))
     return q
 end

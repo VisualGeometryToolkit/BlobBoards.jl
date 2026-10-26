@@ -45,7 +45,7 @@ include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the 
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
-    Mounted, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids
+    PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids
 using Rotations: QuatRotation, params
 using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
 using DrWatson: gitdescribe
@@ -170,7 +170,7 @@ function convert_mocap(session)
         c = cons[b.id]
         file = joinpath(out_root, "constellation_$(b.id).json")
         F = BodyFrame{b.id}
-        rig = Rig{F}(Dict(b.id => Mounted(PointTarget(c.points), EuclideanMap(one(RotMatrix{3, Float64}), zero(SVector{3, Float64}); check = false))))
+        rig = Rig{F}(Dict(b.id => PosedTarget(PointTarget(c.points), EuclideanMap(one(RotMatrix{3, Float64}), zero(SVector{3, Float64}); check = false))))
         VgtkIO.save(
             file, rig;
             provenance = (

@@ -11,7 +11,7 @@ using StructArrays: StructArray
 using Rotations: RotMatrix, RotXYZ, rotation_angle
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
-    EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, Camera, HomographyMap,
+    EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, PosedCamera, HomographyMap,
     centroid, moment_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points
 using RANSACScoringDoneRight: StudentTUniformScoring
 using VisualGeometryToolkitEstimation: AbsolutePoseProblem
@@ -45,7 +45,7 @@ end
 @testset "the transfer object: a homography under :global, the camera under :none" begin
     pose = Extrinsics3(_POSE.R, _POSE.t)
     @test _model_to_homography(pose, _PIN) isa HomographyMap                          # exact plane map
-    @test _model_to_homography(pose, _CAM) isa Camera                                 # no homography exists through a lens
+    @test _model_to_homography(pose, _CAM) isa PosedCamera                                 # no homography exists through a lens
     cam = _model_to_homography(pose, _CAM)
     # the guided transfer compares in the RAW image and searches at the same centre
     wreg = Circle(Point2(60.0, -40.0), 2.5)
@@ -54,18 +54,18 @@ end
     # the conic is transferred, not the point: a projective map does not carry
     # a centre to the transferred conic's centre (second order — 4e-3 px here),
     # and the conic centre is what the imaged blob actually has
-    exact = SVector{2, Float64}(project(Camera(_CAM, _POSE), Point3{Float64}(60.0, -40.0, 0.0)))
+    exact = SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(60.0, -40.0, 0.0)))
     @test isapprox(SVector{2, Float64}(ep.center), exact; atol = 0.05)
     Σi = inv(SMatrix{2, 2, Float64}(moment_matrix(ep)))
     worst = maximum(boundary_points(wreg, 48)) do p
-        q = SVector{2, Float64}(project(Camera(_CAM, _POSE), Point3{Float64}(p[1], p[2], 0.0)))
+        q = SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(p[1], p[2], 0.0)))
         d = q - SVector{2, Float64}(ep.center)
         abs(sqrt(d' * Σi * d) - 1.0)
     end
     @test worst < 0.02
     # a board behind the camera transfers nothing
     behind = _model_to_homography(pose, _CAM)
-    @test _guided_transfer(Camera(_CAM, EuclideanMap(RotMatrix{3, Float64}(one(SMatrix{3, 3, Float64})), Vec3{Float64}(0.0, 0.0, -500.0))), wreg) === nothing
+    @test _guided_transfer(PosedCamera(_CAM, EuclideanMap(RotMatrix{3, Float64}(one(SMatrix{3, 3, Float64})), Vec3{Float64}(0.0, 0.0, -500.0))), wreg) === nothing
 end
 
 @testset "the pose fit itself: raw pixels through the lens, rim included" begin
@@ -95,7 +95,7 @@ end
 end
 
 # track_boards' bookkeeping projects every blob centre through the transfer
-# `_model_to_homography` hands back — the `Camera` itself on the full-camera
+# `_model_to_homography` hands back — the `PosedCamera` itself on the full-camera
 # pose arm. Through a pinhole that is the plane homography's projection; through
 # the lens, the camera's own projection of the z = 0 lift.
 @testset "blob centres through the full camera (track_boards, :none)" begin
@@ -105,10 +105,10 @@ end
     @test through_cam isa Vector{Point2{Float64}} && length(through_cam) == length(wd)
     for (p, d) in zip(through_cam, wd)
         c = centroid(d)
-        @test SVector{2, Float64}(p) ≈ SVector{2, Float64}(project(Camera(_CAM, _POSE), Point3{Float64}(c[1], c[2], 0.0)))
+        @test SVector{2, Float64}(p) ≈ SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(c[1], c[2], 0.0)))
     end
-    # a pinhole camera: the Camera method agrees with the homography method
+    # a pinhole camera: the PosedCamera method agrees with the homography method
     via_H = _project_blob_centers(_model_to_homography(pose, _PIN), wd)
-    via_cam = _project_blob_centers(Camera(_PIN, _POSE), wd)
+    via_cam = _project_blob_centers(PosedCamera(_PIN, _POSE), wd)
     @test all(SVector{2, Float64}(a) ≈ SVector{2, Float64}(b) for (a, b) in zip(via_H, via_cam))
 end

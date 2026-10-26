@@ -377,7 +377,7 @@ end
 
 # The pose arm under `undistortion = :none` keeps the FULL camera as its
 # estimation camera, which has no plane homography: `track_boards` projects the
-# blob centres through the `Camera` itself. Until the `Camera` method of
+# blob centres through the `PosedCamera` itself. Until the `PosedCamera` method of
 # `_project_blob_centers` existed this died in a MethodError on the first
 # accepted board.
 @testset "track_boards — pose arm, full camera (undistortion = :none)" begin

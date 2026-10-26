@@ -46,8 +46,8 @@ The hand-eye (robot-world) calibration for one marker system, cached by config.
 
 `X` is the labeled camera-mount transform (`CameraRigFrame →
 ViewFrame{:optical}`); `targets` is the marker mount as a
-`Rig{BoardRigFrame}` of `Mounted` boards (marker id, as `Symbol` → a
-pose-only `PlanarTarget` and its `TargetFrame{id} → BoardRigFrame` mount,
+`Rig{BoardRigFrame}` of `PosedTarget` boards (marker id, as `Symbol` → a
+pose-only `PlanarTarget` and its `TargetFrame{id} → BoardRigFrame` pose,
 minted on access). `diagnostics`
 carries the fit's scalar health numbers. `file` is the artifact path, for
 provenance.

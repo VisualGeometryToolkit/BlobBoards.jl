@@ -6,7 +6,7 @@
 # =============================================================================
 using Test
 using StaticArrays: SVector
-using VisualGeometryToolkitCore: EuclideanMap, PlanarTarget, Mounted, Rig, BodyFrame, is_resolved, points, mm, dpi, Vec3
+using VisualGeometryToolkitCore: EuclideanMap, PlanarTarget, PosedTarget, Rig, BodyFrame, is_resolved, points, mm, dpi, Vec3, model, pose
 import VisualGeometryToolkitIO as VgtkIO
 using Rotations: QuatRotation
 
@@ -30,13 +30,13 @@ using Rotations: QuatRotation
         # (a mount stored as its quaternion: the value VisualGeometryToolkitIO reads back, exactly)
         q = SVector(0.9, 0.1, -0.2, 0.3) / sqrt(0.95)
         X = EuclideanMap{3, Float64, QuatRotation{Float64}, Vec3{Float64}}(QuatRotation(q..., false), Vec3{Float64}(10.0, -5.0, 2.0))
-        rig = Rig{BodyFrame{:board_rig}}(Dict(uid => Mounted(t, X)))
+        rig = Rig{BodyFrame{:board_rig}}(Dict(uid => PosedTarget(t, X)))
         f = joinpath(dir, "board_rig.json")
         VgtkIO.save(f, rig)
         unresolved = VgtkIO.load(Rig, f)
-        @test !is_resolved(unresolved[uid].target) && unresolved[uid].target == PlanarTarget(uid)
+        @test !is_resolved(model(unresolved[uid])) && model(unresolved[uid]) == PlanarTarget(uid)
         back = VgtkIO.load(Rig, f; resolve)
-        @test back[uid].target == t && back[uid].mount == rig[uid].mount
+        @test model(back[uid]) == t && pose(back[uid]) == pose(rig[uid])
         @test points(back, uid) == points(rig, uid)
     end
 end

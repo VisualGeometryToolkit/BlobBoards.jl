@@ -41,7 +41,7 @@
 # whole sequence.
 # =============================================================================
 
-using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, Camera, transfer_ellipse,
+using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, PosedCamera, transfer_ellipse,
     Extrinsics3, Ellipse, region, centroid, feature_frame,
     EllipticFrame, planar_lift,  # #21 lazy endpoint lifts
     Point3   # the full-camera pose arm projects blob centres (`_project_blob_centers`)
@@ -331,9 +331,9 @@ function _project_blob_centers(H::HomographyMap, wdiscs)
 end
 # The pose arm under `undistortion = :none` keeps the FULL camera as its
 # estimation camera, for which no plane homography exists: `_model_to_homography`
-# hands back the `Camera` itself, and the blob centres go through it — the z = 0
+# hands back the `PosedCamera` itself, and the blob centres go through it — the z = 0
 # lift of each world disc's centre, projected through pose and lens.
-function _project_blob_centers(cam::Camera, wdiscs)
+function _project_blob_centers(cam::PosedCamera, wdiscs)
     return [
         begin
                 c = centroid(d)

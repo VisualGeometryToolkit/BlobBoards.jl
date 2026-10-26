@@ -7,7 +7,7 @@
 # to ANY Makie backend — CairoMakie for PDF/PNG export, GLMakie for interactive
 # display — without re-triggering on a specific backend.
 
-using VisualGeometryToolkitCore: Camera, Circle, project
+using VisualGeometryToolkitCore: PosedCamera, Circle, project
 import LinearAlgebra: I
 using StaticArrays: SMatrix
 using GeometryBasics: Point2f, Point3f
@@ -19,14 +19,14 @@ using GeometryBasics: Point2f, Point3f
 Overlay projected board geometry on a 2D image axis.
 
 `mapping` is any callable that projects world geometry to image coordinates:
-- `Camera(model, pose)` — 3D→2D, supports points/circles/rects/etc. via
+- `PosedCamera(model, pose)` — 3D→2D, supports points/circles/rects/etc. via
   `VisualGeometryToolkitCore.project(camera, x)`. Used for the calibrated path.
 - `PerspectiveMap() ∘ HomographyMap(H)` — 2D→2D projective. Used for the
   uncalibrated (homography) path.
 
 # Example
 ```julia
-board!(ax, Camera(cam_model, pose), rect, discs; cutoff=2.0)
+board!(ax, PosedCamera(cam_model, pose), rect, discs; cutoff=2.0)
 board!(ax, PerspectiveMap() ∘ HomographyMap(H), rect, discs; cutoff=2.0)
 ```
 """
@@ -48,12 +48,12 @@ end
 # Dispatch the projection step on the mapping type. The default path uses
 # the mapping as a callable (works for `HomographyMap`, `PerspectiveMap ∘
 # HomographyMap`, and any user-supplied transformation that overloads
-# `(::Self)(x)`). `Camera` doesn't have a global callable in VGC — some
+# `(::Self)(x)`). `PosedCamera` doesn't have a global callable in VGC — some
 # lens models (OpenCV's, fisheye) are project-only, others are
 # backproject-only — so we route through VGC's `project(camera, x)`
-# explicitly for the Camera case.
+# explicitly for the PosedCamera case.
 _project_shape(m, x) = m(x)
-_project_shape(cam::Camera, x) = project(cam, x)
+_project_shape(cam::PosedCamera, x) = project(cam, x)
 
 function Makie.plot!(p::Board)
     m = p.mapping[]
@@ -95,7 +95,7 @@ function Makie.plot!(p::Board)
 end
 
 _board_frame!(::Board, ::Any) = nothing
-function _board_frame!(p::Board, cam::Camera)
+function _board_frame!(p::Board, cam::PosedCamera)
     p.show_frame[] || return
     origin_2d = Point2f(project(cam, Point3f(0, 0, 0)))
     scale = p.frame_scale[]

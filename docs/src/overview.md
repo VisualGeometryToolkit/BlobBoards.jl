@@ -37,7 +37,7 @@ b = blobs(bundle, :pattern; units=mm)
 ### Unit System
 
 Units are checked at run time via [FlexUnits.jl](https://github.com/Deduction42/FlexUnits.jl)
-with VisualGeometryToolkitCore's pixel dimension (quantities are `VgcQuantity`).
+with VisualGeometryToolkitCore's pixel dimension (quantities are FlexUnits `Quantity`s).
 BlobBoards re-exports `mm`, `cm`, `inch`, `px`, `dpi`, and friends, so
 `using BlobBoards` is all you need. Strip a quantity in a named unit,
 `ustrip(mm, q)`: lengths are held in metres.

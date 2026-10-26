@@ -24,7 +24,7 @@ using BlobBoards: _clamp_patch
 import BlobBoards: view_angle_figure, save_view_angle_figure
 
 using VisualGeometryToolkitCore: VisualGeometryToolkitCore, imshow, ellipses!, matches!,
-    HomographyMap, Camera, project
+    HomographyMap, PosedCamera, project
 # `Colors` is a hard dep of the package, so an extension may use it directly.
 using Colors: Colors
 using StaticArrays: SMatrix, SVector
@@ -374,7 +374,7 @@ end
 #
 # Both paths hand `board!` a 2D->2D homography composition, the mapping its
 # recipe is actually exercised with. `_project_shape` nominally also accepts a
-# `Camera`, but supplying one blows the stack inside Makie's argument pipeline —
+# `PosedCamera`, but supplying one blows the stack inside Makie's argument pipeline —
 # that path appears never to have been used.
 #
 # Pose path: the board is planar (z = 0), so a pinhole pose reduces exactly to
@@ -391,7 +391,7 @@ function _board_proj(camera_model::VgtkCore.CameraModel, pose; lens::Bool = true
     # overlaid on a captured frame needs. `lens = false` keeps the pinhole
     # plane homography below, for an image that has already been undistorted
     # (the trace viewer's `detect_img`).
-    lens && return CameraBoardProj(VgtkCore.Camera(camera_model, pose))
+    lens && return CameraBoardProj(VgtkCore.PosedCamera(camera_model, pose))
     K = SMatrix{3, 3, Float64}(camera_model.intrinsics.K)
     R = SMatrix{3, 3, Float64}(pose.R)
     # Extrinsics3.t is bare mm by convention; a quantity-carrying pose strips in mm.
@@ -440,7 +440,7 @@ _board_proj(::Nothing, m::VgtkCore.RadialHomography; lens::Bool = true) = Radial
 # `RadialBoardProj` does — and samples the lens cannot image (past the fold,
 # behind the camera) are dropped rather than drawn at a fabricated pixel.
 struct CameraBoardProj{C}
-    cam::C          # VisualGeometryToolkitCore.Camera(model, pose): world plane → raw pixels
+    cam::C          # VisualGeometryToolkitCore.PosedCamera(model, pose): world plane → raw pixels
 end
 
 function _cam_pt(p::CameraBoardProj, x, y)
@@ -469,8 +469,8 @@ _board_proj(::Nothing, m::VgtkCore.RadialCamera; lens::Bool = true) = throw(
 )
 
 # The `board!` recipe takes its mapping as a PLOT ARGUMENT, and Makie's argument
-# pipeline recurses into it — anything holding a `Camera` blows the stack there
-# (the note at `_board_proj` above records the same for a bare `Camera`, and
+# pipeline recurses into it — anything holding a `PosedCamera` blows the stack there
+# (the note at `_board_proj` above records the same for a bare `PosedCamera`, and
 # `CameraBoardProj` hits it identically). So the camera path draws the two
 # polygons the recipe would have drawn, itself, with the same batching: ONE
 # `poly!` for the outline and ONE for all the blobs, never a call per blob.

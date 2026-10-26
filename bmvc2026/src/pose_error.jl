@@ -219,7 +219,7 @@ _mount_file(file::AbstractString) = string(splitext(file)[1], "_board_rig", spli
 # The marker mount as a rig: each printed board a pose-only planar target —
 # its design named by its id, its points its design owner's (BlobBoards'
 # `board_points`) — mounted on the board rig.
-_mount_rig(Y::AbstractDict) = Rig{BoardRigFrame}(Dict(Symbol(id) => Mounted(PlanarTarget(Symbol(id)), T) for (id, T) in Y))
+_mount_rig(Y::AbstractDict) = Rig{BoardRigFrame}(Dict(Symbol(id) => PosedTarget(PlanarTarget(Symbol(id)), T) for (id, T) in Y))
 
 """
     save_hand_eye(file, he; provenance = (;)) -> (file, mount)
@@ -264,7 +264,7 @@ function load_hand_eye(file::AbstractString)
 end
 
 # The geometric target rig of an uncertain one (the chain is composed on values).
-_plain_targets(r::Rig) = Rig{BoardRigFrame}(Dict(id => Mounted(r[id].target, geom(pose(r[id]))) for id in ids(r)))
+_plain_targets(r::Rig) = Rig{BoardRigFrame}(Dict(id => PosedTarget(model(r[id]), geom(pose(r[id]))) for id in ids(r)))
 
 """
     inv_pose_covariance(Y, Σ) -> SMatrix{6, 6}

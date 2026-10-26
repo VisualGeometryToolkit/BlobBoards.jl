@@ -91,7 +91,6 @@ using VisualGeometryToolkitCore:
     dpi,
     pt,
     m, mm, cm, inch, ft, μm,
-    VgcQuantity,
     ustrip,
     filter_kwargs,
     validate_dir,
@@ -101,8 +100,7 @@ using VisualGeometryToolkitCore:
     is_map_inlier,                # the posterior > ½ MAP inlier decision (every `weights` read)
     PlanarTarget                  # a board as a target model (board_target, pipeline.jl)
 
-using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare
-using VisualGeometryToolkitFeatures: ScalarOrQuantity
+using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare, unit_string
 
 # Image processing and visualization
 using Colors: Colors, Gray

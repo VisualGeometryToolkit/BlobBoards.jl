@@ -239,7 +239,7 @@ math (Threads.@threads, plain sort — no bitonic needed).
 ## Unit System
 
 Units are FlexUnits with VisualGeometryToolkitCore's pixel dimension, checked at run
-time (quantities are `VgcQuantity`; BlobBoards re-exports `mm`, `inch`, `px`,
+time (quantities are FlexUnits `Quantity`s; BlobBoards re-exports `mm`, `inch`, `px`,
 `dpi`, …). Lengths are held in metres, so strip in a named unit
 (`ustrip(mm, q)`, `ustrip(px, q)`); a bare `ustrip` of a length is metres. The
 project was ported off Unitful and DynamicQuantities — never import units

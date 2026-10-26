@@ -46,7 +46,7 @@ using JSON
 import TOML
 using VisualGeometryToolkitEval.Experiments: read_provenance, warn_commit_drift
 using VisualGeometryToolkitFeatures: KnnMatch
-using VisualGeometryToolkitCore: ustrip, CameraModel, Pinhole, Camera, undistort, imshow, EuclideanMap, CameraFrame,
+using VisualGeometryToolkitCore: ustrip, CameraModel, Pinhole, PosedCamera, undistort, imshow, EuclideanMap, CameraFrame,
     BoundedCamera, TargetPoses
 
 # The repo whose commit `tag!` records into the provenance sidecar — same
@@ -179,7 +179,7 @@ function save_val_overlay(ctx::SweepContext, out_png, img_color_raw, accepted)
         bundle = ctx.board_bundles[uid]
         col = ctx.board_colors[uid]
         board!(
-            ax, Camera(ctx.cam_pinhole, model), Rect(bundle, :world),
+            ax, PosedCamera(ctx.cam_pinhole, model), Rect(bundle, :world),
             blobs(bundle, :world);
             cutoff = cutoff(bundle), outline_color = col, blob_color = col,
             outline_width = 3.0, blob_width = 1.5, show_frame = true,

@@ -57,17 +57,17 @@ Project a board's world-coordinate bounding rectangle into the image through
 the estimated `model` — the ONE place the model→image quad is built (spatial
 suppression, feature claiming, agenda claim masks all share it). Homography
 path (`camera === nothing`): `model` IS the world→image H. Pose path: the
-VGC `Camera` composes pose + intrinsics. `bundle` is typed so a call in the
+VGC `PosedCamera` composes pose + intrinsics. `bundle` is typed so a call in the
 retired `(camera, bundle, model)` order is a MethodError.
 """
 board_quad(::Nothing, H, bundle::BoardBundle) =
     (PerspectiveMap() ∘ HomographyMap(H))(Rect(bundle, :world))
 board_quad(camera_model::CameraModel, model, bundle::BoardBundle) =
-    project(Camera(camera_model, model), Rect(bundle, :world))
+    project(PosedCamera(camera_model, model), Rect(bundle, :world))
 
 # Radial arm: the model is NOT a collineation — the distortion curves the
 # board's edges — so sample the rectangle boundary (as the calibrated path
-# does via `project(::Camera, rect, n)`) and transfer every sample through
+# does via `project(::PosedCamera, rect, n)`) and transfer every sample through
 # the model. Samples whose ray leaves the representable field are dropped.
 board_quad(::Nothing, m::VgtkCore.RadialHomography, bundle::BoardBundle) =
     GeometryBasics.Polygon(radial_outline(m, Rect(bundle, :world)))

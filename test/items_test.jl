@@ -84,7 +84,7 @@ end
 @testitem "boards" begin
     using TiffImages: TiffImages          # reads the TIFF back (test-only)
     using JSON
-    using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert, VgcQuantity
+    using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert
     include("suites/boards.jl")
 end
 
