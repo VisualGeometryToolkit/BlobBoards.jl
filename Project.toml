@@ -111,7 +111,7 @@ PythonCall = "0.9.35"
 Random = "1"
 RANSACScoringDoneRight = "0.1"
 Reactant = "0.2.240"
-VisualGeometryToolkitEstimation = "0.1"
+VisualGeometryToolkitEstimation = "0.2"
 Rotations = "1.7"
 SHA = "0.7, 1"
 Scratch = "1.3"
@@ -126,9 +126,9 @@ StructUtils = "2.11"
 TOML = "1"
 TensorBoardLogger = "0.1"
 VideoIO = "1.10"
-VisualGeometryToolkitCore = "0.1.2"
-VisualGeometryToolkitFeatures = "0.1"
-VisualGeometryToolkitIO = "0.1"
+VisualGeometryToolkitCore = "0.2"
+VisualGeometryToolkitFeatures = "0.2"
+VisualGeometryToolkitIO = "0.2"
 Zlib_jll = "1"
 Zygote = "0.7"
 cuDNN = "1.4.7"
@@ -139,6 +139,15 @@ julia = "1.12"
 # member that runs CUDA carries the same pin (test/, gpu/, examples/, …).
 [preferences.CUDA_Runtime_jll]
 version = "12.9"
+
+# TEMPORARY: the unreleased 0.2 wave; replaced by the registered versions at release
+[sources]
+VisualGeometryToolkitCore = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitCore"}
+VisualGeometryToolkitIO = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitIO"}
+VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitFeatures"}
+VisualGeometryToolkitEstimation = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitEstimation"}
+RANSACScoringDoneRight = {path = "/home/jbpritts/src/rsdr-core-0.2"}
+LocalOptimizationDoneRight = {path = "/home/jbpritts/src/lodr-core-0.2"}
 
 [workspace]
 projects = ["test", "docs", "gpu", "examples", "authoring", "bmvc2026"]

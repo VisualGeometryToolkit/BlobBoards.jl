@@ -37,7 +37,7 @@ VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [compat]
-VisualGeometryToolkitEval = "0.1"
+VisualGeometryToolkitEval = "0.2"
 
 [extras]
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
@@ -47,3 +47,9 @@ version = "12.9"
 
 [sources]
 BlobBoards = { path = ".." }
+# TEMPORARY: the unreleased 0.2 wave; replaced by the registered versions at release
+VisualGeometryToolkitCore = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitCore"}
+VisualGeometryToolkitIO = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitIO"}
+VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitFeatures"}
+VisualGeometryToolkitEstimation = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitEstimation"}
+VisualGeometryToolkitEval = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitEval"}
