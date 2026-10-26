@@ -165,7 +165,7 @@ end
 # A detected board's pose, board → camera optical, millimetres — the value a
 # `vgio/target_poses/v1` frame stores per target.
 pose_value(model) = EuclideanMap(
-    RotMatrix{3, Float64}(SMatrix{3, 3, Float64}(model.R)), SVector{3, Float64}(ustrip.(model.t)); check = false,
+    RotMatrix{3, Float64}(SMatrix{3, 3, Float64}(model.R)), SVector{3}(model.t); check = false,   # the quantities as they are: a writer refuses plain lengths
 )
 
 # Colored-board overlay on the undistorted color image -> raster PNG (one stable

@@ -526,8 +526,8 @@ end
 
 # A pose model never pairs with the radial token or with `nothing` (those
 # geometries fit homographies), so those combinations refuse loudly. Both
-# arms exist so JET sees every union member covered — VGC 0.18's
-# `PosedCamera(model::AbstractCameraModel, …)` turned the old silent
+# arms exist so JET sees every union member covered — `PosedCamera` checks
+# that its model is an unposed camera, which turned the old silent
 # StackOverflow on a wrong model into a static MethodError.
 """
     _model_to_homography(model, cam) -> HomographyMap

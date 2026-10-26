@@ -18,7 +18,7 @@
 #   polarity / check
 #
 # A length is a number and its unit, the unit symbol of VisualGeometryToolkitCore's
-# FlexUnits registry (`PixelUnits`) upper-cased for QR's alphanumeric set:
+# FlexUnits registry (`UnitRegistry`) upper-cased for QR's alphanumeric set:
 # `210MM`, `8.5INCH`. It is written in mm or in inches, whichever is shorter and
 # still decodes to the identical double (Letter's 8.5 inch is
 # 215.89999999999998 mm: `8.5INCH`), and read back by lower-casing the symbol and

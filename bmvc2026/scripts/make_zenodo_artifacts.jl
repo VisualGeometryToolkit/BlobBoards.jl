@@ -240,7 +240,7 @@ elseif TIER == "occlusion"
     end
 elseif TIER == "assets"
     # DATASET-ROOT tier (see the header): the board gallery + the descriptor
-    # networks the teaser/panel figures read. Mounted at the VIEW ROOT by
+    # networks the teaser/panel figures read. Placed at the VIEW ROOT by
     # `_artifact_view` (every other tier mounts under
     # absolute_pose_experiments/), so `data_root()/evaluation/...` and
     # `data_root()/models/...` resolve identically on primary copy and

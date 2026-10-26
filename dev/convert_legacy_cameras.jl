@@ -30,7 +30,7 @@
 #       "$R" "$R/_legacy_camera_backup_$(date +%F)" $FILES
 
 import VisualGeometryToolkitIO as VgtkIO
-using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, lens_parameters, BoundedCamera, Size2
+using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, parameter_vector, BoundedCamera, Size2
 using CoordinateTransformations: AffineMap
 using JSON
 
@@ -65,7 +65,7 @@ for rel in files
     VgtkIO.save(tmp, store)
     back = VgtkIO.load(CameraModel, tmp)
     back.intrinsics.K == model.intrinsics.K || error("K mismatch after reload: $rel")
-    lens_parameters(back.lens) == lens_parameters(model.lens) || error("lens mismatch after reload: $rel")
+    parameter_vector(back.lens) == parameter_vector(model.lens) || error("lens mismatch after reload: $rel")
 
     b = joinpath(backup_root, rel)
     mkpath(dirname(b))
