@@ -123,7 +123,7 @@ Generate a calibration board with custom physical dimensions.
 - `major_tick_spacing`: Ruler major tick spacing
 - `minor_tick_spacing`: Ruler minor tick spacing
 """
-function generate_custom_board(width::BlobBoards.Quantity, height::BlobBoards.Quantity,
+function generate_custom_board(width::typeof(1.0mm), height::typeof(1.0mm),
                                density::Int=300;
                                dir::String=".",
                                ruler_width=15mm,

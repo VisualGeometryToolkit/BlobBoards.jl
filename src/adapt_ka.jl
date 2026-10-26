@@ -44,7 +44,7 @@
 # =============================================================================
 
 using KernelAbstractions: @kernel, @Const, @context, @index, @groupsize,
-    @localmem, @synchronize, @uniform, @atomic
+    @localmem, @synchronize, @uniform
 using SpecialFunctions: loggamma
 
 # The per-blob scan samples a canonical (2·31 + 1)² = 3969-point grid, which
@@ -222,7 +222,7 @@ end
                 if ok && val >= sat_lo && val <= sat_hi
                     f = background - val
                     if f > min_int
-                        slot = @atomic cnt[blob] += Int32(1)
+                        slot = KA.@atomic cnt[blob] += Int32(1)
                         flat = base + slot
                         # Offsets stay in IMAGE pixels regardless of `st`, so
                         # θ, r² and outlier_halfwidth need no rescale downstream.

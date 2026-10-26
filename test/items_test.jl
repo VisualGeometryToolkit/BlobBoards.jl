@@ -26,6 +26,10 @@ end
     include("suites/naming.jl")
 end
 
+@testitem "quality gates" begin
+    include("suites/quality_gates.jl")
+end
+
 @testitem "agent docs" begin
     include("suites/agent_docs.jl")
 end

@@ -99,16 +99,19 @@ end
 # measurement names.
 
 """
-    board_points(bundle::BoardBundle) -> Vector{SVector{2, Float64}}
-    board_points(uid::Symbol, boards) -> Vector{SVector{2, Float64}}
+    board_points(bundle::BoardBundle) -> Vector{SVector{2}} of length quantities
+    board_points(uid::Symbol, boards) -> Vector{SVector{2}} of length quantities
 
 A board design's nominal plane points: its blob centres in the board's world
-frame (millimetres, centred, y up — the plane `z = 0` of `TargetFrame{uid}`),
-in the bundle's blob order, the order a measurement's point index refers to.
-`boards` is a directory of board JSON sidecars, or a uid → bundle dictionary;
-an unknown uid is an `ArgumentError` naming the uids present.
+frame (centred, y up — the plane `z = 0` of `TargetFrame{uid}`), in the bundle's
+blob order, the order a measurement's point index refers to. A printed board is
+physical, so each coordinate is a length quantity in the board's native unit,
+millimetres (`ustrip(mm, p)` for the plain numbers; [`blobs`](@ref)`(bundle, :world)`
+keeps the plain millimetres the pose solvers work in). `boards` is a directory of
+board JSON sidecars, or a uid → bundle dictionary; an unknown uid is an
+`ArgumentError` naming the uids present.
 """
-board_points(bundle::BoardBundle) = SVector{2, Float64}[SVector{2, Float64}(d.center) for d in blobs(bundle, :world)]
+board_points(bundle::BoardBundle) = [SVector{2, Float64}(d.center) .* mm for d in blobs(bundle, :world)]
 board_points(uid::Symbol, boards::AbstractDict) = haskey(boards, uid) ? board_points(boards[uid]) :
     throw(ArgumentError("no board $(uid); the library holds $(sort!(collect(keys(boards))))"))
 board_points(uid::Symbol, boards_dir::AbstractString) = board_points(uid, board_library(boards_dir))
@@ -136,7 +139,7 @@ function board_library(boards_dir::AbstractString)
 end
 
 """
-    board_resolver(boards) -> (design::Symbol -> Vector{SVector{2, Float64}} | nothing)
+    board_resolver(boards) -> (design::Symbol -> Vector{SVector{2}} of mm quantities | nothing)
 
 The resolver a stored target rig takes for its referenced board designs:
 `VisualGeometryToolkitIO.load(Rig, path; resolve = board_resolver(boards_dir))`.
@@ -151,7 +154,7 @@ board_resolver(lib::AbstractDict) = uid -> haskey(lib, uid) ? board_points(lib[u
     board_target(uid::Symbol, boards) -> PlanarTarget
 
 The board as a resolved VisualGeometryToolkitCore `PlanarTarget`: its design named by
-`uid`, its nominal points [`board_points`](@ref), the `Rigid` warp.
+`uid`, its nominal points [`board_points`](@ref) (lengths, in millimetres), the `Rigid` warp.
 """
 board_target(uid::Symbol, boards) = PlanarTarget(uid; nominal = board_points(uid, boards))
 
@@ -1429,7 +1432,7 @@ struct GalleryIndex{G <: StackedGallery, I}
     stacked_index::I
 end
 
-function GalleryIndex(device, board_feature_dict::AbstractDict)
+function GalleryIndex(device::KA.Backend, board_feature_dict::AbstractDict)
     sg = StackedGallery(board_feature_dict)
     return GalleryIndex(sg, StackedDescriptorIndex(device, Dict(_STACK_KEY => sg.features)))
 end

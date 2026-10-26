@@ -115,6 +115,19 @@ const PINNED_PATTERN_JSON = """
                 "BB4/148MM/210MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/1234/2.83464566929/18.1415/3/5000/1.2/2/D/DA6009BB"
             @test _sha(read(_onlyext(dir, ".json"))) == "15c9d0e5fddec0b7f5e0278a8693929608a6d9d99d30224c886b45ab095b38cb"
             @test basename(BlobBoards._render_cache_dir(hash_config(b.preamble), true)) == "da6009bb31d28be9_629d0450"
+            # write → read → write is byte-identical: the v4 lift paths (margin, ruler_width, corner_size, layout_grid,
+            # the blob columns) lose nothing
+            written = _onlyext(dir, ".json")
+            bundle, _, stored = BlobBoards.load_bundle(written)
+            BlobBoards.save_json(joinpath(dir, "again.json"), bundle; config_hash = stored, render = BlobBoards._render_record(BlobBoards.Pdf(), true))
+            @test read(joinpath(dir, "again.json")) == read(written)
+        end
+        # a tracked v4 board file (docs/hero_board.json) re-saves to the same bytes
+        mktempdir() do dir
+            hero = joinpath(pkgdir(BlobBoards), "docs", "hero_board.json")
+            bundle, _, stored = BlobBoards.load_bundle(hero)
+            BlobBoards.save_json(joinpath(dir, "hero.json"), bundle; config_hash = stored, render = BlobBoards._render_record(BlobBoards.Pdf(), false))
+            @test read(joinpath(dir, "hero.json")) == read(hero)
         end
         # a raster output records its density (a quantity) in the render block
         mktempdir() do dir

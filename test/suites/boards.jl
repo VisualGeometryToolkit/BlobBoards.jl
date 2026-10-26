@@ -488,7 +488,7 @@ end
             @test_throws ArgumentError blobs(bundle, :pattern)
             b_px = blobs(bundle, :pattern; density = 300dpi)
             @test length(b_px) == length(bundle.blobs)
-            @test eltype(b_px[1].center) <: BlobBoards.Quantity
+            @test eltype(b_px[1].center) === typeof(1.0px)
             # points × 300/72
             @test ustrip.(px, b_px[1].center) ≈ ustrip.(px, bundle.blobs[1].center) .* (300 / 72)
             AffineMap = BlobBoards.CoordinateTransformations.AffineMap

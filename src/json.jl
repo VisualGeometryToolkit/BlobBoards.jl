@@ -49,6 +49,9 @@ const _JSONObject = Union{AbstractDict, NamedTuple}
 struct _LowerStyle <: JSON.JSONStyle end
 _lower(x) = JSON.lower(_LowerStyle(), x)
 
+# (A pixel pitch, `mm/px`, was written in its own unit "mm/px" while `px` was a
+# dimension. `px` is dimensionless now, so a pitch IS a length and is written as
+# "mm" like any other; no board field holds one.)
 # A board file's quantity is a `{value, unit}` object in the unit its dimension
 # names: a length in "mm", a density in "dpi", a pixel count (dimensionless) in
 # "px"; a pixel count or a density snaps to an integer when it is one. The
