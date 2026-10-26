@@ -20,7 +20,7 @@ using Rotations
 using StaticArrays
 using Statistics
 using VisualGeometryToolkitCore: EuclideanMap, Frame, ViewFrame, TargetFrame, Rig, PosedTarget, PlanarTarget,
-    relabel, unlabel, pose, model, ids
+    relabel, unlabel, pose, model, ids, ustrip, with_unit, mm
 using VisualGeometryToolkitEstimation: fit_robot_world_hand_eye
 using BlobBoards
 

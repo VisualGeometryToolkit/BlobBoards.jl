@@ -58,7 +58,7 @@ function export_target_poses(
         frames[t] = Dict(
             Symbol(String(p.board_id)) => EuclideanMap(
                 RotMatrix{3, Float64}(SMatrix{3, 3, Float64}(reduce(hcat, [Float64.(row) for row in p.rot_mat])')),
-                SVector{3, Float64}(p.trans); check = false,
+                SVector{3, Float64}(p.trans) .* mm; check = false,   # the export's `trans` is millimetres; a file takes lengths as quantities
             ) for p in d.poses
         )
         names[t] = img

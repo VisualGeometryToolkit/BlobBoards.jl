@@ -60,7 +60,8 @@ end
 
 # One body's trajectory of a subset, checked to be that body in the tracker's world.
 function _body_trajectory(dir::AbstractString, body::Symbol)
-    tr = VgtkIO.load(Trajectory, joinpath(dir, "$(body).json"))
+    # a file holds lengths as quantities; the evaluation computes in plain millimetres (RESET_DIST_MM, the error tables)
+    tr = ustrip(mm, VgtkIO.load(Trajectory, joinpath(dir, "$(body).json")))
     tr isa Trajectory{BodyFrame{body}, WorldFrame} ||
         error("$(dir)/$(body).json: expected the trajectory body:$(body) → world, got $(typeof(tr).parameters[1]) → $(typeof(tr).parameters[2])")
     return tr

@@ -1676,7 +1676,7 @@ struct BoardDetection{M}
     source::Symbol       # :detect | :init | :track
 end
 
-# PosedCamera lives inside PoseGeometry; HomographyGeometry is the no-camera path.
+# Camera lives inside PoseGeometry; HomographyGeometry is the no-camera path.
 _camera(g::PoseGeometry) = g.camera
 _camera(::HomographyGeometry) = nothing
 # The geometry itself is the token: uncalibrated, but carrying the image

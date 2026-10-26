@@ -116,7 +116,7 @@ function annotate_blobs(
     )
     # The SAME feature stages as find_boards(…, img): polarity from the boards,
     # scale correction and the gallery's shared extent all come from the
-    # bundles (see `prepare_image_features`). PosedCamera (if any) is read from
+    # bundles (see `prepare_image_features`). Camera (if any) is read from
     # config.geometry. `cutoff` here is the GT-patch extent, not the query one.
     (; detect_img, adapt_img, image_features) = prepare_image_features(
         descriptor_network, img;

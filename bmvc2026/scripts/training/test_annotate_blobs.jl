@@ -68,7 +68,7 @@ uid_to_path = Dict(
 # @info "Loading camera calibration..."
 # camera = VisualGeometryToolkitIO.load(CameraModel,
 #     joinpath(root, "images", "apple-iphone-13-mini_f1.6-1x_till.json"))
-# @info "PosedCamera loaded: $(camera.intrinsics)"
+# @info "Camera loaded: $(camera.intrinsics)"
 
 # =============================================================================
 # Load image

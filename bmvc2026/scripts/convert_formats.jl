@@ -45,7 +45,7 @@ include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the 
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
-    PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids
+    PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids, with_unit, mm, ustrip
 using Rotations: QuatRotation, params
 using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
 using DrWatson: gitdescribe
@@ -172,7 +172,7 @@ function convert_mocap(session)
         F = BodyFrame{b.id}
         rig = Rig{F}(Dict(b.id => PosedTarget(PointTarget(c.points), EuclideanMap(one(RotMatrix{3, Float64}), zero(SVector{3, Float64}); check = false))))
         VgtkIO.save(
-            file, rig;
+            file, with_unit(rig, mm);   # computed in plain mm; a file takes lengths as quantities
             provenance = (
                 body = String(b.id), run_key = KEY,
                 status = "estimated: the vendor's body definition is not in its export",
@@ -203,7 +203,7 @@ function convert_mocap(session)
         )
         mfile = joinpath(odir, "markers.json")
         VgtkIO.save(
-            mfile, TargetPoints3D{WorldFrame}(obs; sensors = MOCAP["sensor"], images, times, time_origin = origin);
+            mfile, with_unit(TargetPoints3D{WorldFrame}(obs; sensors = MOCAP["sensor"], images, times, time_origin = origin), mm);
             provenance = (
                 source = joinpath("poses", "motion_tracker", sub), n_files = length(s.files), run_key = KEY,
                 source_format = "vendor per-frame export {poses: [board rig, camera rig] (rot_mat column-major, trans mm), makers: 14×3 (mm)}",
@@ -255,7 +255,7 @@ function convert_mocap(session)
             )
             file = joinpath(odir, "$(b.id).json")
             VgtkIO.save(
-                file, tr;
+                file, with_unit(tr, mm);
                 provenance = merge(
                     (
                         body = String(b.id), run_key = KEY,
@@ -274,7 +274,7 @@ function convert_mocap(session)
             back = VgtkIO.load(Trajectory, file)
             for (t, X) in poses
                 Y = geom(back[t])
-                (Y.R isa QuatRotation && SVector{4, Float64}(params(Y.R)) == _written_quaternion(X) && Y.t == X.t) ||
+                (Y.R isa QuatRotation && SVector{4, Float64}(params(Y.R)) == _written_quaternion(X) && ustrip.(mm, Y.t) == X.t) ||
                     error("$file: frame $t does not read back")
             end
 
@@ -286,7 +286,7 @@ function convert_mocap(session)
             end
             kfile = joinpath(odir, "$(b.id).kabsch.json")
             VgtkIO.save(
-                kfile, Trajectory(BodyFrame{b.id}, WorldFrame, kab; images = Dict(t => images[t] for t in keys(kab)), times = Dict(t => times[t] for t in keys(kab)), time_origin = origin);
+                kfile, with_unit(Trajectory(BodyFrame{b.id}, WorldFrame, kab; images = Dict(t => images[t] for t in keys(kab)), times = Dict(t => times[t] for t in keys(kab)), time_origin = origin), mm);
                 provenance = (
                     body = String(b.id), run_key = KEY,
                     source = (markers = "markers.json", markers_sha256 = mhash, constellation = "../" * basename(cons_files[b.id]), constellation_sha256 = _sha(cons_files[b.id])),

@@ -122,7 +122,7 @@ end
             VgtkIO.load(CameraModel, camera_path)
         end
     end
-    # PosedCamera lives in config.geometry — PoseGeometry(camera) for calibrated
+    # Camera lives in config.geometry — PoseGeometry(camera) for calibrated
     # sources, HomographyGeometry otherwise. Reuse the worker's detect config.
     base = s.find_boards_config
     geom = isnothing(camera) ? HomographyGeometry(min_inliers = 10) :

@@ -47,7 +47,7 @@ function load_detected_poses(poses_dir::AbstractString)
     out = Dict{String, Vector{@NamedTuple{id::String, R::SMatrix{3, 3, Float64, 9}, t::SVector{3, Float64}}}}()
     for (t, ps) in tp
         out[tp.images[t]] = [
-            (id = String(id), R = SMatrix{3, 3, Float64}(geom(ps[id]).R), t = SVector{3, Float64}(geom(ps[id]).t))
+            (id = String(id), R = SMatrix{3, 3, Float64}(geom(ps[id]).R), t = SVector{3, Float64}(ustrip.(mm, geom(ps[id]).t)))
                 for id in sort!(collect(keys(ps)))
         ]
     end
@@ -219,7 +219,7 @@ _mount_file(file::AbstractString) = string(splitext(file)[1], "_board_rig", spli
 # The marker mount as a rig: each printed board a pose-only planar target —
 # its design named by its id, its points its design owner's (BlobBoards'
 # `board_points`) — mounted on the board rig.
-_mount_rig(Y::AbstractDict) = Rig{BoardRigFrame}(Dict(Symbol(id) => PosedTarget(PlanarTarget(Symbol(id)), T) for (id, T) in Y))
+_mount_rig(Y::AbstractDict) = Rig{BoardRigFrame}(Dict(Symbol(id) => PosedTarget(PlanarTarget(Symbol(id)), with_unit(T, mm)) for (id, T) in Y))
 
 """
     save_hand_eye(file, he; provenance = (;)) -> (file, mount)
@@ -239,7 +239,7 @@ save_hand_eye(file::AbstractString, he::NamedTuple; provenance::NamedTuple = (;)
 
 function save_hand_eye(file::AbstractString, X, Y::AbstractDict; provenance::NamedTuple = (;))
     mount = _mount_file(file)
-    VgtkIO.save(file, [relabel(CameraRigFrame, CameraFrame, unlabel(X))]; provenance)
+    VgtkIO.save(file, [with_unit(relabel(CameraRigFrame, CameraFrame, unlabel(X)), mm)]; provenance)   # computed in plain mm; a file takes quantities
     VgtkIO.save(mount, _mount_rig(Y); provenance = (hand_eye = basename(file),))
     return file, mount
 end
@@ -257,8 +257,8 @@ function load_hand_eye(file::AbstractString)
     poses = VgtkIO.load(Vector{EuclideanMap}, file)
     ix = findfirst(X -> geom(X) isa EuclideanMap{3, <:Any, <:Any, <:Any, CameraRigFrame, CameraFrame}, poses)
     ix === nothing && error("no body:camera_rig -> camera_optical record in $file")
-    X = relabel(CameraRigFrame, ViewFrame{:optical}, poses[ix])
-    targets = VgtkIO.load(Rig, _mount_file(file))
+    X = relabel(CameraRigFrame, ViewFrame{:optical}, ustrip(mm, poses[ix]))   # back to the evaluation's plain millimetres
+    targets = ustrip(mm, VgtkIO.load(Rig, _mount_file(file)))
     targets isa Rig{BoardRigFrame} || error("$(_mount_file(file)): the marker mount is posed in body:board_rig, got $(typeof(targets))")
     return X, targets
 end

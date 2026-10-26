@@ -46,7 +46,7 @@ using JSON
 import TOML
 using VisualGeometryToolkitEval.Experiments: read_provenance, warn_commit_drift
 using VisualGeometryToolkitFeatures: KnnMatch
-using VisualGeometryToolkitCore: ustrip, CameraModel, Pinhole, PosedCamera, undistort, imshow, EuclideanMap, CameraFrame,
+using VisualGeometryToolkitCore: ustrip, mm, CameraModel, Pinhole, PosedCamera, undistort, imshow, EuclideanMap, CameraFrame,
     BoundedCamera, TargetPoses
 
 # The repo whose commit `tag!` records into the provenance sidecar — same
@@ -165,7 +165,7 @@ end
 # A detected board's pose, board → camera optical, millimetres — the value a
 # `vgio/target_poses/v1` frame stores per target.
 pose_value(model) = EuclideanMap(
-    RotMatrix{3, Float64}(SMatrix{3, 3, Float64}(model.R)), SVector{3}(model.t); check = false,   # the quantities as they are: a writer refuses plain lengths
+    RotMatrix{3, Float64}(SMatrix{3, 3, Float64}(model.R)), SVector{3, Float64}(model.t) .* mm; check = false,   # `model.t` is plain millimetres; the writer takes lengths as quantities
 )
 
 # Colored-board overlay on the undistorted color image -> raster PNG (one stable
