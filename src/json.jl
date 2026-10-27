@@ -175,10 +175,10 @@ function _declared_units(x; required::Bool = true)
         throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))
     end
     c = VgtkIO.from_json(VgtkIO.UnitContract, _getfield(x, "units"))
-    extra = setdiff(keys(c.lengths), (:pattern,))
+    extra = setdiff(keys(c.lengths), (:world, :pattern))
     isempty(extra) || throw(ArgumentError("a board file's units declare no length role $(first(extra)); only `pattern`"))
     haskey(c.lengths, :pattern) && (c.lengths.pattern == pt || throw(ArgumentError("the length role `pattern` is in pt, got $(c.lengths.pattern)")))
-    return (c.world, c.density)
+    return (VgtkIO.role_unit(c), c.density)
 end
 
 # The type `JSON.parse(str)` returns for an object.
