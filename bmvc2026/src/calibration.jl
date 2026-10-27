@@ -25,7 +25,7 @@ fourth fit.
 WHAT IS STORED. Two VisualGeometryToolkitIO files, the same shapes the published
 `hand_eye_<name>.json` records take: a `vgio/transforms/v3` file holding X,
 `body:camera_rig → camera_optical`, and beside it (`<name>_board_rig.json`) a
-`vgio/rig/v4` file holding the marker mount — one target per printed board,
+`vgio/rig/v5` file holding the marker mount — one target per printed board,
 its pose `target:<id> → body:board_rig`. Every pose is UNCERTAIN: the fit states
 its 6×6 covariance (rad, mm; the `RigidExpManifold6` chart, rotation first —
 VisualGeometryToolkitCore conventions/persisted-geometry.md), an estimator's estimate
@@ -54,7 +54,7 @@ provenance.
 
 Supply `force = true` to refit and overwrite.
 """
-# THE ARTIFACT IS a `vgio/transforms/v3` file (X) and a `vgio/rig/v4` file
+# THE ARTIFACT IS a `vgio/transforms/v3` file (X) and a `vgio/rig/v5` file
 # (the Y_m), written by VisualGeometryToolkitIO's `save` from the labeled poses and
 # read back through `load`, the labels minted from the files' typed frames.
 # Keyed like every `cached` artifact — `<prefix>_<hash(cfg)>.json` under

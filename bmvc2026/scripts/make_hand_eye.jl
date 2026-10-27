@@ -12,7 +12,7 @@ the result, every pose with the fit's covariance:
                                        keyed on the run keys of its sources)
     vgio/transforms/v3   X: body:camera_rig → camera_optical (+ diagnostics in provenance)
   …/hand_eye_<name>_board_rig.json
-    vgio/rig/v4          Y_m: target:<uid> → body:board_rig, one per marker
+    vgio/rig/v5          Y_m: target:<uid> → body:board_rig, one per marker
 
 The estimator is RVG's `fit_robot_world_hand_eye` staged linear solve (Kabsch on
 pooled relative-motion axes, chordal marker means, joint translation LSQ).

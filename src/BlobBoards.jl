@@ -235,6 +235,24 @@ include("track.jl")        # track_boards — temporal board tracking
 include("annotate.jl")     # annotate_blobs — GT-labeled patches from board detection
 include("training.jl") # TrainingData struct and builders from annotations
 include("authoring/Authoring.jl")   # board authoring: blob_board, rebuild_board, render_board, the PDF/X-4 writer
+"""
+    CONTRACT_GENERICS
+
+BlobBoards' declared extension points: the functions another stack package may
+add methods to (VisualGeometryToolkitCore's `contract_generic_violations`
+checks it). CaliBlobs adds a `GeometryConfig` arm of its own and its run
+configuration through them:
+
+- [`geometry_tag`](@ref) and [`geometry_from_toml`](@ref): the TOML tag of a
+  `GeometryConfig` defined outside this package, and its reader;
+- [`config_dict`](@ref) and [`write_config`](@ref): a run configuration's TOML
+  table, and its writer, for a configuration type defined outside this package.
+
+(BlobBoards also adds methods of VisualGeometryToolkitIO's `migrate_schema`, the
+extension point IO declares for the owner of a schema: src/migrate_boards.jl.)
+"""
+const CONTRACT_GENERICS = (geometry_tag, geometry_from_toml, config_dict, write_config)
+
 # Training pipeline (Lux + Optimisers + Enzyme + Reactant + NNlib + cuDNN)
 # lives in ext/BlobBoardsTrainingExt.jl — loads only when all those trigger
 # packages are imported.

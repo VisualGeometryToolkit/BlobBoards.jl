@@ -48,6 +48,7 @@ export find_boards                         # THE detection entry point
 export FindBoardsConfig                    # All pipeline knobs in one struct
 export GeometryConfig, HomographyGeometry, PoseGeometry, RadialHomographyGeometry  # config.geometry selects H vs P3P vs radial (H, k)
 public geometry_from_toml, geometry_tag    # the TOML tag of a GeometryConfig defined outside this package
+public CONTRACT_GENERICS                  # the functions another stack package may add methods to (geometry_tag, geometry_from_toml, config_dict, write_config)
 export DetectConfig, MxmNms, EllipseNms
 export AbstractDescriptorNetwork, DescriptorNetwork, LuxDescriptorNetwork
 export BoardGallery                        # Cached per-board feature extraction

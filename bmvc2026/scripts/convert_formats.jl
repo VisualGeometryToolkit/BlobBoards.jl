@@ -18,7 +18,7 @@ config of record (configs/convert_formats.toml):
                                       (+ the static-camera recovery of camera-untracked
                                       calibration frames, src/recovery.jl, with its evidence)
   <subset>/<body>.kabsch.json         the reference re-solve from the markers
-  constellation_<body>.json           vgio/rig/v4, frame body:<id> (a PointTarget)
+  constellation_<body>.json           vgio/rig/v5, frame body:<id> (a PointTarget)
 
 Every file carries its sources in `provenance`; the run writes `_config.toml`,
 `_provenance.toml` (config, commit, inputs), `_manifest.jsonl` (one line per

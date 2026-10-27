@@ -17,3 +17,12 @@ VgtkCore.test_quality_gates(
     tag_rules = :report, tag_tables = :report, config_tags = :report,
     stack_dependencies = :report, public_names = :report, contract_generics = :report,
 )
+
+# The extension points BlobBoards declares: the generics CaliBlobs extends (its `GeometryConfig` arm and its run
+# configuration), and nothing else; the methods it adds to other stack packages' functions are all on their
+# contracts (VisualGeometryToolkitIO's `migrate_schema`, src/migrate_boards.jl).
+@testset "BlobBoards declares its extension points" begin
+    @test BlobBoards.CONTRACT_GENERICS ==
+        (BlobBoards.geometry_tag, BlobBoards.geometry_from_toml, BlobBoards.config_dict, BlobBoards.write_config)
+    @test isempty(VgtkCore.contract_generic_violations(BlobBoards))
+end

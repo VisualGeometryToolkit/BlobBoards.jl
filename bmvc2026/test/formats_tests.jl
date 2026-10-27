@@ -81,8 +81,8 @@ end
             d = JSON.parse(read(file, String))
             @test d.schema == "vgio/transforms/v3" && only(d.transforms).from == "body:camera_rig" && haskey(only(d.transforms), :covariance)
             m = JSON.parse(read(joinpath(dir, "hand_eye_bb_board_rig.json"), String))
-            @test m.schema == "vgio/rig/v4" && m.frame == "body:board_rig" && all(t -> haskey(t.pose, :covariance), m.targets)
-            @test all(t -> t.target.type == "planar" && t.target.design == t.id, m.targets)   # pose-only boards, named by id
+            @test m.schema == "vgio/rig/v5" && m.frame == "body:board_rig" && all(t -> haskey(t.pose, :covariance), m.targets)
+            @test all(t -> t.target.type == "planar" && t.target.reference == t.id, m.targets)   # pose-only boards, named by id
             X, mount = BBE.load_hand_eye(file)
             @test X isa Uncertain && geom(X) isa EuclideanMap{3, Float64, <:Any, <:Any, BodyFrame{:camera_rig}, ViewFrame{:optical}}
             @test mount isa Rig{BodyFrame{:board_rig}} && all(id -> pose(mount, id) isa Uncertain, ids(mount))

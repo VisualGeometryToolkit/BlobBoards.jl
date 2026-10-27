@@ -340,7 +340,9 @@ key (`print_density` or `layout_grid`) tells them apart. A pattern file is
   bit-identically), v1/v2 rulers (a `ruler_spec.width` and half-length tick
   widths: the one is dropped and the others doubled, the ruler those boards were
   drawn with), v3 pixel-grid files and v4 point-grid files. `load_bundle` refuses
-  an old file and names the command.
+  an old file and names the command. The command-line form needs BlobBoards
+  loaded, which is what registers these migrations:
+  `julia --project=. -e 'using BlobBoards; import VisualGeometryToolkitIO as VgtkIO; include(joinpath(pkgdir(VgtkIO), "bin", "vgio_migrate.jl"))' tree --apply DIR`.
 - **The file format is not part of the identity.** `hashes.config` is minted
   under the identity schema (`blobboards/board/v4`, frozen), and the QR code
   carries `BB4` — the configuration's own tag, never the file's — so a board's

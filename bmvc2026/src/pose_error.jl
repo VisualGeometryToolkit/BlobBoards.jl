@@ -200,7 +200,7 @@ function absolute_errors(
 end
 
 # =============================================================================
-# The hand-eye record: X (vgio/transforms/v3) and the marker mount (vgio/rig/v4)
+# The hand-eye record: X (vgio/transforms/v3) and the marker mount (vgio/rig/v5)
 # =============================================================================
 #
 # ONE writer and ONE reader of a hand-eye calibration, shared by every producer
@@ -227,7 +227,7 @@ _mount_rig(Y::AbstractDict) = Rig{BoardRigFrame}(Dict(Symbol(id) => PosedTarget(
 
 Write a hand-eye calibration as its two records: `file`, a `vgio/transforms/v3`
 file holding `X` (`body:camera_rig → camera_optical`), and
-`<file stem>_board_rig.json`, a `vgio/rig/v4` file of the marker mount
+`<file stem>_board_rig.json`, a `vgio/rig/v5` file of the marker mount
 `Y` (target id → its pose `target:<id> → body:board_rig`, frame
 `body:board_rig`; each board a pose-only `PlanarTarget` named by its id). Each pose is written as given — with its covariance iff
 `Uncertain`; a FIT (`hand_eye_calibrate`'s `(; X, Y, fit)`) is written with

@@ -239,13 +239,13 @@ RVG ≥ 0.14) and applied to the evaluation sweep. See
   `poses/motion_tracker/<subset>/markers.json` (vgio/target_points3d/v1, the
   14 markers — the source measurements), `board_rig.json`/`camera_rig.json`
   (vgio/trajectory/v3, the vendor's solve; recovered camera frames flagged)
-  and `constellation_<body>.json` (vgio/rig/v4 of one PointTarget, estimated);
+  and `constellation_<body>.json` (vgio/rig/v5 of one PointTarget, estimated);
   the camera is the session's camera of record, an input —
   `calibration/<camera>.json` (vgio/cameras/v3 with its calibration block;
   `camera_of_record`, src/data.jl), the native port of the upstream
   calibration export by `scripts/import_cameras.jl`; the images tier's own
   camera files are superseded and unused; hand-eye records
-  vgio/transforms/v3 + vgio/rig/v4 (each printed board a pose-only
+  vgio/transforms/v3 + vgio/rig/v5 (each printed board a pose-only
   PlanarTarget named by its id, `BlobBoards.board_resolver` resolves its
   points), with the fit's covariances. Every kind is the direct serialization
   of a VisualGeometryToolkitCore value; rotations are stored, and read back, as unit

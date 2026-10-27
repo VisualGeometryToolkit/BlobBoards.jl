@@ -295,7 +295,9 @@ reads the earlier `{value, unit}` schemas (board v1–v4, pattern v1–v2): they
 MIGRATED once by `VgtkIO.vgio_migrate(path)`, through the `migrate_schema`
 methods of src/migrate_boards.jl, which hold the retired reader (the one place
 that parses a `{value, unit}` object). A migration keeps the stored
-`hashes.config`.
+`hashes.config`. IO's command knows these migrations only once BlobBoards is
+loaded: `julia --project=. -e 'using BlobBoards; import VisualGeometryToolkitIO as
+VgtkIO; include(joinpath(pkgdir(VgtkIO), "bin", "vgio_migrate.jl"))' tree --apply DIR`.
 
 Two forms of the same lowering, never mixed (src/json.jl): a FILE holds numbers,
 and a board's IDENTITY is minted over a canonical tree in which each quantity is
