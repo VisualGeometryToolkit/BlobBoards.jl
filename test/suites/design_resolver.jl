@@ -74,8 +74,13 @@ using Rotations: QuatRotation
         back = VgtkIO.load(Rig, f; resolve)
         @test points(model(back[uid])) == points(tt) && reference(model(back[uid])) === uid
         @test board(model(back[uid])) == board(tt)
-        # the canvas (and its texture) is VisualGeometryToolkitIO's rig/v5 `canvas` block, not yet landed: until
-        # then a stored rig drops it, and the whole target does not come back
+        # the canvas and its texture: the rig/v5 planar body's `canvas` block. The texture's path, hash and size
+        # come back bit for bit; the page's side (147.99733… mm) and the corners (-W/2 mm) do not: FlexUnits'
+        # `x * mm` is one ulp off the decimal-nearest metre value, which no millimetre file number reads back to
+        # (Deduction42/FlexUnits.jl#131), so the full equalities succeed once that is adopted
+        bt = canvas(model(back[uid])).texture
+        @test (bt.path, bt.sha256, bt.size) == (tex.path, tex.sha256, tex.size) && bt.origin ≈ tex.origin
+        @test canvas(model(back[uid])).origin ≈ canvas(tt).origin
         @test_broken canvas(model(back[uid])) == canvas(tt)
         @test_broken model(back[uid]) == tt
 
