@@ -286,7 +286,7 @@ Every board is saved as a print file plus a JSON sidecar, `blob_board_<uid>_<has
                         alpha, cutoff, polarity }   (no pattern size: it is the board's;
                                                      no pixel_type or raster_aligned: a point-grid board has neither)
   },
-  "blobs":         { "unit": "pt", "centers": [...], "sigmas": [...] },
+  "blobs":         { "centers": [...], "sigmas": [...] },   (pt on this grid: the `pattern` role)
   "hashes":        { "config": "<sha256 of the identity schema, the canonical preamble and the blobs>" },
   "render":        { "format": "pdf", "icc_profile": "linear",
                      "id_label": true, "shading_function": "calculator",
@@ -304,7 +304,7 @@ quantity format every file of the stack uses (VisualGeometryToolkitIO's
 `UnitContract`): lengths in `world` (mm: the canvas, margin, ruler, corner,
 padding, tick spacing and width, a PDF's bleed), a density in `density`
 (dpi), and the point-grid board's own numbers in the length role `pattern`
-(pt: the σ range and the layout grid; the blobs declare their own `unit`).
+(pt: the σ range, the layout grid and the blob columns; a pixel-grid board's and a pattern's blobs are pixels). The `units` block is the file's only declaration of a unit.
 Pixel counts need no declaration: a pixel-grid board's `pattern_resolution`,
 `min_scale` and `max_scale` are pixels. A tick's `width` is its full drawn
 length across the frame band. Blob centres are 0.01 pt grid values, the very

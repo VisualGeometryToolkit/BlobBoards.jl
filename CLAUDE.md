@@ -307,10 +307,15 @@ identity: `IDENTITY_SCHEMA` ("blobboards/board/v4", frozen) is the tree's schema
 field and the source of the QR code's `BB4` tag; `BOARD_SCHEMA` is the file's.
 A change to the file format therefore moves no uid and no printed QR code; a
 change to what a configuration places is a new IDENTITY schema and a new tag.
-The memory ↔ number conversion is `ustrip(unit, q)` and `number * unit` — NOT
-IO's decimal-exact `write_quantity`/`read_quantity` (a board is built from
-literals such as `9.0mm`, which are not on that grid; see the header of
-src/json.jl).
+The memory ↔ number conversion is ONE pair, `_file_number`/`_file_quantity`
+(src/json.jl), for every file number including the point grid's pt values and
+the blob columns, and it is TEMPORARY: it is `ustrip(unit, q)` and
+`number * unit` because IO's decimal-exact `write_quantity`/`read_quantity` is
+not exact for a quantity built as `v * unit` (a board is built from literals
+such as `9.0mm`; IO would write `9.000000000000002`). When IO's writer writes `v`
+back for `v * unit`, the pair is replaced by IO's under the file's
+`UnitContract` and nothing else changes. The file declares its unit once: the
+`units` block (blobs carry none).
 
 ## GLMakie off the main thread — thread 1
 

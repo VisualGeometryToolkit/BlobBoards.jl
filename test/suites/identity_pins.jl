@@ -50,7 +50,6 @@ const PINNED_PATTERN_JSON = """
         "polarity": "dark"
     },
     "blobs": {
-        "unit": "px",
         "centers": [
             [
                 10.5,
@@ -98,7 +97,7 @@ const PINNED_PATTERN_JSON = """
             BlobBoards.save_json(joinpath(dir, "pretty.json"), pb)
             @test read(joinpath(dir, "pretty.json"), String) == PINNED_PATTERN_JSON
             BlobBoards.save_json(joinpath(dir, "compact.json"), pb; pretty_json = false)
-            @test _sha(read(joinpath(dir, "compact.json"))) == "fe15e2d852977e2cedfef6fe0b84ac9497de03d2551678be56b73f8dba97d16a"
+            @test _sha(read(joinpath(dir, "compact.json"))) == "5e7d23ee4f191a905d020e559d9247ec09150bd0e1d1bb81911d3b680634db94"
         end
     end
 
@@ -109,7 +108,7 @@ const PINNED_PATTERN_JSON = """
             @test _sha(BlobBoards.canonical_config_json(b.preamble)) == "80388c6c81978b0923d85f0a9e95aa2e7c94eff600d09bea40ceaf8e50fc1e4b"
             @test BlobBoards.board_code(b.preamble) ==
                 "BB4/148MM/210MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/1234/2.83464566929/18.1415/3/5000/1.2/2/D/DA6009BB"
-            @test _sha(read(_onlyext(dir, ".json"))) == "638105cda9e03fb1507768e825f8ef10fc129ae94be82fbc2a7305053feab87e"
+            @test _sha(read(_onlyext(dir, ".json"))) == "d2e6f9e075af835ec73a65727ae3dc1804e07265c02d5691d2d598c3ee77a37b"
             @test basename(BlobBoards._render_cache_dir(hash_config(b.preamble), true)) == "da6009bb31d28be9_05984910"
             # write → read → write is byte-identical: the lift paths (margin, ruler_width, corner_size, layout_grid,
             # the blob columns) lose nothing
@@ -129,7 +128,7 @@ const PINNED_PATTERN_JSON = """
         mktempdir() do dir
             blob_board("A5"; blob_sizes = (5.0mm, 0.2short_side), seed = 0x77, dir, output = BlobBoards.Png(150dpi), id_label = true)
             json = read(_onlyext(dir, ".json"))
-            @test _sha(json) == "df504c5f3496567f95d13563912dd8e9dcab3fb57fdf91b10a437cf2984775d1"
+            @test _sha(json) == "b033504e51517fd276c736f787ed26dc66184661b2d152c8586696f3b574d049"
             @test occursin("cd5a5372d3c7c38f4b2a3724759421f44d354027b127b9a5623543dc37ec4017", String(json))
         end
     end
@@ -137,9 +136,9 @@ const PINNED_PATTERN_JSON = """
     @testset "stored pixel-grid boards: identity, re-save and rebuild bytes (board v5)" begin
         for (name, h, resave) in (
                 ("odd300", "0ed26d0d3b982d10064a872e75e1dfb5215ef91cac71633083a2da5c6ddadc39",
-                    "e0cca7b28d53a1281545a3333a896fe2faa30d99ee9aca9a1bf500b64ce410d7"),
+                    "16df891e5b78d67dac9a1fbf86f95a22ee31bf4fb5ee3dbbb290c43e675208c7"),
                 ("framed600", "b01c46b2f66b6507175cd68e077f8445cfc538ea550e05101f1e4d062f353768",
-                    "eb06733bd28ab318b79db8ec489152438da00a5bd3588085953419ccd39b5f52"),
+                    "f7e732a06609f6c97efcefb2bde7c4bc4e6b4b5b22637251d8138382a3efd099"),
             )
             v3, _, stored = BlobBoards.load_bundle(joinpath(_FIXTURES, name * ".json"))
             @test stored == h
@@ -152,7 +151,7 @@ const PINNED_PATTERN_JSON = """
         end
         mktempdir() do dir
             BlobBoards.rebuild_board(joinpath(_FIXTURES, "odd300.json"); dir)
-            @test _sha(read(_onlyext(dir, ".json"))) == "8a71575e49f3ddfe21456738c906cb739df051a20f64858fe7d78239fb402322"
+            @test _sha(read(_onlyext(dir, ".json"))) == "a1181578131b932ecba8bc7ece7cd64b65a6953600cc9b2e5b41ec09834f0d04"
         end
     end
 
@@ -167,10 +166,12 @@ const PINNED_PATTERN_JSON = """
             ("framed600_v3.json", joinpath(_FIXTURES, "framed600.json"), "blobboards/board/v3", "b01"),
             ("v3_raster_render_no_density.json", joinpath(pkg, "test", "fixtures", "v3_raster_render_no_density.json"), "blobboards/board/v3", "6f5"),
         )
-        # the two the IO monorepo kept as migration inputs (VisualGeometryToolkitIO at 0d86d1e,
+        # all four legacy inputs are byte-pinned; the first two the IO monorepo kept as migration inputs (VisualGeometryToolkitIO at 0d86d1e,
         # test/fixtures/legacy_quantities/): the very same bytes
         @test _sha(read(joinpath(legacy, "odd300_v3.json"))) == "2bedb7da2c2f4348238b59b842c55eae37fcad4dd721312f6a082222ca41d1f9"
         @test _sha(read(joinpath(legacy, "v3_raster_render_no_density.json"))) == "7fbd716d89acd1e9c8b81e660323e7d5d4a709db49694db171beb678b995e077"
+        @test _sha(read(joinpath(legacy, "hero_board_v4.json"))) == "2316eaa2cf49965f5a59c3d91495f6960241a39acf7a2d25605cd9a4c44fc6cf"
+        @test _sha(read(joinpath(legacy, "framed600_v3.json"))) == "d90d048e520892bae055ed5a0c2aa377516edf4a1cc192202ae09aef2622fc7d"
         for (old, tracked, from, uid) in cases
             old_path = joinpath(legacy, old)
             old_obj = JSON.parse(read(old_path, String))
@@ -203,10 +204,62 @@ const PINNED_PATTERN_JSON = """
             end
         end
         # the new files' bytes
-        @test _sha(read(joinpath(pkg, "docs", "hero_board.json"))) == "d77843a45ec333562de08e135aa063ddc0b09fd41664420b6e28e16bda76e143"
-        @test _sha(read(joinpath(_FIXTURES, "odd300.json"))) == "f3dc087dbc61d5232e82ff8dd6e9ce76dfbd0ef9c63e94ec154e0e0664a58bd4"
-        @test _sha(read(joinpath(_FIXTURES, "framed600.json"))) == "fd2e046c3dfb8ed492230527e290252a6b76298e979a4f1a45d2fb46da45050e"
-        @test _sha(read(joinpath(pkg, "test", "fixtures", "v3_raster_render_no_density.json"))) == "6762a06795eb5534f5b90264711a2e5a774ea3f9d053890d6b1ade3cc4ab59fc"
+        @test _sha(read(joinpath(pkg, "docs", "hero_board.json"))) == "eb09ac5696c83c75f314ed564b6bcfb75d912c4e9f56a76e9408b606a7fc73ce"
+        @test _sha(read(joinpath(_FIXTURES, "odd300.json"))) == "6b2e3dfcf442bcdea35d7d9472fd05827cfdeef792de22d4832df4292f86473c"
+        @test _sha(read(joinpath(_FIXTURES, "framed600.json"))) == "c2829bab15087ca8656add8cf73a32f4fead9351414f9711b8f576a923579249"
+        @test _sha(read(joinpath(pkg, "test", "fixtures", "v3_raster_render_no_density.json"))) == "10eece32c2d719fdfa96867c02c0bcc3f768ba3a2822a15308cc71a3917f467a"
+    end
+
+
+    @testset "the migration enforces the uid: a point-grid file whose identity does not recompute is refused, nothing left" begin
+        legacy = joinpath(@__DIR__, "..", "fixtures", "legacy", "hero_board_v4.json")
+        mktempdir() do dir
+            obj = JSON.parse(read(legacy, String); dicttype = Dict{String, Any})
+            obj["blobs"]["centers"][1][1] += 0.01                     # a doctored blob: the stored hash no longer recomputes
+            bad = joinpath(dir, "bad.json")
+            write(bad, JSON.json(obj))
+            out = joinpath(dir, "out.json")
+            err = try
+                VgtkIO.vgio_migrate(bad; out)
+                nothing
+            catch e
+                sprint(showerror, e)
+            end
+            @test err !== nothing && occursin("stored hashes.config", err)
+            @test !ispath(out) && sort(readdir(dir)) == ["bad.json"]       # nothing written, no staging left
+            # called directly, the migration removes its own output
+            direct = joinpath(dir, "direct.json")
+            @test_throws ArgumentError VgtkIO.migrate_schema(Val(Symbol("blobboards/board/v4")), bad, direct)
+            @test !ispath(direct)
+            # a doctored stored hash is the same refusal
+            obj = JSON.parse(read(legacy, String); dicttype = Dict{String, Any})
+            obj["hashes"]["config"] = "0" ^ 64
+            write(bad, JSON.json(obj))
+            @test_throws ArgumentError VgtkIO.vgio_migrate(bad; out)
+        end
+    end
+
+    @testset "the identity tree is the frozen {value, unit} form, whole (no quantity leaks a bare number)" begin
+        leaves(x::AbstractDict) = (l = Any[]; for (k, v) in x; append!(l, [(k, w) for w in leaves(v)]); end; l)
+        leaves(x::AbstractVector) = reduce(vcat, [leaves(v) for v in x]; init = Any[])
+        leaves(x) = Any[x]
+        quantity_object(d, k) = d[k] isa AbstractDict && keys(d[k]) == Set(["value", "unit"])
+        pt_board = blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir = mktempdir())
+        bc = BlobBoards._plain(pt_board.preamble)["board_config"]
+        pc = BlobBoards._plain(pt_board.preamble)["pattern_config"]
+        @test all(k -> quantity_object(pc, k), ("min_scale", "max_scale"))
+        @test pc["min_scale"]["unit"] == "pt" && bc["layout_grid"] == Dict{String, Any}("value" => 0.01, "unit" => "pt")
+        @test all(k -> quantity_object(bc["canvas_size"], k), ("width", "height")) && all(k -> quantity_object(bc["margin"], k), ("width", "height"))
+        @test all(k -> quantity_object(bc, k), ("ruler_width", "corner_size", "frame_padding"))
+        @test all(t -> all(k -> quantity_object(bc["ruler_spec"][t], k), ("spacing", "width")), ("major_tick", "minor_tick"))
+        px_board, _, _ = BlobBoards.load_bundle(joinpath(_FIXTURES, "odd300.json"))
+        tree = BlobBoards._plain(px_board.preamble)
+        @test quantity_object(tree["board_config"], "print_density") && quantity_object(tree["board_config"], "frame_width")
+        @test all(k -> quantity_object(tree["pattern_config"]["pattern_resolution"], k), ("width", "height"))
+        @test all(k -> quantity_object(tree["pattern_config"], k), ("min_scale", "max_scale"))
+        # and the blob columns of the identity declare their unit, as they always have; the FILE's do not
+        @test BlobBoards._plain(BlobBoards._identity_blobs(pt_board.blobs, "pt"))["unit"] == "pt"
+        @test !haskey(BlobBoards._file_blobs(pt_board.blobs), :unit)
     end
 
     @testset "the file format is not part of an identity" begin

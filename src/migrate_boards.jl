@@ -19,7 +19,7 @@
 # bundle through the v5 writer (`save_json`, with the file's own stored
 # `hashes.config` and its `render` block), READS THE RESULT BACK with the v5
 # reader and compares every value with what the old file read as, bit for bit.
-# Any difference refuses the file and writes nothing. The identity is the
+# Any difference refuses the file and removes the output. The identity is the
 # stored `hashes.config`, carried over unchanged; the bundle's identity
 # recomputed from the migrated file is checked to be the one recomputed from
 # the old file (`_bundle_identity`, which covers the identity schema and the
@@ -158,17 +158,25 @@ function _legacy_pattern_from_points(x, bc::BoardConfig)
     return d
 end
 
+# The retired columns declared their own `unit`: it must be the grid's.
+function _legacy_blobs(data, unit::String)
+    data isa AbstractVector && return _construct_blobs(data)     # (the retired row form: refused there)
+    String(_getfield(data, "unit")) == unit ||
+        throw(ArgumentError("columnar blobs must declare unit \"$unit\", got \"$(_getfield(data, "unit"))\""))
+    return _construct_blobs((centers = _getfield(data, "centers"), sigmas = _getfield(data, "sigmas")))
+end
+
 function _legacy_board_bundle(x)
     pre = _getfield(x, "preamble")
     bc = _legacy_board_config(_getfield(pre, "board_config"))
     raw = _getfield(pre, "pattern_config")
     pc = _legacy_pattern_config(bc.layout_grid isa PointGrid ? _legacy_pattern_from_points(raw, bc) : raw)
-    blobs = _construct_blobs(_getfield(x, "blobs"); unit = _blob_unit(bc.layout_grid))
+    blobs = _legacy_blobs(_getfield(x, "blobs"), _blob_unit(bc.layout_grid))
     return BoardBundle(BoardPreamble(bc, pc), blobs)
 end
 
 function _legacy_pattern_bundle(x)
-    return PatternBundle(_legacy_pattern_config(_getfield(x, "pattern_config")), _construct_blobs(_getfield(x, "blobs")))
+    return PatternBundle(_legacy_pattern_config(_getfield(x, "pattern_config")), _legacy_blobs(_getfield(x, "blobs"), "px"))
 end
 
 # -----------------------------------------------------------------------------
@@ -212,6 +220,15 @@ function _render_migrated_ok(old::_JSONObject, new)
 end
 
 function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::AbstractString)
+    try
+        return _migrate_bundle_file_checked(src, dst, from)
+    catch
+        rm(dst; force = true)         # a refused migration leaves no output at `dst`
+        rethrow()
+    end
+end
+
+function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString)
     obj = JSON.parse(read(src, String))::_ParsedObject
     get(obj, :schema, nothing) == from ||
         throw(ArgumentError("$(src): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
@@ -226,19 +243,34 @@ function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::Ab
     stored === nothing && throw(
         ArgumentError("$(src): stores no hashes.config; a migration carries a stored identity over and mints none")
     )
+    # The uid must not move. A point-grid board's identity covers its schema, configuration and blobs and is
+    # reproducible: the file's identity recomputed from what it holds must BE its stored hash, or the file is
+    # refused (a stored identity this code cannot reproduce is not carried over unverified). A pixel-grid board
+    # or a pattern keeps its stored hash, authoritative across the encodings that minted it (older boards recompute
+    # to something else, all 50 example boards among them); there the identity recomputed from the migrated file
+    # must be the one recomputed from the old file.
+    identity_old = _bundle_identity(old)
+    if old isa BoardBundle && old.preamble.board_config.layout_grid isa PointGrid && identity_old != stored
+        throw(
+            ArgumentError(
+                "$(src): the identity recomputed from the file ($(identity_old[1:8])…) is not its stored hashes.config " *
+                    "($(stored[1:8])…); the uid would not be verified, so the file is not migrated"
+            )
+        )
+    end
     render = haskey(obj, :render) ? _migrated_render(obj[:render]::_JSONObject) : nothing
     save_json(dst, old; overwrite = true, config_hash = stored, render)
     new, config_hash = _parse_bundle(dst)
     _same_value(old, new) ||
-        throw(ArgumentError("$(src): the migration does not read back as the file read (a number moved); nothing was written"))
+        throw(ArgumentError("$(src): the migration does not read back as the file read (a number moved); the output is discarded"))
     config_hash == stored ||
-        throw(ArgumentError("$(src): the migration does not keep the stored identity; nothing was written"))
-    _bundle_identity(new) == _bundle_identity(old) ||
-        throw(ArgumentError("$(src): the identity recomputed from the migration differs from the old file's; nothing was written"))
+        throw(ArgumentError("$(src): the migration does not keep the stored identity; the output is discarded"))
+    _bundle_identity(new) == identity_old ||
+        throw(ArgumentError("$(src): the identity recomputed from the migration differs from the old file's; the output is discarded"))
     if render !== nothing
         written = JSON.parse(read(dst, String))::_ParsedObject
         _render_migrated_ok(obj[:render]::_JSONObject, get(written, :render, nothing)) ||
-            throw(ArgumentError("$(src): the migrated render block does not read back as the old one; nothing was written"))
+            throw(ArgumentError("$(src): the migrated render block does not read back as the old one; the output is discarded"))
     end
     return (; to = String(get(JSON.parse(read(dst, String))::_ParsedObject, :schema, "")), uid = uid_from_hash(stored), config_hash = stored)
 end

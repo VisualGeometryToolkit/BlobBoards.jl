@@ -55,19 +55,24 @@ _lower(x) = JSON.lower(_LowerStyle(), x)
 #
 # FILE (board/v5, pattern/v3): a quantity is a NUMBER in the unit the file's
 # `units` block declares — VisualGeometryToolkitIO's quantity format, the one
-# every stack file uses: a length in the declared `world` unit (mm), a density
-# in the declared `density` unit (dpi), a pixel count in pixels; the point-grid
-# board's pattern lengths (the σ range, the layout grid) are plain numbers in
-# the declared `pattern` length role (pt). A pixel count or a density is an
-# integer when it is one. The conversion to and from a number is `ustrip(unit, q)`
+# every stack file uses, and the ONLY place a file declares a unit: a length in
+# the declared `world` unit (mm), a density in the declared `density` unit
+# (dpi), a pixel count in pixels; the point-grid board's own numbers (the σ
+# range, the layout grid, the blobs) are plain numbers in the declared `pattern`
+# length role (pt). A pixel count or a density is an integer when it is one.
+#
+# TEMPORARY: every conversion between a quantity and a file number goes through
+# ONE pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(unit, q)`
 # and `number * unit`, NOT VisualGeometryToolkitIO's decimal-exact
-# `write_quantity`/`read_quantity`: a board is built from literals (`210.0mm`),
-# and `210.0 * 0.001` is not the double nearest the decimal 0.21, so IO's
-# writer would print `9.000000000000002` for a `9.0mm` canvas and IO's reader
-# would hold a value an ulp from the one the board was built with. The unit
-# declaration, the roles and the numbers are IO's; the two directions are the
-# ones a board's identity, its byte pins and its placement were computed with.
-# (`test/suites/serialization.jl` reads a written board with IO's own reader.)
+# `write_quantity`/`read_quantity`. The reason is an IO gap: its writer is not
+# exact for a quantity built as `v * unit` — a board is built from literals
+# (`9.0mm`, which is 0.009000000000000001 m), so IO would print
+# `9.000000000000002` for it, and its reader would hold a value an ulp from the
+# one the board was built with (identity, byte pins and placement were computed
+# with `v * unit`). When IO's writer writes `v` back for `v * unit`, this pair is
+# replaced by `write_quantity`/`read_quantity` under the file's `UnitContract`
+# (roles included) and nothing else changes: no other code converts a file
+# number. (`test/suites/identity_pins.jl` reads a written board with IO's reader.)
 #
 # IDENTITY: a board's identity (`hashes.config`, the uid printed in its corners
 # and carried by its QR code) is the SHA-256 of a canonical tree built from the
@@ -76,6 +81,8 @@ _lower(x) = JSON.lower(_LowerStyle(), x)
 # encoding, frozen — not a file format; nothing reads it back — and it is what
 # keeps a uid from moving when the file format does. `_plain` turns it on for
 # the duration of one canonical encoding (`_IDENTITY`); everything else is a file.
+# `_lowered` is the one function every lowering calls for a quantity, and
+# `_identity_form` the one place the frozen form is written.
 const _IDENTITY = ScopedValue(false)
 
 # The units a file being READ declares (`units`: world, density). The default is
@@ -86,8 +93,13 @@ _snap_integer(v::Integer) = Int(v)
 _snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
 _snap_integer(v) = v
 
-# A quantity as the number a file holds (always in mm, dpi, px: what is written).
-function _file_number(q::Quantity)
+# A quantity as the number a file holds. `role = :world` (the default): by
+# dimension, a length in mm, a density in dpi, a pixel count in px. `role =
+# :pattern`: a point-grid board's own number (σ range, layout grid, blob
+# coordinate), the stored-unit magnitude — the points the print master holds —
+# always a Float64.
+function _file_number(q::Quantity; role::Symbol = :world)
+    role === :pattern && return Float64(ustrip(px, q))
     d = dimension(q)
     d == dimension(mm) && return Float64(ustrip(mm, q))
     d == dimension(dpi) && return _snap_integer(ustrip(dpi, q))
@@ -95,8 +107,16 @@ function _file_number(q::Quantity)
     throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
 end
 
-# A quantity in the identity tree: the object every board's identity was minted from.
-function _identity_quantity(q::Quantity)
+"""
+    _identity_form(q::Quantity; role = :world) -> NamedTuple
+
+The FROZEN canonical form of a quantity in a board's identity tree: the object
+`(value, unit)` every board's identity was minted from (a length in "mm", a
+density in "dpi", a pixel count in "px", a `:pattern` number in "pt"). It is
+not a file format and nothing reads it back; changing it re-uids every board.
+"""
+function _identity_form(q::Quantity; role::Symbol = :world)
+    role === :pattern && return (value = Float64(ustrip(px, q)), unit = unit_string(pt))
     d = dimension(q)
     u = d == dimension(mm) ? mm : d == dimension(dpi) ? dpi : d == dimension(px) ? px :
         throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
@@ -104,15 +124,21 @@ function _identity_quantity(q::Quantity)
     return (value = u === mm ? Float64(v) : _snap_integer(v), unit = unit_string(u))
 end
 
-# A field's value as the writer writes it: a number (a file) or the identity's object.
-_jv(q::Quantity) = _IDENTITY[] ? _identity_quantity(q) : _file_number(q)
+# The one function every lowering calls for a quantity: the file's number, or
+# (inside `_plain`) the identity's frozen object.
+_lowered(q::Quantity; role::Symbol = :world) = _IDENTITY[] ? _identity_form(q; role) : _file_number(q; role)
+
+# A field's value as the writer writes it.
+_jv(q::Quantity) = _lowered(q)
 _jv(s::Size2) = (width = _jv(s.width), height = _jv(s.height))
 _jv(x) = x
 
 _lower(q::Quantity) = _jv(q)
 _lower(s::Size2) = _jv(s)
 
-# A file's number as the quantity of its kind (`:length`, `:pixel`, `:density`)
+# A file's number as the quantity of its kind (`:length`, `:pixel`, `:density`;
+# `:pattern` and `:blob`, the point-grid board's own numbers, stored-unit pixels:
+# `:pattern` snaps an integral value to an integer, `:blob` is always a Float64)
 # under the units it declares. A `{value, unit}` object is the retired form,
 # which only a migration reads (migrate_boards.jl).
 function _file_quantity(x, kind::Symbol)
@@ -126,8 +152,9 @@ function _file_quantity(x, kind::Symbol)
     world, density = _FILE_UNITS[]
     kind === :length && return Float64(x) * world
     kind === :density && return _snap_integer(x) * density
-    kind === :pixel && return _snap_integer(x) * px
-    throw(ArgumentError("a quantity's kind is :length, :pixel or :density, got $(repr(kind))"))
+    (kind === :pixel || kind === :pattern) && return _snap_integer(x) * px
+    kind === :blob && return Float64(x) * px
+    throw(ArgumentError("a quantity's kind is :length, :pixel, :density, :pattern or :blob, got $(repr(kind))"))
 end
 _file_size2(x, kind::Symbol) =
     Size2(width = _file_quantity(_getfield(x, "width"), kind), height = _file_quantity(_getfield(x, "height"), kind))

@@ -362,20 +362,18 @@ blobs(pb::PatternBundle) = pb.blobs
 
 StructUtils.structlike(::Type{<:PatternBundle}) = false
 
-# v1 blob encoding: columnar with ONE unit declaration — blobs are bulk
-# derived data (never identity-bearing; the hash covers only the config), so
-# ~650 identical per-scalar {value, unit} pairs per file were pure noise.
-#
-# `unit` is the declared unit of the stored numbers: "px" for a pattern and a
-# v3 board, "pt" for a v4 (point-grid) board, whose stored px ARE points — the
-# same numbers either way, declared as what they are.
-_lower_blobs(blobs::Vector{<:Disc}; unit::String = "px") = (
-    unit = unit,
-    centers = [Float64[ustrip(px, b.center[1]), ustrip(px, b.center[2])] for b in blobs],
-    sigmas = Float64[ustrip(px, b.σ) for b in blobs],
+# Blob encoding: columnar. In a FILE the blobs are plain numbers in the stored
+# unit — px for a pattern and a pixel-grid board, the declared `pattern` role (pt)
+# for a point-grid board, whose stored px ARE points — and the unit is declared
+# once, in the file's `units` block, not here. In the board's IDENTITY the
+# columns carry their `unit` string, as every identity was minted (`_identity_blobs`).
+_file_blobs(blobs::Vector{<:Disc}) = (
+    centers = [Float64[_file_number(b.center[1]; role = :pattern), _file_number(b.center[2]; role = :pattern)] for b in blobs],
+    sigmas = Float64[_file_number(b.σ; role = :pattern) for b in blobs],
 )
+_identity_blobs(blobs::Vector{<:Disc}, unit::String) = merge((; unit), _file_blobs(blobs))
 
-function _construct_blobs(data; unit::String = "px")
+function _construct_blobs(data)
     data isa AbstractVector && throw(
         ArgumentError(
             "row-form blobs are the retired pre-v1 encoding; migrate the file " *
@@ -383,16 +381,17 @@ function _construct_blobs(data; unit::String = "px")
                 "migrator were removed in 0.19)"
         )
     )
-    u = String(_getfield(data, "unit"))
-    u == unit || throw(ArgumentError("columnar blobs must declare unit \"$unit\", got \"$u\""))
+    _hasfield(data, "unit") && throw(
+        ArgumentError("blobs declare no unit of their own: the file's `units` block is the only declaration (a board v4 or earlier file: migrate it)")
+    )
     return [
-        Disc(Point2(Float64(c[1]) * px, Float64(c[2]) * px), Float64(s) * px)
+        Disc(Point2(_file_quantity(c[1], :blob), _file_quantity(c[2], :blob)), _file_quantity(s, :blob))
             for (c, s) in zip(_getfield(data, "centers"), _getfield(data, "sigmas"))
     ]
 end
 
 function JSON.lower(::JSON.JSONStyle, pb::PatternBundle)
-    return (units = _bundle_units(pb), pattern_config = pb.pattern_config, blobs = _lower_blobs(pb.blobs))
+    return (units = _bundle_units(pb), pattern_config = pb.pattern_config, blobs = _file_blobs(pb.blobs))
 end
 
 function JSON.lift(::Type{<:PatternBundle}, x::_JSONObject)
@@ -925,9 +924,7 @@ StructUtils.structlike(::Type{<:BoardConfig}) = false
 # its stored unit — a number in the file's `pattern` length role (pt), and in
 # the identity's own form the object it was minted from.
 _grid_record(g::PixelGrid) = (; print_density = _jv(g.density))
-_grid_record(g::PointGrid) = (;
-    layout_grid = _IDENTITY[] ? (value = 1 / _grid_per_stored(g), unit = _blob_unit(g)) : 1 / _grid_per_stored(g)
-)
+_grid_record(g::PointGrid) = (; layout_grid = _lowered((1 / _grid_per_stored(g)) * px; role = :pattern))
 
 JSON.lower(::JSON.JSONStyle, bc::BoardConfig) = (;
     canvas_size = _jv(bc.canvas_size),
@@ -951,7 +948,7 @@ function _construct_grid(x)
     g = _getfield(x, "layout_grid", nothing)
     if g !== nothing
         want = 1 / _grid_per_stored(PointGrid())
-        (g isa Real && Float64(g) == want) ||
+        (g isa Real && ustrip(px, _file_quantity(g, :pattern)) == want) ||
             throw(ArgumentError("board_config.layout_grid must be $(want) (points, the file's `pattern` length role), got $(repr(g))"))
         return PointGrid()
     end
@@ -1014,7 +1011,7 @@ _lower_pattern(pc::PatternConfig, ::PixelGrid) = pc
 function _lower_pattern(pc::PatternConfig, g::PointGrid)
     pc.pixel_type == DEFAULT_PIXEL_TYPE ||
         throw(ArgumentError("a point-grid board has no pixel type; got a pattern config with $(pc.pixel_type)"))
-    stored(q) = _IDENTITY[] ? (value = Float64(ustrip(px, q)), unit = _blob_unit(g)) : Float64(ustrip(px, q))
+    stored(q) = _lowered(q; role = :pattern)
     return Base.structdiff(
         merge(_lower(pc), (min_scale = stored(pc.min_scale), max_scale = stored(pc.max_scale))),
         NamedTuple{(:pixel_type, :pattern_resolution, :raster_aligned)}
@@ -1081,7 +1078,7 @@ _blob_unit(::PixelGrid) = "px"
 _blob_unit(::PointGrid) = "pt"
 
 function JSON.lower(::JSON.JSONStyle, bb::BoardBundle)
-    return (units = _bundle_units(bb), preamble = bb.preamble, blobs = _lower_blobs(bb.blobs; unit = _blob_unit(bb.preamble.board_config.layout_grid)))
+    return (units = _bundle_units(bb), preamble = bb.preamble, blobs = _file_blobs(bb.blobs))
 end
 
 function JSON.lift(::Type{<:BoardBundle}, x::_JSONObject)
@@ -1091,7 +1088,7 @@ function JSON.lift(::Type{<:BoardBundle}, x::_JSONObject)
         grid = preamble.board_config.layout_grid
         grid isa PointGrid && !_declares_pattern_role(x) &&
             throw(ArgumentError("a point-grid board's `units` declare the length role `pattern` (pt): its σ range and layout grid are numbers in it"))
-        blobs = _construct_blobs(_getfield(x, "blobs"); unit = _blob_unit(grid))
+        blobs = _construct_blobs(_getfield(x, "blobs"))
         return BoardBundle(preamble, blobs)
     end
 end
@@ -1227,11 +1224,11 @@ _hash_board(::PixelGrid, p::BoardPreamble) = sha256_hex(canonical_config_json(p)
 _hash_board(::PointGrid, p::BoardPreamble) = _board_identity(p, _place_board_blobs(p))
 # The identity of a board whose blobs are known (minted where they were placed,
 # or read with them), never re-placing them. A v4 board's covers the blobs in the
-# encoding its file stores them in (`_lower_blobs`).
+# columns of the identity tree (`_identity_blobs`).
 _board_identity(p::BoardPreamble, blobs) = _board_identity(p.board_config.layout_grid, p, blobs)
 _board_identity(g::PixelGrid, p::BoardPreamble, _) = _hash_board(g, p)
 function _board_identity(g::PointGrid, p::BoardPreamble, blobs)
-    record = Dict{String, Any}("schema" => IDENTITY_SCHEMA, "preamble" => _plain(p), "blobs" => _plain(_lower_blobs(blobs; unit = _blob_unit(g))))
+    record = Dict{String, Any}("schema" => IDENTITY_SCHEMA, "preamble" => _plain(p), "blobs" => _plain(_identity_blobs(blobs, _blob_unit(g))))
     return sha256_hex(canonical_json(record))
 end
 

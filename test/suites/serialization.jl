@@ -175,7 +175,7 @@ const V0_FIXTURE = """
         @test haskey(obj.pattern_config, :max_scale) && !haskey(obj.pattern_config, :max_diameter_fraction)
         @test String(obj.hashes.config) == GOLDEN_HASH                    # canonical mint
         @test haskey(obj.blobs, :centers) && haskey(obj.blobs, :sigmas)   # columnar
-        @test obj.blobs.unit == "px"
+        @test !haskey(obj.blobs, :unit)                                   # the units block is the one declaration
         @test haskey(obj.pattern_config, :alpha)                          # v1 spelling
         @test obj.pattern_config.pixel_type == "gray8"
 
