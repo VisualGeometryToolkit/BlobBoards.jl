@@ -137,8 +137,15 @@ _file_size2(x, kind::Symbol) =
 # point grid, the length role `pattern` (pt); any other role is refused.
 function _declared_units(x; required::Bool = true)
     if !_hasfield(x, "units")
-        required && throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))
-        return (mm, dpi)
+        required || return (mm, dpi)
+        schema = _getfield(x, "schema", nothing)
+        schema in MIGRATED_SCHEMAS && throw(
+            ArgumentError(
+                "this is a $(schema) file, the retired {value, unit} quantity form; this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")). " *
+                    "Migrate the file once with VisualGeometryToolkitIO.vgio_migrate (it keeps the stored identity)"
+            )
+        )
+        throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))
     end
     c = VgtkIO.from_json(VgtkIO.UnitContract, _getfield(x, "units"))
     extra = setdiff(keys(c.lengths), (:pattern,))

@@ -45,7 +45,21 @@ catch err
     nothing
 end
 _only(dir, pred) = (fs = filter(pred, readdir(dir; join = true)); length(fs) == 1 ? only(fs) : nothing)
-const _BOARDS_DIR = _EXAMPLE === nothing ? nothing : _EXAMPLE.boards
+
+# The example boards artifact is `bb_example_boards_v3` (board schema v3, the retired
+# `{value, unit}` form) until the migrated set is published as a new entry. A set of
+# retired files is migrated here, into a temporary directory, by the very migration
+# (`vgio_migrate`) that makes the new set; a current set is used as it is.
+function _current_boards(dir)
+    files = filter(endswith(".json"), readdir(dir; join = true))
+    all(f -> JSON.parsefile(f)["schema"] in BlobBoards.READABLE_SCHEMAS, files) && return dir
+    out = mktempdir()
+    for f in files
+        VgtkIO.vgio_migrate(f; out = joinpath(out, basename(f)))
+    end
+    return out
+end
+const _BOARDS_DIR = _EXAMPLE === nothing ? nothing : _current_boards(_EXAMPLE.boards)
 # Network from configs/default.toml — the one place a default entry point
 # learns which descriptor to load: the iter4 log-polar net, resolved by
 # artifact name through the package's Artifacts.toml catalog.

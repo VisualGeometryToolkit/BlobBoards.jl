@@ -175,6 +175,14 @@ const PINNED_PATTERN_JSON = """
             old_path = joinpath(legacy, old)
             old_obj = JSON.parse(read(old_path, String))
             @test old_obj.schema == from
+            # loading the retired form (here through JSON.parse, as the Python wrapper does) names the migration
+            err = try
+                JSON.parse(read(old_path, String), BlobBoards.BoardBundle)
+                nothing
+            catch e
+                sprint(showerror, e)
+            end
+            @test err !== nothing && occursin("vgio_migrate", err) && occursin(from, err)
             mktempdir() do dir
                 out = joinpath(dir, basename(tracked))
                 r = VgtkIO.vgio_migrate(old_path; out)

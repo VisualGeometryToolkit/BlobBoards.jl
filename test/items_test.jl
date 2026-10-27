@@ -108,6 +108,7 @@ end
 end
 
 @testitem "annotate smoke (detection on the device)" tags=[:gpu] begin
+    using JSON
     using VisualGeometryToolkitCore: mm, px, dpi
     include("suites/annotate_smoke.jl")
 end

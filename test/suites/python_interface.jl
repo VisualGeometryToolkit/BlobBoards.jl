@@ -142,9 +142,9 @@
         )
         jjson = JSON.parse(read(only(filter(endswith(".json"), readdir(jdir; join = true))), String))
         pjson = JSON.parse(read(only(filter(endswith(".json"), readdir(pdir; join = true))), String))
-        @test jjson.schema == "blobboards/board/v4"
-        @test jjson.preamble.pattern_config.min_scale.value ≈ 0.18                # σ = 0.0025 inch, in points
-        @test jjson.preamble.pattern_config.min_scale.unit == "pt"
+        @test jjson.schema == "blobboards/board/v5"
+        @test jjson.preamble.pattern_config.min_scale ≈ 0.18                      # σ = 0.0025 inch, in points
+        @test jjson.units.lengths.pattern == "pt"                                 # … which the units block declares
         @test jjson.render.density === nothing                                   # a PDF has no density
         @test !haskey(jjson.preamble.pattern_config, :max_diameter_fraction)
         @test JSON.json(jjson.preamble) == JSON.json(pjson.preamble)
