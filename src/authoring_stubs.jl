@@ -229,6 +229,26 @@ glyphs and the file name come from `config_hash`.
 function render_board end
 
 """
+    save_canvas_texture(path, bundle::BoardBundle; density, relative_to = dirname(path),
+                        id_label = false, config_hash = <the bundle's identity>) -> VisualGeometryToolkitCore.CanvasTexture
+
+Write the board's printed page — the sheet [`render_board`](@ref) draws, as a
+[`Png`](@ref)`(density)` (8-bit grey, linear gamma) — to `path`, and return
+the VisualGeometryToolkitCore `CanvasTexture` that names it: the path relative
+to `relative_to` (the directory of the file that will name it), the SHA-256 of
+the bytes written, and the rectangle of the design chart the image covers. The
+design chart is the board's world frame (canvas centre, y up; the plane `z = 0`
+of `TargetFrame{uid}`, where [`board_points`](@ref) lie). The image is the
+page on the raster's pixel grid — anchored at the canvas's top-left corner,
+`1/density` per pixel, rounded UP to whole pixels — so the covered rectangle is
+that many pixels at `density`, from the canvas's top-left corner: the canvas
+itself when the page is a whole number of pixels, otherwise up to one blank
+pixel more. Give it to [`board_target`](@ref)`(uid, boards; texture)`. A raster
+follows [`render_board`](@ref)'s rules. Implemented in `BlobBoards.Authoring`.
+"""
+function save_canvas_texture end
+
+"""
     write_tiff(path, grey::AbstractMatrix{UInt8}, density, icc::Vector{UInt8}) -> path
 
 Write an 8-bit grey image (a board's sheet, converted) as an LZW-compressed TIFF (horizontal

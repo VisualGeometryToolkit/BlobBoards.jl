@@ -28,6 +28,7 @@ Tiff
 Png
 BlobBoards.render_board
 BlobBoards.rebuild_board
+BlobBoards.save_canvas_texture
 BlobBoards.board_code
 BlobBoards.parse_board_code
 ```

@@ -27,6 +27,7 @@ public calc_blob_scales                   # the σ ladder from min_scale to max_
 public board_code, parse_board_code       # a board's definition as its QR code's text, and back (checked)
 public render_board                       # re-render a stored board (its recorded blobs) without placement
 public rebuild_board                      # rebuild a stored board from its JSON, as printed
+public save_canvas_texture                # a board's printed page as a canvas texture (a PNG, its SHA-256, the rectangle it covers)
 export PatternConfig, BoardConfig          # Seeded configs (bit-exact reproduction)
 public save                                # Write a pattern bundle's JSON + PNG (`BlobBoards.save`: Makie exports a `save` too)
 export Size2                               # Pattern/board dimensions
@@ -53,7 +54,7 @@ export DetectConfig, MxmNms, EllipseNms
 export AbstractDescriptorNetwork, DescriptorNetwork, LuxDescriptorNetwork
 export BoardGallery                        # Cached per-board feature extraction
 export load_board                          # Board JSON loading (cameras: VisualGeometryToolkitIO.load)
-export board_points, board_library, board_resolver, board_target   # the design resolver: a board uid → its nominal plane points
+export board_points, board_library, board_resolver, board_target   # the design resolver: a board uid → its nominal plane points; the target with its board and canvas
 export extract_board_features, extract_image_features  # Pre-extraction for multi-frame reuse
 export Disc, EllipticFrame, BlobDetection  # Result/geometry types
 export track_boards                        # video: temporally warm-started tracking
