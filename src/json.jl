@@ -42,53 +42,110 @@ _getfield(x, key::String, default) = _hasfield(x, key) ? _getfield(x, key) : def
 const _JSONObject = Union{AbstractDict, NamedTuple}
 
 # A value's JSON lowering (types.jl: each BlobBoards type's `JSON.lower`; a
-# quantity or a `Size2` through `_lower`/`_quantity_json` below), the value itself
-# when it has none: what the writer serializes and what the canonical identity
-# encoding (`_plain`) is computed over. The style is private; every lowering
-# method takes any `JSON.JSONStyle`.
+# quantity or a `Size2` through `_lower`/`_jv` below), the value itself when it
+# has none: what the writer serializes and what the canonical identity encoding
+# (`_plain`) is computed over. The style is private; every lowering method takes
+# any `JSON.JSONStyle`.
 struct _LowerStyle <: JSON.JSONStyle end
 _lower(x) = JSON.lower(_LowerStyle(), x)
 
-# (A pixel pitch, `mm/px`, was written in its own unit "mm/px" while `px` was a
-# dimension. `px` is dimensionless now, so a pitch IS a length and is written as
-# "mm" like any other; no board field holds one.)
-# A board file's quantity is a `{value, unit}` object in the unit its dimension
-# names: a length in "mm", a density in "dpi", a pixel count (dimensionless) in
-# "px"; a pixel count or a density snaps to an integer when it is one. The
-# stack's own quantity format (a number in the record's declared unit) is not
-# written here: board files keep the form every stored board has, and
-# VisualGeometryToolkitIO reads it (`read_quantity` accepts the object).
-function _quantity_json(q::Quantity)
+# -----------------------------------------------------------------------------
+# A quantity in a board file, and in a board's identity
+# -----------------------------------------------------------------------------
+#
+# FILE (board/v5, pattern/v3): a quantity is a NUMBER in the unit the file's
+# `units` block declares — VisualGeometryToolkitIO's quantity format, the one
+# every stack file uses: a length in the declared `world` unit (mm), a density
+# in the declared `density` unit (dpi), a pixel count in pixels; the point-grid
+# board's pattern lengths (the σ range, the layout grid) are plain numbers in
+# the declared `pattern` length role (pt). A pixel count or a density is an
+# integer when it is one. The conversion to and from a number is `ustrip(unit, q)`
+# and `number * unit`, NOT VisualGeometryToolkitIO's decimal-exact
+# `write_quantity`/`read_quantity`: a board is built from literals (`210.0mm`),
+# and `210.0 * 0.001` is not the double nearest the decimal 0.21, so IO's
+# writer would print `9.000000000000002` for a `9.0mm` canvas and IO's reader
+# would hold a value an ulp from the one the board was built with. The unit
+# declaration, the roles and the numbers are IO's; the two directions are the
+# ones a board's identity, its byte pins and its placement were computed with.
+# (`test/suites/serialization.jl` reads a written board with IO's own reader.)
+#
+# IDENTITY: a board's identity (`hashes.config`, the uid printed in its corners
+# and carried by its QR code) is the SHA-256 of a canonical tree built from the
+# same lowering, in the form every board's identity has ever been minted from:
+# each quantity an object `{value, unit}`. That form is the identity's own
+# encoding, frozen — not a file format; nothing reads it back — and it is what
+# keeps a uid from moving when the file format does. `_plain` turns it on for
+# the duration of one canonical encoding (`_IDENTITY`); everything else is a file.
+const _IDENTITY = ScopedValue(false)
+
+# The units a file being READ declares (`units`: world, density). The default is
+# what every file this package writes declares.
+const _FILE_UNITS = ScopedValue((mm, dpi))
+
+_snap_integer(v::Integer) = Int(v)
+_snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
+_snap_integer(v) = v
+
+# A quantity as the number a file holds (always in mm, dpi, px: what is written).
+function _file_number(q::Quantity)
+    d = dimension(q)
+    d == dimension(mm) && return Float64(ustrip(mm, q))
+    d == dimension(dpi) && return _snap_integer(ustrip(dpi, q))
+    d == dimension(px) && return _snap_integer(ustrip(px, q))
+    throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
+end
+
+# A quantity in the identity tree: the object every board's identity was minted from.
+function _identity_quantity(q::Quantity)
     d = dimension(q)
     u = d == dimension(mm) ? mm : d == dimension(dpi) ? dpi : d == dimension(px) ? px :
         throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
     v = ustrip(u, q)
     return (value = u === mm ? Float64(v) : _snap_integer(v), unit = unit_string(u))
 end
-_snap_integer(v::Integer) = Int(v)
-_snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
-_snap_integer(v) = v
 
-# a board file's number or quantity, as the writer writes it
-_json_scalar(q::Quantity) = _quantity_json(q)
-_json_scalar(x) = x
-_json_size2(s::Size2) = (width = _json_scalar(s.width), height = _json_scalar(s.height))
+# A field's value as the writer writes it: a number (a file) or the identity's object.
+_jv(q::Quantity) = _IDENTITY[] ? _identity_quantity(q) : _file_number(q)
+_jv(s::Size2) = (width = _jv(s.width), height = _jv(s.height))
+_jv(x) = x
 
-_lower(q::Quantity) = _quantity_json(q)
-_lower(s::Size2) = _json_size2(s)
-_jv(s::Size2) = _json_size2(s)   # a field's value as the writer writes it
-_jv(x) = _json_scalar(x)
+_lower(q::Quantity) = _jv(q)
+_lower(s::Size2) = _jv(s)
 
-# A board file's number or `{value, unit}` object, read: a number as it is, an
-# object as the quantity (any unit name `parse_unit` reads, so every string a
-# stored board holds loads: mm, px, dpi, pd, pt).
-function _lift_scalar(x)
-    x isa _JSONObject || return x
-    u = parse_unit(String(_getfield(x, "unit")); compound = true)
-    v = _getfield(x, "value")
-    return (dimension(u) == dimension(mm) ? Float64(v) : _snap_integer(v)) * u
+# A file's number as the quantity of its kind (`:length`, `:pixel`, `:density`)
+# under the units it declares. A `{value, unit}` object is the retired form,
+# which only a migration reads (migrate_boards.jl).
+function _file_quantity(x, kind::Symbol)
+    (x isa Real && !(x isa Bool)) || throw(
+        ArgumentError(
+            "a board file's quantity is a number in the file's declared unit, got $(repr(x)) " *
+                "(the {value, unit} form belongs to board schemas up to v4 and pattern schemas up to v2: " *
+                "migrate the file once with VisualGeometryToolkitIO.vgio_migrate)"
+        )
+    )
+    world, density = _FILE_UNITS[]
+    kind === :length && return Float64(x) * world
+    kind === :density && return _snap_integer(x) * density
+    kind === :pixel && return _snap_integer(x) * px
+    throw(ArgumentError("a quantity's kind is :length, :pixel or :density, got $(repr(kind))"))
 end
-_lift_size2(x) = Size2(width = _lift_scalar(_getfield(x, "width")), height = _lift_scalar(_getfield(x, "height")))
+_file_size2(x, kind::Symbol) =
+    Size2(width = _file_quantity(_getfield(x, "width"), kind), height = _file_quantity(_getfield(x, "height"), kind))
+
+# The `units` block a file declares, read: a VisualGeometryToolkitIO
+# `UnitContract`. A board declares a world length (mm), a density (dpi) and, on a
+# point grid, the length role `pattern` (pt); any other role is refused.
+function _declared_units(x; required::Bool = true)
+    if !_hasfield(x, "units")
+        required && throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))
+        return (mm, dpi)
+    end
+    c = VgtkIO.from_json(VgtkIO.UnitContract, _getfield(x, "units"))
+    extra = setdiff(keys(c.lengths), (:pattern,))
+    isempty(extra) || throw(ArgumentError("a board file's units declare no length role $(first(extra)); only `pattern`"))
+    haskey(c.lengths, :pattern) && (c.lengths.pattern == pt || throw(ArgumentError("the length role `pattern` is in pt, got $(c.lengths.pattern)")))
+    return (c.world, c.density)
+end
 
 # The type `JSON.parse(str)` returns for an object.
 const _ParsedObject = JSON.Object{String, Any}

@@ -268,13 +268,13 @@ end
         @test rs.major_tick.width == 16mm && rs.minor_tick.width == 8mm
     end
 
-    @testset "A pre-v3 board's ruler migrates on read" begin
-        # board v1/v2 stored `ruler_spec.width` and HALF-extent tick widths; the
-        # reader drops the one and doubles the others, keeping the stored hash.
+    @testset "A pre-v3 board's ruler migrates (board v1/v2 → v5)" begin
+        # board v1/v2 stored `ruler_spec.width` and HALF-extent tick widths in the
+        # `{value, unit}` form; the migration drops the one and doubles the others,
+        # keeping the stored hash. Built from the migrated v3 pixel-grid fixture's
+        # legacy copy.
         mktempdir() do dir
-            bundle = blob_board("A5"; blob_sizes = (9.0mm, 0.2short_side), seed = 0x1234, ruler_width = 20mm, dir, output = Png(400dpi))
-            json = only(filter(endswith(".json"), readdir(dir; join = true)))
-            d = JSON.parse(read(json, String); dicttype = Dict{String, Any})
+            d = JSON.parse(read(joinpath(@__DIR__, "..", "fixtures", "legacy", "framed600_v3.json"), String); dicttype = Dict{String, Any})
             rs = d["preamble"]["board_config"]["ruler_spec"]
             half(t) = Dict("spacing" => t["spacing"], "width" => Dict("value" => t["width"]["value"] / 2, "unit" => t["width"]["unit"]))
             d["preamble"]["board_config"]["ruler_spec"] = Dict(
@@ -282,14 +282,16 @@ end
                 "major_tick" => half(rs["major_tick"]), "minor_tick" => half(rs["minor_tick"]),
             )
             d["schema"] = "blobboards/board/v1"
-            d["hashes"] = Dict("config" => "0123456789abcdef" ^ 4)   # a stored identity, never recomputed
-            legacy = joinpath(mktempdir(), "blob_board_legacy.json")
+            legacy = joinpath(dir, "legacy", "blob_board_legacy.json")
+            mkpath(dirname(legacy))
             open(io -> JSON.json(io, d), legacy, "w")
-            cp(only(filter(endswith(".png"), readdir(dir; join = true))), replace(legacy, ".json" => ".png"))
-            b, _, h = BlobBoards.load_bundle(legacy)
-            @test b.preamble.board_config.ruler_spec == bundle.preamble.board_config.ruler_spec
-            @test h == "0123456789abcdef" ^ 4
-            @test hash_config(b.preamble) == hash_config(bundle.preamble)
+            out = joinpath(dir, "v5.json")
+            @test VgtkIO.vgio_migrate(legacy; out).to == "blobboards/board/v5"
+            b, h = BlobBoards._parse_bundle(out)
+            want, hw = BlobBoards._parse_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "framed600.json"))
+            @test b.preamble.board_config.ruler_spec == want.preamble.board_config.ruler_spec
+            @test h == hw == d["hashes"]["config"]
+            @test hash_config(b.preamble) == hash_config(want.preamble)
         end
     end
 
@@ -633,7 +635,7 @@ end
         @test only(boxes["BleedBox"]) == only(boxes["MediaBox"])
         @test isapprox(only(boxes["TrimBox"]), [pt(2), pt(2), pt(150), pt(212)]; atol = 0.02)
         rec = JSON.parse(read(onlyjson(joinpath(root, "bleed")), String)).render
-        @test rec.bleed.value == 2 && rec.bleed.unit == "mm"
+        @test rec.bleed == 2                                       # a number, in the file's declared unit (mm)
         # the rebuild prints what was printed: the same boxes
         BlobBoards.rebuild_board(onlyjson(joinpath(root, "bleed")); dir = joinpath(root, "re"))
         @test pdf_boxes(String(read(onlypdf(joinpath(root, "re"))))) == boxes
@@ -791,7 +793,7 @@ end
         @test BlobBoards._recorded_output(BlobBoards._render_options(jon)) == Pdf()
         mk(joinpath(root, "png"); output = Png(300dpi))
         jpng = JSON.parse(read(onlyjson(joinpath(root, "png")), String))
-        @test jpng.render.format == "png" && jpng.render.density.value == 300 && jpng.render.density.unit == "dpi"
+        @test jpng.render.format == "png" && jpng.render.density == 300      # dpi, as the units block declares
         @test !haskey(jpng.render, :pdf_standard) && jpng.render.icc_profile === nothing
         @test BlobBoards._recorded_output(BlobBoards._render_options(jpng)) == Png(300dpi)
         @test jpng.hashes.config == jon.hashes.config                 # the output is not the board
@@ -808,7 +810,7 @@ end
         old["render"]["print_density"] = pop!(old["render"], "density")
         @test BlobBoards._render_options(JSON.parse(JSON.json(old))).density == 300dpi
         oldpdf = JSON.parse(str_on; dicttype = Dict{String, Any})
-        oldpdf["render"]["print_density"] = Dict("value" => 300, "unit" => "dpi")
+        oldpdf["render"]["print_density"] = 300
         @test BlobBoards._render_options(JSON.parse(JSON.json(oldpdf))).density === nothing
         # a raster record with no density cannot be reproduced: the caller names the output
         delete!(old["render"], "print_density")
@@ -834,9 +836,9 @@ end
 end
 
 @testset "reconstruction keeps the STORED identity; the QR carries the board code" begin
-    # A v1 board's in-memory preamble lowers to the current schema, so its
-    # recomputed hash is not its identity. Build a v1 file from a fresh board:
-    # same config, v1 fields, a stored hash that differs from any recomputation.
+    # A migrated board's recomputed hash need not be its identity (a v1 board's
+    # never was). Build such a file from a fresh board: same config, a stored
+    # hash that differs from any recomputation.
     AE = BlobBoards.Authoring
     # a sidecar's preamble, read back, equals the bundle's — same schema, same values
     sidecar_matches(bundle, json_path) =
@@ -857,21 +859,12 @@ end
         @test hash_config(BlobBoards.parse_board_code(qr_text(fresh, h_fresh))) == h_fresh
 
         obj = JSON.parse(read(fresh_json, String); dicttype = Dict{String, Any})
-        pc = obj["preamble"]["pattern_config"]
-        delete!(pc, "max_scale"); pc["max_diameter_fraction"] = 0.2
-        rs = obj["preamble"]["board_config"]["ruler_spec"]
-        half(t) = Dict("spacing" => t["spacing"], "width" => Dict("value" => t["width"]["value"] / 2, "unit" => t["width"]["unit"]))
-        obj["preamble"]["board_config"]["ruler_spec"] = Dict(
-            "width" => half(rs["major_tick"])["width"], "major_tick" => half(rs["major_tick"]), "minor_tick" => half(rs["minor_tick"])
-        )
-        obj["schema"] = "blobboards/board/v1"
         stored = "abcdef" * "0"^58
         obj["hashes"] = Dict("config" => stored)
         delete!(obj, "render")
         v1 = JSON.json(obj)
 
-        # (a synthetic file: a point-grid layout under the v1 spellings, so it
-        # records no density and the rebuild names one)
+        # (a file with no render block, so it records no density)
         rebuilt = BlobBoards.rebuild_board(v1; dir = joinpath(root, "rebuilt"))
         files = readdir(joinpath(root, "rebuilt"))
         @test "blob_board_abc_def00.json" in files && "blob_board_abc_def00.pdf" in files
@@ -882,12 +875,10 @@ end
         @test sidecar_matches(rebuilt, rebuilt_json)
         # its config does not reproduce the stored identity, so its QR is the identity, not a code
         @test qr_text(rebuilt, stored) == uppercase(stored)
-        @test !haskey(side.preamble.pattern_config, :max_diameter_fraction)
-        @test !haskey(side.preamble.board_config.ruler_spec, :width)
 
-        # render_board of the loaded v1 board: same rules
+        # render_board of the loaded board: same rules
         b, _, h = BlobBoards.load_bundle(begin
-            p = joinpath(root, "v1", "blob_board_abc_def00.json"); mkpath(dirname(p)); write(p, v1)
+            p = joinpath(root, "stored", "blob_board_abc_def00.json"); mkpath(dirname(p)); write(p, v1)
             cp(joinpath(root, "rebuilt", "blob_board_abc_def00.pdf"), replace(p, ".json" => ".pdf")); p
         end)
         rr = BlobBoards.render_board(b; output = Png(100dpi), dir = joinpath(root, "rerender"), config_hash = h)
@@ -905,7 +896,7 @@ end
         # a TIFF embeds its profile and records it, with its density; it has no PDF standard
         mk(; output = Tiff(300dpi), dir = joinpath(root, "t"))
         r = JSON.parse(read(only(filter(endswith(".json"), readdir(joinpath(root, "t"); join = true))), String)).render
-        @test r.format == "tiff" && !haskey(r, :pdf_standard) && r.icc_profile == "linear" && r.density.value == 300
+        @test r.format == "tiff" && !haskey(r, :pdf_standard) && r.icc_profile == "linear" && r.density == 300
         # the render block records whether the label was DRAWN: a frameless board
         # filling its sheet has no room for it
         @test_logs (:warn, r"id_label skipped") match_mode = :any blob_board(
@@ -1211,7 +1202,9 @@ end
     # the tag is the schema's version: another schema's code is refused by name
     err = try; BlobBoards.parse_board_code(replace(code, r"^BB4" => "BB5")); nothing; catch e; e; end
     @test err isa ArgumentError && occursin("schema v5", err.msg)
-    @test BlobBoards.BOARD_CODE_TAG == "BB" * last(split(BlobBoards.BOARD_SCHEMA, "/v"))
+    # ... of the IDENTITY schema, not of the file format: a board file is v5 and its printed QR code stays BB4
+    @test BlobBoards.BOARD_CODE_TAG == "BB" * last(split(BlobBoards.IDENTITY_SCHEMA, "/v")) == "BB4"
+    @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v5" && BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"
     # a stored v3 board's identity is still its configuration's alone (its stored hash)
     v3, _, h3 = BlobBoards.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
     @test hash_config(v3.preamble) == h3 == BlobBoards._bundle_identity(v3)
@@ -1322,24 +1315,27 @@ end
     end
 end
 
-@testset "boards written before 2026-10-13 still load" begin
+@testset "boards written before 2026-10-13 migrate" begin
     # a v4 sidecar then recorded `pixel_type: "gray8"` and `render.blob_encoding`;
-    # it loads under its STORED identity (its recomputed one changed when the
-    # pixel type left the v4 identity), and the legacy record maps across
+    # it migrates under its STORED identity, and the legacy record maps across
+    # (the v5 reader knows neither key)
     mktempdir() do dir
-        blob_board("A5"; blob_sizes = (9.0mm, 0.2short_side), seed = 0x7, dir)
-        json = onlyjson(dir)
-        obj = JSON.parse(read(json, String); dicttype = Dict{String, Any})
+        obj = JSON.parse(read(joinpath(@__DIR__, "..", "fixtures", "legacy", "hero_board_v4.json"), String); dicttype = Dict{String, Any})
         obj["preamble"]["pattern_config"]["pixel_type"] = "gray8"
         delete!(obj["render"], "shading_function")
         obj["render"]["blob_encoding"] = "raster"                 # a TIFF/PNG of 2026-10-10/11
-        write(json, JSON.json(obj))
-        b, _, h = BlobBoards.load_bundle(json)
+        old = joinpath(dir, "old", "blob_board_289_adc61.json")
+        mkpath(dirname(old))
+        write(old, JSON.json(obj))
+        out = joinpath(dir, "blob_board_289_adc61.json")
+        @test VgtkIO.vgio_migrate(old; out).uid == "289"
+        b, h = BlobBoards._parse_bundle(out)
         @test h == obj["hashes"]["config"]
-        @test BlobBoards._render_options(JSON.parse(read(json, String))).shading_function === :calculator
+        @test BlobBoards._render_options(JSON.parse(read(out, String))).shading_function === :calculator
         obj["preamble"]["pattern_config"]["pixel_type"] = "gray16"     # never a board's
-        write(json, JSON.json(obj))
-        @test_throws ArgumentError BlobBoards.load_bundle(json)
+        write(old, JSON.json(obj))
+        @test_throws ArgumentError VgtkIO.vgio_migrate(old; out = joinpath(dir, "other.json"))
+        @test !ispath(joinpath(dir, "other.json"))
     end
 end
 
@@ -1405,7 +1401,7 @@ end
         mktempdir() do dir
             BlobBoards.rebuild_board(read(json, String); dir)
             @test same(masters(dir), want)
-            @test JSON.parse(read(onlyjson(dir), String)).schema == "blobboards/board/v3"
+            @test JSON.parse(read(onlyjson(dir), String)).schema == BlobBoards.BOARD_SCHEMA     # a pixel-grid board is written as v5 too
         end
         mktempdir() do dir
             BlobBoards.render_board(b; output = Pdf(), dir, config_hash = h)

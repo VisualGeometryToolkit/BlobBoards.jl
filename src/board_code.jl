@@ -38,14 +38,16 @@
 # depth, until 2026-10-14 no corner size, and its identity did not cover the
 # blobs. Such codes are refused — by their field count, or by their check.)
 
-# The tag IS the board schema's version (`BOARD_SCHEMA`, "blobboards/board/v4" →
-# "BB4"), derived from it so the two cannot disagree. A schema is the meaning of
+# The tag IS the identity schema's version (`IDENTITY_SCHEMA`, "blobboards/board/v4"
+# → "BB4"), derived from it so the two cannot disagree. A schema is the meaning of
 # a configuration — its fields AND how they place the blobs and the frame's
 # marks — so any change to placement or the marks is a new schema, and a new tag.
+# The FILE format is not part of it: board files are v5 and their QR codes stay
+# BB4, because the code carries the configuration, never the file.
 # The identity covers the placed blobs (`_board_identity`), so a code decoded by
 # software that places differently fails its check rather than rebuilding
 # another board.
-const BOARD_CODE_TAG = "BB" * last(split(BOARD_SCHEMA, "/v"))
+const BOARD_CODE_TAG = "BB" * last(split(IDENTITY_SCHEMA, "/v"))
 const _BOARD_CODE_FIELDS = 21
 
 # A number exactly as the identity encodes it (`canonical_json`: an integral
@@ -142,7 +144,7 @@ function parse_board_code(code::AbstractString)
     if f[1] != BOARD_CODE_TAG
         tag = Base.match(r"^BB(\d+)$", f[1])
         tag === nothing && bad("not a board code (no BB<schema> tag)")
-        bad("a board schema v$(tag[1]) code; this BlobBoards reads schema $(BOARD_SCHEMA) ($(BOARD_CODE_TAG)) codes")
+        bad("a board schema v$(tag[1]) code; this BlobBoards reads schema $(IDENTITY_SCHEMA) ($(BOARD_CODE_TAG)) codes")
     end
     length(f) == _BOARD_CODE_FIELDS || bad("a $(BOARD_CODE_TAG) code has $(_BOARD_CODE_FIELDS) '/'-separated fields, this one $(length(f))")
     function num(i)

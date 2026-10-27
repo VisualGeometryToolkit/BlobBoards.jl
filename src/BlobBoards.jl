@@ -110,6 +110,7 @@ import KernelAbstractions as KA   # KA devices are the backend dispatch tokens
 
 # Serialization and I/O
 using JSON: JSON             # every JSON file (src/json.jl: the writer, byte-pinned)
+using Base.ScopedValues: ScopedValue, @with   # the unit declaration a file is read under; identity vs file lowering (json.jl)
 using StructUtils: StructUtils   # `structlike(T) = false`: `JSON.parse(str, T)` lifts the whole object
 using Preferences: @load_preference
 using SHA: SHA, sha256
@@ -211,6 +212,7 @@ include("coordinates.jl")  # Coordinate maps, reference frames, unit conversion
 include("pattern.jl")      # Pattern subsystem (placement, rendering, API)
 include("board_output.jl") # Pdf / Tiff / Png — what a board is written as
 include("io.jl")           # File I/O: JSON sidecars + loading (figure export in authoring/)
+include("migrate_boards.jl")   # the retired {value, unit} schemas: vgio_migrate's migrate_schema methods for boards and patterns
 include("board_code.jl")   # board_code / parse_board_code — the definition a board's QR carries
 include("authoring_stubs.jl")  # blob_board/rebuild_board/render_board docs (authoring/); board! etc. (MakieExt)
 include("media.jl")        # media enumeration: walk/probe/group by resolution

@@ -1,5 +1,5 @@
 # =============================================================================
-# Bundle serialization: v2 schema, v1 read, canonical identity, v0 refusal
+# Bundle serialization: pattern v3, the v1 migration, canonical identity, v0 refusal
 # =============================================================================
 #
 # The golden constants below are the point of this file: if a change to the
@@ -23,9 +23,10 @@ const GOLDEN_CANONICAL = "{\"alpha\":1.6,\"cutoff\":2,\"max_scale\":{\"unit\":\"
 const GOLDEN_HASH = "ba1b3dc4bd7e068ed6f059a15d305e168dea5c0e6e80c96f578931c8f339708f"
 
 # A v1 pattern bundle as the v1 writer emitted it: `max_diameter_fraction`, no
-# `max_scale`. It must still load (v1 is READABLE), its fraction converting to the
-# top rung it produced — 256 px, cutoff 2, fraction 0.2: σ cap 12.8 px, so 6 rungs
-# from 3 px, top 3·2^(5/3) — and its stored hash staying the identity.
+# `max_scale`, every quantity a `{value, unit}` object. It is no longer READ; it
+# MIGRATES (`vgio_migrate`), its fraction converting to the top rung it produced
+# — 256 px, cutoff 2, fraction 0.2: σ cap 12.8 px, so 6 rungs from 3 px, top
+# 3·2^(5/3) — and its stored hash staying the identity.
 const V1_FIXTURE = """
 {"schema": "blobboards/pattern/v1",
  "pattern_config": {
@@ -91,16 +92,28 @@ const V0_FIXTURE = """
         @test_throws Exception JSON.parse(V0_FIXTURE, PatternBundle)
     end
 
-    @testset "v1 files load: fraction → max_scale, stored hash kept" begin
+    @testset "v1 files migrate: fraction → max_scale, stored hash kept; loading one points at the migration" begin
         mktempdir() do dir
             path = joinpath(dir, "blob_pattern_abc_12345.json")
             write(path, V1_FIXTURE)
             write(joinpath(dir, "blob_pattern_abc_12345.png"), "")   # sidecar present: no re-render
-            bundle, _, config_hash = BlobBoards.load_bundle(path)
+            err = try
+                BlobBoards.load_bundle(path)
+                nothing
+            catch e
+                sprint(showerror, e)
+            end
+            @test err !== nothing && occursin("vgio_migrate", err) && occursin("blobboards/pattern/v1", err)
+            out = joinpath(dir, "migrated", "blob_pattern_abc_12345.json")
+            r = VgtkIO.vgio_migrate(path; out)
+            @test r.from == "blobboards/pattern/v1" && r.to == "blobboards/pattern/v3"
+            write(joinpath(dir, "migrated", "blob_pattern_abc_12345.png"), "")
+            bundle, _, config_hash = BlobBoards.load_bundle(out)
             pc = bundle.pattern_config
             @test pc.max_scale ≈ 3 * 2^(5 / 3) * px
             @test BlobBoards.calc_blob_scales(3.0, ustrip(pc.max_scale)) == [3.0 * 2^(i / 3) for i in 0:5]
             @test config_hash == "abc12345000000000000000000000000000000000000000000000000000000ff"
+            @test JSON.parse(read(out, String)).pattern_config.min_scale == 3     # a number, in the declared unit
         end
     end
 
@@ -141,7 +154,7 @@ const V0_FIXTURE = """
             seed = 0x42, cutoff = 2.0))
     end
 
-    @testset "v2 write → read round trip" begin
+    @testset "v3 write → read round trip" begin
         pb = PatternBundle(
             _golden_config(),
             [
@@ -155,7 +168,10 @@ const V0_FIXTURE = """
             read(path, String)
         end
         obj = JSON.parse(str)
-        @test obj.schema == "blobboards/pattern/v2"
+        @test obj.schema == "blobboards/pattern/v3"
+        @test VgtkIO.from_json(VgtkIO.UnitContract, obj.units) == VgtkIO.UnitContract()
+        @test obj.pattern_config.min_scale == 3 && obj.pattern_config.max_scale == 6 &&
+            obj.pattern_config.pattern_resolution.width == 64   # numbers, pixels
         @test haskey(obj.pattern_config, :max_scale) && !haskey(obj.pattern_config, :max_diameter_fraction)
         @test String(obj.hashes.config) == GOLDEN_HASH                    # canonical mint
         @test haskey(obj.blobs, :centers) && haskey(obj.blobs, :sigmas)   # columnar

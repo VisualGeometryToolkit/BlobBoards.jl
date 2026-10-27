@@ -41,11 +41,14 @@ end
 
 @testitem "bundle serialization" begin
     using JSON
+    import VisualGeometryToolkitIO as VgtkIO
     using VisualGeometryToolkitCore: mm, px
     include("suites/serialization.jl")
 end
 
 @testitem "identity and byte pins" begin
+    using JSON
+    import VisualGeometryToolkitIO as VgtkIO
     include("suites/identity_pins.jl")
 end
 
@@ -88,6 +91,7 @@ end
 @testitem "boards" begin
     using TiffImages: TiffImages          # reads the TIFF back (test-only)
     using JSON
+    import VisualGeometryToolkitIO as VgtkIO
     using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert
     include("suites/boards.jl")
 end

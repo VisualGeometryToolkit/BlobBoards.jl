@@ -87,7 +87,7 @@ re-exported by BlobBoards; do not import them from another units package.
 bundle, img = BlobBoards.load("board.json")
 
 # Get blobs in pixel units (default), at the density of the image they are in
-# (a stored v3 board's own by default; a v4 board's layout has no density)
+# (a pixel-grid board's own by default; a point-grid board's layout has no density)
 blobs_px = blobs(bundle, :pattern; density = 300dpi)   # Pattern coordinate frame
 blobs_px = blobs(bundle, :board; density = 300dpi)     # Board coordinate frame (the same as :pattern on a board made today)
 
@@ -261,7 +261,7 @@ Paper sizes: `"A4"`, `"A5"`, `"Letter"`, or custom `Size2(width, height)`
   writes the file itself, with no external tools
 - **TIFF**: the same sheet converted at the TIFF's density, an LZW raster with resolution tags and ICC profile
 - **PNG**: the same conversion as a grey PNG, for training datasets
-- **JSON**: Full configuration and blob coordinates (schema v4; see the reference guide)
+- **JSON**: Full configuration and blob coordinates (board schema v5, every quantity a number in the file's declared unit; see the reference guide)
 
 ## Cross-validation (the paper projects)
 

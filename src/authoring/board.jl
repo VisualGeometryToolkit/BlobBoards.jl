@@ -395,11 +395,11 @@ function rebuild_board(
     blobs_stored = bundle.blobs
     if isempty(blobs_stored)
         blobs_stored = BlobBoards._place_board_blobs(preamble)
-    elseif get(obj, :schema, nothing) == BlobBoards.BOARD_SCHEMA         # a file of today's schema
+    elseif g isa BlobBoards.PointGrid                                    # a point-grid board: placed under today's identity schema
         BlobBoards._place_board_blobs(preamble) == blobs_stored || throw(
             ArgumentError(
                 "rebuild_board: this board's configuration no longer places the blobs its JSON records " *
-                    "(placement changed since it was made, schema $(BlobBoards.BOARD_SCHEMA)): its stored blobs are " *
+                    "(placement changed since it was made, schema $(BlobBoards.IDENTITY_SCHEMA)): its stored blobs are " *
                     "drawn by render_board(bundle; dir, output), which does not re-place"
             )
         )

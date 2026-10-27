@@ -166,7 +166,7 @@ _recorded_shading(::BoardOutput) = nothing             # a raster has none (it i
 # The density an output is rasterized at; a PDF has none.
 _density(::Pdf) = nothing
 _density(o::Union{Tiff, Png}) = o.density
-_recorded_density(o::BoardOutput) = (d = _density(o); d === nothing ? nothing : (value = ustrip(dpi, d), unit = "dpi"))
+_recorded_density(o::BoardOutput) = (d = _density(o); d === nothing ? nothing : _file_number(d))
 
 # The JSON `render` block — how the file was made, so a reconstruction
 # reproduces the sheet: one set of keys whatever the format, and whether the id
@@ -175,8 +175,8 @@ _render_record(o::BoardOutput, id_label) = (;
     format = _format(o), icc_profile = _recorded_icc(o), id_label,
     shading_function = _recorded_shading(o), density = _recorded_density(o), bleed = _recorded_bleed(o),
 )
-# A PDF's bleed, in mm; a raster has none (it is the default PDF, converted).
-_recorded_bleed(o::Pdf) = (value = ustrip(mm, o.bleed), unit = "mm")
+# A PDF's bleed, in mm (the file's world unit); a raster has none (it is the default PDF, converted).
+_recorded_bleed(o::Pdf) = _file_number(o.bleed)
 _recorded_bleed(::BoardOutput) = nothing
 
 # The output a render record describes (`opts`: `_render_options`; the Python

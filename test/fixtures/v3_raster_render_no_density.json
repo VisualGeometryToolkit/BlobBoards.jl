@@ -1,84 +1,43 @@
 {
-    "schema": "blobboards/board/v3",
+    "schema": "blobboards/board/v5",
+    "units": {
+        "world": "mm",
+        "density": "dpi"
+    },
     "preamble": {
         "board_config": {
             "canvas_size": {
-                "width": {
-                    "value": 150,
-                    "unit": "mm"
-                },
-                "height": {
-                    "value": 150,
-                    "unit": "mm"
-                }
+                "width": 150,
+                "height": 150
             },
             "board_size": {
-                "width": {
-                    "value": 150,
-                    "unit": "mm"
-                },
-                "height": {
-                    "value": 150,
-                    "unit": "mm"
-                }
+                "width": 150,
+                "height": 150
             },
-            "print_density": {
-                "value": 1200,
-                "unit": "dpi"
-            },
-            "frame_width": {
-                "value": 11.25,
-                "unit": "mm"
-            },
-            "frame_padding": {
-                "value": 0,
-                "unit": "mm"
-            },
+            "print_density": 1200,
+            "frame_width": 11.25,
+            "frame_padding": 0,
             "ruler_spec": {
                 "major_tick": {
-                    "spacing": {
-                        "value": 10,
-                        "unit": "mm"
-                    },
-                    "width": {
-                        "value": 11.25,
-                        "unit": "mm"
-                    }
+                    "spacing": 10,
+                    "width": 11.25
                 },
                 "minor_tick": {
-                    "spacing": {
-                        "value": 5,
-                        "unit": "mm"
-                    },
-                    "width": {
-                        "value": 5.625,
-                        "unit": "mm"
-                    }
+                    "spacing": 5,
+                    "width": 5.625
                 }
             },
             "frame_style": "ruler"
         },
         "pattern_config": {
             "pattern_resolution": {
-                "width": {
-                    "value": 6024,
-                    "unit": "px"
-                },
-                "height": {
-                    "value": 6024,
-                    "unit": "px"
-                }
+                "width": 6024,
+                "height": 6024
             },
-            "min_scale": {
-                "value": 47.2440944882,
-                "unit": "px"
-            },
+            "min_scale": 47.2440944882,
             "seed": "47525333549",
             "pixel_type": "gray8",
-            "max_scale": {
-                "value": 301.2,
-                "unit": "px"
-            },
+            "max_scale": 301.2,
             "scales_per_octave": 3,
             "max_trials": 5000,
             "alpha": 1.2,
@@ -799,8 +758,6 @@
             47.2440944882
         ]
     },
-    "saddle_points": [
-    ],
     "hashes": {
         "config": "6f5074ae1d9bf2aa50d404095c8af0aa5b34b1f3ce445f041838c647c92e2ca0"
     },

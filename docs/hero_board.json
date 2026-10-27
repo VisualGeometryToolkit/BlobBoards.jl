@@ -1,76 +1,41 @@
 {
-    "schema": "blobboards/board/v4",
+    "schema": "blobboards/board/v5",
+    "units": {
+        "world": "mm",
+        "density": "dpi",
+        "lengths": {
+            "pattern": "pt"
+        }
+    },
     "preamble": {
         "board_config": {
             "canvas_size": {
-                "width": {
-                    "value": 150,
-                    "unit": "mm"
-                },
-                "height": {
-                    "value": 150,
-                    "unit": "mm"
-                }
+                "width": 150,
+                "height": 150
             },
             "margin": {
-                "width": {
-                    "value": 0,
-                    "unit": "mm"
-                },
-                "height": {
-                    "value": 0,
-                    "unit": "mm"
-                }
+                "width": 0,
+                "height": 0
             },
-            "layout_grid": {
-                "value": 0.01,
-                "unit": "pt"
-            },
-            "ruler_width": {
-                "value": 0,
-                "unit": "mm"
-            },
-            "corner_size": {
-                "value": 10,
-                "unit": "mm"
-            },
-            "frame_padding": {
-                "value": 0,
-                "unit": "mm"
-            },
+            "layout_grid": 0.01,
+            "ruler_width": 0,
+            "corner_size": 10,
+            "frame_padding": 0,
             "ruler_spec": {
                 "major_tick": {
-                    "spacing": {
-                        "value": 0,
-                        "unit": "mm"
-                    },
-                    "width": {
-                        "value": 0,
-                        "unit": "mm"
-                    }
+                    "spacing": 0,
+                    "width": 0
                 },
                 "minor_tick": {
-                    "spacing": {
-                        "value": 0,
-                        "unit": "mm"
-                    },
-                    "width": {
-                        "value": 0,
-                        "unit": "mm"
-                    }
+                    "spacing": 0,
+                    "width": 0
                 }
             }
         },
         "pattern_config": {
-            "min_scale": {
-                "value": 2.12598425197,
-                "unit": "pt"
-            },
+            "min_scale": 2.12598425197,
             "seed": "47525333549",
-            "max_scale": {
-                "value": 21.2595,
-                "unit": "pt"
-            },
+            "max_scale": 21.2595,
             "scales_per_octave": 3,
             "max_trials": 5000,
             "alpha": 1.2,
@@ -1319,9 +1284,6 @@
         "id_label": false,
         "shading_function": "calculator",
         "density": null,
-        "bleed": {
-            "value": 0,
-            "unit": "mm"
-        }
+        "bleed": 0
     }
 }

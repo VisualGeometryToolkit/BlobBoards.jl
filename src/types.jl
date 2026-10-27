@@ -63,8 +63,8 @@ StructUtils.arraylike(::Type{<:RulerTick}) = false
 JSON.lower(::JSON.JSONStyle, rt::RulerTick) = (spacing = _jv(rt.spacing), width = _jv(rt.width))
 
 function JSON.lift(::Type{<:RulerTick}, x::_JSONObject)
-    spacing = _lift_scalar(_getfield(x, "spacing"))
-    width = _lift_scalar(_getfield(x, "width"))
+    spacing = _file_quantity(_getfield(x, "spacing"), :length)
+    width = _file_quantity(_getfield(x, "width"), :length)
     return RulerTick(spacing, width)
 end
 
@@ -89,8 +89,8 @@ ticks. Requires `0 < minor ≤ major ≤ ruler_width − 2·frame_padding` (chec
 `BoardConfig` while the ruler is on).
 
 Schema: board bundles before `blobboards/board/v3` stored a third field,
-`width` (the "ruler width"), and HALF-extent tick widths; the reader drops that
-field and doubles the tick widths (`JSON.lift` below), which
+`width` (the "ruler width"), and HALF-extent tick widths; the migration to v5
+(migrate_boards.jl) drops that field and doubles the tick widths, which
 reproduces exactly the ruler those boards were drawn with. The stored
 `hashes.config` stays their identity.
 """
@@ -106,14 +106,6 @@ JSON.lower(::JSON.JSONStyle, rs::RulerSpec) = (major_tick = rs.major_tick, minor
 function JSON.lift(::Type{<:RulerSpec}, x::_JSONObject)
     major_tick = JSON.lift(RulerTick, _getfield(x, "major_tick"))
     minor_tick = JSON.lift(RulerTick, _getfield(x, "minor_tick"))
-    # A pre-v3 ruler (board schema v1/v2) carries `width` and half-extent tick
-    # widths: drop the one, double the others (see the docstring). Detected by
-    # the field itself, so a bare preamble (a QR payload) migrates the same way.
-    if _getfield(x, "width", nothing) !== nothing
-        major_tick = RulerTick(major_tick.spacing, 2 * major_tick.width)
-        minor_tick = RulerTick(minor_tick.spacing, 2 * minor_tick.width)
-    end
-
     # Promote major_tick and minor_tick to have consistent types
     spacing_promoted = promote(major_tick.spacing, minor_tick.spacing)
     width_promoted = promote(major_tick.width, minor_tick.width)
@@ -284,53 +276,24 @@ end
 
 function JSON.lift(::Type{<:PatternConfig}, x::_JSONObject)
     pixel_type = _pixel_type_from_name(String(_getfield(x, "pixel_type")))
+    pattern_resolution = _file_size2(_getfield(x, "pattern_resolution"), :pixel)
 
-    pattern_resolution = _lift_size2(_getfield(x, "pattern_resolution"))
-    min_scale = _lift_scalar(_getfield(x, "min_scale"))
-
-    # Handle seed as either number or string (for full UInt64 precision)
+    # the seed is a string (full UInt64 precision), or a number
     seed_raw = _getfield(x, "seed")
     seed = seed_raw isa AbstractString ? parse(UInt64, seed_raw) : UInt64(seed_raw)
 
-    polarity_raw = _getfield(x, "polarity", nothing)
-    polarity = polarity_raw !== nothing ? Symbol(polarity_raw) : :dark
-
-    # v2 stores `max_scale`; a v1 file stores `max_diameter_fraction`, converted
-    # here to the top rung it always produced (same ladder, so the blobs re-place
-    # bit-identically; the stored hash stays the identity).
-    max_scale_raw = _getfield(x, "max_scale", nothing)
-    max_fraction_raw = _getfield(x, "max_diameter_fraction", nothing)
-    (max_scale_raw === nothing) == (max_fraction_raw === nothing) && throw(
-        ArgumentError("pattern_config must carry exactly one of max_scale (v2) or max_diameter_fraction (v1)")
-    )
-    cutoff = Float64(something(_getfield(x, "cutoff", _getfield(x, "sigma_cutoff", nothing)), DEFAULT_CUTOFF))
-    scales_per_octave = Int(_getfield(x, "scales_per_octave"))
-    max_scale = if max_scale_raw !== nothing
-        _lift_scalar(max_scale_raw)
-    else
-        σ_min = Float64(ustrip(px, min_scale))
-        k = _ladder_top_from_fraction(ustrip.(px, pattern_resolution), σ_min, Float64(max_fraction_raw), scales_per_octave, cutoff)
-        σ_min * 2^(k / scales_per_octave) * px
-    end
-
-    alpha_raw = _getfield(x, "alpha", nothing)
-    alpha_raw === nothing && throw(ArgumentError("pattern_config missing alpha"))
-
     return PatternConfig(
         pattern_resolution = pattern_resolution,
-        min_scale = min_scale,
+        min_scale = _file_quantity(_getfield(x, "min_scale"), :pixel),
         seed = seed,
         pixel_type = pixel_type,
-        max_scale = max_scale,
-        scales_per_octave = scales_per_octave,
+        max_scale = _file_quantity(_getfield(x, "max_scale"), :pixel),
+        scales_per_octave = Int(_getfield(x, "scales_per_octave")),
         max_trials = Int(_getfield(x, "max_trials")),
-        α = Float64(alpha_raw),
-        cutoff = cutoff,
-        # `oversampling` (present in pre-2026-07-28 JSONs) is intentionally
-        # ignored: the field was removed, old boards are never re-rendered,
-        # and their UIDs come from the stored config hash.
+        α = Float64(_getfield(x, "alpha")),
+        cutoff = Float64(_getfield(x, "cutoff")),
         raster_aligned = Bool(_getfield(x, "raster_aligned")),
-        polarity = polarity
+        polarity = Symbol(_getfield(x, "polarity")),
     )
 end
 
@@ -429,13 +392,15 @@ function _construct_blobs(data; unit::String = "px")
 end
 
 function JSON.lower(::JSON.JSONStyle, pb::PatternBundle)
-    return (pattern_config = pb.pattern_config, blobs = _lower_blobs(pb.blobs))
+    return (units = _bundle_units(pb), pattern_config = pb.pattern_config, blobs = _lower_blobs(pb.blobs))
 end
 
 function JSON.lift(::Type{<:PatternBundle}, x::_JSONObject)
-    pc = JSON.lift(PatternConfig, _getfield(x, "pattern_config"))
-    blobs_vec = _construct_blobs(_getfield(x, "blobs"))
-    return PatternBundle(pc, blobs_vec)
+    @with _FILE_UNITS => _declared_units(x) begin
+        pc = JSON.lift(PatternConfig, _getfield(x, "pattern_config"))
+        blobs_vec = _construct_blobs(_getfield(x, "blobs"))
+        return PatternBundle(pc, blobs_vec)
+    end
 end
 
 # =============================================================================
@@ -955,12 +920,14 @@ end
 
 StructUtils.structlike(::Type{<:BoardConfig}) = false
 
-# The grid's record: a v3 board's density, under the key it was stored with
-# (`print_density`: part of the stored v3 record, so it stays); a v4 board's
-# declared grid. The key order is the v3 sidecar's, so a stored v3 board
-# re-saves unchanged.
+# The grid's record: a pixel-grid board's density (`print_density`, the key it
+# has always been stored under); a point-grid board's declared grid, the pitch in
+# its stored unit — a number in the file's `pattern` length role (pt), and in
+# the identity's own form the object it was minted from.
 _grid_record(g::PixelGrid) = (; print_density = _jv(g.density))
-_grid_record(g::PointGrid) = (; layout_grid = (value = 1 / _grid_per_stored(g), unit = _blob_unit(g)))
+_grid_record(g::PointGrid) = (;
+    layout_grid = _IDENTITY[] ? (value = 1 / _grid_per_stored(g), unit = _blob_unit(g)) : 1 / _grid_per_stored(g)
+)
 
 JSON.lower(::JSON.JSONStyle, bc::BoardConfig) = (;
     canvas_size = _jv(bc.canvas_size),
@@ -968,8 +935,8 @@ JSON.lower(::JSON.JSONStyle, bc::BoardConfig) = (;
     _grid_record(bc.layout_grid)...,
     _frame_record(bc.layout_grid, bc)...,
 )
-# A v4 board records its margin (its board is derived: `_board_from_margin`); a
-# v3 board, the board size it was laid out with.
+# A point-grid board records its margin (its board is derived:
+# `_board_from_margin`); a pixel-grid board, the board size it was laid out with.
 _board_record(::PointGrid, bc) = (; margin = _jv(bc.margin))
 _board_record(::PixelGrid, bc) = (; board_size = _jv(bc.board_size))
 # A v4 board records its marks' sizes (a zero turns one off) and the ruler's
@@ -983,12 +950,12 @@ _frame_record(::PixelGrid, bc) =
 function _construct_grid(x)
     g = _getfield(x, "layout_grid", nothing)
     if g !== nothing
-        want = _grid_record(PointGrid()).layout_grid
-        (Float64(_getfield(g, "value")) == want.value && String(_getfield(g, "unit")) == want.unit) ||
-            throw(ArgumentError("board_config.layout_grid must be {value: $(want.value), unit: \"$(want.unit)\"}, got $(g)"))
+        want = 1 / _grid_per_stored(PointGrid())
+        (g isa Real && Float64(g) == want) ||
+            throw(ArgumentError("board_config.layout_grid must be $(want) (points, the file's `pattern` length role), got $(repr(g))"))
         return PointGrid()
     end
-    return PixelGrid(_lift_scalar(_getfield(x, "print_density")))
+    return PixelGrid(_file_quantity(_getfield(x, "print_density"), :density))
 end
 
 # The ruler's ticks, as keywords: what a stored board is rebuilt with while its
@@ -999,12 +966,12 @@ _tick_kwargs(rs) = (;
 )
 
 function JSON.lift(::Type{<:BoardConfig}, x::_JSONObject)
-    canvas_size = _lift_size2(_getfield(x, "canvas_size"))
+    canvas_size = _file_size2(_getfield(x, "canvas_size"), :length)
     layout_grid = _construct_grid(x)
-    # a v4 board's margin (its board derived from it); a v3 board's board, as recorded
-    sized = layout_grid isa PixelGrid ? (; board_size = _lift_size2(_getfield(x, "board_size"))) :
-        (; margin = _lift_size2(_getfield(x, "margin")))
-    q(k) = _lift_scalar(_getfield(x, k))
+    # a point-grid board's margin (its board derived from it); a pixel-grid board's board, as recorded
+    sized = layout_grid isa PixelGrid ? (; board_size = _file_size2(_getfield(x, "board_size"), :length)) :
+        (; margin = _file_size2(_getfield(x, "margin"), :length))
+    q(k) = _file_quantity(_getfield(x, k), :length)
     frame_padding = q("frame_padding")
     ruler_spec = JSON.lift(RulerSpec, _getfield(x, "ruler_spec"))
     marks = if layout_grid isa PixelGrid
@@ -1047,43 +1014,22 @@ _lower_pattern(pc::PatternConfig, ::PixelGrid) = pc
 function _lower_pattern(pc::PatternConfig, g::PointGrid)
     pc.pixel_type == DEFAULT_PIXEL_TYPE ||
         throw(ArgumentError("a point-grid board has no pixel type; got a pattern config with $(pc.pixel_type)"))
-    pt(q) = (value = Float64(ustrip(px, q)), unit = _blob_unit(g))
+    stored(q) = _IDENTITY[] ? (value = Float64(ustrip(px, q)), unit = _blob_unit(g)) : Float64(ustrip(px, q))
     return Base.structdiff(
-        merge(_lower(pc), (min_scale = pt(pc.min_scale), max_scale = pt(pc.max_scale))),
+        merge(_lower(pc), (min_scale = stored(pc.min_scale), max_scale = stored(pc.max_scale))),
         NamedTuple{(:pixel_type, :pattern_resolution, :raster_aligned)}
     )
 end
 
-# The inverse: a point grid's "pt" lengths back to the stored px they are (the
-# same numbers), in the form `PatternConfig`'s reader takes; the pattern size is
-# the board's (a v4 file written before 2026-10-14 records it: that one is read).
+# The inverse: a point grid's σ range (plain numbers in the `pattern` role, pt:
+# the stored px, declared as the points they are) in the form `PatternConfig`'s
+# reader takes. The pattern size is the board's, and a point-grid board has no
+# pixel type and no `raster_aligned` (its centres sit on the 0.01 pt grid).
 function _pattern_from_points(x, bc::BoardConfig)
-    function stored(q)
-        u = String(_getfield(q, "unit"))
-        u == _blob_unit(PointGrid()) || throw(ArgumentError("a point-grid board's pattern lengths are in \"$(_blob_unit(PointGrid()))\", got \"$u\""))
-        return Dict{String, Any}("value" => _getfield(q, "value"), "unit" => "px")
-    end
-    res = _getfield(x, "pattern_resolution", nothing)
     d = Dict{String, Any}(string(k) => v for (k, v) in pairs(x))
-    d["pattern_resolution"] = if res === nothing
-        p = _board_pattern_points(bc)
-        Dict{String, Any}(k => Dict{String, Any}("value" => ustrip(px, q), "unit" => "px") for (k, q) in (("width", p.width), ("height", p.height)))
-    else
-        Dict{String, Any}("width" => stored(_getfield(res, "width")), "height" => stored(_getfield(res, "height")))
-    end
-    for k in ("min_scale", "max_scale")
-        v = _getfield(x, k, nothing)
-        v === nothing || (d[k] = stored(v))      # (a v1 config has no max_scale)
-    end
-    # no pixel type (a v4 file written before 2026-10-13 records "gray8", the
-    # only one a board then took into its QR code; its stored hash stays its identity)
-    t = get(d, "pixel_type", _pixel_type_name(DEFAULT_PIXEL_TYPE))
-    t == _pixel_type_name(DEFAULT_PIXEL_TYPE) ||
-        throw(ArgumentError("a point-grid board has no pixel type; this one records $(repr(t))"))
-    d["pixel_type"] = t
-    # always false on a point grid (a v4 file written before 2026-10-14 records it)
-    a = get(d, "raster_aligned", false)
-    a === false || throw(ArgumentError("a point-grid board's centres sit on its grid: raster_aligned must be false, got $(repr(a))"))
+    p = _board_pattern_points(bc)
+    d["pattern_resolution"] = Dict{String, Any}("width" => ustrip(px, p.width), "height" => ustrip(px, p.height))
+    d["pixel_type"] = _pixel_type_name(DEFAULT_PIXEL_TYPE)
     d["raster_aligned"] = false
     return d
 end
@@ -1135,18 +1081,29 @@ _blob_unit(::PixelGrid) = "px"
 _blob_unit(::PointGrid) = "pt"
 
 function JSON.lower(::JSON.JSONStyle, bb::BoardBundle)
-    return (preamble = bb.preamble, blobs = _lower_blobs(bb.blobs; unit = _blob_unit(bb.preamble.board_config.layout_grid)))
+    return (units = _bundle_units(bb), preamble = bb.preamble, blobs = _lower_blobs(bb.blobs; unit = _blob_unit(bb.preamble.board_config.layout_grid)))
 end
 
 function JSON.lift(::Type{<:BoardBundle}, x::_JSONObject)
-    preamble = JSON.lift(BoardPreamble, _getfield(x, "preamble"))
-    grid = preamble.board_config.layout_grid
-    blobs = _construct_blobs(_getfield(x, "blobs"); unit = _blob_unit(grid))
-
-    # A file written before 2026-10 also carries `saddle_points` (always empty:
-    # no board used the removed saddle frame); it is ignored.
-    return BoardBundle(preamble, blobs)
+    units = _declared_units(x)
+    @with _FILE_UNITS => units begin
+        preamble = JSON.lift(BoardPreamble, _getfield(x, "preamble"))
+        grid = preamble.board_config.layout_grid
+        grid isa PointGrid && !_declares_pattern_role(x) &&
+            throw(ArgumentError("a point-grid board's `units` declare the length role `pattern` (pt): its σ range and layout grid are numbers in it"))
+        blobs = _construct_blobs(_getfield(x, "blobs"); unit = _blob_unit(grid))
+        return BoardBundle(preamble, blobs)
+    end
 end
+
+_declares_pattern_role(x) = (u = _getfield(x, "units"); _hasfield(u, "lengths") && _hasfield(_getfield(u, "lengths"), "pattern"))
+
+# The `units` a bundle's file declares: the world length, the density and, on a
+# point grid, the length role `pattern` (VisualGeometryToolkitIO's `UnitContract`).
+_units_contract(::PixelGrid) = VgtkIO.UnitContract(world = mm, density = dpi)
+_units_contract(::PointGrid) = VgtkIO.UnitContract(world = mm, density = dpi, lengths = (pattern = pt,))
+_bundle_units(b::BoardBundle) = VgtkIO.json_value(_units_contract(b.preamble.board_config.layout_grid))
+_bundle_units(::PatternBundle) = VgtkIO.json_value(VgtkIO.UnitContract(world = mm, density = dpi))
 
 # =============================================================================
 # Constants
@@ -1204,23 +1161,27 @@ end
 # round-trip printing (Ryu). Existing boards never re-mint: the stored
 # `hashes.config` is authoritative on load (see load_bundle).
 
-function _plain(x)
+# The canonical tree of a value, in the identity's own form (json.jl: each
+# quantity an object `{value, unit}`, whatever the file format is).
+_plain(x) = @with _IDENTITY => true _plain_tree(x)
+
+function _plain_tree(x)
     x isa Union{AbstractString, Bool, Nothing} && return x
     x isa Integer && return Int64(x)
     x isa AbstractFloat && return Float64(x)
     x isa Symbol && return string(x)
     x isa NamedTuple &&
-        return Dict{String, Any}(string(k) => _plain(v) for (k, v) in pairs(x))
+        return Dict{String, Any}(string(k) => _plain_tree(v) for (k, v) in pairs(x))
     x isa AbstractDict &&
-        return Dict{String, Any}(string(k) => _plain(v) for (k, v) in x)
+        return Dict{String, Any}(string(k) => _plain_tree(v) for (k, v) in x)
     # A type's JSON lowering takes precedence over container-ness, so the
     # canonical tree mirrors the serialized structure (Size2 is an
-    # AbstractVector but serializes as {width, height}; quantities as
-    # {value, unit}). A type without one lowers to itself (a plain Vector{Any},
+    # AbstractVector but serializes as {width, height}; quantities, in the
+    # identity's form, as {value, unit}). A type without one lowers to itself (a plain Vector{Any},
     # a config_dict value such as a tilt schedule, is then a container).
     l = _lower(x)
-    l !== x && return _plain(l)
-    x isa Union{AbstractVector, Tuple} && return Any[_plain(v) for v in x]
+    l !== x && return _plain_tree(l)
+    x isa Union{AbstractVector, Tuple} && return Any[_plain_tree(v) for v in x]
     throw(ArgumentError("cannot canonicalize $(typeof(x)): it has no JSON lowering"))
 end
 
@@ -1270,7 +1231,7 @@ _hash_board(::PointGrid, p::BoardPreamble) = _board_identity(p, _place_board_blo
 _board_identity(p::BoardPreamble, blobs) = _board_identity(p.board_config.layout_grid, p, blobs)
 _board_identity(g::PixelGrid, p::BoardPreamble, _) = _hash_board(g, p)
 function _board_identity(g::PointGrid, p::BoardPreamble, blobs)
-    record = Dict{String, Any}("schema" => BOARD_SCHEMA, "preamble" => _plain(p), "blobs" => _plain(_lower_blobs(blobs; unit = _blob_unit(g))))
+    record = Dict{String, Any}("schema" => IDENTITY_SCHEMA, "preamble" => _plain(p), "blobs" => _plain(_lower_blobs(blobs; unit = _blob_unit(g))))
     return sha256_hex(canonical_json(record))
 end
 

@@ -251,7 +251,7 @@ from another package:
 
 Critical distinction:
 - `blob_pattern()`: `blob_sizes` are disc **diameters** (2·cutoff·σ) in **logical** units (e.g., `(12px, nothing)`)
-- `blob_board()`: `blob_sizes` are printed disc **diameters** in **physical** units, BOTH ends REQUIRED (no default, and no `nothing` max): `suggest_blob_sizes(600dpi, "A4")` — `suggest_blob_sizes(density, extent)` returns `(smallest, largest)`: the disc that prints well on a printer (3 mm × 1200/dpi), and 20% of the board's shorter side, at most 64 mm (`extent`: a paper name — the default board on it, less 10 mm margins — a `Size2` or a `(w, h)` tuple); a plain length or `0.2short_side` (of the PATTERN's short side, no cap) is taken as given; stored as σ in **points** (`min_scale`/`max_scale`). A board (schema v4) is laid out on a fixed 1/7200-inch grid (`PointGrid`, 0.01 pt — sized for 6 significant digits below 9999.99 pt, the precision of the Ghostscript writer it was introduced with) and has NO density: `blob_board("A4"; blob_sizes, dir)` takes none, and the PDF mentions none. A density belongs to a raster OUTPUT only — `output = Pdf()` (default) | `Tiff(600dpi)` | `Png(300dpi)` (src/board_output.jl; `render_board(bundle; dir, output)`), which must give the smallest blob ≥ 2 px per σ — and to pixel coordinates you ask for (`blobs(…; density)`, `AffineMap(…; density)` — every pixel density in the API is called `density`). The detector's image of a v4 board is rendered at the board's own raster density (smallest disc 16 px across, `[board_raster]` in configs/authoring.toml; `load_board(path; density)` overrides). Placement keeps SHAPES apart in one per-level grid of `Union{Circle, Rect2}`: each blob's footprint `Circle(disc, cutoff)` and the keep-out `Rect2`s (`_keepouts`) as the first level, checked first (A/B 2026-10-14: 0.83–0.91× a circles-only grid on ruler boards) — the frame's marks are switched by their sizes — `corner_size` (corner cells: QR, uid; blobs keep `CORNER_CLEARANCE` off them) and `ruler_width` (ruler bands), 10 mm each, a zero length turning one off (no `frame_style`/`frame_width` on a v4 board); the circle test was measured bit-identical to the old σ form on every stored board. Stored v3 boards keep `PixelGrid(density)` (JSON key still `print_density`), render exactly as printed (`test/fixtures/v3_render`) and rasterize at that density only.
+- `blob_board()`: `blob_sizes` are printed disc **diameters** in **physical** units, BOTH ends REQUIRED (no default, and no `nothing` max): `suggest_blob_sizes(600dpi, "A4")` — `suggest_blob_sizes(density, extent)` returns `(smallest, largest)`: the disc that prints well on a printer (3 mm × 1200/dpi), and 20% of the board's shorter side, at most 64 mm (`extent`: a paper name — the default board on it, less 10 mm margins — a `Size2` or a `(w, h)` tuple); a plain length or `0.2short_side` (of the PATTERN's short side, no cap) is taken as given; stored as σ in **points** (`min_scale`/`max_scale`). A board (identity schema v4: the point grid) is laid out on a fixed 1/7200-inch grid (`PointGrid`, 0.01 pt — sized for 6 significant digits below 9999.99 pt, the precision of the Ghostscript writer it was introduced with) and has NO density: `blob_board("A4"; blob_sizes, dir)` takes none, and the PDF mentions none. A density belongs to a raster OUTPUT only — `output = Pdf()` (default) | `Tiff(600dpi)` | `Png(300dpi)` (src/board_output.jl; `render_board(bundle; dir, output)`), which must give the smallest blob ≥ 2 px per σ — and to pixel coordinates you ask for (`blobs(…; density)`, `AffineMap(…; density)` — every pixel density in the API is called `density`). The detector's image of a v4 board is rendered at the board's own raster density (smallest disc 16 px across, `[board_raster]` in configs/authoring.toml; `load_board(path; density)` overrides). Placement keeps SHAPES apart in one per-level grid of `Union{Circle, Rect2}`: each blob's footprint `Circle(disc, cutoff)` and the keep-out `Rect2`s (`_keepouts`) as the first level, checked first (A/B 2026-10-14: 0.83–0.91× a circles-only grid on ruler boards) — the frame's marks are switched by their sizes — `corner_size` (corner cells: QR, uid; blobs keep `CORNER_CLEARANCE` off them) and `ruler_width` (ruler bands), 10 mm each, a zero length turning one off (no `frame_style`/`frame_width` on a v4 board); the circle test was measured bit-identical to the old σ form on every stored board. Stored v3 boards keep `PixelGrid(density)` (JSON key still `print_density`), render exactly as printed (`test/fixtures/v3_render`) and rasterize at that density only.
 
 ## Coordinate Systems
 
@@ -282,8 +282,33 @@ reproduces byte for byte what the retired JSON3 writer (`JSON3.pretty`) wrote,
 quirks included (integral floats printed as integers except late in an all-float
 array; two-line empty containers). `test/suites/identity_pins.jl` pins board
 uids, the annotation config hash, the render-cache key and the saved bytes of
-patterns, v4 boards and the stored v3 fixtures; a serializer change that moves
-any of them is a bug, never a re-pin.
+patterns, point-grid boards and the stored pixel-grid fixtures; a serializer
+change that moves a uid or an identity is a bug, never a re-pin.
+
+### Board and pattern files: board v5, pattern v3
+
+A board file is `blobboards/board/v5` and a pattern file `blobboards/pattern/v3`
+(2026-10-27): every quantity a NUMBER in the unit the file's `units` block
+declares (VisualGeometryToolkitIO's `UnitContract`: `world` mm, `density` dpi,
+the length role `pattern` pt on a point-grid board, pixels undeclared). Nothing
+reads the earlier `{value, unit}` schemas (board v1–v4, pattern v1–v2): they are
+MIGRATED once by `VgtkIO.vgio_migrate(path)`, through the `migrate_schema`
+methods of src/migrate_boards.jl, which hold the retired reader (the one place
+that parses a `{value, unit}` object). A migration keeps the stored
+`hashes.config`.
+
+Two forms of the same lowering, never mixed (src/json.jl): a FILE holds numbers,
+and a board's IDENTITY is minted over a canonical tree in which each quantity is
+the object `{value, unit}` (`_IDENTITY`, set by `_plain`) — frozen, because it is
+what every printed uid was minted from. The file format version is not in the
+identity: `IDENTITY_SCHEMA` ("blobboards/board/v4", frozen) is the tree's schema
+field and the source of the QR code's `BB4` tag; `BOARD_SCHEMA` is the file's.
+A change to the file format therefore moves no uid and no printed QR code; a
+change to what a configuration places is a new IDENTITY schema and a new tag.
+The memory ↔ number conversion is `ustrip(unit, q)` and `number * unit` — NOT
+IO's decimal-exact `write_quantity`/`read_quantity` (a board is built from
+literals such as `9.0mm`, which are not on that grid; see the header of
+src/json.jl).
 
 ## GLMakie off the main thread — thread 1
 

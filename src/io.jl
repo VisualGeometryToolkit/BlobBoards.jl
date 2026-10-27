@@ -40,44 +40,55 @@ function make_filebase(
 end
 
 
-# Bundle JSON schema. The pre-v1 ("v0") reader — per-scalar {value, unit}
-# blobs, `α`/Julia-type-name spellings, schema-less files — was REMOVED in
-# 0.19 after every known corpus was migrated in place (281 bundles,
-# 2026-08-20, identity-preserving). A stray v0 file migrates with the
-# permanently registered BlobBoards@0.18 (`migrate_bundles!`); this version
-# refuses it with that instruction rather than guessing.
+# Bundle JSON schema. Files are read in ONE format, board v5 and pattern v3:
+# every quantity a number in the unit the file's `units` block declares
+# (VisualGeometryToolkitIO's quantity format). The schemas before them
+# (board v1–v4, pattern v1–v2) stored each quantity as a `{"value": …,
+# "unit": …}` object; such a file is MIGRATED once, never read — by
+# `VisualGeometryToolkitIO.vgio_migrate`, through the `migrate_schema` methods
+# of src/migrate_boards.jl, which keep the stored identity. The history of the
+# schemas the migration still reads:
 #
-# v2 (0.36): `pattern_config.max_scale` (px, the top rung of the scale ladder)
-# replaces v1's `max_diameter_fraction`. Both versions are READ — a v1 config's
-# fraction converts to the rung it always produced, so v1 boards re-place
-# bit-identically — and v2 is what is written. Identity is the stored
-# `hashes.config`, never a recompute (already true for every migrated v0 board).
+# The pre-v1 ("v0") reader — per-scalar {value, unit} blobs, `α`/Julia-type-name
+# spellings, schema-less files — was REMOVED in 0.19 after every known corpus
+# was migrated in place (281 bundles, 2026-08-20, identity-preserving). A stray
+# v0 file migrates with the permanently registered BlobBoards@0.18
+# (`migrate_bundles!`).
+#
+# pattern v2 (0.36): `pattern_config.max_scale` (px, the top rung of the scale
+# ladder) replaces v1's `max_diameter_fraction`; a v1 config's fraction converts
+# to the rung it always produced, so v1 boards re-place bit-identically.
+# Identity is the stored `hashes.config`, never a recompute.
 #
 # board v3 (0.37): the ruler is its ticks — `ruler_spec.width` is gone and the
-# tick widths are FULL lengths across the frame band. A v1/v2 board's ruler is
-# migrated in memory on read (drop `width`, double the half-extent tick widths;
-# `JSON.lift(::Type{<:RulerSpec}, _)`), drawing the same ruler; files
-# are never rewritten by loading, and the stored hash stays the identity.
-# Patterns are unaffected and stay at v2.
+# tick widths are FULL lengths across the frame band (a v1/v2 board's ruler
+# migrates: drop `width`, double the half-extent tick widths).
 #
 # board v4 (2026-10): physical boards. A board is laid out on a fixed
 # 1/7200-inch grid (`PointGrid`), independent of the print density; its pattern
 # config and blobs are stored in points ("pt"), blob centres on 0.01 pt grid
 # points — the numbers the print master holds. `print_density` left the config
 # (and so the identity: one layout, one uid, whatever it is printed at) for the
-# `render` block. A v3 board reads as `PixelGrid(density)` and keeps its
-# geometry, schema and identity; a re-save writes it as v3.
-const BOARD_SCHEMA = "blobboards/board/v4"
-const PATTERN_SCHEMA = "blobboards/pattern/v2"
-const BOARD_SCHEMA_V3 = "blobboards/board/v3"   # a pixel-grid board's, written as it was
-const READABLE_SCHEMAS = (
-    BOARD_SCHEMA, PATTERN_SCHEMA,
-    BOARD_SCHEMA_V3, "blobboards/board/v2", "blobboards/board/v1", "blobboards/pattern/v1",
+# `render` block. A v3 board is a `PixelGrid(density)` board.
+#
+# board v5 / pattern v3 (2026-10): the quantity format. Nothing else changes:
+# a v3 (pixel-grid) and a v4 (point-grid) board are both written as v5, told
+# apart by their grid key (`print_density` or `layout_grid`), and the file
+# format is NOT part of a board's identity: `IDENTITY_SCHEMA` names the identity
+# (the canonical tree's schema field, and the `BB4` tag of the QR code), and it
+# stays "blobboards/board/v4", so no uid moves and no printed QR code is
+# unreadable.
+const BOARD_SCHEMA = "blobboards/board/v5"
+const PATTERN_SCHEMA = "blobboards/pattern/v3"
+const IDENTITY_SCHEMA = "blobboards/board/v4"   # frozen: the schema a point-grid board's identity (and its QR code) is minted under
+const READABLE_SCHEMAS = (BOARD_SCHEMA, PATTERN_SCHEMA)
+# the schemas of the retired quantity form: migrated, never read
+const MIGRATED_SCHEMAS = (
+    "blobboards/board/v4", "blobboards/board/v3", "blobboards/board/v2", "blobboards/board/v1",
+    "blobboards/pattern/v2", "blobboards/pattern/v1",
 )
 
-_bundle_schema(b::BoardBundle) = _board_schema(b.preamble.board_config.layout_grid)
-_board_schema(::PointGrid) = BOARD_SCHEMA
-_board_schema(::PixelGrid) = BOARD_SCHEMA_V3
+_bundle_schema(::BoardBundle) = BOARD_SCHEMA
 _bundle_schema(::PatternBundle) = PATTERN_SCHEMA
 # A bundle's identity, minted from what it holds: a board's from its own blobs
 # (no placement), a pattern's from its configuration.
@@ -238,12 +249,14 @@ end
 # a "purged" cache kept serving a stale render).
 const _RENDER_LOCK = ReentrantLock()
 
-# Keyed by the board, its id label, the writer's render record AND the bundle
-# schema: a render made otherwise (or by an older writer — a QR carrying an
-# older schema's preamble) is a different file, never served for this JSON.
+# Keyed by the board, its id label, the writer's render record AND the identity
+# schema (what its QR carries and its blobs are placed under): a render made
+# otherwise (or by an older writer — a QR carrying an older schema's preamble)
+# is a different file, never served for this JSON. (The file format is not in
+# it: the same board is the same render in v4 and v5.)
 _render_cache_dir(config_hash::AbstractString, id_label::Bool) = joinpath(
     @get_scratch!("board_renders"),
-    String(config_hash)[1:16] * "_" * bytes2hex(sha256(codeunits(string(_render_record(Pdf(), id_label), BOARD_SCHEMA))))[1:8]
+    String(config_hash)[1:16] * "_" * bytes2hex(sha256(codeunits(string(_render_record(Pdf(), id_label), IDENTITY_SCHEMA))))[1:8]
 )
 
 """
@@ -318,7 +331,10 @@ content-addressed scratch file for the rebuild.
 `bleed` is a PDF's trim allowance (`Pdf(; bleed)`), a length; `nothing` when
 none is recorded (every board written before it existed: no bleed).
 """
-function _render_options(json_obj::_ParsedObject)
+_render_options(json_obj::_ParsedObject) =
+    @with _FILE_UNITS => _declared_units(json_obj; required = false) _render_options_in_units(json_obj)
+
+function _render_options_in_units(json_obj::_ParsedObject)
     # isa-narrowed field by field: dynamic JSON access is a union JET cannot
     # narrow (the core ratchet). A wrong-TYPED entry falls back to the default; a
     # well-typed but unknown value (`"shading_function": "x"`) is refused, loudly,
@@ -344,10 +360,10 @@ function _render_options(json_obj::_ParsedObject)
         e === nothing && legacy isa AbstractString &&
             (shading_function = get(_LEGACY_SHADING_FUNCTIONS, legacy, Symbol(legacy)))
         d = get(r, :density, nothing)
-        d isa _ParsedObject || (d = get(r, :print_density, nothing))
-        d isa _ParsedObject && lowercase(format) != "pdf" && (density = _density_record(d))
+        d isa Real || (d = get(r, :print_density, nothing))
+        d isa Real && lowercase(format) != "pdf" && (density = _density_record(d))
         b = get(r, :bleed, nothing)
-        b isa _ParsedObject && lowercase(format) == "pdf" && (bleed = _bleed_record(b))
+        b isa Real && lowercase(format) == "pdf" && (bleed = _bleed_record(b))
     end
     return (; format, icc_profile, id_label, shading_function, density, bleed)
 end
@@ -372,18 +388,16 @@ function _icc_from_record(c::_ParsedObject)
     return path
 end
 
-# A recorded bleed, `{value, unit}` a length; anything else is refused.
+# A recorded bleed, a number in the file's world unit; anything else is refused.
 function _bleed_record(b)
-    q = _lift_scalar(b)
-    (q isa Quantity && dimension(q) == dimension(mm)) || throw(ArgumentError("render.bleed must be a length, got $(b)"))
-    return q
+    b isa Real || throw(ArgumentError("render.bleed must be a length (a number in the file's declared unit), got $(b)"))
+    return _file_quantity(b, :length)
 end
 
-# A recorded density, `{value, unit}` in dpi; anything else is refused.
+# A recorded density, a number in the file's density unit; anything else is refused.
 function _density_record(d)
-    q = _lift_scalar(d)
-    (q isa Quantity && dimension(q) == dimension(dpi)) || throw(ArgumentError("render.density must be a density, got $(d)"))
-    return q
+    d isa Real || throw(ArgumentError("render.density must be a density (a number in the file's declared unit), got $(d)"))
+    return _file_quantity(d, :density)
 end
 
 _regenerate_render(json_path::AbstractString, bundle, config_hash; id_label = false) = error(
@@ -586,6 +600,10 @@ function _parse_bundle(json_path::AbstractString)
             "was removed in 0.19; migrate the corpus once with the " *
             "permanently registered BlobBoards@0.18 " *
             "(BlobBoards.migrate_bundles!(dir))." :
+            schema in MIGRATED_SCHEMAS ?
+            "$json_path is a $(String(schema)) file, the retired {value, unit} quantity form; this BlobBoards " *
+            "reads $(join(READABLE_SCHEMAS, ", ")). Migrate the file once: " *
+            "VisualGeometryToolkitIO.vgio_migrate($(repr(json_path))) (or `bin/vgio_migrate.jl`), which keeps its stored identity." :
             "$json_path declares unknown bundle schema $(repr(String(schema))); " *
             "this BlobBoards reads $(join(READABLE_SCHEMAS, ", "))"
     )

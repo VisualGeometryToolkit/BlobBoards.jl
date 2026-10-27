@@ -1,84 +1,43 @@
 {
-    "schema": "blobboards/board/v3",
+    "schema": "blobboards/board/v5",
+    "units": {
+        "world": "mm",
+        "density": "dpi"
+    },
     "preamble": {
         "board_config": {
             "canvas_size": {
-                "width": {
-                    "value": 120,
-                    "unit": "mm"
-                },
-                "height": {
-                    "value": 90,
-                    "unit": "mm"
-                }
+                "width": 120,
+                "height": 90
             },
             "board_size": {
-                "width": {
-                    "value": 120,
-                    "unit": "mm"
-                },
-                "height": {
-                    "value": 90,
-                    "unit": "mm"
-                }
+                "width": 120,
+                "height": 90
             },
-            "print_density": {
-                "value": 600,
-                "unit": "dpi"
-            },
-            "frame_width": {
-                "value": 9,
-                "unit": "mm"
-            },
-            "frame_padding": {
-                "value": 0,
-                "unit": "mm"
-            },
+            "print_density": 600,
+            "frame_width": 9,
+            "frame_padding": 0,
             "ruler_spec": {
                 "major_tick": {
-                    "spacing": {
-                        "value": 10,
-                        "unit": "mm"
-                    },
-                    "width": {
-                        "value": 9,
-                        "unit": "mm"
-                    }
+                    "spacing": 10,
+                    "width": 9
                 },
                 "minor_tick": {
-                    "spacing": {
-                        "value": 5,
-                        "unit": "mm"
-                    },
-                    "width": {
-                        "value": 4.5,
-                        "unit": "mm"
-                    }
+                    "spacing": 5,
+                    "width": 4.5
                 }
             },
             "frame_style": "ruler"
         },
         "pattern_config": {
             "pattern_resolution": {
-                "width": {
-                    "value": 2410,
-                    "unit": "px"
-                },
-                "height": {
-                    "value": 1701,
-                    "unit": "px"
-                }
+                "width": 2410,
+                "height": 1701
             },
-            "min_scale": {
-                "value": 9.44881889764,
-                "unit": "px"
-            },
+            "min_scale": 9.44881889764,
             "seed": "113",
             "pixel_type": "gray8",
-            "max_scale": {
-                "value": 85.05,
-                "unit": "px"
-            },
+            "max_scale": 85.05,
             "scales_per_octave": 3,
             "max_trials": 5000,
             "alpha": 1.2,

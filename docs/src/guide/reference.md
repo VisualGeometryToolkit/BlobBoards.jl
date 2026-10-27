@@ -274,33 +274,47 @@ Every board is saved as a print file plus a JSON sidecar, `blob_board_<uid>_<has
 
 ```
 {
-  "schema": "blobboards/board/v4",
+  "schema": "blobboards/board/v5",
+  "units":  { "world": "mm", "density": "dpi", "lengths": { "pattern": "pt" } },
   "preamble": {
-    "board_config":   { canvas_size, margin, layout_grid: { value: 0.01, unit: "pt" },
+    "board_config":   { canvas_size, margin, layout_grid: 0.01,
                         corner_size, ruler_width, frame_padding,
                         ruler_spec: { major_tick: { spacing, width },
                                       minor_tick: { spacing, width } } },
     "pattern_config": { min_scale, max_scale,   (pt)
                         seed, scales_per_octave, max_trials,
                         alpha, cutoff, polarity }   (no pattern size: it is the board's;
-                                                     no pixel_type or raster_aligned: a v4 board has neither)
+                                                     no pixel_type or raster_aligned: a point-grid board has neither)
   },
-  "blobs":         { "unit": "pt", "centers": […], "sigmas": […] },
-  "hashes":        { "config": "<sha256 of the schema, the canonical preamble and the blobs>" },
+  "blobs":         { "unit": "pt", "centers": [...], "sigmas": [...] },
+  "hashes":        { "config": "<sha256 of the identity schema, the canonical preamble and the blobs>" },
   "render":        { "format": "pdf", "icc_profile": "linear",
                      "id_label": true, "shading_function": "calculator",
-                     "density": null, "bleed": { "value": 0, "unit": "mm" } }
+                     "density": null, "bleed": 0 }
 }
 ```
 
 For a raster, `render` records `"format": "tiff"` or `"png"` and
-`"density": { "value": 600, "unit": "dpi" }` (a PNG's `icc_profile` is `null`, and a raster's `bleed` is `null`).
+`"density": 600` (a PNG's `icc_profile` is `null`, and a raster's `bleed` is `null`).
 A custom ICC profile is recorded with its bytes — `{ "name": "press.icc",
 "sha256": …, "data": "<base64>" }` — so a rebuild needs no original file.
 
-Lengths are `{ "value": …, "unit": "mm" | "pt" | "dpi" }`; a tick's `width` is
-its full drawn length across the frame band. Blob centres are 0.01 pt grid
-values, the very numbers the print master holds.
+Every quantity is a number in the unit the `units` block declares — the one
+quantity format every file of the stack uses (VisualGeometryToolkitIO's
+`UnitContract`): lengths in `world` (mm: the canvas, margin, ruler, corner,
+padding, tick spacing and width, a PDF's bleed), a density in `density`
+(dpi), and the point-grid board's own numbers in the length role `pattern`
+(pt: the σ range and the layout grid; the blobs declare their own `unit`).
+Pixel counts need no declaration: a pixel-grid board's `pattern_resolution`,
+`min_scale` and `max_scale` are pixels. A tick's `width` is its full drawn
+length across the frame band. Blob centres are 0.01 pt grid values, the very
+numbers the print master holds.
+
+A pixel-grid board (the former schema v3: `board_size`, `print_density`,
+`frame_width`, `frame_style`, a `pattern_config` with a `pattern_resolution`, a
+`pixel_type` and `raster_aligned`, blobs in `px`) is the same schema; its grid
+key (`print_density` or `layout_grid`) tells them apart. A pattern file is
+`blobboards/pattern/v3`, in the same format.
 
 - **Identity** is `hashes.config`, the SHA-256 of the schema, the canonical
   `preamble` and the blobs; the
@@ -315,11 +329,19 @@ values, the very numbers the print master holds.
   has one hash.
   `rebuild_board` and the gallery's regeneration render as recorded; a file
   without the block renders as PDF/X-4 with no label.
-- **Older schemas** still load. v1 files (with `max_diameter_fraction`) have the
-  fraction converted to the largest σ it produced, so v1 boards re-place
-  bit-identically. v1 and v2 rulers carry a `ruler_spec.width` and half-length
-  tick widths; the reader drops the one and doubles the others, which is the
-  ruler those boards were drawn with. Their stored `hashes.config` stays their
-  identity. v3 files (pixels at `board_config.print_density`, blobs in px) keep
-  that layout: they load, re-render and rebuild on their own pixel grid exactly
-  as printed, and re-save as v3.
+- **Older schemas migrate, they do not load.** Boards before v5 and patterns
+  before v3 stored every quantity as a `{"value": …, "unit": …}` object. They are
+  migrated once with VisualGeometryToolkitIO's `vgio_migrate(path)` (or
+  `bin/vgio_migrate.jl file|tree`), which reads the old file, writes the v5 file
+  through the writer, reads it back and compares every number bit for bit, and
+  carries the stored `hashes.config` over — so the uid never moves. The
+  migration reads every earlier schema: v1 files (with `max_diameter_fraction`:
+  the fraction converts to the largest σ it produced, so v1 boards re-place
+  bit-identically), v1/v2 rulers (a `ruler_spec.width` and half-length tick
+  widths: the one is dropped and the others doubled, the ruler those boards were
+  drawn with), v3 pixel-grid files and v4 point-grid files. `load_bundle` refuses
+  an old file and names the command.
+- **The file format is not part of the identity.** `hashes.config` is minted
+  under the identity schema (`blobboards/board/v4`, frozen), and the QR code
+  carries `BB4` — the configuration's own tag, never the file's — so a board's
+  printed uid and QR code do not depend on the file format version.
