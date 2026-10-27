@@ -294,6 +294,26 @@
             U = pyconvert(Matrix{Float64}, frames[k - 1]["image_points"])
             @test all(U[i, :] == pix(R, t, grid[i]) .- 0.5 for i in eachindex(grid))   # xy − 0.5, exactly
         end
+        # a planar target whose calibration is not rigid has measured points other than its nominal ones:
+        # refused, never handed back as its design
+        bent = mktempdir()
+        cp(run, bent; force = true)
+        rigfile = joinpath(bent, "targets_1.json")
+        rec_bent = JSON.parse(read(rigfile, String))
+        @test rec_bent["schema"] == "vgio/rig/v5" && rec_bent["targets"][1]["target"]["calibration"]["type"] == "rigid"
+        rec_bent["targets"][1]["target"]["calibration"] = Dict("type" => "affine", "parameters" => [1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+        write(rigfile, JSON.json(rec_bent))
+        err = try
+            corr.load_correspondences(bent, "opencv")
+            nothing
+        catch e
+            e
+        end
+        @test err isa PythonCall.PyException && occursin("calibrated as 'affine'", sprint(showerror, err))
+        # a v4 rig is refused by name
+        rec_bent["schema"] = "vgio/rig/v4"
+        write(rigfile, JSON.json(rec_bent))
+        @test_throws PythonCall.PyException corr.load_correspondences(bent, "opencv")
         # a frame seeing two targets is refused, before OpenCV is even imported
         @test_throws PythonCall.PyException corr.calibrate_opencv(run_dir(true), "default")
         # the fit's output, written natively, reads back as the camera and poses it came from

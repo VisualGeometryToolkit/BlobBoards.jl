@@ -3,10 +3,15 @@
 A run directory carries ``observations.json`` (vgio/target_points2d/v1: per frame,
 the image, the sensor and each measured point's pixel and reference into a target's
 point list, in the pixel frame the file declares — the canonical COLMAP frame,
-top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v4: each
+top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v5: each
 member target's points in its own frame — a ``points`` target's ``points``, a
 ``planar`` target's ``nominal`` points — in the file's declared ``length_unit``; a
-planar target named only by its design reference carries no points here). This
+planar target named only by its reference carries no points here). A planar
+target is the points it was DESIGNED with only while its ``calibration`` is
+``rigid``: a target calibrated as an affine map, a thin-plate spline, a height
+field or a chain of them has measured points that differ from its nominal ones,
+which this module does not apply, so such a target is refused rather than
+handed back as its design. This
 module resolves the references into per-frame point arrays — object points
 converted to millimetres from that declared unit, as VisualGeometryToolkitIO's
 ``correspondences`` does — and moves the pixels into the requested convention,
@@ -38,11 +43,20 @@ def _points_mm(path, unit, tgt):
     return np.asarray(tgt, dtype=np.float64) * MM_PER_UNIT[unit]
 
 
-def _target_points(body):
-    """A rig/v4 target body's own points (a list), or None for a design named only by reference."""
+def _target_points(path, tid, body):
+    """A rig/v5 target body's own points (a list), or None for a target named only by reference.
+
+    A planar target's nominal points are its measured ones only under a ``rigid`` calibration; any
+    other calibration (``affine``, ``thin_plate_spline``, ``height_field``, a ``chain``) moves them,
+    and is refused."""
     if body.get("type") == "points":
         return body["points"]
     if body.get("type") == "planar":
+        kind = (body.get("calibration") or {}).get("type", "rigid")
+        if kind != "rigid":
+            raise ValueError(f"{path}: target {tid} is calibrated as {kind!r}, so its nominal points are not its "
+                             "measured ones and this reader does not apply the calibration; only a rigid "
+                             "planar target (or a points target) is read")
         return body.get("nominal")
     raise ValueError(f"unknown target type {body.get('type')!r}")
 
@@ -69,10 +83,11 @@ def load_correspondences(run_dir, convention="opencv"):
     points = {}
     for path in paths:
         t = json.load(open(path))
-        if t.get("schema") != "vgio/rig/v4":
-            raise ValueError(f"{path}: not a vgio/rig/v4 file")
+        if t.get("schema") != "vgio/rig/v5":
+            raise ValueError(f"{path}: not a vgio/rig/v5 file (a v4 rig: migrate it with "
+                             "VisualGeometryToolkitIO.vgio_migrate)")
         for tgt in t.get("targets", []):
-            own = _target_points(tgt["target"])
+            own = _target_points(path, tgt["id"], tgt["target"])
             if own is None:
                 continue
             pts = _points_mm(path, t.get("length_unit"), own)
