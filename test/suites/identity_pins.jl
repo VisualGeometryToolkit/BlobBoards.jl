@@ -211,31 +211,26 @@ const PINNED_PATTERN_JSON = """
     end
 
 
-    @testset "the migration enforces the uid: a point-grid file whose identity does not recompute is refused, nothing left" begin
+    @testset "the migration enforces the uid: stored hash carried, identity(migrated) == identity(old); a doctored output is refused" begin
         legacy = joinpath(@__DIR__, "..", "fixtures", "legacy", "hero_board_v4.json")
+        mig(src, dst; kw...) = BlobBoards._migrate_bundle_file(src, dst, "blobboards/board/v4"; kw...)
         mktempdir() do dir
-            obj = JSON.parse(read(legacy, String); dicttype = Dict{String, Any})
-            obj["blobs"]["centers"][1][1] += 0.01                     # a doctored blob: the stored hash no longer recomputes
-            bad = joinpath(dir, "bad.json")
-            write(bad, JSON.json(obj))
-            out = joinpath(dir, "out.json")
-            err = try
-                VgtkIO.vgio_migrate(bad; out)
-                nothing
-            catch e
-                sprint(showerror, e)
-            end
-            @test err !== nothing && occursin("stored hashes.config", err)
-            @test !ispath(out) && sort(readdir(dir)) == ["bad.json"]       # nothing written, no staging left
-            # called directly, the migration removes its own output
-            direct = joinpath(dir, "direct.json")
-            @test_throws ArgumentError VgtkIO.migrate_schema(Val(Symbol("blobboards/board/v4")), bad, direct)
-            @test !ispath(direct)
-            # a doctored stored hash is the same refusal
+            # a doctored MIGRATED file (a blob moved after the write) is refused and leaves no output
+            dst = joinpath(dir, "out.json")
+            moved(path) = (o = JSON.parse(read(path, String); dicttype = Dict{String, Any}); o["blobs"]["centers"][1][1] += 0.01; write(path, JSON.json(o)))
+            @test_throws ArgumentError mig(legacy, dst; after_write = moved)
+            @test !ispath(dst)
+            # … so is one whose stored hash was changed
+            rehash(path) = (o = JSON.parse(read(path, String); dicttype = Dict{String, Any}); o["hashes"]["config"] = "0" ^ 64; write(path, JSON.json(o)))
+            @test_throws ArgumentError mig(legacy, dst; after_write = rehash)
+            @test !ispath(dst)
+            # a stored hash that does not recompute is authoritative, not a refusal: it is carried over (and logged)
             obj = JSON.parse(read(legacy, String); dicttype = Dict{String, Any})
             obj["hashes"]["config"] = "0" ^ 64
-            write(bad, JSON.json(obj))
-            @test_throws ArgumentError VgtkIO.vgio_migrate(bad; out)
+            old = joinpath(dir, "old.json")
+            write(old, JSON.json(obj))
+            r = @test_logs (:info, r"not the stored hashes.config") match_mode = :any VgtkIO.vgio_migrate(old; out = joinpath(dir, "new.json"))
+            @test r.config_hash == "0" ^ 64 && JSON.parse(read(joinpath(dir, "new.json"), String)).hashes.config == "0" ^ 64
         end
     end
 

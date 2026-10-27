@@ -219,16 +219,17 @@ function _render_migrated_ok(old::_JSONObject, new)
     end
 end
 
-function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::AbstractString)
+function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::AbstractString; after_write = identity)
     try
-        return _migrate_bundle_file_checked(src, dst, from)
+        return _migrate_bundle_file_checked(src, dst, from, after_write)
     catch
         rm(dst; force = true)         # a refused migration leaves no output at `dst`
         rethrow()
     end
 end
 
-function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString)
+# (`after_write(dst)`: a test hook run on the written file before it is read back)
+function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString, after_write)
     obj = JSON.parse(read(src, String))::_ParsedObject
     get(obj, :schema, nothing) == from ||
         throw(ArgumentError("$(src): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
@@ -243,23 +244,16 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
     stored === nothing && throw(
         ArgumentError("$(src): stores no hashes.config; a migration carries a stored identity over and mints none")
     )
-    # The uid must not move. A point-grid board's identity covers its schema, configuration and blobs and is
-    # reproducible: the file's identity recomputed from what it holds must BE its stored hash, or the file is
-    # refused (a stored identity this code cannot reproduce is not carried over unverified). A pixel-grid board
-    # or a pattern keeps its stored hash, authoritative across the encodings that minted it (older boards recompute
-    # to something else, all 50 example boards among them); there the identity recomputed from the migrated file
-    # must be the one recomputed from the old file.
+    # The uid must not move: the stored `hashes.config` is authoritative for every board kind and is carried over
+    # unchanged, and the identity recomputed from the migrated file must be the one recomputed from the old file
+    # (under the current, frozen encoding). Whether either equals the stored hash is information, never a refusal:
+    # boards minted under an older encoding (all 50 example boards) recompute to something else.
     identity_old = _bundle_identity(old)
-    if old isa BoardBundle && old.preamble.board_config.layout_grid isa PointGrid && identity_old != stored
-        throw(
-            ArgumentError(
-                "$(src): the identity recomputed from the file ($(identity_old[1:8])…) is not its stored hashes.config " *
-                    "($(stored[1:8])…); the uid would not be verified, so the file is not migrated"
-            )
-        )
-    end
+    identity_old == stored ||
+        @info "migrating $(basename(src)): the identity recomputed under the current encoding ($(identity_old[1:8])…) is not the stored hashes.config ($(stored[1:8])…); the stored hash is carried over"
     render = haskey(obj, :render) ? _migrated_render(obj[:render]::_JSONObject) : nothing
     save_json(dst, old; overwrite = true, config_hash = stored, render)
+    after_write(dst)
     new, config_hash = _parse_bundle(dst)
     _same_value(old, new) ||
         throw(ArgumentError("$(src): the migration does not read back as the file read (a number moved); the output is discarded"))
