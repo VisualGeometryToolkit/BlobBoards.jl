@@ -7,12 +7,7 @@ using DrWatson: projectdir
 import VisualGeometryToolkitEval
 
 # Deferred / justified exceptions, each with its reason (rule, file, match).
-const PAPER_PROJECT_ALLOW = [
-    # The training annotation builder's LOGGER stamps each log line with the
-    # wall-clock time; that is a log line's time, not an output path (the run
-    # directory itself is keyed by the settings' run key).
-    ("D3", "scripts/training/build_annotations.jl", "timestamp = Dates.format(now(), \"yyyy-mm-dd HH:MM:SS\")"),
-]
+const PAPER_PROJECT_ALLOW = Tuple{String, String, String}[]
 
 @testset "bmvc2026 paper-project conventions (PaperProjects)" begin
     if isdefined(VisualGeometryToolkitEval, :PaperProjects)
