@@ -40,6 +40,16 @@ lazy = true
     sha256 = "ada6578daf576c926c7982afa7e7bd4e162c389a55a18d778d98fbc600cd4806"
     url = "https://zenodo.org/records/23243553/files/bb_example_boards_v3.tar.gz?download=1"
 
+# The same 50 boards as blobboards/board/v5, migrated once by vgio_migrate from
+# bb_example_boards_v3 (uids kept); hosted on Hugging Face until the next record.
+[bb_example_boards_v5]
+git-tree-sha1 = "e0f9dd0ae71a737ecc0faf8df5b191f5071560d4"
+lazy = true
+
+    [[bb_example_boards_v5.download]]
+    sha256 = "5fc4c484abd0a4ddc5af97d6e24c27400fd7e6979557745ff2ec0eb09d1deda5"
+    url = "https://huggingface.co/datasets/prittjam/blobboards-examples/resolve/64bd6cf7689b6af13815a1241e5fee0c6d267bc2/bb_example_boards_v5.tar.gz"
+
 # The still and the clip with their cameras.json in vgio/cameras/v3 (the lens
 # families' lens records), produced by VisualGeometryToolkitIO's one-shot lens
 # migration (migrate/v3, run 5be29639b85ec047), each lens proven to compute the

@@ -656,7 +656,7 @@ end
 # example is a new entry, and this map moves to it). The _v3 entries: boards
 # as blobboards/board/v3, the still's and clip's cameras.json as vgio/cameras/v3.
 const _EXAMPLE_ARTIFACTS = Dict(
-    :boards => "bb_example_boards_v3", :still => "bb_example_still_v3", :video => "bb_example_video_v3",
+    :boards => "bb_example_boards_v5", :still => "bb_example_still_v3", :video => "bb_example_video_v3",
 )
 
 # ONE catalog lookup for every artifact the package names (descriptor networks,
