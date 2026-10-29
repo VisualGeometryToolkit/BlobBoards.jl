@@ -23,8 +23,6 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [sources]
 BlobBoards = { path = ".." }
-# TEMPORARY: the unreleased 0.2 wave; replaced by the registered versions at release
-VisualGeometryToolkitCore = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitCore"}
 
 [compat]
 CUDA = "5.11.0"

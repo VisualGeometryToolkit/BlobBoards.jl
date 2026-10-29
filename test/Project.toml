@@ -61,13 +61,6 @@ VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 
 [sources]
 BlobBoards = {path = ".."}
-# TEMPORARY: the unreleased 0.2 wave; replaced by the registered versions at release
-VisualGeometryToolkitCore = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitCore"}
-VisualGeometryToolkitIO = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitIO"}
-VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitFeatures"}
-VisualGeometryToolkitEstimation = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitEstimation"}
-RANSACScoringDoneRight = {path = "/home/jbpritts/src/rsdr-core-0.2"}
-LocalOptimizationDoneRight = {path = "/home/jbpritts/src/lodr-core-0.2"}
 
 [compat]
 Accessors = "0.1.45"
@@ -84,10 +77,10 @@ JSON = "1.12"
 KernelAbstractions = "0.9.45"
 Libtiff_jll = "4.7"
 LinearAlgebra = "1"
-LocalOptimizationDoneRight = "0.1"
+LocalOptimizationDoneRight = "0.2"
 PythonCall = "0.9.35"
 Random = "1"
-RANSACScoringDoneRight = "0.1"
+RANSACScoringDoneRight = "0.2"
 ReTestItems = "1.35"
 VisualGeometryToolkitEstimation = "0.2"
 Rotations = "1.7"

@@ -62,11 +62,6 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [sources]
 BlobBoards = {path = ".."}
-# TEMPORARY: the unreleased 0.2 wave; replaced by the registered versions at release
-VisualGeometryToolkitCore = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitCore"}
-VisualGeometryToolkitIO = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitIO"}
-VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitFeatures"}
-VisualGeometryToolkitEstimation = {path = "/home/jbpritts/src/vgtk-hand-eye-nlls/VisualGeometryToolkitEstimation"}
 
 [compat]
 # No VisualGeometryToolkitIO entry: BlobBoards' own [compat] (dev'd via [sources])
