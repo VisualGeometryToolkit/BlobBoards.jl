@@ -610,10 +610,12 @@ end
         @test haskey(entry, "download") && !isempty(entry["download"])
         dl = entry["download"][1]
         @test length(dl["sha256"]) == 64
-        # Zenodo only, a numbered record version, the stack's zenodo_url form;
-        # no placeholder record id may ship.
-        @test occursin(r"^https://zenodo\.org/records/\d+/files/[^/]+\.tar\.gz\?download=1$", dl["url"])
-        @test endswith(dl["url"], "/$name.tar.gz?download=1")
+        # The stack's two hosts, each pinned: a numbered Zenodo record version
+        # (zenodo_url's form) or a Hugging Face dataset at a full commit
+        # (huggingface_url's form); no placeholder id or branch may ship.
+        zenodo = "https://zenodo\\.org/records/\\d+/files/$name\\.tar\\.gz\\?download=1"
+        hf = "https://huggingface\\.co/datasets/[^/]+/[^/]+/resolve/[0-9a-f]{40}/$name\\.tar\\.gz"
+        @test occursin(Regex("^($zenodo|$hf)\$"), dl["url"])
     end
     @test all(in(keys(catalog)), keys(pending))
 end
