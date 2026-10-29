@@ -26,7 +26,8 @@ using VisualGeometryToolkitFeatures:
     StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one
 
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_homography, find_absolute_pose, RansacConfig,
-    locally_optimize, AbsolutePoseProblem, HomographyProblem, BoundedProblem,
+    refine_homography, refine_radial_homography, locally_optimize,
+    AbsolutePoseProblem, HomographyProblem, BoundedProblem,
     # The radial arm's OWN search. `find_*` is RANSAC and lives here by the
     # verb table; `fit_*` (inliers given) lives in VisualGeometryToolkitCore.
     find_radial_homography, RadialHomographyProblem
@@ -385,29 +386,34 @@ _find_model(
 )
 
 # Seeded warm local-optimization refine (no second RANSAC) for the guided final
-# fit — the LM-guarded `locally_optimize` (RVG) refines `θ₀` on the guided
-# correspondences. Mirrors `_find_model`'s camera dispatch (incl. the LO choice).
-# `workspace` is an optional pre-allocated RansacWorkspace (sized ≥ the
-# guided set; `set_n!` inside locally_optimize trims it) — the driver supplies
-# per-thread warm workspaces so the guided refit stops allocating one per
-# candidate fit.
-_bounded(p, extent) = isnothing(extent) ? p : BoundedProblem(p, extent)
+# fit — the estimator's `refine_*` (its `find_*`'s local optimization alone, from
+# `θ₀`) on the guided correspondences. Mirrors `_find_model`'s camera dispatch
+# (incl. the LO choice and the scorer). `workspace` is an optional pre-allocated
+# RansacWorkspace (sized ≥ the guided set; the refine trims it) — the driver
+# supplies per-thread warm workspaces so the guided refit stops allocating one
+# per candidate fit. `nothing` below a minimal sample.
+#
+# The pose arm stays on `locally_optimize` (the step `refine_absolute_pose` runs):
+# VisualGeometryToolkitEstimation 0.2.1's `refine_absolute_pose` returns the pose
+# with an `SVector` translation, while `find_absolute_pose` returns the solvers'
+# `Extrinsics3` (a `Vec`), and a track holds one model type — the guided refit's
+# result would not convert into it.
 _refine(
     cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization = _default_lo(cam),
     extent = nothing, workspace = nothing
-) =
-    locally_optimize(
-    _bounded(HomographyProblem(pt_csponds), extent), θ₀;
-    scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization
+) = refine_homography(
+    θ₀, pt_csponds; extent, workspace, local_optimization,
+    scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth)
 )
 _refine(
     cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization = _default_lo(cam),
     extent = nothing, workspace = nothing
-) =
-    locally_optimize(
+) = locally_optimize(
     _bounded(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
     scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization
 )
+_bounded(p, ::Nothing) = p
+_bounded(p, extent) = BoundedProblem(p, extent)
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
 # z=0-lifts them to world points. (The radial arm's method — 2D, like H —
@@ -1124,7 +1130,7 @@ function _resolve_pose_ambiguity(
     # SYMMETRIC LRT: both branches through the IDENTICAL seeded-LO call —
     # same scoring construction, same optimization treatment — so the
     # quality difference is a true log likelihood ratio. (Comparing
-    # RANSAC's quality against locally_optimize's is a units error:
+    # RANSAC's quality against a refine's is a units error:
     # different scoring objects — measured to flip healthy boards.)
     inc = _refine(
         camera, pt_csponds, res.estimate;
@@ -1747,15 +1753,15 @@ _distortion_center(g) = VgtkCore.Point2{Float64}(g.image_size[1] / 2, g.image_si
 _refine(g::RadialHomographyGeometry, pt_csponds, θ₀::HomographyMat; local_optimization = g.local_optimization, kw...) =
     _refine(nothing, pt_csponds, θ₀; local_optimization, kw...)
 # The radial homography is its own manifold (sl(3) ⊕ k) — polish it there, not
-# through a plain homography.
+# through a plain homography. The problem's distortion centre is the model's
+# own, which `_find_model` set to `_distortion_center(g)`.
 _refine(
     g::RadialHomographyGeometry, pt_csponds, θ₀::VgtkCore.RadialHomography;
     outlier_halfwidth, local_optimization = g.local_optimization,
     extent = nothing, workspace = nothing,
-) =
-    locally_optimize(
-    _bounded(RadialHomographyProblem(pt_csponds; center = _distortion_center(g)), extent), θ₀;
-    scoring = _scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization
+) = refine_radial_homography(
+    θ₀, pt_csponds; extent, workspace, local_optimization,
+    scoring = _scoring(_RadialProblem5, outlier_halfwidth)
 )
 
 # The pose arm: undistort the image under :global, detect raw under :none
@@ -2513,7 +2519,7 @@ end
 
 # Per-thread RANSAC workspace pools, BOTH estimator paths — `(fit, refine)`,
 # either `nothing` when its size is below the minimal sample. `set_n!` inside
-# ransac()/locally_optimize trims a bigger buffer to the problem's data_size,
+# ransac() and the refine_* trim a bigger buffer to the problem's data_size,
 # so one workspace sized to the largest set serves every board.
 # `fit` serves the initial RANSAC (sized by the largest match list);
 # `refine` the guided refit, whose set is bounded by the board's world-blob
