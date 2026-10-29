@@ -91,6 +91,8 @@ const _FILE_UNITS = ScopedValue((mm, dpi))
 
 _snap_integer(v::Integer) = Int(v)
 _snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
+# an exact quantity's magnitude (`300px` is a Rational): an integer, else its Float64
+_snap_integer(v::Rational) = isinteger(v) ? Int(v) : Float64(v)
 _snap_integer(v) = v
 
 # A quantity as the number a file holds. `role = :world` (the default): by

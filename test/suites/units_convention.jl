@@ -84,13 +84,14 @@ end
     @test BB.ustrip(mm, cs.height - 2 * mg.height) !== 277.0
     @test BB._margin_of(cs, BB._board_from_margin(cs, mg)) == mg
     # a physical length in px: mm × px/mm, the arithmetic the sheets were laid out
-    # with (tick spacings, padding, grid counts); the native product differs
+    # with (tick spacings, padding, grid counts). Through FlexUnits 0.6.15 the
+    # native product differed on both values below (at 135.89 mm and 300 dpi
+    # enough to move a floor at a whole pixel, 1605); 0.6.16 applies a rational
+    # scale with one rounding and agrees on them, and the hand form stays the
+    # arithmetic the stored sheets were made with
     q, d = 0.5mm, 300dpi
     @test BB._length_to_px(q, d) === BB.ustrip(mm, q) * BB.ustrip(px / mm, d)
-    @test BB._length_to_px(q, d) !== BB.ustrip(px, q * d)
-    # ... enough to move a floor at a whole pixel: 135.89 mm at 300 dpi
     @test floor(BB._length_to_px(135.89mm, 300dpi)) == 1604
-    @test floor(BB.ustrip(px, 135.89mm * 300dpi)) == 1605
     # points per pixel of a density: a ratio of dpi magnitudes (vector blobs, the
     # PDF's point scale); the native quotient differs at 96 dpi
     @test BB._pt_per(96dpi) === BB.ustrip(dpi, BB.POINT_DENSITY) / 96.0

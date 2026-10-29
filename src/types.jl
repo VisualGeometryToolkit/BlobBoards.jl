@@ -183,20 +183,20 @@ struct PatternConfig{U <: Quantity, U2, PT}
 
         pattern_resolution =
         if eltype(pattern_resolution) <: Integer
-            pattern_resolution .* px
+            base_quantity.(pattern_resolution .* px)
         else
-            pattern_resolution
+            base_quantity.(pattern_resolution)
         end
 
         # Ensure min_scale is a logical (px) quantity — plain numbers get
         # px attached; quantities must already be pixel-dimensioned (the
         # physical-length form belongs to blob_board, not blob_pattern).
         min_scale = if !(min_scale isa Quantity)
-            min_scale * px
+            base_quantity(min_scale * px)
         else
             dimension(min_scale) == dimension(px) ||
                 throw(ArgumentError("min_scale must be in pixels, got $(min_scale)"))
-            ubase(min_scale)
+            base_quantity(min_scale)
         end
 
         # Convert seed to UInt64 if needed
@@ -645,10 +645,11 @@ or raster conversion, recorded with the render.
 is not a keyword of a new one: its `:ruler` or `:none` says whether the ruler is
 on.
 """
-# A quantity (or a Size2 of them) in base units, FlexUnits' `ubase` (the
-# dynamic quantity type, Float64); `nothing` kept.
+# A quantity (or a Size2 of them) in the stored form, VisualGeometryToolkitCore's
+# `base_quantity` (base units, Float64: an integer length such as `14mm` is an
+# exact Rational until stored, and a file reads back the Float64); `nothing` kept.
 _vgc(::Nothing) = nothing
-_vgc(x) = ubase.(x)
+_vgc(x) = base_quantity.(x)
 
 struct BoardConfig{L <: Quantity, G <: LayoutGrid, F <: Quantity, P <: Quantity, RS <: RulerSpec}
     canvas_size::Size2{L}

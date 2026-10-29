@@ -19,9 +19,9 @@
 #
 # A length is a number and its unit, the unit symbol of VisualGeometryToolkitCore's
 # FlexUnits registry (`UnitRegistry`) upper-cased for QR's alphanumeric set:
-# `210MM`, `8.5INCH`. It is written in mm or in inches, whichever is shorter and
-# still decodes to the identical double (Letter's 8.5 inch is
-# 215.89999999999998 mm: `8.5INCH`), and read back by lower-casing the symbol and
+# `210MM`, `11INCH`. It is written in mm or in inches, whichever is shorter and
+# still decodes to the identical double (mm on a tie: Letter's 8.5 inch is
+# `215.9MM`, its 11 inch `11INCH`), and read back by lower-casing the symbol and
 # resolving it through the registry — any registered length unit reads. A ruler
 # width or corner size of 0 turns that mark off. (Until 2026-10-15 a length was
 # a bare mm number or a number with the suffix IN; such codes are refused.) The board is centred: the code carries its margin, and the decoder
@@ -96,7 +96,7 @@ alphanumeric characters, ending in the first 8 hex of the identity as a check.
 ```julia
 board_code(bundle.preamble)
 # "BB4/210MM/297MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/…"   (A4)
-# "BB4/8.5INCH/11INCH/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/…"   (Letter)
+# "BB4/215.9MM/11INCH/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/…"   (Letter)
 ```
 """
 board_code(preamble::BoardPreamble) = _board_code(preamble, hash_config(preamble))
@@ -153,7 +153,7 @@ function parse_board_code(code::AbstractString)
     end
     function len(i)
         v = _parse_length(f[i])
-        return v === nothing ? bad("field $i ($(repr(f[i]))) is not a length (a number and a registered length unit, e.g. 210MM, 8.5INCH)") : v
+        return v === nothing ? bad("field $i ($(repr(f[i]))) is not a length (a number and a registered length unit, e.g. 210MM, 11INCH)") : v
     end
     function int(i)
         v = tryparse(Int, f[i])

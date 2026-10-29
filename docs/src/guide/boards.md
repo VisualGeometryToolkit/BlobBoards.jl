@@ -205,8 +205,8 @@ ticks, seed (hex), the smallest and largest σ (pt), the ladder and placement
 settings, polarity, and the first 8 hex of the identity as a check. A length is
 a number and its unit, the unit symbol of VisualGeometryToolkitCore's FlexUnits
 registry upper-cased so the code stays in QR's alphanumeric set: `210MM`, or
-`8.5INCH` on Letter, whichever of mm and inch is shorter and reads back to the
-identical value. The reader lower-cases the symbol and resolves it through the
+`11INCH` on Letter, whichever of mm and inch is shorter and reads back to the
+identical value (mm on a tie: Letter's width is `215.9MM`). The reader lower-cases the symbol and resolves it through the
 registry, so any registered length unit reads (`21CM`); a number without a unit
 is refused, and so is a code in the older mm/`IN` spelling. Any phone reads it
 (a 41 × 41 code, its modules about 0.24 mm in the 10 mm corner);

@@ -86,7 +86,7 @@ end
             @test !applicable(blob_board, bundle.preamble, BlobBoards.BoardLayout(bundle.preamble.board_config), 100dpi)
             @test blob_board(bundle.preamble).blobs == bundle.blobs
             @test length(bundle.blobs) > 0
-            @test bundle.preamble.board_config.ruler_width == 10mm && bundle.preamble.board_config.corner_size == 10mm   # both marks, by default
+            @test bundle.preamble.board_config.ruler_width == 10.0mm && bundle.preamble.board_config.corner_size == 10.0mm   # both marks, by default
         end
 
         @testset "Saddle frame: removed" begin
@@ -263,9 +263,9 @@ end
         # defaults: the padded band and half of it
         cfg(; k...) = BoardConfig(; canvas_size = BlobBoards.PRINT_SIZES["A5"], ruler_width = 20mm, k...)
         rs = cfg().ruler_spec
-        @test rs.major_tick.width == 20mm && rs.minor_tick.width == 10mm
+        @test rs.major_tick.width == 20.0mm && rs.minor_tick.width == 10.0mm
         rs = cfg(frame_padding = 2mm).ruler_spec
-        @test rs.major_tick.width == 16mm && rs.minor_tick.width == 8mm
+        @test rs.major_tick.width == 16.0mm && rs.minor_tick.width == 8.0mm
     end
 
     @testset "A pre-v3 board's ruler migrates (board v1/v2 → v5)" begin
@@ -1165,9 +1165,9 @@ end
     # The default board clears every printer's unprintable border (≤ 6.35 mm)
     # with room for the id label; the frame is constant, whatever the board.
     a4 = blob_board("A4"; blob_sizes = (12.0mm, 0.2short_side), seed = 1).preamble.board_config
-    @test a4.board_size == BlobBoards.Size2(width = 190mm, height = 277mm)
-    @test a4.ruler_width == 10mm && a4.corner_size == 10mm
-    @test blob_board("A0"; seed = 1, blob_sizes = (8mm, 0.2short_side)).preamble.board_config.ruler_width == 10mm
+    @test a4.board_size == BlobBoards.Size2(width = 190.0mm, height = 277.0mm)
+    @test a4.ruler_width == 10.0mm && a4.corner_size == 10.0mm
+    @test blob_board("A0"; seed = 1, blob_sizes = (8.0mm, 0.2short_side)).preamble.board_config.ruler_width == 10.0mm
     # an explicit board_size is used as given: full bleed is board_size = canvas
     @test blob_board("A5"; blob_sizes = (12.0mm, 0.2short_side), seed = 1, board_size = BlobBoards.PRINT_SIZES["A5"]).preamble.board_config.board_size ==
         BlobBoards.PRINT_SIZES["A5"]
@@ -1250,11 +1250,13 @@ end
         c = BlobBoards._code_length(q)
         @test all(in(alnum), c)
         r = BlobBoards._parse_length(c)
-        @test r == q && ustrip(r) === ustrip(q)                                   # the stored base value, bit for bit
+        b = BlobBoards.base_quantity(q)                                           # the stored form (`210mm` is exact until stored)
+        @test r == b && ustrip(r) === ustrip(b)                                   # the stored base value, bit for bit
     end
     @test BlobBoards._code_length(210mm) == "210MM"
-    @test BlobBoards._code_length(8.5inch) == "8.5INCH"                         # 215.89999999999998MM is longer
-    @test BlobBoards._parse_length("21CM") == 210mm                              # any registered length unit reads
+    @test BlobBoards._code_length(11.0inch) == "11INCH"                           # 279.4MM is longer
+    @test BlobBoards._code_length(8.5inch) == "215.9MM"                         # as long as 8.5INCH: a tie keeps mm
+    @test BlobBoards._parse_length("21CM") == 210.0mm                            # any registered length unit reads
     for bad in ("210", "10PX", "10DPI", "10FOO", "MM", "1.2.3MM", "10mm")        # no unit, not a length, unregistered, no number, lower case
         @test BlobBoards._parse_length(bad) === nothing
     end
@@ -1497,12 +1499,12 @@ end
     kw = (; blob_sizes = (6mm, 0.2short_side), seed = 0x3)
     # the default: 10 mm every side; the board derived from it
     a4 = bc(blob_board("A4"; kw...))
-    @test a4.margin == BlobBoards.Size2(width = 10mm, height = 10mm)
-    @test a4.board_size == BlobBoards.Size2(width = 190mm, height = 277mm)
+    @test a4.margin == BlobBoards.Size2(width = 10.0mm, height = 10.0mm)
+    @test a4.board_size == BlobBoards.Size2(width = 190.0mm, height = 277.0mm)
     # a Size2 (width: left and right, height: above and below), or a board size (its margin: half the excess)
-    @test bc(blob_board("A4"; kw..., margin = BlobBoards.Size2(width = 5mm, height = 20mm))).board_size == BlobBoards.Size2(width = 200mm, height = 257mm)
+    @test bc(blob_board("A4"; kw..., margin = BlobBoards.Size2(width = 5.0mm, height = 20.0mm))).board_size == BlobBoards.Size2(width = 200.0mm, height = 257.0mm)
     sq = bc(blob_board("A4"; kw..., board_size = BlobBoards.Size2(width = 180mm, height = 180mm)))
-    @test sq.margin == BlobBoards.Size2(width = 15mm, height = 58.5mm) && sq.board_size == BlobBoards.Size2(width = 180mm, height = 180mm)
+    @test sq.margin == BlobBoards.Size2(width = 15.0mm, height = 58.5mm) && sq.board_size == BlobBoards.Size2(width = 180.0mm, height = 180.0mm)
     @test bc(blob_board("A5"; kw..., margin = BlobBoards.Size2(width = 0mm, height = 0mm))).board_size == BlobBoards.PRINT_SIZES["A5"]
     # the two keywords size the same thing: giving both is refused, as is a margin that leaves no board
     m(w, h) = BlobBoards.Size2(width = w, height = h)
@@ -1520,7 +1522,7 @@ end
     # the code carries the margin and spells a length in inches when that is shorter and exact
     letter = blob_board("Letter"; kw...)
     code = BlobBoards.board_code(letter)
-    @test startswith(code, "BB4/8.5INCH/11INCH/10MM/10MM/") && length(code) < 135
+    @test startswith(code, "BB4/215.9MM/11INCH/10MM/10MM/") && length(code) < 135
     @test hash_config(BlobBoards.parse_board_code(code)) == BlobBoards._bundle_identity(letter)
 end
 

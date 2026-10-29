@@ -24,7 +24,7 @@ had to supply by convention.
 function mm_per_px(density::Quantity)
     dimension(density) == dimension(dpi) ||
         throw(ArgumentError("density must be a density (px per length), got $(density)"))
-    return ubase(1 / density)
+    return base_quantity((1 / density)::Quantity)   # a quantity: the assertion narrows FlexUnits' inferred union
 end
 
 # A physical length at a density as plain px: mm × px/mm, the arithmetic the

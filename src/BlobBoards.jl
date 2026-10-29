@@ -84,7 +84,7 @@ using VisualGeometryToolkitCore.SpatialQueries: foreach_intersecting, nearest_ne
 
 # Units and physical quantities: FlexUnits with VisualGeometryToolkitCore's pixel
 # dimension (values in base units — name the unit at every `ustrip`)
-using FlexUnits: Quantity, Units, dimension, ubase
+using FlexUnits: Quantity, Units, dimension
 using VisualGeometryToolkitCore:
     VisualGeometryToolkitCore, # for qualified access (e.g., VisualGeometryToolkitCore.estimate)
     px,
@@ -100,7 +100,7 @@ using VisualGeometryToolkitCore:
     is_map_inlier,                # the posterior > ½ MAP inlier decision (every `weights` read)
     PlanarTarget                  # a board as a target model (board_target, pipeline.jl)
 
-using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare, unit_string
+using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare, unit_string, base_quantity
 
 # Image processing and visualization
 using Colors: Colors, Gray
