@@ -29,7 +29,7 @@ using ..BlobBoards: BoardPreamble, BoardConfig, BoardBundle, BoardOutput,
     hruler, vruler, uid_from_hash,
     # the outputs a board is written as (board_output.jl)
     Pdf, Tiff, Png
-import ..BlobBoards: blob_board, render_board, rebuild_board, write_tiff
+import ..BlobBoards: blob_board, render_board, rebuild_board, write_tiff, save_canvas_texture
 using VisualGeometryToolkitCore: filter_kwargs, px, validate_dir
 using FlexUnits: Quantity, dimension
 using GeometryBasics: GeometryBasics
@@ -38,6 +38,8 @@ using JSON: JSON
 using FileIO: FileIO
 using VisualGeometryToolkitCore: ustrip, mm, pt
 using VisualGeometryToolkitCore: dpi
+import VisualGeometryToolkitCore as VgtkCore     # CanvasTexture (save_canvas_texture)
+using StaticArrays: SVector
 
 # The QR encoder of QRCoders.jl 1.4.5, vendored (qrencode/, VENDORED.toml):
 # only the board QR corner needs it.

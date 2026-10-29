@@ -152,12 +152,51 @@ board_resolver(boards_dir::AbstractString) = board_resolver(board_library(boards
 board_resolver(lib::AbstractDict) = uid -> haskey(lib, uid) ? board_points(lib[uid]) : nothing
 
 """
-    board_target(uid::Symbol, boards) -> PlanarTarget
+    board_target(uid::Symbol, boards; texture = nothing) -> PlanarTarget
 
-The board as a resolved VisualGeometryToolkitCore `PlanarTarget`: its design named by
-`uid`, its nominal points [`board_points`](@ref) (lengths, in millimetres), the `Rigid` warp.
+The board as a resolved VisualGeometryToolkitCore `PlanarTarget` — its whole
+design, as a stored rig (VisualGeometryToolkitIO's `rig/v5`) carries it:
+
+- the design named by `uid`, and its nominal points [`board_points`](@ref)
+  (lengths, in millimetres); the `Rigid` calibration;
+- the board it is printed on, a VisualGeometryToolkitCore `Board`: the board
+  proper — inside the sheet's margins, its frame included — as its size and
+  its lower-left corner;
+- the page, a VisualGeometryToolkitCore `Canvas`: the canvas's size and
+  lower-left corner, with `texture`, the printed image
+  ([`save_canvas_texture`](@ref)'s `CanvasTexture`), when one is given.
+
+All of them in the design chart, the board's world frame: canvas centre,
+y up, the plane `z = 0` of `TargetFrame{uid}`. `boards` is a directory of
+board JSON sidecars, a uid → bundle dictionary, or the bundle itself (whose
+uid the caller names: a stored board's uid is the one its file records).
 """
-board_target(uid::Symbol, boards) = PlanarTarget(uid; nominal = board_points(uid, boards))
+board_target(uid::Symbol, boards; texture = nothing) = board_target(uid, _board_bundle(uid, boards); texture)
+function board_target(uid::Symbol, bundle::BoardBundle; texture::Union{Nothing, VgtkCore.CanvasTexture} = nothing)
+    bo, bs = _world_rect(bundle, :board)
+    co, cs = _world_rect(bundle, :canvas)
+    return PlanarTarget(
+        uid; nominal = board_points(bundle),
+        board = VgtkCore.Board(Size2(width = bs[1] * mm, height = bs[2] * mm), bo .* mm),
+        canvas = VgtkCore.Canvas(Size2(width = cs[1] * mm, height = cs[2] * mm), co .* mm; texture),
+    )
+end
+
+_board_bundle(uid::Symbol, boards::AbstractDict) = haskey(boards, uid) ? boards[uid] :
+    throw(ArgumentError("no board $(uid); the library holds $(sort!(collect(keys(boards))))"))
+_board_bundle(uid::Symbol, boards_dir::AbstractString) = _board_bundle(uid, board_library(boards_dir))
+
+# A reference frame's rectangle (`:pattern`, `:board`, `:canvas`) in the world
+# chart, plain mm: its lower-left corner and its (width, height). `Rect(bundle,
+# f)` holds it in pattern coordinates (y down, from the pattern's top-left);
+# the world is the canvas centred, y up — the map `blobs(bundle, :world)` uses.
+function _world_rect(bundle::BoardBundle, f::Symbol)
+    r, c = Rect(bundle, f), Rect(bundle, :canvas)
+    W, H = _canvas_mm(board_config(bundle))
+    x, y = ustrip.(mm, r.origin .- c.origin)              # top-left, from the canvas's top-left
+    w, h = ustrip.(mm, widths(r))
+    return SVector(x - W / 2, H / 2 - (y + h)), SVector(w, h)
+end
 
 # =============================================================================
 # extract_board_features — rasterize + canonicalize + describe one board

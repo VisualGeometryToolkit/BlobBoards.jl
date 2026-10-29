@@ -149,14 +149,20 @@ function _assemble_board(
     )
     bundle = BoardBundle(preamble, blobs_stored)
     isnothing(dir) && return bundle
-    # the board code (QR and label), once: it re-derives nothing from placement
-    code = _code_or_nothing(preamble, blobs_stored, config_hash; verified)
-    # what the render block records: whether the label was actually drawn
-    sheet, labelled = _frame_content(
-        preamble, board_sizes, config_hash, _qr_text(code, config_hash), id_label ? _id_label_text(bundle, config_hash, code) : nothing
-    )
+    sheet, labelled = _board_sheet(bundle, board_sizes, config_hash; id_label, verified)
     _save_board(out, sheet, bundle; dir, id_label = labelled, config_hash)
     return bundle
+end
+
+# The sheet's frame (QR, uid glyphs, rulers, the label when asked) and whether
+# the label was actually drawn — what the render block records.
+function _board_sheet(bundle::BoardBundle, board_sizes, config_hash::AbstractString; id_label::Bool, verified::Bool = false)
+    preamble = bundle.preamble
+    # the board code (QR and label), once: it re-derives nothing from placement
+    code = _code_or_nothing(preamble, bundle.blobs, config_hash; verified)
+    return _frame_content(
+        preamble, board_sizes, config_hash, _qr_text(code, config_hash), id_label ? _id_label_text(bundle, config_hash, code) : nothing
+    )
 end
 
 #     blob_board(width::Quantity, height::Quantity; blob_sizes, kwargs...)

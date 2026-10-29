@@ -123,3 +123,25 @@ function _save_board(
     )
     return fig_path, json_path
 end
+
+# The board's printed page as a canvas texture: the sheet `render_board` draws,
+# as a PNG at `density`, and the record that names it (save_canvas_texture,
+# authoring_stubs.jl). The covered rectangle is the raster's own extent —
+# whole pixels at `density` from the canvas's top-left corner — in the world
+# chart (canvas centre, y up).
+function save_canvas_texture(
+        path::AbstractString, bundle::BoardBundle; density::Quantity, relative_to::AbstractString = dirname(path),
+        id_label::Bool = false, config_hash::AbstractString = BlobBoards._bundle_identity(bundle)
+    )
+    preamble = bundle.preamble
+    board_sizes = BoardLayout(preamble.board_config)
+    out = Png(density)
+    _check_output(out, preamble, board_sizes)
+    sheet, _ = _board_sheet(bundle, board_sizes, config_hash; id_label)
+    _write_output(out, path, sheet, bundle; title = "BlobBoards board $(make_filebase(bundle; config_hash))")
+    w, h = _raster_size(_canvas_units(bundle), preamble.board_config.layout_grid, BlobBoards._render_dpi(density))
+    W, H = BlobBoards._canvas_mm(preamble.board_config)
+    size = Size2(width = w * px / density, height = h * px / density)
+    origin = SVector(-W / 2 * mm, H / 2 * mm - size.height)        # lower-left: the top-left corner less the height
+    return VgtkCore.CanvasTexture(relpath(path, relative_to), bytes2hex(open(sha256, path)), size, origin)
+end
