@@ -53,7 +53,7 @@ using Rotations: QuatRotation
         tex = BlobBoards.save_canvas_texture(png, bundle; density = 100dpi, relative_to = dir)
         @test tex.path == joinpath("textures", "page.png") && tex.sha256 == bytes2hex(open(sha256, png))
         img = BlobBoards.PNGFiles.load(png)
-        @test (tex.size.width, tex.size.height) == (size(img, 2) * px / 100dpi, size(img, 1) * px / 100dpi)
+        @test (tex.size.width, tex.size.height) == BlobBoards.base_quantity.((size(img, 2) * px / 100dpi, size(img, 1) * px / 100dpi))
         tlo = ustrip.(mm, tex.origin .* m)
         @test tlo[1] == -W / 2 && tlo[2] + ustrip(mm, tex.size.height) ≈ H / 2
         pitch = ustrip(mm, 1px / 100dpi)
@@ -74,26 +74,22 @@ using Rotations: QuatRotation
         back = VgtkIO.load(Rig, f; resolve)
         @test points(model(back[uid])) == points(tt) && reference(model(back[uid])) === uid
         @test board(model(back[uid])) == board(tt)
-        # the canvas and its texture: the rig/v5 planar body's `canvas` block. The texture's path, hash and size
-        # come back bit for bit; the page's side (147.99733… mm) and the corners (-W/2 mm) do not: FlexUnits'
-        # `x * mm` is one ulp off the decimal-nearest metre value, which no millimetre file number reads back to
-        # (Deduction42/FlexUnits.jl#131), so the full equalities succeed once that is adopted
+        # the canvas and its texture: the rig/v5 planar body's `canvas` block, back bit for bit (FlexUnits
+        # 0.6.16 rounds `x * mm` to the decimal-nearest metre value, Deduction42/FlexUnits.jl#131)
         bt = canvas(model(back[uid])).texture
         @test (bt.path, bt.sha256, bt.size) == (tex.path, tex.sha256, tex.size) && bt.origin ≈ tex.origin
         @test canvas(model(back[uid])).origin ≈ canvas(tt).origin
-        @test_broken canvas(model(back[uid])) == canvas(tt)
-        @test_broken model(back[uid]) == tt
+        @test canvas(model(back[uid])) == canvas(tt)
+        @test model(back[uid]) == tt
 
         @test pose(back[uid]) == pose(rig[uid])
         @test points(back, uid) == points(rig, uid)
 
-        # A board side whose FlexUnits length is not the decimal-nearest metre value (142mm = 142 × 0.001 =
-        # 0.14200000000000002 m, one ulp off 0.142) has no millimetre file number that reads back to it, so
-        # the example boards' 142 mm board does not survive the file bit for bit. Fixed upstream
-        # (Deduction42/FlexUnits.jl#131); this test succeeds once that is adopted.
+        # The example boards' 142 mm board survives the file bit for bit: 142mm is exact (71//500 m) and
+        # stored as the decimal-nearest 0.142 m, which the millimetre file number reads back to.
         t142 = PlanarTarget(uid; nominal = [SVector(0.0, 0.0) .* mm], board = Board(Size2(width = 142mm, height = 142mm), SVector(-71.0, -71.0) .* mm))
         f142 = joinpath(dir, "board_142.json")
         VgtkIO.save(f142, Rig{BodyFrame{:board_rig}}(Dict(uid => PosedTarget(t142, X))))
-        @test_broken board(model(VgtkIO.load(Rig, f142)[uid])) == board(t142)
+        @test board(model(VgtkIO.load(Rig, f142)[uid])) == board(t142)
     end
 end
