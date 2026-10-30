@@ -74,14 +74,15 @@ Copy the command for your language and install method.
 
 ### Julia
 
-**From a checkout** — Julia 1.12+ is the only prerequisite; then `using BlobBoards`:
+**From a checkout** — Julia 1.12+ is the only prerequisite (no pixi; the command adds CauRegistry, which
+holds LocalOptimizationDoneRight); then `using BlobBoards`:
 
 ```bash
-git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoards.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
+git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoards.jl && julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 ```
 
-**Pkg** — from CauRegistry, where BlobBoards and its stack live until they
-are registered in General (Julia 1.12+):
+**Pkg** — BlobBoards and LocalOptimizationDoneRight are in CauRegistry, the rest
+of its stack in General (Julia 1.12+):
 
 ```julia
 using Pkg

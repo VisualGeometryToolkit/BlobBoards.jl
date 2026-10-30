@@ -274,8 +274,10 @@ before 2026-10-01 are refused and must be regenerated.
 
 ### As a dependency
 
-BlobBoards and its stack are in CauRegistry until they are registered in
-General (Julia 1.12+):
+BlobBoards and LocalOptimizationDoneRight are in CauRegistry; the rest of its
+stack (VisualGeometryToolkitCore, VisualGeometryToolkitIO,
+VisualGeometryToolkitFeatures, VisualGeometryToolkitEstimation,
+RANSACScoringDoneRight) is in General. Add CauRegistry once (Julia 1.12+):
 
 ```julia
 using Pkg
@@ -283,19 +285,20 @@ Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
 Pkg.add("BlobBoards")
 ```
 
-Its upstream stack (VisualGeometryToolkitCore, VisualGeometryToolkitFeatures,
-VisualGeometryToolkitEstimation, VisualGeometryToolkitIO) resolves automatically.
+Everything else resolves automatically. No pixi or Python is needed: pixi is
+only for the Python interface.
 
 ### For development
 
 Julia 1.12+ is the only requirement (install via
 [juliaup](https://github.com/JuliaLang/juliaup) or
-[download](https://julialang.org/downloads/)); BlobBoards needs no external tools.
+[download](https://julialang.org/downloads/)); BlobBoards needs no external tools. A checkout needs CauRegistry too, for
+LocalOptimizationDoneRight; adding it again is harmless.
 
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 ```
 
 [pixi](https://pixi.sh) is used only for the Python interface: `pixi run -e py …`
@@ -306,8 +309,8 @@ installed.
 
 ```bash
 # Install docs dependencies and build
-julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-julia --project=docs docs/make.jl
+julia --startup-file=no --project=docs -e 'using Pkg; Pkg.instantiate()'
+julia --startup-file=no --project=docs docs/make.jl
 
 # View locally
 open docs/build/index.html

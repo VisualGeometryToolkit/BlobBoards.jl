@@ -10,7 +10,7 @@ pixi install
 pixi run julia --project=.
 
 # Setup (standard Julia)
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 
 # Once per clone: let git regenerate the Manifest whenever a pull, checkout or
 # rebase moves Project.toml (compat bumps from a release cut elsewhere).

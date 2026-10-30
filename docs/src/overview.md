@@ -95,11 +95,12 @@ See the [Coordinates Guide](guide/coordinates.md) for detailed documentation.
 
 ## Installation
 
-Julia 1.12+ is the only requirement:
+Julia 1.12+ is the only requirement (the command adds CauRegistry, which holds
+LocalOptimizationDoneRight):
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 ```
 
 See the [Getting Started](guide/getting-started.md) guide for detailed instructions.

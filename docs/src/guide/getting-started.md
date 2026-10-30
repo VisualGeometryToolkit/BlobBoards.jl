@@ -4,12 +4,15 @@ This guide walks through the basics of generating blob patterns and calibration 
 
 ## Installation
 
-Julia 1.12+ is the only requirement; BlobBoards needs no external tools.
+Julia 1.12+ is the only requirement; BlobBoards needs no external tools and no
+pixi (pixi is only for the [Python interface](python.md)). The command adds
+CauRegistry, which holds BlobBoards and LocalOptimizationDoneRight; the rest of
+the stack comes from General.
 
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 ```
 
 ## Author your first board

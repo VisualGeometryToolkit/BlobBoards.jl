@@ -14,7 +14,7 @@ package writes the PDF print master itself (no Cairo, no Ghostscript), and its
 TIFF and PNG conversions with Poppler and libtiff, which it brings along.
 
 ```bash
-julia --project=. -e 'using Pkg; Pkg.instantiate()'           # once, in a checkout
+julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'           # once, in a checkout
 julia --project=. examples/generate/board.jl                   # A4, for a 300 dpi printer, PDF
 ```
 
