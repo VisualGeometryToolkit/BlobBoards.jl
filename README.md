@@ -281,6 +281,7 @@ RANSACScoringDoneRight) is in General. Add CauRegistry once (Julia 1.12+):
 
 ```julia
 using Pkg
+Pkg.Registry.add("General")
 Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
 Pkg.add("BlobBoards")
 ```
@@ -298,7 +299,7 @@ LocalOptimizationDoneRight and PoseLib; adding it again is harmless.
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 ```
 
 [pixi](https://pixi.sh) is used only for the Python interface: `pixi run -e py …`

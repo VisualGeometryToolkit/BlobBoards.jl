@@ -12,7 +12,7 @@ the stack comes from General.
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
 ```
 
 ## Author your first board
