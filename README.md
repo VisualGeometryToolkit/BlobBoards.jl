@@ -274,8 +274,8 @@ before 2026-10-01 are refused and must be regenerated.
 
 ### As a dependency
 
-BlobBoards and LocalOptimizationDoneRight are in CauRegistry; the rest of its
-stack (VisualGeometryToolkitCore, VisualGeometryToolkitIO,
+BlobBoards, LocalOptimizationDoneRight and PoseLib are in CauRegistry; the rest
+of its stack (VisualGeometryToolkitCore, VisualGeometryToolkitIO,
 VisualGeometryToolkitFeatures, VisualGeometryToolkitEstimation,
 RANSACScoringDoneRight) is in General. Add CauRegistry once (Julia 1.12+):
 
@@ -293,7 +293,7 @@ only for the Python interface.
 Julia 1.12+ is the only requirement (install via
 [juliaup](https://github.com/JuliaLang/juliaup) or
 [download](https://julialang.org/downloads/)); BlobBoards needs no external tools. A checkout needs CauRegistry too, for
-LocalOptimizationDoneRight; adding it again is harmless.
+LocalOptimizationDoneRight and PoseLib; adding it again is harmless.
 
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl

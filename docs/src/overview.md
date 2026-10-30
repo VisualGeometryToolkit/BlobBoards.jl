@@ -96,7 +96,7 @@ See the [Coordinates Guide](guide/coordinates.md) for detailed documentation.
 ## Installation
 
 Julia 1.12+ is the only requirement (the command adds CauRegistry, which holds
-LocalOptimizationDoneRight):
+LocalOptimizationDoneRight and PoseLib):
 ```bash
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl

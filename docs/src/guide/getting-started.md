@@ -6,7 +6,7 @@ This guide walks through the basics of generating blob patterns and calibration 
 
 Julia 1.12+ is the only requirement; BlobBoards needs no external tools and no
 pixi (pixi is only for the [Python interface](python.md)). The command adds
-CauRegistry, which holds BlobBoards and LocalOptimizationDoneRight; the rest of
+CauRegistry, which holds BlobBoards, LocalOptimizationDoneRight and PoseLib; the rest of
 the stack comes from General.
 
 ```bash
