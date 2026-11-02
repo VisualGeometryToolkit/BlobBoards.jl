@@ -57,7 +57,7 @@ end
         net = joinpath(data, rc["descriptor"]["model"])
         mkpath(dirname(net)); write(net, "not a network")
         mkpath(joinpath(data, "absolute_pose_experiments", "260527"))
-        withenv("CAU_DATA_ROOT" => data, "CAU_RESULTS_ROOT" => results) do
+        withenv("VGTK_DATA_ROOT" => data, "VGTK_RESULTS_ROOT" => results) do
             @test network_path(rc) == net
             src = eval_sources(load_config("figures/evaluation.toml"))
             under(p, root) = startswith(abspath(p), abspath(root) * "/")

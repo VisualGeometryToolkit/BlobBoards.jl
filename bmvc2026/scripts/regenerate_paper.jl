@@ -38,8 +38,8 @@ only what changed. A failing step is FATAL.
 
 Outputs go to papers/figures and papers/images unless BB_PAPER_FIGURES /
 BB_PAPER_IMAGES point elsewhere — how a regeneration is reviewed against the
-submitted assets before it replaces them (REPRODUCE.md). CAU_RESULTS_ROOT
-places the results; CAU_DATA_ROOT, or the artifact view, the inputs.
+submitted assets before it replaces them (REPRODUCE.md). VGTK_RESULTS_ROOT
+places the results; VGTK_DATA_ROOT, or the artifact view, the inputs.
 
 The run is a stage runner (`--plan`, `--stage=<name>[,…]`, `--force`; each
 stage runs one generator in its own module). Every generator reads its config

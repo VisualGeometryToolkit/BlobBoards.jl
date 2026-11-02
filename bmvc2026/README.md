@@ -142,7 +142,7 @@ Zenodo-hosted tiers, lazy per-tier download). The resolution ladder is the
 stack's one implementation (VisualGeometryToolkitEval.Experiments), bound in
 `src/data.jl`:
 
-1. `ENV["CAU_DATA_ROOT"]` — explicit override;
+1. `ENV["VGTK_DATA_ROOT"]` — explicit override;
 2. `datadir("exp_raw")` — the per-machine link, resolved;
 3. `BlobBoards.data_dir()` (`BLOBBOARDS_DATA` / `LocalPreferences.toml`) —
    the author's primary **writable** copy;
@@ -164,7 +164,7 @@ README) and `bb_descriptor_training_sources` (the 634 captures); see
 `scripts/make_zenodo_artifacts.jl`.
 
 **Nothing writes into the dataset.** `data_root()` is the input set; every
-result goes to `results_root()` (`bmvc2026/data/exp_pro`, `CAU_RESULTS_ROOT`
+result goes to `results_root()` (`bmvc2026/data/exp_pro`, `VGTK_RESULTS_ROOT`
 to override) and figures to `plotsdir()` (`bmvc2026/plots`).
 `test/data_tests.jl` enforces it: every run resolver points into
 `results_root()`, no driver joins a `data_root()` path with a result kind.

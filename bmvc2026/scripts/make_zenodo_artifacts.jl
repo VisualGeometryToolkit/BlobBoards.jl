@@ -72,12 +72,12 @@ using TOML
 # up. Bind against @__DIR__ and the packager writes a file nothing consumes.
 const PROJECT_ROOT = dirname(@__DIR__)
 
-# The SOURCE copy is named explicitly (ENV["CAU_DATA_ROOT"], rung 1 of the
+# The SOURCE copy is named explicitly (ENV["VGTK_DATA_ROOT"], rung 1 of the
 # data_root() ladder): the packer builds the artifacts, so it cannot resolve
 # through the artifact view they define. Only the inputs tier loads
 # BlobBoardsEval, to find the camera port's run through its config of record.
 const DS_ROOT = joinpath(
-    get(() -> error("set CAU_DATA_ROOT to the dataset root (20251028_BlobBoards_Office)"), ENV, "CAU_DATA_ROOT"),
+    get(() -> error("set VGTK_DATA_ROOT to the dataset root (20251028_BlobBoards_Office)"), ENV, "VGTK_DATA_ROOT"),
     "absolute_pose_experiments"
 )
 const TIER = isempty(ARGS) ? "inputs" : ARGS[1]

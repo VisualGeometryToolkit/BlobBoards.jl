@@ -7,8 +7,8 @@
 # VisualGeometryToolkitEval's DataArtifacts (load_catalog, catalog_violations); the
 # tarballs are built and bound by scripts/make_zenodo_artifacts.jl, whose tier
 # filters are the authority on the file lists — this catalog names each tier's
-# root directory and filter (kind `bb_tier`, a project kind: `dir` plus a
-# `filter` description), so it is derived from the existing bindings, not a
+# root directory and contents (kind `bb_tier`, a project kind: `dir` plus a
+# `contents` description; `filter` is DataArtifacts' glob list for a `tree` entry), so it is derived from the existing bindings, not a
 # second file list. src/data.jl's data_root() resolves the mounts.
 #
 # Mount `data` is the dataset root (the parent of absolute_pose_experiments/):
@@ -42,7 +42,7 @@ placeholder = "ZENODO_RECORD_ID"
 [artifacts.bb_absolute_pose_inputs]
 kind = "bb_tier"
 dir = "absolute_pose_experiments"
-filter = "per published session: poses/motion_tracker/<subset>/marker_*.json[.del], calibration/<camera>.json (scripts/import_cameras.jl's output), boards/ without *_tmp.png; teaser/{DSC04596.png,testit.jpg}; provenance/ (BlobBoards-Evaluation-main.zip, calibration/<session>/<upstream export>, README.md)"
+contents = "per published session: poses/motion_tracker/<subset>/marker_*.json[.del], calibration/<camera>.json (scripts/import_cameras.jl's output), boards/ without *_tmp.png; teaser/{DSC04596.png,testit.jpg}; provenance/ (BlobBoards-Evaluation-main.zip, calibration/<session>/<upstream export>, README.md)"
 mount = "data"
 record = "bb"
 required = true
@@ -52,7 +52,7 @@ provenance = "captured by the authors (absolute_pose_experiments/260527); camera
 [artifacts.bb_absolute_pose_images_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -62,7 +62,7 @@ provenance = "captured and processed by the authors (absolute_pose_experiments/2
 [artifacts.bb_absolute_pose_occlusion_00_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/00/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -72,7 +72,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_10_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/10/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -82,7 +82,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_20_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/20/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -92,7 +92,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_30_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/30/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -102,7 +102,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_40_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/40/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -112,7 +112,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_50_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/50/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -122,7 +122,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_60_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/60/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -132,7 +132,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_70_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/70/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -142,7 +142,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_80_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/80/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -152,7 +152,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_absolute_pose_occlusion_90_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/occlusion/90/images"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -162,7 +162,7 @@ provenance = "synthesized from the 260527 captures by the external generator Blo
 [artifacts.bb_assets]
 kind = "bb_tier"
 dir = "."
-filter = "evaluation/blobboards_original/*.json (board definitions) and the descriptor networks of record under models/ (track_logpolar_circ_s96_iter4.onnx, track_logpolar_circ_s96_cuda.onnx); no .jld2 caches"
+contents = "evaluation/blobboards_original/*.json (board definitions) and the descriptor networks of record under models/ (track_logpolar_circ_s96_iter4.onnx, track_logpolar_circ_s96_cuda.onnx); no .jld2 caches"
 mount = "data"
 record = "bb"
 required = true
@@ -172,7 +172,7 @@ provenance = "board definitions generated by the authors; networks trained by th
 [artifacts.bb_descriptor_training_metadata]
 kind = "bb_tier"
 dir = "descriptor_training"
-filter = "everything except sources/ and .jld2 caches"
+contents = "everything except sources/ and .jld2 caches"
 mount = "data"
 record = "bb"
 required = false
@@ -182,7 +182,7 @@ provenance = "trained by the authors (Sec. Curriculum training)"
 [artifacts.bb_descriptor_training_sources]
 kind = "bb_tier"
 dir = "descriptor_training/sources"
-filter = "all"
+contents = "all"
 mount = "data"
 record = "bb"
 required = false
@@ -192,7 +192,7 @@ provenance = "captured by the authors"
 [artifacts.bb_pipeline_figure]
 kind = "bb_tier"
 dir = "blobboard_training"
-filter = "images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG, images/dataset_sonyfx3_tamron20mm_f8_cameras.json (the session's OpenCV calibration as a VisualGeometryToolkitIO cameras/v3 record with its calibration block) and README_bb_pipeline_figure.md"
+contents = "images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG, images/dataset_sonyfx3_tamron20mm_f8_cameras.json (the session's OpenCV calibration as a VisualGeometryToolkitIO cameras/v3 record with its calibration block) and README_bb_pipeline_figure.md"
 mount = "data"
 record = "bb"
 required = false

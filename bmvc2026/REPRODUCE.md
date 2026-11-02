@@ -55,7 +55,7 @@ Only inputs are published (`configs/data_artifacts.toml`): the captures, the
 motion tracker's raw per-frame exports, the cameras of record, the board
 definitions, the synthetic occlusion images, the descriptor networks and the
 board gallery. Every result is produced by a codified stage into a keyed run
-directory under `results_root()` (`CAU_RESULTS_ROOT`, default
+directory under `results_root()` (`VGTK_RESULTS_ROOT`, default
 `bmvc2026/data/exp_pro`) and found again through the stage's config of record
 → its run key → its directory (`src/runs.jl`, DrWatson-style; the evaluation
 names its upstream configs in `configs/figures/evaluation.toml` `[runs]`). A
@@ -87,7 +87,7 @@ reproduces the published exports bit for bit (poses, ids, camera matrix;
 
 ## Data tiers
 
-`data_root()` (src/data.jl) resolves the dataset: `CAU_DATA_ROOT`, the
+`data_root()` (src/data.jl) resolves the dataset: `VGTK_DATA_ROOT`, the
 project's `data/exp_raw` symlink, the BlobBoards `data_dir` preference, or the
 Zenodo artifact view (`Artifacts.toml`, lazily downloaded per tier). The tiers
 a generator needs are named in the `data` column:

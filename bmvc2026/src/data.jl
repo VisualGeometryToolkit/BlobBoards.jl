@@ -67,7 +67,7 @@ _tier_mount(t) = t in _ROOT_TIERS ? "" : "absolute_pose_experiments"
 # THE data binding (VisualGeometryToolkitEval.Experiments, the stack's one
 # implementation). `data_root(; tiers)`:
 #
-#   1. ENV["CAU_DATA_ROOT"]        explicit override
+#   1. ENV["VGTK_DATA_ROOT"]        explicit override
 #   2. datadir("exp_raw")          the project's own symlink, RESOLVED
 #                                  (`resolve_links`: run keys downstream hash
 #                                  paths under it) — per machine, gitignored
@@ -80,7 +80,7 @@ _tier_mount(t) = t in _ROOT_TIERS ? "" : "absolute_pose_experiments"
 # staging-tree layout ≡ packed-tier layout ≡ composed view — artifact tarballs
 # store dataset-root-relative paths, so drivers use only data_root()-relative
 # paths and cannot tell whose machine they are on. `results_root()`:
-# ENV["CAU_RESULTS_ROOT"] → datadir("exp_pro"), created on demand — the
+# ENV["VGTK_RESULTS_ROOT"] → datadir("exp_pro"), created on demand — the
 # add-only outputs tree, where EVERY result lives (src/runs.jl). Nothing is
 # ever written into data_root(): it is the input set.
 set_project_root!(
