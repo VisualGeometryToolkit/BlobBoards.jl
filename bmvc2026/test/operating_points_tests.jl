@@ -2,25 +2,17 @@
 # CV's config is well-formed and its artifact clears the gate, and every tuned
 # value of the configs of record IS the value of the artifact it was adopted
 # from, read through VisualGeometryToolkitEval's one gated reader (`deployed_setting`)
-# — never a literal that drifted from its tuning.
-import VisualGeometryToolkitEval as VgtkEval
-using Test
-using DrWatson: projectdir
-import TOML
-import VisualGeometryToolkitEval
-using VisualGeometryToolkitEval.Evaluation: deployed_setting
-using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy
+# — never a literal that drifted from its tuning. The artifact reads are the
+# `:results` items: without the artifact (results root not bound, or the run
+# not made) they record a skip.
 
-module OperatingPoints
-    include(joinpath(@__DIR__, "..", "src", "operating_points.jl"))
-end
+@testitem "the joint detection CV: its spec and its run directory" setup = [OperatingPoints] begin
+    import VisualGeometryToolkitEval as VgtkEval
+    using DrWatson: projectdir
+    import TOML
+    using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy
 
-const CV_CONFIG = projectdir("configs", "detection_cv.toml")
-# The run configs of record that carry the operating point.
-const RUN_CONFIGS = ["bmvc2026_260527.toml", "bmvc2026_260527_noflip.toml"]
-
-@testset "the joint detection CV: its spec, its run directory, its gate" begin
-    cfg = TOML.parsefile(CV_CONFIG)
+    cfg = TOML.parsefile(projectdir("configs", "detection_cv.toml"))
     s = tuning_spec(cfg, "detection").scheme
     @test s isa JointCoarseFine && s.criterion == MeanAverageAccuracy(10.0)
     @test sort!(collect(keys(s.axes))) == ["min_similarity", "outlier_halfwidth", "peak_threshold"]
@@ -31,7 +23,17 @@ const RUN_CONFIGS = ["bmvc2026_260527.toml", "bmvc2026_260527_noflip.toml"]
     # the record of this config is the one the configs of record deploy
     @test all(op -> op.artifact == relpath(OperatingPoints.detection_cv_artifact(dir), OperatingPoints.results_root()),
               OperatingPoints.ADOPTED_OPERATING_POINTS)
-    path = OperatingPoints.detection_cv_artifact(dir)
+end
+
+@testitem "the joint detection CV: its gate" tags = [:results] setup = [OperatingPoints] begin
+    using DrWatson: projectdir
+    import TOML
+    using VisualGeometryToolkitEval.Evaluation: deployed_setting
+    using VisualGeometryToolkitEval.Tuning: tuning_spec
+
+    cfg = TOML.parsefile(projectdir("configs", "detection_cv.toml"))
+    s = tuning_spec(cfg, "detection").scheme
+    path = OperatingPoints.detection_cv_artifact(OperatingPoints.detection_cv_dir(cfg))
     if !isfile(path)
         @info "no joint detection CV artifact at $path (results root not bound or not run): gate check SKIPPED"
         @test_skip false
@@ -41,12 +43,21 @@ const RUN_CONFIGS = ["bmvc2026_260527.toml", "bmvc2026_260527_noflip.toml"]
     end
 end
 
-@testset "operating points: the configs of record carry their adopted tuning" begin
+# Each run config of record that carries the operating point names the run
+# its value came from.
+@testitem "operating points: the configs of record name their tuning runs" setup = [OperatingPoints] begin
+    using DrWatson: projectdir
+    for op in OperatingPoints.ADOPTED_OPERATING_POINTS, rc in OperatingPoints.RUN_CONFIGS
+        @test occursin(basename(dirname(op.artifact)), read(projectdir("configs", rc), String))
+    end
+end
+
+@testitem "operating points: the configs of record carry their adopted tuning" tags = [:results] setup = [OperatingPoints] begin
+    using DrWatson: projectdir
+    import TOML
+    using VisualGeometryToolkitEval.Evaluation: deployed_setting
+
     for op in OperatingPoints.ADOPTED_OPERATING_POINTS
-        # each run config names the run its value came from
-        for rc in RUN_CONFIGS
-            @test occursin(basename(dirname(op.artifact)), read(projectdir("configs", rc), String))
-        end
         path = joinpath(OperatingPoints.results_root(), op.artifact)
         if !isfile(path)
             @info "no tuning artifact at $path (results root not bound here): config-vs-artifact check SKIPPED"
@@ -54,7 +65,7 @@ end
             continue
         end
         tuned = deployed_setting(path; context = "bmvc2026 $(op.axis)")[op.axis]
-        for rc in RUN_CONFIGS
+        for rc in OperatingPoints.RUN_CONFIGS
             @test foldl(getindex, op.key; init = TOML.parsefile(projectdir("configs", rc))) == tuned
         end
     end

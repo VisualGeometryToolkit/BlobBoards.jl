@@ -23,6 +23,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+ReTestItems = "817f1d60-ba6b-4fd5-9520-3cf149f6a823"
 VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 SlurmClusterManager = "c82cd089-7bf7-41d7-976b-6b5d413cbe0a"
@@ -37,6 +38,7 @@ VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [compat]
+ReTestItems = "1.35"
 VisualGeometryToolkitEval = "0.4"
 
 [extras]

@@ -11,17 +11,9 @@
 #   4. the inputs tier, where it is installed, holds input kinds only.
 # =============================================================================
 
-using Test
-using DrWatson: projectdir
-import TOML
-import Pkg
-if !isdefined(Main, :BlobBoardsEval)
-    include(projectdir("src", "BlobBoardsEval.jl"))
-end
-using .BlobBoardsEval: camera_of_record, eval_sources, poses_dir, val_dir, hand_eye_dir, records_dir, mocap_dir,
-    sweep_dir, baselines_dir, load_config, network_path
-
-@testset "cameras of record: calibration/<camera>.json, never the images tier" begin
+@testitem "cameras of record: calibration/<camera>.json, never the images tier" setup = [BBEval] begin
+    using DrWatson: projectdir
+    using .BBEval.BlobBoardsEval: camera_of_record
     mktempdir() do dir
         session = mkpath(joinpath(dir, "260527"))
         cam = "sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
@@ -48,7 +40,10 @@ using .BlobBoardsEval: camera_of_record, eval_sources, poses_dir, val_dir, hand_
     @test isempty(hits)
 end
 
-@testset "every run resolves into results_root(), never data_root()" begin
+@testitem "every run resolves into results_root(), never data_root()" setup = [BBEval] begin
+    using DrWatson: projectdir
+    using .BBEval.BlobBoardsEval: eval_sources, poses_dir, val_dir, hand_eye_dir, records_dir, mocap_dir,
+        sweep_dir, baselines_dir, load_config, network_path
     mktempdir() do tmp
         data, results = mkpath(joinpath(tmp, "data")), mkpath(joinpath(tmp, "results"))
         # an inputs-only data root: the network a run config names (the sweep
@@ -79,15 +74,16 @@ end
     end
 end
 
-# A result kind: what only our code or a detector produces.
-const RESULT_SEGMENTS = ["poses", "val", "results", "pose_results", "figures", "reconstruction",
-    "target_poses.json", "telemetry.jsonl", "_promoted.toml", "hand_eye.json", "markers.json",
-    "board_rig.json", "camera_rig.json"]
-# The one producer that reads a raw input under one of those names: the
-# motion-capture stage reads the tracker's exports at poses/motion_tracker.
-const RAW_INPUT_READERS = Dict("scripts/convert_formats.jl" => ["poses"])
+@testitem "no driver reads a result from data_root()" begin
+    using DrWatson: projectdir
+    # A result kind: what only our code or a detector produces.
+    const RESULT_SEGMENTS = ["poses", "val", "results", "pose_results", "figures", "reconstruction",
+        "target_poses.json", "telemetry.jsonl", "_promoted.toml", "hand_eye.json", "markers.json",
+        "board_rig.json", "camera_rig.json"]
+    # The one producer that reads a raw input under one of those names: the
+    # motion-capture stage reads the tracker's exports at poses/motion_tracker.
+    const RAW_INPUT_READERS = Dict("scripts/convert_formats.jl" => ["poses"])
 
-@testset "no driver reads a result from data_root()" begin
     seg = join((replace(s, "." => "\\.") for s in RESULT_SEGMENTS), "|")
     hits = String[]
     for top in ("src", "scripts"), (root, _, files) in walkdir(projectdir(top)), f in files
@@ -124,7 +120,10 @@ const RAW_INPUT_READERS = Dict("scripts/convert_formats.jl" => ["poses"])
     @test !isfile(projectdir("scripts", "promote_run.jl"))
 end
 
-@testset "the inputs tier holds inputs only" begin
+@testitem "the inputs tier holds inputs only" tags = [:data] begin
+    using DrWatson: projectdir
+    import TOML
+    import Pkg
     toml = TOML.parsefile(projectdir("Artifacts.toml"))
     @test !haskey(toml, "bb_absolute_pose_metadata") && !haskey(toml, "bb_absolute_pose_val_260527")
     @test haskey(toml, "bb_absolute_pose_inputs")
@@ -149,5 +148,6 @@ end
         end
     else
         @info "bb_absolute_pose_inputs is not installed — the tier-content check is skipped"
+        @test_skip false
     end
 end

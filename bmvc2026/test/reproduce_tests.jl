@@ -4,31 +4,31 @@
 # of record (configs/figures/*.toml) and its generator reads it, and no
 # generated number is re-typed in the prose. The check is VisualGeometryToolkitEval's
 # `Reproduce`.
-import VisualGeometryToolkitEval as VgtkEval
-using Test
-using DrWatson: projectdir
-import VisualGeometryToolkitEval
 
-# VisualGeometryToolkitEval releases from the one that ships `Reproduce` on carry it;
-# an older resolved version reads the dependency-free implementation file from
-# a checkout that has it (VGEVAL_REPRODUCE_SRC = .../src/reproduce/reproduce_index.jl).
-const Reproduce = if isdefined(VisualGeometryToolkitEval, :Reproduce)
-    VgtkEval.Reproduce
-else
-    let src = get(ENV, "VGEVAL_REPRODUCE_SRC", "")
-        isfile(src) || error(
-            "VisualGeometryToolkitEval $(pkgversion(VisualGeometryToolkitEval)) predates Reproduce: update it, or set " *
-                "VGEVAL_REPRODUCE_SRC to src/reproduce/reproduce_index.jl of a checkout that has it"
-        )
-        m = Module(:Reproduce)
-        Base.include(m, src)
-        m
+@testitem "bmvc2026 reproducible figures (REPRODUCE.md)" begin
+    import VisualGeometryToolkitEval as VgtkEval
+    using DrWatson: projectdir
+    import VisualGeometryToolkitEval
+
+    # VisualGeometryToolkitEval releases from the one that ships `Reproduce` on carry it;
+    # an older resolved version reads the dependency-free implementation file from
+    # a checkout that has it (VGEVAL_REPRODUCE_SRC = .../src/reproduce/reproduce_index.jl).
+    const Reproduce = if isdefined(VisualGeometryToolkitEval, :Reproduce)
+        VgtkEval.Reproduce
+    else
+        let src = get(ENV, "VGEVAL_REPRODUCE_SRC", "")
+            isfile(src) || error(
+                "VisualGeometryToolkitEval $(pkgversion(VisualGeometryToolkitEval)) predates Reproduce: update it, or set " *
+                    "VGEVAL_REPRODUCE_SRC to src/reproduce/reproduce_index.jl of a checkout that has it"
+            )
+            m = Module(:Reproduce)
+            Base.include(m, src)
+            m
+        end
     end
-end
 
-const PAPERS = ["papers/blob_boards_bmvc.tex", "papers/bmvc_supp.tex"]
+    const PAPERS = ["papers/blob_boards_bmvc.tex", "papers/bmvc_supp.tex"]
 
-@testset "bmvc2026 reproducible figures (REPRODUCE.md)" begin
     vs = Reproduce.reproduce_index_violations(projectdir(); papers = PAPERS, require_config = true)
     foreach(v -> @info(sprint(show, v)), vs)
     @test isempty(vs)
@@ -41,7 +41,8 @@ end
 # Every figure config of record is a TOML whose [experiment] names a generator
 # that exists and reads it, and that generator holds no `const` data tables:
 # the picks, crops, seeds and panel lists live in the config.
-@testset "bmvc2026 figure configs of record" begin
+@testitem "bmvc2026 figure configs of record" begin
+    using DrWatson: projectdir
     import TOML
     dir = projectdir("configs", "figures")
     scripts = Dict(
@@ -74,7 +75,8 @@ end
 # record (`[inputs] run_config`, read by reference, no detector values
 # restated) unless its config declares a reasoned `[find_boards]
 # detector_exception` — so a figure and the evaluation cannot silently diverge.
-@testset "bmvc2026 figures use the run config of record" begin
+@testitem "bmvc2026 figures use the run config of record" begin
+    using DrWatson: projectdir
     import TOML
     detector_keys = ("peak_threshold", "edge_threshold", "nms_cutoff", "nms_band_octaves", "upsample", "tilts")
     has_key(d, k) = d isa AbstractDict && (haskey(d, k) || any(v -> has_key(v, k), values(d)))
@@ -105,4 +107,3 @@ end
         @test f in ("make_adapted_panels.jl", "make_bmvc2026_intro.jl", "make_pipeline_panels.jl")
     end
 end
-

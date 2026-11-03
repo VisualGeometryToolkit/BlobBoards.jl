@@ -9,35 +9,35 @@
 # Float64 for these values).
 # =============================================================================
 
-using Test
-using DrWatson: projectdir
-import TOML
-import VisualGeometryToolkitIO as VgtkIO
-using VisualGeometryToolkitCore: BoundedCamera, CameraModel, Size2
-using VisualGeometryToolkitIO: opencv_lens
-using StaticArrays: SMatrix
+@testitem "cameras of record: the exact native port of the upstream export" tags = [:data] setup = [BBEval] begin
+    using DrWatson: projectdir
+    import TOML
+    import VisualGeometryToolkitIO as VgtkIO
+    using VisualGeometryToolkitCore: BoundedCamera, CameraModel, Size2
+    using VisualGeometryToolkitIO: opencv_lens
+    using VisualGeometryToolkitEval.Experiments: is_primary_copy
+    using StaticArrays: SMatrix
+    using .BBEval.BlobBoardsEval: upstream_camera, upstream_source
 
-# The previous cameras of record (canonical frame), by value.
-const PREVIOUS = Dict(
-    "260527" => (K = SMatrix{3, 3, Float64}(2461.4310993500767, 0, 0, 0, 2460.563045263503, 0, 2140.1593652825422, 1400.3009044208025, 1),
-        k = [-0.15680625941667098, 0.04565665542192153, -0.0003527415347489064, 0.0008423616851487834], size = (4240, 2832)),
-    "260521" => (K = SMatrix{3, 3, Float64}(2468.2077040546915, 0, 0, 0, 2468.247581880029, 0, 2147.861813010314, 1402.5157043838487, 1),
-        k = [-0.15749700505351585, 0.048447063332657615, -0.0004763899767071182, 0.0008518580750734769], size = (4240, 2832)),
-)
+    # The previous cameras of record (canonical frame), by value.
+    const PREVIOUS = Dict(
+        "260527" => (K = SMatrix{3, 3, Float64}(2461.4310993500767, 0, 0, 0, 2460.563045263503, 0, 2140.1593652825422, 1400.3009044208025, 1),
+            k = [-0.15680625941667098, 0.04565665542192153, -0.0003527415347489064, 0.0008423616851487834], size = (4240, 2832)),
+        "260521" => (K = SMatrix{3, 3, Float64}(2468.2077040546915, 0, 0, 0, 2468.247581880029, 0, 2147.861813010314, 1402.5157043838487, 1),
+            k = [-0.15749700505351585, 0.048447063332657615, -0.0004763899767071182, 0.0008518580750734769], size = (4240, 2832)),
+    )
 
-if !isdefined(Main, :BlobBoardsEval)
-    include(projectdir("src", "BlobBoardsEval.jl"))
-end
-using .BlobBoardsEval: upstream_camera, upstream_source
-
-@testset "cameras of record: the exact native port of the upstream export" begin
     cfg = TOML.parsefile(projectdir("configs", "import_cameras.toml"))
     @test sort([c["session"] for c in cfg["cameras"]]) == sort(collect(keys(PREVIOUS)))
     for entry in cfg["cameras"]
         prev = PREVIOUS[entry["session"]]
         @test !isabspath(entry["source"])                                                  # data_root()-relative, never a machine path
-        if !isfile(upstream_source(entry))
+        # the export is an input under the data root: without a bound one, or
+        # without the file, a recorded skip (never an install of the artifact
+        # view, which upstream_source would trigger)
+        if !is_primary_copy() || !isfile(upstream_source(entry))
             @info "upstream export of $(entry["session"]) not on this machine — conversion check skipped"
+            @test_skip false
             continue
         end
         name, camera, _ = upstream_camera(entry, cfg["upstream"])

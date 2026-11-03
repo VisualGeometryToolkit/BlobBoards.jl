@@ -5,52 +5,47 @@
 # states the fit's uncertainty on every pose it publishes.
 # =============================================================================
 
-using Test
-using DrWatson: projectdir
-if !isdefined(Main, :BlobBoardsEval)
-    include(projectdir("src", "BlobBoardsEval.jl"))
-end
-using .BlobBoardsEval
-import VisualGeometryToolkitIO as VgtkIO
-using VisualGeometryToolkitCore: Trajectory, TargetPoses, PosedTarget, PlanarTarget, is_resolved, model, with_unit, mm
-using VisualGeometryToolkitCore: EuclideanMap, BodyFrame, WorldFrame, CameraFrame, TargetFrame, ViewFrame, Uncertain, CovMat,
-    geom, relabel, unlabel, pose, ids, Rig
-import Rotations
-using Rotations: RotMatrix, RotXYZ, rotation_angle
-using StaticArrays: SVector, SMatrix
-using LinearAlgebra: norm, I
-using Statistics: cov
-import JSON
+@testitem "evaluation formats" setup = [BBEval] begin
+    using .BBEval.BlobBoardsEval
+    import VisualGeometryToolkitIO as VgtkIO
+    using VisualGeometryToolkitCore: Trajectory, TargetPoses, PosedTarget, PlanarTarget, is_resolved, model, with_unit, mm
+    using VisualGeometryToolkitCore: EuclideanMap, BodyFrame, WorldFrame, CameraFrame, TargetFrame, ViewFrame, Uncertain, CovMat,
+        geom, relabel, unlabel, pose, ids, Rig
+    import Rotations
+    using Rotations: RotMatrix, RotXYZ, rotation_angle
+    using StaticArrays: SVector, SMatrix
+    using LinearAlgebra: norm, I
+    using Statistics: cov
+    import JSON
 
-const BBE = BlobBoardsEval
+    const BBE = BBEval.BlobBoardsEval
 
-_map(a, b, c, t) = EuclideanMap(RotMatrix{3, Float64}(RotXYZ(a, b, c)), SVector{3, Float64}(t); check = false)
+    _map(a, b, c, t) = EuclideanMap(RotMatrix{3, Float64}(RotXYZ(a, b, c)), SVector{3, Float64}(t); check = false)
 
-# A synthetic calibration: the rigs in the world, the camera mount X, the board
-# mount Y_m, and the detections they imply (T_det = X ∘ T_cb ∘ Y_m).
-function synthetic_capture(dir; n = 12)
-    X = _map(0.3, -0.2, 0.1, [10.0, -40.0, 60.0])                 # camera rig → optical
-    Ys = Dict("b$(m)" => _map(0.05m, 0.1, -0.02m, [30.0m, -15.0, 5.0m]) for m in 1:3)
-    Twc = Dict(t => _map(0.01t, 0.0, 0.0, [2000.0, 0.0, 1300.0]) for t in 1:n)
-    Twb = Dict(t => _map(0.2 * sin(t), 0.35 * cos(1.3t), 0.15t, [1000.0 + 20t, 30.0 * cos(t), 1400.0]) for t in 1:n)
-    images = Dict(t => "DSC$(lpad(t, 4, '0')).JPG" for t in 1:n)
-    mt = mkpath(joinpath(dir, "poses", "motion_tracker", "calibration_bb"))
-    for (body, P) in ((:board_rig, Twb), (:camera_rig, Twc))
-        VgtkIO.save(joinpath(mt, "$(body).json"), with_unit(Trajectory(BodyFrame{body}, WorldFrame, P; images), mm);
-            provenance = (recovery = (status = "not needed",),))
+    # A synthetic calibration: the rigs in the world, the camera mount X, the board
+    # mount Y_m, and the detections they imply (T_det = X ∘ T_cb ∘ Y_m).
+    function synthetic_capture(dir; n = 12)
+        X = _map(0.3, -0.2, 0.1, [10.0, -40.0, 60.0])                 # camera rig → optical
+        Ys = Dict("b$(m)" => _map(0.05m, 0.1, -0.02m, [30.0m, -15.0, 5.0m]) for m in 1:3)
+        Twc = Dict(t => _map(0.01t, 0.0, 0.0, [2000.0, 0.0, 1300.0]) for t in 1:n)
+        Twb = Dict(t => _map(0.2 * sin(t), 0.35 * cos(1.3t), 0.15t, [1000.0 + 20t, 30.0 * cos(t), 1400.0]) for t in 1:n)
+        images = Dict(t => "DSC$(lpad(t, 4, '0')).JPG" for t in 1:n)
+        mt = mkpath(joinpath(dir, "poses", "motion_tracker", "calibration_bb"))
+        for (body, P) in ((:board_rig, Twb), (:camera_rig, Twc))
+            VgtkIO.save(joinpath(mt, "$(body).json"), with_unit(Trajectory(BodyFrame{body}, WorldFrame, P; images), mm);
+                provenance = (recovery = (status = "not needed",),))
+        end
+        # detections with a small deterministic error, so the fit has a residual
+        # (and so a covariance) to report
+        jitter(t, m) = _map(1.0e-3 * sin(t + m), 1.0e-3 * cos(2t), 1.0e-3 * sin(3m), [0.1 * sin(t), 0.1 * cos(m), 0.1 * sin(t * m)])
+        det = Dict(
+            t => Dict(Symbol(k) => X ∘ inv(Twc[t]) ∘ Twb[t] ∘ Y ∘ jitter(t, i) for (i, (k, Y)) in enumerate(sort!(collect(Ys); by = first))) for t in 1:n
+        )
+        pd = mkpath(joinpath(dir, "poses", "calibration", "bb"))
+        VgtkIO.save(joinpath(pd, "target_poses.json"), with_unit(TargetPoses{CameraFrame}(det; images, sensors = "cam"), mm))
+        return (; X, Ys, Twc, Twb, images)
     end
-    # detections with a small deterministic error, so the fit has a residual
-    # (and so a covariance) to report
-    jitter(t, m) = _map(1.0e-3 * sin(t + m), 1.0e-3 * cos(2t), 1.0e-3 * sin(3m), [0.1 * sin(t), 0.1 * cos(m), 0.1 * sin(t * m)])
-    det = Dict(
-        t => Dict(Symbol(k) => X ∘ inv(Twc[t]) ∘ Twb[t] ∘ Y ∘ jitter(t, i) for (i, (k, Y)) in enumerate(sort!(collect(Ys); by = first))) for t in 1:n
-    )
-    pd = mkpath(joinpath(dir, "poses", "calibration", "bb"))
-    VgtkIO.save(joinpath(pd, "target_poses.json"), with_unit(TargetPoses{CameraFrame}(det; images, sensors = "cam"), mm))
-    return (; X, Ys, Twc, Twb, images)
-end
 
-@testset "evaluation formats" begin
     mktempdir() do dir
         cap = synthetic_capture(dir)
 
