@@ -69,3 +69,54 @@ lazy = true
     [[bb_example_video_v3.download]]
     sha256 = "71d30e195c2d2927a6d14d1110d4ac22bd26a14ca25ef31e75398f9b55f4d244"
     url = "https://zenodo.org/records/23243553/files/bb_example_video_v3.tar.gz?download=1"
+
+# Version 1.2.0 of the record (23921651, published 2026-11-03): the board definitions as blobboards/board/v5,
+# one tarball per physical board set (migrated once by vgio_migrate, uids and stored hashes.config kept; print PDFs /
+# PNG renders beside them where they exist). bb_boards_descriptor_training_wood_board5 is bb_example_boards_v5's tree.
+[bb_boards_absolute_pose_panel_board5]
+git-tree-sha1 = "233118b95688ba5fc4ca67356ac58d693482567f"
+lazy = true
+
+    [[bb_boards_absolute_pose_panel_board5.download]]
+    sha256 = "6faa05af43b04a8be2d9150d3a7ace7d11cc8549994e0a631785fcb40af3f6d5"
+    url = "https://zenodo.org/records/23921651/files/bb_boards_absolute_pose_panel_board5.tar.gz?download=1"
+
+[bb_boards_descriptor_training_wood_board5]
+git-tree-sha1 = "e0f9dd0ae71a737ecc0faf8df5b191f5071560d4"
+lazy = true
+
+    [[bb_boards_descriptor_training_wood_board5.download]]
+    sha256 = "f556b6f1a7f96c893e5727b655f403b5e2bf5d3007c3a1eacc8d54d6633c5e03"
+    url = "https://zenodo.org/records/23921651/files/bb_boards_descriptor_training_wood_board5.tar.gz?download=1"
+
+[bb_boards_mocap_large_glass_board5]
+git-tree-sha1 = "54bf3cc0c9605f5cd22accac1ed33c3760f21aac"
+lazy = true
+
+    [[bb_boards_mocap_large_glass_board5.download]]
+    sha256 = "dc870eaaa8327be8d505b40194b0fb21ac1d0992542be4d725a4ca6d86e7eba6"
+    url = "https://zenodo.org/records/23921651/files/bb_boards_mocap_large_glass_board5.tar.gz?download=1"
+
+[bb_boards_mocap_mirrors_board5]
+git-tree-sha1 = "0ab523ab469b363ddd8554c7fcbaebce8aea472a"
+lazy = true
+
+    [[bb_boards_mocap_mirrors_board5.download]]
+    sha256 = "fb60a1ced8270cd11971b6df4288fef72d47167cbec74a2eae834e0aa07d7e28"
+    url = "https://zenodo.org/records/23921651/files/bb_boards_mocap_mirrors_board5.tar.gz?download=1"
+
+[bb_boards_print_series_aluminum_board5]
+git-tree-sha1 = "784b5080cf786419ce77cdc1178c927ec5b360a8"
+lazy = true
+
+    [[bb_boards_print_series_aluminum_board5.download]]
+    sha256 = "ad2c4e73bceb70eb7e500ee25032f5f1ab787599a32826016d2a90266ba10447"
+    url = "https://zenodo.org/records/23921651/files/bb_boards_print_series_aluminum_board5.tar.gz?download=1"
+
+[bb_boards_unknown_board5]
+git-tree-sha1 = "a51220421acb5ac823b74b5e5e35212b7ce988c3"
+lazy = true
+
+    [[bb_boards_unknown_board5.download]]
+    sha256 = "2579365ef57ef50289ad4f7ca02f257db1f47b09aff67a7cf1bb7f7a8fbeb8a6"
+    url = "https://zenodo.org/records/23921651/files/bb_boards_unknown_board5.tar.gz?download=1"
