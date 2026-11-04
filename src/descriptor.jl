@@ -307,8 +307,10 @@ function DescriptorNetwork(
                     "The CPU EP is ~34x slower on this network (1.76 ms vs " *
                     "52 us per patch), so falling back silently would " *
                     "misreport pipeline throughput.\n" *
-                    "Fix: `import CUDA, cuDNN` before constructing " *
-                    "DescriptorNetwork (cuDNN is required and easy to omit), " *
+                    "Fix: install both once with `$(EXTENSION_INSTALL.BlobBoardsCUDAExt.install)`, " *
+                    "pin the CUDA runtime ONNX Runtime takes with `$(CUDA_RUNTIME_PIN)` " *
+                    "(then restart Julia), and `import CUDA, cuDNN` before constructing " *
+                    "DescriptorNetwork (cuDNN is required and easy to omit); " *
                     "or free the GPU if the arena reservation failed.\n" *
                     "Opt out: DescriptorNetwork(path; execution_provider = :cpu) " *
                     "or DescriptorNetwork(path; allow_cpu_fallback = true).\n" *
@@ -397,7 +399,8 @@ end
     LuxDescriptorNetwork(...)
 
 Lux-based descriptor model. Implementation provided by the
-BlobBoardsLuxExt extension; available when Lux + NNlib + cuDNN are loaded.
+BlobBoardsLuxExt extension; available when Lux + NNlib + cuDNN are loaded,
+and without them the call raises an error naming the install line.
 Auto-moves parameters to GPU when functional.
 """
 function LuxDescriptorNetwork end

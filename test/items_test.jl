@@ -25,10 +25,95 @@ end
     include("suites/agent_docs.jl")
 end
 
-# The README's and Getting started's examples, in a fresh environment built
-# from the README's install line (a child process: this target is not that env).
+# The install table and the examples of the README and the docs, statically;
+# then each install row's examples, in a fresh environment built from that
+# row's install line alone (a child process: this target is not that env).
 @testitem "readme" begin
     include("suites/readme.jl")
+end
+
+@testitem "readme row: author boards" begin
+    include("suites/readme_rows.jl")
+    run_row("author boards (pattern, PDF, PNG)")
+end
+
+# The CPU row's environment has no extension's packages: every function whose
+# methods live in an extension raises the error naming its install line.
+@testitem "readme row: find boards on the CPU, and the missing-extension errors" begin
+    include("suites/readme_rows.jl")
+    run_row("find boards on the CPU"; after = """
+        fallbacks = [collect(BlobBoards.EXTENSION_FUNCTIONS);
+                     (BlobBoards.board, :BlobBoardsMakieExt); (BlobBoards.board!, :BlobBoardsMakieExt)]
+        for (f, ext) in fallbacks
+            err = try f("a", 1); nothing catch e; e end
+            @test err isa ErrorException
+            @test occursin(getproperty(BlobBoards.EXTENSION_INSTALL, ext).install, sprint(showerror, err))
+        end
+        # The GPU: the network's CUDA provider names the GPU row's line and the runtime pin.
+        err = try BlobBoards.DescriptorNetwork(BlobBoards.descriptor_network_path()); nothing catch e; e end
+        @test err isa ErrorException
+        @test occursin(BlobBoards.EXTENSION_INSTALL.BlobBoardsCUDAExt.install, sprint(showerror, err))
+        @test occursin(BlobBoards.CUDA_RUNTIME_PIN, sprint(showerror, err))
+        """)
+end
+
+@testitem "readme row: track boards in a video" begin
+    include("suites/readme_rows.jl")
+    run_row("track boards in a video")
+end
+
+# With the extension loaded, a call no method fits is the MethodError it always was.
+@testitem "readme row: plot or visualize" begin
+    include("suites/readme_rows.jl")
+    run_row("plot or visualize"; after = """
+        @test_throws MethodError BlobBoards.plot_boards("a", 1)
+        """)
+end
+
+# Runs where a CUDA device is functional (CUDA_VISIBLE_DEVICES=0 on the release
+# machine); records a skip otherwise. The runtime pin is part of the row.
+# Tagged :gpu, so it runs with the GPU items, one at a time, never beside another item.
+@testitem "readme row: find boards on the GPU" tags=[:gpu] begin
+    using CUDA: CUDA
+    include("suites/readme_rows.jl")
+    if get(ENV, "BB_TEST_SKIP_GPU", "0") != "1" && CUDA.functional()
+        run_row("find boards on the GPU"; setup = BlobBoards.CUDA_RUNTIME_PIN)
+    else
+        @test_skip "find boards on the GPU: no functional CUDA device"
+    end
+end
+
+# The Python script, run by the pixi `py` environment's interpreter (the one
+# JULIA_PYTHONCALL_EXE names); a skip without it, as for the Python suite.
+@testitem "readme row: use from Python" begin
+    include("suites/readme_rows.jl")
+    python = get(ENV, "JULIA_PYTHONCALL_EXE", nothing)
+    if python === nothing || get(ENV, "BB_TEST_SKIP_PYTHON", "0") == "1"
+        @test_skip "use from Python: no JULIA_PYTHONCALL_EXE (run under pixi run -e py)"
+    else
+        script = joinpath(mktempdir(), "find_board.py")
+        write(script, only(e.code for e in examples() if e.lang == "python"))
+        # juliacall is given this Julia's own binary, not juliaup's launcher
+        # (whose sys.so it cannot load: python/README.md).
+        out = withenv("JULIA_LOAD_PATH" => nothing, "JULIA_PROJECT" => nothing,
+                      "PYTHON_JULIAPKG_EXE" => joinpath(Sys.BINDIR, Base.julia_exename())) do
+            read(`$python $script`, String)
+        end
+        @test last(split(strip(out), '\n')) == "True"
+    end
+end
+
+# The clone row's last line, run in this checkout's root environment: only in a
+# clone whose workspace is instantiated (an installed copy has no root Manifest).
+@testitem "readme row: work in a clone" begin
+    include("suites/readme_rows.jl")
+    clone = only(e.code for e in examples() if e.row == "work in a clone")
+    code = match(r"^julia --project=\. -e '(using BlobBoards;.*)'$"m, clone)[1]
+    if isfile(joinpath(README_ROOT, "Manifest.toml"))
+        @test run_child(README_ROOT, "-e", code) == 0
+    else
+        @test_skip "work in a clone: no instantiated workspace at $(README_ROOT)"
+    end
 end
 
 @testitem "JET static analysis" begin

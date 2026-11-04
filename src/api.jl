@@ -85,6 +85,9 @@ export default_device
 # the 2026-09-07 audit: zero users in-repo or downstream since the 0.23 round.
 export board, board!
 
+# Each function's methods live in BlobBoardsMakieExt; its fallback, which names
+# the install line when no Makie backend is loaded, is defined from
+# EXTENSION_FUNCTIONS (src/extensions.jl).
 "Plot a grid of accepted find_boards results. Requires a Makie backend."
 function plot_boards end
 
@@ -159,6 +162,7 @@ public symmetric_iou_match
 # backend that writes files (CairoMakie for headless runs).
 public view_angle_profile, print_view_angle_profile
 public view_angle_figure, save_view_angle_figure
+public train_descriptor                    # the descriptor network's training loop (BlobBoardsTrainingExt)
 # Result element types: `symmetric_iou_match -> Vector{TrainingPair}` and
 # `view_angle_profile -> Vector{ViewAngleStat}`, same treatment as PatternBundle.
 public TrainingPair, ViewAngleStat
@@ -172,9 +176,9 @@ public TrainingPair, ViewAngleStat
 # =============================================================================
 # Python Interface — provided by BlobBoardsPythonExt
 # =============================================================================
-# These are stubs (function declarations with no methods). Methods are
-# defined in `ext/BlobBoardsPythonExt.jl` and become callable when the user
-# loads PythonCall. Inside `pixi run`, JULIA_PYTHONCALL_EXE points PythonCall
+# Their methods are defined in `ext/BlobBoardsPythonExt.jl` and become
+# callable when the user loads PythonCall; until then each one's fallback
+# (from EXTENSION_FUNCTIONS, src/extensions.jl) names the install line. Inside `pixi run`, JULIA_PYTHONCALL_EXE points PythonCall
 # at pixi's Python (numpy + pint preinstalled); outside pixi the extension
 # still loads but pyimport("numpy") will fail unless the user provides a
 # Python with numpy themselves.
@@ -184,9 +188,10 @@ public TrainingPair, ViewAngleStat
 
 The Python package's `blobboards.blob_pattern`: [`blob_pattern`](@ref) for arguments as Python
 objects — Python numbers or pint lengths (bare numbers: pixels) — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function blob_pattern_python end
 """
@@ -194,9 +199,10 @@ function blob_pattern_python end
 
 The Python package's `blobboards.blob_board`: [`blob_board`](@ref) for arguments as Python
 objects — a paper name, or Python numbers / pint lengths (bare numbers: mm) — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function blob_board_python end
 """
@@ -204,9 +210,10 @@ function blob_board_python end
 
 The Python package's `blobboards.blobs`: [`blobs`](@ref) for arguments as Python
 objects — a pattern or board JSON path — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function blobs_python end
 """
@@ -214,9 +221,10 @@ function blobs_python end
 
 The Python package's `blobboards.detect_blobs`: [`detect_blobs`](@ref) for arguments as Python
 objects — a 2-D numpy image — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function detect_blobs_python end
 """
@@ -224,9 +232,10 @@ function detect_blobs_python end
 
 The Python package's `blobboards.find_boards`: [`find_boards`](@ref) for arguments as Python
 objects — board JSON paths, the descriptor ONNX path and a numpy image — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function find_boards_python end
 """
@@ -234,9 +243,10 @@ function find_boards_python end
 
 The Python package's `blobboards.load_board`: [`load_board`](@ref) for arguments as Python
 objects — a board JSON path — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function load_board_python end
 """
@@ -244,9 +254,10 @@ function load_board_python end
 
 The Python package's `blobboards.render_board`: [`render_board`](@ref) for arguments as Python
 objects — a board JSON path — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function render_board_python end
 """
@@ -254,9 +265,10 @@ function render_board_python end
 
 The Python package's `blobboards.track_boards`: [`track_boards`](@ref) for arguments as Python
 objects — board JSON paths, the descriptor ONNX path and numpy frames — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. A stub: its method is
+coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
+Without PythonCall the call raises an error naming the install line.
 """
 function track_boards_python end
 

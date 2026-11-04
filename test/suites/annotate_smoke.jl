@@ -275,12 +275,15 @@ end
         poses = [(r[1], r[2]) for r in results]
         @test plot_boards(cam, results, g.bundles, img) isa CairoMakie.Makie.Figure
         @test plot_board_poses(cam, poses, g.bundles, img) isa CairoMakie.Makie.Figure
-        # the retired orders bind no method: image first, and the image second
-        @test !applicable(plot_boards, img, results, g.bundles, cam)
-        @test !applicable(plot_board_poses, img, poses, g.bundles, cam)
-        @test !applicable(plot_boards, cam, img, results, g.bundles)
-        @test !applicable(plot_board_poses, cam, img, poses, g.bundles)
-        @test !applicable(plot_board_poses, cam, img, Dict(poses), g.bundles)
+        # the retired orders bind no method: image first, and the image second.
+        # A MethodError rather than `!applicable`: the core's catch-all fallback
+        # (src/extensions.jl) applies to every order, and with the extension
+        # loaded it raises the MethodError of a call no extension method fits.
+        @test_throws MethodError plot_boards(img, results, g.bundles, cam)
+        @test_throws MethodError plot_board_poses(img, poses, g.bundles, cam)
+        @test_throws MethodError plot_boards(cam, img, results, g.bundles)
+        @test_throws MethodError plot_board_poses(cam, img, poses, g.bundles)
+        @test_throws MethodError plot_board_poses(cam, img, Dict(poses), g.bundles)
     end
 
     # (The former BLOBBOARDS_RUN_VIDEO_SMOKE gate is gone: the VGF ASIFT

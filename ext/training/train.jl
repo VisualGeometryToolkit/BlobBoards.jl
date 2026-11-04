@@ -33,37 +33,9 @@ function _make_optimizer(cfg::TrainingConfig)
     end
 end
 
-"""
-    train_descriptor(train_path, val_path=nothing;
-                     cfg=TrainingConfig(), output_dir="checkpoints",
-                     resume=nothing)
-
-Train a BlobDescriptorNetwork on annotation data.
-
-Uses Lux + Zygote for automatic differentiation with GPU acceleration
-(falls back to CPU if no GPU is available).
-
-Learning rate decays linearly from `cfg.lr` to 0 over the full training run.
-Validation (FPR@95) runs every `cfg.eval_interval` iterations and at epoch boundaries.
-
-# Arguments
-- `train_path`: path to training annotations HDF5 (from `annotate_blobs`)
-- `val_path`: optional path to validation annotations HDF5
-- `cfg`: `TrainingConfig` with all hyperparameters
-- `output_dir`: directory for checkpoints (created if needed)
-- `resume`: path to checkpoint JLD2 to resume from (restores params, state, epoch,
-  and iteration count; optimizer is restarted fresh)
-
-# Checkpoints (JLD2)
-Saved to `output_dir/`:
-- `checkpoint_epoch_N.jld2` — every epoch
-- `best_model.jld2` — lowest FPR@95 on validation
-
-Each contains `:ps`, `:st`, `:opt_state`, `:cfg`, `:epoch`, `:iteration`, `:fpr`.
-
-# Returns
-`TrainingResult` with final parameters.
-"""
+# The method of the core's `train_descriptor` (src/training.jl), whose
+# docstring documents it: a docstring on a method of an imported function
+# breaks extension precompilation.
 function train_descriptor(
         train_path::AbstractString,
         val_path::Union{Nothing, AbstractString} = nothing;

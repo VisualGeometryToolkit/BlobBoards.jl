@@ -1479,16 +1479,42 @@ the format (`.png`, `.svg`, `.pdf`). Requires a Makie backend that can save —
 """
 function save_view_angle_figure end
 
+"""
+    train_descriptor(train_path, val_path = nothing; cfg, output_dir = "checkpoints", resume = nothing)
+
+Train the blob descriptor network on annotation files (HDF5, from
+`annotate_blobs`), with Lux and Zygote, on the GPU when one is available and on
+the CPU otherwise. The learning rate decays linearly from `cfg.lr` to 0 over
+the run; validation (FPR@95) runs every `cfg.eval_interval` iterations and at
+epoch boundaries. TensorBoard logs go to `output_dir/tb`.
+
+- `train_path`: the training annotations (HDF5).
+- `val_path`: optional validation annotations (HDF5).
+- `cfg`: the training extension's `TrainingConfig`, every hyperparameter
+  (`TrainingConfig()` when omitted).
+- `output_dir`: the checkpoint directory, created if needed.
+- `resume`: a checkpoint (JLD2) to resume from: its parameters, state, epoch
+  and iteration count are restored; the optimizer restarts.
+
+Checkpoints (JLD2) are written to `output_dir`: `checkpoint_epoch_N.jld2` every
+epoch and `best_model.jld2` at the lowest FPR@95 on validation, each with
+`:ps`, `:st`, `:opt_state`, `:cfg`, `:epoch`, `:iteration` and `:fpr`. Returns
+a `TrainingResult` with the final parameters.
+
+The method lives in BlobBoardsTrainingExt, which loads with Lux, Optimisers,
+Enzyme, Reactant, NNlib, TensorBoardLogger and Zygote; without them the call
+raises an error naming the install line.
+"""
+function train_descriptor end
+
 # Chart `stats` to `path` if a Makie backend is loaded, otherwise print the text
 # profile. Best-effort: a rendering failure never aborts a track build, it just
 # degrades to the terminal chart. Used by the build drivers below.
 function _emit_view_angle_profile(path, stats; title, edges = VIEW_ANGLE_EDGES)
-    if !isempty(stats) && !isempty(methods(save_view_angle_figure))
+    if !isempty(stats) && _extension_loaded(:BlobBoardsMakieExt)
         try
-            # `save_view_angle_figure` is a core stub with ZERO methods until
-            # BlobBoardsMakieExt loads, so a direct call is a static
-            # MethodError to JET. The `methods(...)` test above is the real
-            # guard; `invokelatest` is what makes the dispatch honest.
+            # `save_view_angle_figure`'s method lives in BlobBoardsMakieExt,
+            # loaded after this was compiled: `invokelatest` reaches it.
             Base.invokelatest(save_view_angle_figure, path, stats; title, edges)
             printstyled("  $title → $path\n"; bold = true, color = :cyan)
             return path

@@ -70,61 +70,60 @@ none.
 
 ## Install
 
-Copy the command for your language and install method.
+BlobBoards requires Julia 1.12 or later. Until the General registrations of
+BlobBoards and LocalOptimizationDoneRight merge, add
+[CauRegistry](https://github.com/prittjam/CauRegistry.jl) first:
 
-### Julia
-
-**From a checkout** — Julia 1.12+ is the only prerequisite (no pixi; the command adds CauRegistry, which
-holds LocalOptimizationDoneRight); then `using BlobBoards`:
-
-```bash
-git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoards.jl && julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
+```julia-repl
+pkg> registry add https://github.com/prittjam/CauRegistry.jl
 ```
 
-**Pkg** — BlobBoards and LocalOptimizationDoneRight are in CauRegistry, the
-rest of its stack in General (Julia 1.12+):
+The example below finds a board on the CPU:
 
-```julia
-using Pkg
-Pkg.Registry.add("General")
-Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
-Pkg.add("BlobBoards")
+```julia-repl
+pkg> add BlobBoards VisualGeometryToolkitCore
 ```
 
-### Python
-
-**pixi** — its `py` environment provides Python with the `blobboards` package
-(Julia itself is a prerequisite); the example writes an A4 board to the
-current directory:
-
-```bash
-git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoards.jl && pixi run -e py python python/examples/boards/generate_a4_board.py
-```
-
-**pip** — installs `blobboards` with its `juliacall` and `numpy` dependencies into
-your current Python environment:
-
-```bash
-git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl && cd BlobBoards.jl/python && pip install -e .
-```
+Finding boards on a GPU, plotting, training and the Python package each have
+their own line: see [Install for your task](guide/install.md), which gives the
+line and a runnable example for each.
 
 ## Getting started
 
-Install BlobBoards and generate, print and detect your first board in
-[Getting Started](guide/getting-started.md). [Authoring boards](guide/boards.md) covers
+Render a board as an image, then find it in that image with no camera (one
+homography per board). [Getting Started](guide/getting-started.md) authors,
+prints and loads a first board; [Authoring boards](guide/boards.md) covers
 every board option and printing; [Detecting boards](guide/detection.md)
 covers `find_boards`, pose estimation and GPU acceleration. The [Overview](overview.md)
 introduces patterns, boards and the coordinate conventions.
 
 ```julia
+# Install row: find boards on the CPU
 using BlobBoards
+using VisualGeometryToolkitCore: is_map_inlier
 
-# A4 board, smallest printed disc 4 mm across → board PDF + JSON in ./out
-blob_board("A4"; blob_sizes = (4.0mm, 0.2short_side), seed = 0xBEEF, dir = "./out")
+# A small board rendered at 100 pixels per inch: the image to search
+dir = mktempdir()
+blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0xBEEF, dir, output = Png(100dpi))
+board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
+scene = load_board(board_json)                 # the board's uid and bundle
+_, image = BlobBoards.load(board_json)         # the rendered sheet, a grey image
 
-# Or a pixel pattern for simulation and training
-blob_pattern(800, 600; blob_sizes = (12px, nothing), seed = 0x1234, dir = "./out")
+network = DescriptorNetwork(descriptor_network_path(); execution_provider = :cpu)
+gallery = BoardGallery(joinpath(dir, "board_features.jld2"), network)
+boards  = Dict(insert!(gallery, [board_json], network))   # uid => the board's described blobs
+bundles = Dict(scene.uid => scene.bundle)
+
+config   = FindBoardsConfig(geometry = HomographyGeometry())
+accepted = find_boards(boards, network, image; board_bundles = bundles, config)
+
+uid, H, quality, csponds = only(accepted)      # the board's uid, its board → image homography
+n_inliers = count(is_map_inlier, csponds.weights)
+uid == scene.uid                               # true
 ```
+
+For Python, the `blobboards` package runs in a clone of the repository:
+`pixi run -e py python` (see [Use from Python](guide/install.md#Use-from-Python)).
 
 ## Method
 
@@ -227,6 +226,11 @@ Please use the [GitHub issue tracker](https://github.com/VisualGeometryToolkit/B
 for bug reports, questions, and feature requests. The repository's `examples/`
 directory has runnable Julia scripts for generation, detection, tracking and building
 training tracks; `python/examples/` covers the Python package.
+
+## Contributors
+
+BlobBoards is developed by James Pritts, with contributions from Hendrik
+Sauer and Till Sittart.
 
 ## Acknowledgments
 

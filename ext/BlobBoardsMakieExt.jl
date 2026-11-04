@@ -12,11 +12,12 @@ module BlobBoardsMakieExt
 using Makie: Makie
 using BlobBoards
 using BlobBoards: PipelineTrace
-# `board` looks unused here — it is NOT. The `@recipe` in
-# makie/board_overlay_recipe.jl defines methods on BOTH `board` and `board!`,
-# and the import must precede the include or the macro mints an ext-local
-# binding and the core `BlobBoards.board` stub never gets its method.
-import BlobBoards: board, board!, inspect_pipeline, plot_annotations, plot_boards, plot_board_poses, plot_tracks, replay
+# `board` and `board!` are NOT imported: the `@recipe` in
+# makie/board_overlay_recipe.jl defines this module's own `board(args...; kw...)`
+# and `board!(args...; kw...)`, and the core's functions of those names forward
+# to them (src/authoring_stubs.jl). A recipe method on the core's function would
+# overwrite the core's fallback of the same signature, which precompilation refuses.
+import BlobBoards: inspect_pipeline, plot_annotations, plot_boards, plot_board_poses, plot_tracks, replay
 import BlobBoards: board_overlay!, inliers!, board_panel!, plot_comparison
 # `_clamp_patch` (track_trace.jl) — plot_annotations called it unqualified and
 # nothing exercised the viewer until the 2026-09 smoke test caught the UndefVarError.

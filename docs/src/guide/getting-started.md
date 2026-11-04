@@ -4,41 +4,36 @@ This guide walks through the basics of generating blob patterns and calibration 
 
 ## Installation
 
-Julia 1.12+ is the only requirement; BlobBoards needs no external tools and no
-pixi (pixi is only for the [Python interface](python.md)). The examples below
-also import a few names from VisualGeometryToolkitCore, the stack package that
-owns them:
-
-```julia-repl
-pkg> add BlobBoards VisualGeometryToolkitCore
-```
-
-Until the General registrations of BlobBoards and LocalOptimizationDoneRight
-merge, add [CauRegistry](https://github.com/prittjam/CauRegistry.jl) first; the
-rest of the stack comes from General:
+Julia 1.12+ is the only requirement; board authoring needs no external tools and no
+pixi (pixi is only for the [Python interface](python.md)). Until the General
+registrations of BlobBoards and LocalOptimizationDoneRight merge, add
+[CauRegistry](https://github.com/prittjam/CauRegistry.jl) first; the rest of
+the stack comes from General:
 
 ```julia-repl
 pkg> registry add https://github.com/prittjam/CauRegistry.jl
 ```
 
-To work on a checkout instead:
+Every example on this page authors boards and needs BlobBoards alone:
 
-```bash
-git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
-cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
+```julia-repl
+pkg> add BlobBoards
 ```
 
-The `julia` blocks below run as written, in order, in a fresh environment with
-the install line above; the package's test suite runs them. Every file goes to
-a temporary directory.
+Finding boards, on the CPU or a GPU, tracking, plotting, training and the
+Python package each have their own install line: see
+[Install for your task](install.md). Each `julia` block below is a complete
+script that runs as written in a fresh environment with that line, and writes
+its files to a temporary directory; the package's test suite runs each of them.
 
 ## Author your first board
 
 ```julia
+# Install row: author boards
 using BlobBoards
 dir = mktempdir()
 bundle = blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), seed = 0xBEEF, dir)
+count(endswith(".pdf"), readdir(dir)) == 1    # true
 ```
 
 This writes `blob_board_<uid>.pdf` (print it at 100%) and its JSON sidecar.
@@ -53,21 +48,24 @@ keyword.
 ## Detect boards and estimate pose
 
 [`find_boards`](@ref) finds known boards in an image and returns each one's
-homography or pose. See [Detection and Pose](detection.md).
+homography or pose: [Find boards on the CPU](install.md#Find-boards-on-the-CPU)
+is a complete example, and [Detection and Pose](detection.md) the guide.
 
 ## Generating Patterns Only
 
 For training data or custom layouts, generate just the pattern:
 
 ```julia
+# Install row: author boards
 using BlobBoards
 
-# Generate a 800x600 pixel pattern
-pattern, pattern_blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234)
+# An 800 × 600 pixel pattern, in memory
+pattern, pattern_blobs, config = blob_pattern(800, 600; blob_sizes = (12px, nothing), seed = 0x1234)
 
-# Save to disk
+# The same, saved to disk: the PNG and its JSON sidecar
 pattern_dir = mktempdir()
-pattern, pattern_blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), dir=pattern_dir)
+pattern, pattern_blobs, config = blob_pattern(800, 600; blob_sizes = (12px, nothing), seed = 0x1234, dir = pattern_dir)
+size(pattern) == (600, 800)    # true
 ```
 
 ## Extracting Blob Coordinates
@@ -75,46 +73,54 @@ pattern, pattern_blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothin
 ### From Board Files
 
 ```julia
-board_json = only(filter(endswith(".json"), readdir(dir; join = true)))   # the board authored above
+# Install row: author boards
+using BlobBoards
+dir = mktempdir()
+blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), seed = 0xBEEF, dir)
+board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
 bundle, image = BlobBoards.load(board_json)
 
 # Physical coordinates (mm) relative to pattern origin
-b = blobs(bundle, :pattern; units=mm)
+b = blobs(bundle, :pattern; units = mm)
 
 # Physical coordinates relative to board origin (includes frame)
-b = blobs(bundle, :board; units=mm)
+b = blobs(bundle, :board; units = mm)
 
 # Pixel coordinates at a density (COLMAP convention, convert as needed)
 b = blobs(bundle, :pattern; density = 300dpi)
+
+# The world frame (centred, y-up, unitless mm), lifted to 3D points on the
+# z = 0 plane for calibration
+world = blobs(bundle, :world)
+X = [(x, y, 0.0) for (x, y) in (b.center for b in world)]
+length(X) == length(b)    # true
 ```
 
 ### From Pattern Files
 
 ```julia
+# Install row: author boards
+using BlobBoards
+pattern_dir = mktempdir()
+blob_pattern(800, 600; blob_sizes = (12px, nothing), seed = 0x1234, dir = pattern_dir)
 pattern_json = only(filter(endswith(".json"), readdir(pattern_dir; join = true)))
 bundle, _ = BlobBoards.load(pattern_json)
 
 # Pixel coordinates (COLMAP convention)
 b = blobs(bundle)
-```
-
-### World Coordinates for 3D Calibration
-
-```julia
-bundle, image = BlobBoards.load(board_json)
-
-# Get blobs in world frame (centered, y-up, unitless mm)
-world = blobs(bundle, :world)
-
-# Lift to 3D points on z=0 plane
-using VisualGeometryToolkitCore: Point3
-X = [Point3(b.center..., 0.0) for b in world]
+!isempty(b)    # true
 ```
 
 ## Loading Saved Boards
 
 ```julia
+# Install row: author boards
+using BlobBoards
+dir = mktempdir()
+blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), seed = 0xBEEF, dir)
+
 # Load from any paired file (JSON, PNG, or PDF)
+board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
 board_pdf = only(filter(endswith(".pdf"), readdir(dir; join = true)))
 bundle, image = BlobBoards.load(board_json)
 bundle, image = BlobBoards.load(board_pdf)
@@ -122,6 +128,7 @@ bundle, image = BlobBoards.load(board_pdf)
 # Access configuration
 config = pattern_config(bundle)
 board_cfg = board_config(bundle)
+config.seed == 0xBEEF    # true
 ```
 
 ## Available Paper Sizes
@@ -134,12 +141,15 @@ Standard sizes include:
 | | | Tabloid, Ledger |
 
 ```julia
+# Install row: author boards
+using BlobBoards
 # List all available sizes
-keys(BlobBoards.PRINT_SIZES)
+"A4" in keys(BlobBoards.PRINT_SIZES)    # true
 ```
 
 ## Next Steps
 
+- [Install for your task](install.md) - The install line and an example for each task
 - [Patterns Guide](patterns.md) - Detailed pattern generation options
 - [Authoring a Board](boards.md) - Board layout, output types and printing
 - [Detection and Pose](detection.md) - `find_boards`, `track_boards` and the GPU environment

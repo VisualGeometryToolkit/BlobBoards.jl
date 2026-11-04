@@ -264,7 +264,18 @@ function write_tiff end
 Project a board's world rect + blobs into an image axis. Requires a Makie
 backend (BlobBoardsMakieExt).
 """
-function board! end
+board!(args...; kwargs...) = _makie_recipe(board!, args, kwargs)
 
 "Non-mutating form of [`board!`](@ref). Requires a Makie backend."
-function board end
+board(args...; kwargs...) = _makie_recipe(board, args, kwargs)
+
+# `board`/`board!` are the functions of the extension's Makie recipe (`Board`).
+# `Makie.@recipe` defines `board(args...; kw...)` itself, the same signature as
+# a fallback here, and a method overwritten from an extension is an error under
+# precompilation. So the recipe's functions are the extension's own, and these
+# forward to them — or name the install line when no Makie backend is loaded.
+function _makie_recipe(f, args, kwargs)
+    ext = Base.get_extension(@__MODULE__, :BlobBoardsMakieExt)
+    ext === nothing && error(_missing_extension_message(f, :BlobBoardsMakieExt))
+    return Base.invokelatest(getproperty(ext, nameof(f)), args...; kwargs...)
+end

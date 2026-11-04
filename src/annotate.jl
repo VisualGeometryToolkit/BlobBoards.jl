@@ -1163,5 +1163,7 @@ reference patch (from board PDF), then a gap, then observation columns
     plot_annotations(sets)                           # top 20 blobs
     plot_annotations(sets; max_blobs=5, max_obs=20)  # fewer blobs, more obs
     plot_annotations(load_cspond_sets("annotations/"))   # directory of per-image JLD2s
+
+Requires a Makie backend (BlobBoardsMakieExt).
 """
 function plot_annotations end

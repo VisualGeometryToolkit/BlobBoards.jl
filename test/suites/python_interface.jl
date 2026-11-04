@@ -376,7 +376,8 @@
     @testset "find_boards_python: board paths and model lead, the image follows" begin
         img = zeros(UInt8, 4, 4)
         @test applicable(BlobBoards.find_boards_python, ["board.json"], "model.onnx", img)
-        # the retired image-first order binds no method
-        @test !applicable(BlobBoards.find_boards_python, img, ["board.json"], "model.onnx")
+        # the retired image-first order binds no method: a MethodError, since
+        # the core's catch-all fallback (src/extensions.jl) is applicable to any order
+        @test_throws MethodError BlobBoards.find_boards_python(img, ["board.json"], "model.onnx")
     end
 end

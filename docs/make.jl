@@ -30,6 +30,7 @@ makedocs(;
         "Home" => "index.md",
         "Overview" => "overview.md",
         "Quick Reference" => "guide/reference.md",
+        "Install for your task" => "guide/install.md",
         "Getting Started" => "guide/getting-started.md",
         "User Guide" => [
             "Patterns" => "guide/patterns.md",

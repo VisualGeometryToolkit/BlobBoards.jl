@@ -206,7 +206,7 @@ end
 
 # Core includes in dependency order (flat, consolidated)
 include("config_defaults.jl") # configs/default.toml -> the keyword defaults of every config struct below
-include("json.jl")         # JSON field access and the one JSON writer
+include("json.jl")        # JSON field access and the one JSON writer
 include("types.jl")        # Structs and their JSON lowering/lifting
 include("coordinates.jl")  # Coordinate maps, reference frames, unit conversion
 include("pattern.jl")      # Pattern subsystem (placement, rendering, API)
@@ -234,6 +234,7 @@ include("track_trace.jl")  # TrackFrameRecord/TrackTrace — capture/replay reco
 include("track.jl")        # track_boards — temporal board tracking
 include("annotate.jl")     # annotate_blobs — GT-labeled patches from board detection
 include("training.jl") # TrainingData struct and builders from annotations
+include("extensions.jl")   # what each package extension needs; the fallbacks of the functions whose methods live there
 include("authoring/Authoring.jl")   # board authoring: blob_board, rebuild_board, render_board, the PDF/X-4 writer
 """
     CONTRACT_GENERICS

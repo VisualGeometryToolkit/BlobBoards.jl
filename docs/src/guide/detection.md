@@ -277,13 +277,12 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 version = "12.9"
 ```
 
-Or interactively:
+Or interactively, as the [GPU row](install.md#Find-boards-on-the-GPU) of
+Install for your task does:
 
-```julia
-using Pkg
-Pkg.add(["BlobBoards", "CUDA", "cuDNN", "CUDA_Runtime_jll"])
-using CUDA
-CUDA.set_runtime_version!(v"12.9")   # writes the pin to LocalPreferences.toml; restart Julia
+```julia-repl
+pkg> add BlobBoards CUDA cuDNN
+julia> using CUDA; CUDA.set_runtime_version!(v"12.9")   # writes the pin to LocalPreferences.toml; restart Julia
 ```
 
 After the restart, the check below must report `:cuda`. Add FileIO, Colors

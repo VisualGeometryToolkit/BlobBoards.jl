@@ -26,6 +26,9 @@ using JLD2: JLD2
 
 using BlobBoards
 using BlobBoards: AbstractDescriptorNetwork, load_annotations
+# The training loop is a method of the core's `train_descriptor`, whose
+# fallback names the install line when this extension is not loaded.
+import BlobBoards: train_descriptor
 
 # The model architecture (`BlobDescriptorNetwork`, ext/training/model.jl) is
 # included HERE as well as in BlobBoardsLuxExt — one source file, compiled in

@@ -1,91 +1,90 @@
-# readme.jl — the README's examples and the documentation's Getting started run
-# as written, in a clean environment that holds exactly what the README's
-# install line adds. A reader's first contact with the package is that code; it
-# once began with shell lines inside a julia block and loaded placeholder files
-# ("board.json", "cameras.json", "descriptor.onnx") it never wrote (General
-# registration review, 2026-11).
+# readme.jl — the install table and the examples, checked without running them
+# (the readme row items run them: suites/readme_rows.jl).
 #
-# The examples import names from VisualGeometryToolkitCore, and a reader's
-# environment holds only what the install line adds, not this test target. So
-# the item builds a temporary environment — this package by path, every other
-# package of the install line from the registries — and runs the blocks in a
-# child Julia process there. The install lines are `pkg>` blocks
-# (```julia-repl), so they are not run as code: the item checks instead that the
-# `pkg> add` line names every non-standard-library package the examples load,
-# and nothing else, and that the documentation shows the same line.
-#
-# A ```julia block whose first line begins `# Illustrative` is not part of the
-# runnable example (the calibrated GPU pipeline on the reader's own camera and
-# images, the API signatures, the training pipeline on the reader's videos): it
-# is excluded here, by that marker and by count, so a new block is classified
-# rather than silently skipped.
+# - The README's and Install for your task's tables agree, row for row, and
+#   hold the eight tasks.
+# - A row whose task is an extension names the extension's own install line
+#   (src/extensions.jl), the line its fallbacks print.
+# - Every code example of the README and of the pages that show the install
+#   lines names its install row in its first line; only the training example is
+#   illustrative (it needs the reader's recordings), and the counts are pinned
+#   so a new block is classified rather than skipped.
+# - Each row's install line names exactly the non-standard-library packages its
+#   examples load.
+# - The README's example and the landing page's are the same block, and so is
+#   the CPU row's.
 
-using Test
-root = pkgdir(BlobBoards)
-julia_blocks(path) = [m[1] for m in eachmatch(r"^```julia\n(.*?)^```"ms, read(path, String))]
-illustrative(block) = startswith(block, "# Illustrative")
-readme_path = joinpath(root, "README.md")
-docs_path = joinpath(root, "docs", "src", "guide", "getting-started.md")
-readme = read(readme_path, String)
-example = filter(!illustrative, julia_blocks(readme_path))
-docs = filter(!illustrative, julia_blocks(docs_path))
-# Patterns and boards, Blob Extraction, Detection on the CPU; then the GPU
-# pipeline, the two signature blocks and the training pipeline.
-@test length(example) == 3
-@test count(illustrative, julia_blocks(readme_path)) == 4
-@test length(docs) == 7
-@test !any(illustrative, julia_blocks(docs_path))
+include("readme_rows.jl")
+using TOML
 
-# The install line adds exactly the packages the examples load, and the
-# documentation shows the same line.
-install = match(r"^pkg> add (.+)$"m, readme)
-@test install !== nothing
-@test [m[1] for m in eachmatch(r"^pkg> add (.+)$"m, read(docs_path, String))] == [install[1]]
-packages = split(install[1])
-loaded = Set{String}()
-for code in [example; docs], m in eachmatch(r"^(?:using|import)\s+([^:\n]+)"m, code)
-    for part in split(m[1], ',')
-        push!(loaded, first(split(strip(part), r"[.\s]")))
-    end
-end
-stdlib(name) = isdir(joinpath(Sys.STDLIB, name))
-@test Set(filter(!stdlib, loaded)) == Set(packages)
+readme_table = install_table(joinpath(README_ROOT, "README.md"))
+guide_table = install_table(joinpath(README_ROOT, "docs", "src", "guide", "install.md"))
+@test sort(collect(keys(readme_table))) == sort(INSTALL_ROWS)
+@test readme_table == guide_table
 
-env = mktempdir()
-write(joinpath(env, "readme_example.jl"), join(example, "\n"))
-write(joinpath(env, "docs_example.jl"), join(docs, "\n"))
-registered = filter(!=("BlobBoards"), String.(packages))
-script = joinpath(env, "run.jl")
-write(script, """
-using Pkg
-Pkg.develop(path = $(repr(root)); io = devnull)
-Pkg.add($(repr(registered)); io = devnull)
-readme = Module(:ReadmeSandbox)
-Base.include(readme, $(repr(joinpath(env, "readme_example.jl"))))
-docs = Module(:DocsSandbox)
-Base.include(docs, $(repr(joinpath(env, "docs_example.jl"))))
-using Test
-@testset "README example" begin
-    @test length(readdir(readme.board_dir)) == 2            # the PDF and its sidecar
-    @test length(readme.blobs_mm) == length(readme.blobs_px) > 0
-    # COLMAP → Julia moves every centre by half a pixel on both axes.
-    c = readme.ustrip.(readme.px, readme.centroid(first(readme.blobs_px)))
-    @test first(readme.centres_julia) ≈ c .+ 0.5
-    # The rendered board is found in its own image, by most of its blobs.
-    @test readme.uid == readme.scene.uid
-    @test readme.n_inliers >= length(readme.scene.world_frames) ÷ 2
+# The extension rows print the lines the fallbacks print.
+ext_install(ext) = getproperty(BlobBoards.EXTENSION_INSTALL, ext).install
+@test occursin("`$(ext_install(:BlobBoardsMakieExt))`", readme_table["plot or visualize"])
+@test occursin("`$(ext_install(:BlobBoardsTrainingExt))`", readme_table["train the descriptor network"])
+gpu = readme_table["find boards on the GPU"]
+@test issubset(split(chopprefix(ext_install(:BlobBoardsCUDAExt), "pkg> add ")), install_packages(gpu))
+@test occursin("`$(BlobBoards.CUDA_RUNTIME_PIN)`", gpu)
+
+# The table covers every extension of the Project.toml, and each install line
+# names its extension's triggers (a Makie backend stands in for Makie).
+extensions = TOML.parsefile(joinpath(README_ROOT, "Project.toml"))["extensions"]
+@test Set(String.(keys(BlobBoards.EXTENSION_INSTALL))) == Set(keys(extensions))
+for (ext, triggers) in extensions
+    installed = split(chopprefix(ext_install(Symbol(ext)), "pkg> add "))
+    @test issubset(filter(!=("Makie"), vcat(triggers)), installed)
 end
-@testset "Getting started examples" begin
-    @test length(docs.X) == length(docs.world) > 0
-    @test all(p -> p[3] == 0, docs.X)                       # on the board's plane
-    @test docs.config == docs.pattern_config(docs.bundle)
-    @test "A4" in keys(docs.BlobBoards.PRINT_SIZES)
+
+all_examples = examples()
+@test all(e -> e.row in row_key.(INSTALL_ROWS), all_examples)
+@test count(e -> e.illustrative, all_examples) == 1
+@test only(filter(e -> e.illustrative, all_examples)).row == "train the descriptor network"
+counts = Dict(row => count(e -> e.row == row, all_examples) for row in row_key.(INSTALL_ROWS))
+@test counts == Dict(
+    "author boards" => 8, "find boards on the CPU" => 3, "find boards on the GPU" => 1,
+    "track boards in a video" => 1, "plot or visualize" => 1, "train the descriptor network" => 1,
+    "use from Python" => 2, "work in a clone" => 1,
+)
+# Julia rows hold Julia examples; the Python row a shell line and a Python
+# script; the clone row a shell session.
+@test all(e -> e.lang == "julia", filter(e -> !(e.row in ("use from Python", "work in a clone")), all_examples))
+@test sort([e.lang for e in all_examples if e.row == "use from Python"]) == ["bash", "python"]
+@test only(e.lang for e in all_examples if e.row == "work in a clone") == "bash"
+
+# Each row's line names exactly what its examples load.
+for task in INSTALL_ROWS
+    packages = install_packages(readme_table[task])
+    isempty(packages) && continue
+    julia = [e.code for e in all_examples if e.lang == "julia" && e.row == row_key(task)]
+    @test Set(packages) == union(loaded_packages.(julia)...)
 end
-""")
-julia = joinpath(Sys.BINDIR, Base.julia_exename())
-cmd = `$julia --startup-file=no --project=$env $script`
-# A clean environment: none of the test run's load path or project.
-proc = withenv("JULIA_LOAD_PATH" => nothing, "JULIA_PROJECT" => nothing) do
-    run(ignorestatus(cmd))
-end
-@test proc.exitcode == 0
+# The Python script imports only the pixi environment's packages.
+python = only(e.code for e in all_examples if e.lang == "python")
+imported = Set(first(split(m[1], '.')) for m in eachmatch(r"^(?:from|import)\s+(\S+)"m, python))
+@test imported == Set(["os", "tempfile", "matplotlib", "blobboards"])
+
+# One example, shown in the README, on the landing page and in the CPU row.
+page_julia(page) = [e.code for e in all_examples if e.page == page && e.lang == "julia"]
+readme_example = only(page_julia("README.md"))
+@test page_julia(joinpath("docs", "src", "index.md")) == [readme_example]
+@test readme_example in page_julia(joinpath("docs", "src", "guide", "install.md"))
+
+# The README's and the landing page's install line is the example's row; the
+# Getting started line is the authoring row's, which its examples use.
+install_lines(page) = [m[1] for m in eachmatch(r"^pkg> add (.+)$"m, read(joinpath(README_ROOT, page), String))]
+@test install_lines("README.md") == [join(install_packages(readme_table["find boards on the CPU"]), " ")]
+@test install_lines(joinpath("docs", "src", "index.md")) == install_lines("README.md")
+@test install_lines(joinpath("docs", "src", "guide", "getting-started.md")) ==
+    [join(install_packages(readme_table["author boards (pattern, PDF, PNG)"]), " ")]
+
+# The clone row's members are the workspace's.
+clone = only(e for e in all_examples if e.row == "work in a clone")
+guide = read(joinpath(README_ROOT, "docs", "src", "guide", "install.md"), String)
+members = [m[1] for m in eachmatch(r"^\| `([^`]+)` \| "m, guide)]
+workspace = TOML.parsefile(joinpath(README_ROOT, "Project.toml"))["workspace"]["projects"]
+@test !isempty(members) && issubset(filter(!=("."), members), workspace)
+@test occursin("julia --project=. -e 'using BlobBoards;", clone.code)

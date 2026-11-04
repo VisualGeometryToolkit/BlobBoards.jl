@@ -14,17 +14,21 @@ BlobBoards.jl creates calibration targets with blob patterns that are:
 ## Quick Start
 
 ```julia
+# Install row: author boards
 using BlobBoards      # re-exports the units: mm, inch, px, dpi, …
 
-# Generate a printable A4 calibration board
-bundle = blob_board("A4"; blob_sizes=(4.0mm, 0.2short_side), seed=0x1234, dir="./output")
+# Generate a printable A4 calibration board: the PDF and its JSON sidecar
+dir = mktempdir()
+bundle = blob_board("A4"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir)
 
-# Generate a pattern for training/simulation (core package only)
-pattern, discs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234)
+# Generate a pattern for training/simulation
+pattern, discs, config = blob_pattern(800, 600; blob_sizes = (12px, nothing), seed = 0x1234)
 
-# Extract blobs from saved files
-bundle, _ = BlobBoards.load("blob_board.json")
-b = blobs(bundle, :pattern; units=mm)
+# Extract blobs from the saved board, in mm in the pattern frame
+board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
+loaded, _ = BlobBoards.load(board_json)
+b = blobs(loaded, :pattern; units = mm)
+length(b) == length(blobs(bundle, :pattern; units = mm))    # true
 ```
 
 ## Key Concepts
@@ -95,13 +99,10 @@ See the [Coordinates Guide](guide/coordinates.md) for detailed documentation.
 
 ## Installation
 
-Julia 1.12+ is the only requirement (the command adds CauRegistry, which holds
-LocalOptimizationDoneRight):
-```bash
-git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
-cd BlobBoards.jl
-julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
-```
+Julia 1.12+ is the only requirement. [Install for your task](guide/install.md)
+gives the `pkg> add` line of each task (authoring, finding boards on the CPU or
+a GPU, tracking, plotting, training, Python, a clone) and a runnable example of
+each.
 
 See the [Getting Started](guide/getting-started.md) guide for detailed instructions.
 
