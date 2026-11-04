@@ -42,7 +42,7 @@ function signature_lines(text::AbstractString)
     for l in split(text, '\n')
         if startswith(l, "    ")
             push!(lines, strip(l))
-        elseif !isempty(lines) || !isempty(strip(l))
+        elseif !isempty(strip(l))
             break
         end
     end
@@ -145,6 +145,9 @@ function _bare_strings!(out, ex, where)
             push!(out, "$where:$line")
         elseif a isa Expr && a.head === :module
             _bare_strings!(out, a.args[3], where)
+        elseif a isa Expr && a.head === :macrocall && a.args[end] isa Expr && a.args[end].head === :module
+            # A documented module parses as an @doc macrocall around the module.
+            _bare_strings!(out, a.args[end].args[3], where)
         elseif a isa Expr && a.head in (:block, :toplevel)
             _bare_strings!(out, a, where)
         end
