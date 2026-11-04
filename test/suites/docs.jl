@@ -2,7 +2,7 @@
 # every public name has a docstring, every docstring is attached to its
 # definition, and every signature line a docstring shows is accepted by a method.
 # Documenter's checkdocs = :public only checks the docstrings that exist, so a
-# public name with none would pass the docs build; this item finds it.
+# public name with none goes unnoticed by the docs build; this item finds it.
 #
 # EXCEPTIONS: a finding allowed for good, each with its reason. BACKLOG: work
 # not done yet; it only shrinks. Both are printed, so they stay visible.
