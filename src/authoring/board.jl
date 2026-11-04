@@ -368,7 +368,8 @@ function rebuild_board(
         output::Union{Nothing, BoardOutput} = nothing, id_label::Union{Nothing, Bool} = nothing, kwargs...
     )
     _refuse_unknown_kwargs("rebuild_board", (; kwargs...))
-    json_config = if startswith(lstrip(json_or_path), '{')
+    is_text = startswith(lstrip(json_or_path), '{')
+    json_config = if is_text
         String(json_or_path)
     elseif isfile(json_or_path)
         read(json_or_path, String)
@@ -379,7 +380,7 @@ function rebuild_board(
     # (no output keyword without a dir); the recorded options then fill in
     _check_writer(dir, output, id_label)
     # Try to read as BoardBundle first (the common case), extract preamble
-    obj = BlobBoards._read_record(json_config, isfile(json_or_path) ? String(json_or_path) : "rebuild_board's JSON")   # an earlier schema through its version steps
+    obj = BlobBoards._read_record(json_config, is_text ? "rebuild_board's JSON" : String(json_or_path))   # an earlier schema through its version steps
     bundle = JSON.lift(BoardBundle, obj)
     preamble = bundle.preamble
     rec = BlobBoards._render_options(obj)
