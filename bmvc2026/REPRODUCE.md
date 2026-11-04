@@ -95,20 +95,21 @@ a generator needs are named in the `data` column:
 | tier | holds |
 |---|---|
 | `inputs` | `bb_absolute_pose_inputs`: the raw motion-capture exports, the cameras of record, the board definitions, the teaser photos, and the provenance material (`provenance/`: the BlobBoards-Evaluation code archive, the upstream calibration exports) |
-| `images` | `bb_absolute_pose_images_260527`: the evaluation, calibration and intrinsic-calibration captures |
+| `images` | `bb_absolute_pose_images_260527`: the evaluation, calibration and intrinsic-calibration captures (their own Zenodo record, doi:10.5281/zenodo.23965208, a supplement of the data record; every other tier is in the data record) |
 | `occlusion-LL` | `bb_absolute_pose_occlusion_LL_260527`: the synthetic occlusion images at level LL (inputs with provenance: BlobBoards-Evaluation 88bca9f `evaluation_pipe/occlusion_generator.py`, hand-clicked corners and a MAGSAC homography per board) |
 | `assets` | `bb_assets`: the descriptor networks of record and the evaluation board gallery |
 
 **Cameras of record** (inputs): each session's camera is
-`<session>/calibration/<camera>.json` (vgio/cameras/v3 with its calibration
+`<session>/calibration/<camera>.json` (vgio/cameras/v4 with its calibration
 block), found by `camera_of_record` (src/data.jl). It is the exact native port,
 by `scripts/import_cameras.jl` (config of record `configs/import_cameras.toml`,
 run once; `test/cameras_tests.jl`: K and lens bit for bit), of the upstream
 `calibrate_pinhole` export (OpenCV `calibrateCamera`, 6×7 chessboard of 0.05 m
 squares, `CALIB_RATIONAL_MODEL` with k3–k6 fixed; its error statistic is a
 mean, stated in the block's note), which ships in the inputs tier under
-`provenance/calibration/`. The images tier is record 1.0.0's tarball reused
-unchanged; its camera files are superseded and never read.
+`provenance/calibration/`. The images tier holds record 1.0.0's captures
+unchanged, without the session's two superseded camera files (retired
+vgio/cameras/v1, never read).
 
 ## Operating points (tuning)
 

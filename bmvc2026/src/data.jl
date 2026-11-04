@@ -93,11 +93,12 @@ set_project_root!(
 
 # THE CAMERA OF RECORD. A session's camera — the intrinsics every detection
 # of it is estimated with — is `<session>/calibration/<camera>.json`
-# (vgio/cameras/v3, with its calibration block), an INPUT of the inputs tier:
+# (vgio/cameras/v4, with its calibration block), an INPUT of the inputs tier:
 # the native port, by scripts/import_cameras.jl, of the upstream calibration
-# export (published beside it as the conversion's source). The images tier's
-# own camera files (`images/<camera>.json`, `…_old.json`: record 1.0.0's
-# tarball, reused unchanged) are superseded and never read.
+# export (published beside it as the conversion's source). The session's own
+# camera files beside its captures (`images/<camera>.json`, `…_old.json`, in
+# the dataset's primary copy and record 1.0.0-1.2.0's images tarball; the
+# images record leaves them out) are superseded and never read.
 _is_camera_store_file(p) = isfile(p) && endswith(p, ".json") &&
     occursin(r"\"schema\"\s*:\s*\"vgio/cameras/", read(p, String))
 

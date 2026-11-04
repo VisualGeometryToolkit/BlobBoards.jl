@@ -33,16 +33,37 @@ license = "CC-BY-4.0"
 # 1.0.0 (21998311) stays published and immutable.
 #
 # Version 1.2.0 (23921651, published 2026-11-03) carries every 1.1.0 tarball
-# unchanged (same md5) and adds the bb_boards_* board sets (blobboards/board/v5);
-# the tiers are bound there. Its records keep their schemas (cameras/v3,
-# board/v1 and v3), which VisualGeometryToolkitIO 0.5.1 loads.
+# unchanged (same md5) and adds the bb_boards_* board sets (blobboards/board/v5).
+#
+# Version 1.3.0 (23937759): every record in its current schema, migrated once
+# by VisualGeometryToolkitIO.vgio_migrate (each read back and compared): the
+# board definitions in bb_absolute_pose_inputs (board/v1), bb_assets and
+# bb_descriptor_training_metadata (board/v3) as blobboards/board/v5, uids and
+# stored hashes.config kept, byte for byte the files of 1.2.0's bb_boards_*
+# tiers; the cameras of record and bb_pipeline_figure's camera as
+# vgio/cameras/v4. The occlusion and training-sources tiers are 1.0.0's
+# tarballs, unchanged. The images tier is NOT in 1.3.0: it is its own record,
+# bb_images below, so that this one downloads quickly.
 #
 # The cameras of record are in the inputs tier (<session>/calibration/<camera>.json,
 # the native port of the upstream calibration export, which ships beside it
-# under provenance/). The images tier's own camera files are superseded and
-# never read — `camera_of_record` (src/data.jl) reads calibration/.
-id = "23921651"
+# under provenance/) — `camera_of_record` (src/data.jl) reads calibration/.
+id = "23937759"
 placeholder = "ZENODO_RECORD_ID"
+
+[records.bb_images]
+title = "BlobBoards absolute-pose images (260527)"
+license = "MIT"
+# The captures of the 260527 session, split off the data record at its version
+# 1.3.0 (versions 1.0.0-1.2.0 carry them), published as a supplement of it
+# (concept doi:10.5281/zenodo.21998310; this record doi:10.5281/zenodo.23965208,
+# licence as the data record's Zenodo entry). The tarball drops the session's
+# two superseded camera files (260527/images/*.json, retired vgio/cameras/v1,
+# never read); the captures are unchanged. The packer binds it with this
+# record's id as its record argument
+# (scripts/make_zenodo_artifacts.jl images <staging> 23965208).
+id = "23965208"
+placeholder = "ZENODO_IMAGES_RECORD_ID"
 
 [artifacts.bb_absolute_pose_inputs]
 kind = "bb_tier"
@@ -51,17 +72,17 @@ contents = "per published session: poses/motion_tracker/<subset>/marker_*.json[.
 mount = "data"
 record = "bb"
 required = true
-what = "the motion-capture measurements of record (the tracker's per-frame exports), the cameras of record (vgio/cameras/v3, with their calibration block), the board definitions of the three marker systems, the teaser photos, and the provenance material (the external evaluation code archive and the upstream calibration exports)"
+what = "the motion-capture measurements of record (the tracker's per-frame exports), the cameras of record (vgio/cameras/v4, with their calibration block), the board definitions of the three marker systems (the BlobBoards ones as blobboards/board/v5), the teaser photos, and the provenance material (the external evaluation code archive and the upstream calibration exports)"
 provenance = "captured by the authors (absolute_pose_experiments/260527); cameras: OpenCV calibrateCamera by BlobBoards-Evaluation calibrate_pinhole, ported by scripts/import_cameras.jl; packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_images_260527]
 kind = "bb_tier"
 dir = "absolute_pose_experiments/260527/images"
-contents = "all"
+contents = "all but the superseded camera files (*.json directly under 260527/images)"
 mount = "data"
-record = "bb"
+record = "bb_images"
 required = false
-what = "the evaluation, calibration and intrinsic-calibration captures of the 260527 session (record 1.0.0's tarball, unchanged; its camera files are superseded and unused — the cameras of record are in the inputs tier)"
+what = "the evaluation, calibration and intrinsic-calibration captures of the 260527 session (record 1.0.0's captures, unchanged; the cameras of record are in the inputs tier)"
 provenance = "captured and processed by the authors (absolute_pose_experiments/260527), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_00_260527]
@@ -197,9 +218,9 @@ provenance = "captured by the authors"
 [artifacts.bb_pipeline_figure]
 kind = "bb_tier"
 dir = "blobboard_training"
-contents = "images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG, images/dataset_sonyfx3_tamron20mm_f8_cameras.json (the session's OpenCV calibration as a VisualGeometryToolkitIO cameras/v3 record with its calibration block) and README_bb_pipeline_figure.md"
+contents = "images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG, images/dataset_sonyfx3_tamron20mm_f8_cameras.json (the session's OpenCV calibration as a VisualGeometryToolkitIO cameras/v4 record with its calibration block) and README_bb_pipeline_figure.md"
 mount = "data"
 record = "bb"
 required = false
-what = "the source frame of fig:pipeline (DSC02800.JPG, Sony FX3 + Tamron 20 mm f/8 corridor session) and that session's camera as a VisualGeometryToolkitIO cameras/v3 record"
-provenance = "captured by the authors (descriptor-training corridor session, 2026-01-19); the camera is that session's OpenCV calibrateCamera fit (36 images, RMS 0.159 px), converted exactly to the v3 record"
+what = "the source frame of fig:pipeline (DSC02800.JPG, Sony FX3 + Tamron 20 mm f/8 corridor session) and that session's camera as a VisualGeometryToolkitIO cameras/v4 record"
+provenance = "captured by the authors (descriptor-training corridor session, 2026-01-19); the camera is that session's OpenCV calibrateCamera fit (36 images, RMS 0.159 px), converted exactly to the v3 record and migrated to v4 by vgio_migrate (record 1.3.0)"
