@@ -30,8 +30,7 @@
 #       "$R" "$R/_legacy_camera_backup_$(date +%F)" $FILES
 
 import VisualGeometryToolkitIO as VgtkIO
-using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, parameter_vector, BoundedCamera, Size2
-using CoordinateTransformations: AffineMap
+using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, EuclideanMap, PixelFrame, parameter_vector, BoundedCamera, Size2, affine_part
 using JSON
 
 length(ARGS) >= 3 || error("usage: convert_legacy_cameras.jl <root> <backup_root> <relative json paths...>")
@@ -54,7 +53,7 @@ for rel in files
     K = CameraCalibrationMat(stack(p.camera_matrix)')          # row-major 3×3 → matrix
     coeffs = collect(Float64, p.distortion_coefficients)       # OpenCV order; VgtkIO.opencv_lens knows it
     model = CameraModel(
-        EuclideanMap(PixelFrame{:opencv}, PixelFrame{:colmap}) ∘ AffineMap(K);
+        EuclideanMap(PixelFrame{:opencv}, PixelFrame{:colmap}) ∘ affine_part(K);
         lens = VgtkIO.opencv_lens(coeffs)
     )
     name = join(filter(!isempty, [String(get(p, :camera_id, "")), String(get(p, :lens_id, ""))]), " / ")
