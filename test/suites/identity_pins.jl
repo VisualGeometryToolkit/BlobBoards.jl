@@ -201,6 +201,10 @@ const PINNED_PATTERN_JSON = """
                 # every number reads back as the old file read it
                 legacy_bundle = BlobBoards._legacy_board_bundle(old_obj)
                 @test BlobBoards._same_value(legacy_bundle, bundle)
+                # the old file itself loads (its version step, in memory) as the migrated file, uid kept
+                old_bundle, old_stored = BlobBoards._parse_bundle(old_path)
+                @test BlobBoards._same_value(old_bundle, bundle) && old_stored == stored
+                @test BlobBoards.uid_from_hash(old_stored) == uid
             end
         end
         # the new files' bytes

@@ -292,6 +292,9 @@ end
             @test b.preamble.board_config.ruler_spec == want.preamble.board_config.ruler_spec
             @test h == hw == d["hashes"]["config"]
             @test hash_config(b.preamble) == hash_config(want.preamble)
+            # the v1 file itself loads, through its version step, as its migration, the stored identity kept
+            b1, h1 = BlobBoards._parse_bundle(legacy)
+            @test BlobBoards._same_value(b1, b) && h1 == h
         end
     end
 

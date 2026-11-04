@@ -44,9 +44,10 @@ end
 # every quantity a number in the unit the file's `units` block declares
 # (VisualGeometryToolkitIO's quantity format). The schemas before them
 # (board v1–v4, pattern v1–v2) stored each quantity as a `{"value": …,
-# "unit": …}` object; such a file is MIGRATED once, never read — by
-# `VisualGeometryToolkitIO.vgio_migrate`, through the `migrate_schema` methods
-# of src/migrate_boards.jl, which keep the stored identity. The history of the
+# "unit": …}` object; such a file is read through its version step in memory
+# (the `migrate_schema(::Val{schema}, tree)` methods of src/migrate_boards.jl,
+# run by `VisualGeometryToolkitIO.migrate_record`), and can be rewritten once by
+# `VisualGeometryToolkitIO.vgio_migrate`; both keep the stored identity. The history of the
 # schemas the migration still reads:
 #
 # The pre-v1 ("v0") reader — per-scalar {value, unit} blobs, `α`/Julia-type-name
@@ -82,7 +83,7 @@ const BOARD_SCHEMA = "blobboards/board/v5"
 const PATTERN_SCHEMA = "blobboards/pattern/v3"
 const IDENTITY_SCHEMA = "blobboards/board/v4"   # frozen: the schema a point-grid board's identity (and its QR code) is minted under
 const READABLE_SCHEMAS = (BOARD_SCHEMA, PATTERN_SCHEMA)
-# the schemas of the retired quantity form: migrated, never read
+# the schemas of the retired quantity form: read through their version steps (never written)
 const MIGRATED_SCHEMAS = (
     "blobboards/board/v4", "blobboards/board/v3", "blobboards/board/v2", "blobboards/board/v1",
     "blobboards/pattern/v2", "blobboards/pattern/v1",
@@ -593,6 +594,12 @@ function _parse_bundle(json_path::AbstractString)
     # (the 6 JET reports that broke the ratchet, 2026-08-06).
     json_obj = JSON.parse(json_str)::_ParsedObject
 
+    # An earlier schema a published file holds is read, not refused: its version steps
+    # (src/migrate_boards.jl, through VisualGeometryToolkitIO's migrate_record) give the
+    # current record in memory, the stored identity kept; the file is not rewritten.
+    if get(json_obj, :schema, nothing) in MIGRATED_SCHEMAS
+        json_obj = JSON.parse(JSON.json(VgtkIO.migrate_record(json_obj)))::_ParsedObject
+    end
     schema = get(json_obj, :schema, nothing)
     schema in READABLE_SCHEMAS || error(
         schema === nothing ?
@@ -600,12 +607,8 @@ function _parse_bundle(json_path::AbstractString)
             "was removed in 0.19; migrate the corpus once with the " *
             "permanently registered BlobBoards@0.18 " *
             "(BlobBoards.migrate_bundles!(dir))." :
-            schema in MIGRATED_SCHEMAS ?
-            "$json_path is a $(String(schema)) file, the retired {value, unit} quantity form; this BlobBoards " *
-            "reads $(join(READABLE_SCHEMAS, ", ")). Migrate the file once: " *
-            "VisualGeometryToolkitIO.vgio_migrate($(repr(json_path))) (or `bin/vgio_migrate.jl`), which keeps its stored identity." :
             "$json_path declares unknown bundle schema $(repr(String(schema))); " *
-            "this BlobBoards reads $(join(READABLE_SCHEMAS, ", "))"
+            "this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")) and, through their version steps, $(join(MIGRATED_SCHEMAS, ", "))"
     )
     bundle = if haskey(json_obj, :preamble)
         JSON.lift(BoardBundle, json_obj)

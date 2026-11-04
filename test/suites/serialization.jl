@@ -92,18 +92,13 @@ const V0_FIXTURE = """
         @test_throws Exception JSON.parse(V0_FIXTURE, PatternBundle)
     end
 
-    @testset "v1 files migrate: fraction → max_scale, stored hash kept; loading one points at the migration" begin
+    @testset "v1 files load and migrate: fraction → max_scale, stored hash kept" begin
         mktempdir() do dir
             path = joinpath(dir, "blob_pattern_abc_12345.json")
             write(path, V1_FIXTURE)
             write(joinpath(dir, "blob_pattern_abc_12345.png"), "")   # sidecar present: no re-render
-            err = try
-                BlobBoards.load_bundle(path)
-                nothing
-            catch e
-                sprint(showerror, e)
-            end
-            @test err !== nothing && occursin("vgio_migrate", err) && occursin("blobboards/pattern/v1", err)
+            old_bundle, _, old_hash = BlobBoards.load_bundle(path)   # its version step, in memory
+            @test read(path, String) == V1_FIXTURE                    # the file is not rewritten
             out = joinpath(dir, "migrated", "blob_pattern_abc_12345.json")
             r = VgtkIO.vgio_migrate(path; out)
             @test r.from == "blobboards/pattern/v1" && r.to == "blobboards/pattern/v3"
@@ -114,6 +109,8 @@ const V0_FIXTURE = """
             @test BlobBoards.calc_blob_scales(3.0, ustrip(pc.max_scale)) == [3.0 * 2^(i / 3) for i in 0:5]
             @test config_hash == "abc12345000000000000000000000000000000000000000000000000000000ff"
             @test JSON.parse(read(out, String)).pattern_config.min_scale == 3     # a number, in the declared unit
+            # the v1 file loads as its migration, its stored identity kept
+            @test BlobBoards._same_value(old_bundle, bundle) && old_hash == config_hash
         end
     end
 

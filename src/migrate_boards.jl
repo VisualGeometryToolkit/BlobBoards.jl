@@ -6,10 +6,14 @@
 # A board file is read in ONE format, `blobboards/board/v5` (a pattern file,
 # `blobboards/pattern/v3`): every quantity a number in the unit the file's
 # `units` block declares (types.jl, json.jl). The schemas before it stored each
-# quantity as a `{"value": …, "unit": …}` object. Nothing reads those at run
-# time; a stored file is MIGRATED once, with VisualGeometryToolkitIO's
+# quantity as a `{"value": …, "unit": …}` object. Such a file is still READ —
+# published boards keep their schemas (a schema change must not force the
+# published data to be uploaded again): `load_bundle` runs the version step of
+# its schema in memory (`migrate_schema(::Val{schema}, tree)`, through
+# VisualGeometryToolkitIO's `migrate_record`), and the file is untouched. A
+# stored file can also be MIGRATED once, with VisualGeometryToolkitIO's
 # `vgio_migrate` (or the `bin/vgio_migrate.jl` command), which finds the file's
-# schema and calls the method of `migrate_schema` this file adds for it:
+# schema and calls the file form of `migrate_schema` this file adds for it:
 #
 #     VisualGeometryToolkitIO.vgio_migrate("blob_board_ab1_c2d3e.json")
 #
@@ -228,22 +232,43 @@ function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::Ab
     end
 end
 
-# (`after_write(dst)`: a test hook run on the written file before it is read back)
-function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString, after_write)
-    obj = JSON.parse(read(src, String))::_ParsedObject
+# A record of the retired schema `from` read with the legacy lift: the bundle, its stored `hashes.config` (required:
+# a migration carries a stored identity over and mints none) and its render block with the quantity objects as the
+# numbers a v5 file holds (`nothing` when it has none). `where_` names the record in a refusal.
+function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::AbstractString)
     get(obj, :schema, nothing) == from ||
-        throw(ArgumentError("$(src): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
+        throw(ArgumentError("$(where_): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
     old = if haskey(obj, :preamble)
         _legacy_board_bundle(obj)
     elseif haskey(obj, :pattern_config)
         _legacy_pattern_bundle(obj)
     else
-        throw(ArgumentError("$(src): neither a board (preamble) nor a pattern (pattern_config)"))
+        throw(ArgumentError("$(where_): neither a board (preamble) nor a pattern (pattern_config)"))
     end
     stored = _stored_config_hash(obj)
     stored === nothing && throw(
-        ArgumentError("$(src): stores no hashes.config; a migration carries a stored identity over and mints none")
+        ArgumentError("$(where_): stores no hashes.config; a migration carries a stored identity over and mints none")
     )
+    render = haskey(obj, :render) ? _migrated_render(obj[:render]::_JSONObject) : nothing
+    return (; old, stored, render)
+end
+
+# The STEP of a retired schema, run on load by VisualGeometryToolkitIO's `migrate_record` (the published boards keep
+# their old schemas and are read, not rewritten): the record read with the legacy lift, as the current record —
+# exactly the tree `save_json` writes for it, the stored `hashes.config` and the render block carried over as the
+# file form carries them. Nothing is written.
+function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
+    obj = JSON.parse(JSON.json(tree))::_ParsedObject
+    (; old, stored, render) = _legacy_record(obj, from, "a $(from) record")
+    output = (schema = _bundle_schema(old), _lower(old)..., hashes = (config = stored,))
+    render === nothing || (output = merge(output, (; render)))
+    return JSON.parse(JSON.json(output; sort_keys = false))::_ParsedObject
+end
+
+# (`after_write(dst)`: a test hook run on the written file before it is read back)
+function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString, after_write)
+    obj = JSON.parse(read(src, String))::_ParsedObject
+    (; old, stored, render) = _legacy_record(obj, from, src)
     # The uid must not move: the stored `hashes.config` is authoritative for every board kind and is carried over
     # unchanged, and the identity recomputed from the migrated file must be the one recomputed from the old file
     # (under the current, frozen encoding). Whether either equals the stored hash is information, never a refusal:
@@ -251,7 +276,6 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
     identity_old = _bundle_identity(old)
     identity_old == stored ||
         @info "migrating $(basename(src)): the identity recomputed under the current encoding ($(identity_old[1:8])…) is not the stored hashes.config ($(stored[1:8])…); the stored hash is carried over"
-    render = haskey(obj, :render) ? _migrated_render(obj[:render]::_JSONObject) : nothing
     save_json(dst, old; overwrite = true, config_hash = stored, render)
     after_write(dst)
     new, config_hash = _parse_bundle(dst)
@@ -270,16 +294,29 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
 end
 
 """
+    VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, tree)
     VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, src, dst)
 
 BlobBoards' migrations of its retired `{value, unit}` schemas — board v1 to v4
 and pattern v1 and v2 — into `blobboards/board/v5` and `blobboards/pattern/v3`,
-by the contract of [`VisualGeometryToolkitIO.migrate_schema`]: write `dst`
-through the current writer, read it back, compare every value bit for bit, keep
-the stored identity. Run by `VisualGeometryToolkitIO.vgio_migrate` (and its
-command), which stages the result and replaces the file only once verified.
-Returns `(; to, uid, config_hash)`.
+by the contract of [`VisualGeometryToolkitIO.migrate_schema`], in its two forms.
+
+The STEP (`tree`, a parsed record): the record as the current one, in memory,
+its stored identity kept — what `load_bundle` runs, through
+`VisualGeometryToolkitIO.migrate_record`, on an old file, so a published board
+keeps loading as it is.
+
+The FILE form: write `dst` through the current writer, read it back, compare
+every value bit for bit, keep the stored identity. Run by
+`VisualGeometryToolkitIO.vgio_migrate` (and its command), which stages the
+result and replaces the file only once verified. Returns `(; to, uid, config_hash)`.
 """
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v4")
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v3")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v3")
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v2")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v2")
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v1")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v1")
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v2")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/pattern/v2")
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v1")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/pattern/v1")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v4")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v3")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v3")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v2")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v2")
