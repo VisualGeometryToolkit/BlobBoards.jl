@@ -1,4 +1,4 @@
-# docs.jl — the docstring gates of the julia-docs-pass skill (suites/docs_gates.jl):
+# docs.jl — the stack's docstring gates (suites/docs_gates.jl):
 # every public name has a docstring, every docstring is attached to its
 # definition, and every signature line a docstring shows is accepted by a method.
 # Documenter's checkdocs = :public only checks the docstrings that exist, so a

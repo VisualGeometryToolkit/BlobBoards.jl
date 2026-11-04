@@ -1,11 +1,11 @@
-# docs_gates.jl — three docstring checks a package's suite runs (julia-docs-pass skill).
+# docs_gates.jl — three docstring checks a package's suite runs (the stack's docs skill).
 #
 #   undocumented_public(M)       public names of M (and its submodules) with no docstring
 #   signature_mismatches(M)      docstring signature lines that no method of the name accepts
 #   detached_docstrings(srcdir)  a top-level docstring followed by a blank or comment line
 #
 # Each returns a vector of findings (strings); suites/docs.jl compares them to its
-# allow-lists. Copied from the julia-docs-pass skill's docs_gates.jl; hoisting it
+# allow-lists. Copied from the stack's docs skill (its docs_gates.jl); hoisting it
 # into VisualGeometryToolkitCore's src/quality (beside check_naming) would let
 # every stack package call it instead of copying it.
 
