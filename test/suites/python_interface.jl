@@ -300,8 +300,8 @@
         cp(run, bent; force = true)
         rigfile = joinpath(bent, "targets_1.json")
         rec_bent = JSON.parse(read(rigfile, String))
-        @test rec_bent["schema"] == "vgio/rig/v5" && rec_bent["targets"][1]["target"]["calibration"]["type"] == "rigid"
-        rec_bent["targets"][1]["target"]["calibration"] = Dict("type" => "affine", "parameters" => [1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+        @test rec_bent["schema"] == "vgio/rig/v6" && rec_bent["targets"][1]["target"]["calibration"]["type"] == "rigid"
+        rec_bent["targets"][1]["target"]["calibration"] = Dict("type" => "aspect", "parameters" => [0.01])
         write(rigfile, JSON.json(rec_bent))
         err = try
             corr.load_correspondences(bent, "opencv")
@@ -309,11 +309,26 @@
         catch e
             e
         end
-        @test err isa PythonCall.PyException && occursin("calibrated as 'affine'", sprint(showerror, err))
-        # a v4 rig is refused by name
-        rec_bent["schema"] = "vgio/rig/v4"
+        @test err isa PythonCall.PyException && occursin("calibrated as 'aspect'", sprint(showerror, err))
+        # … and so is a composition of kinds (target v3's `{"type": "composition", "compose": [outer, …]}`)
+        rec_bent["targets"][1]["target"]["calibration"] = Dict(
+            "type" => "composition",
+            "compose" => [Dict("type" => "aspect", "parameters" => [0.01]), Dict("type" => "skew", "parameters" => [0.002])],
+        )
         write(rigfile, JSON.json(rec_bent))
-        @test_throws PythonCall.PyException corr.load_correspondences(bent, "opencv")
+        err = try
+            corr.load_correspondences(bent, "opencv")
+            nothing
+        catch e
+            e
+        end
+        @test err isa PythonCall.PyException && occursin("calibrated as 'composition'", sprint(showerror, err))
+        # a v4 or v5 rig is refused by name
+        for old in ("vgio/rig/v4", "vgio/rig/v5")
+            rec_bent["schema"] = old
+            write(rigfile, JSON.json(rec_bent))
+            @test_throws PythonCall.PyException corr.load_correspondences(bent, "opencv")
+        end
         # a frame seeing two targets is refused, before OpenCV is even imported
         @test_throws PythonCall.PyException corr.calibrate_opencv(run_dir(true), "default")
         # the fit's output, written natively, reads back as the camera and poses it came from

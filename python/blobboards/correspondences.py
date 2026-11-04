@@ -3,13 +3,14 @@
 A run directory carries ``observations.json`` (vgio/target_points2d/v1: per frame,
 the image, the sensor and each measured point's pixel and reference into a target's
 point list, in the pixel frame the file declares — the canonical COLMAP frame,
-top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v5: each
+top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v6: each
 member target's points in its own frame — a ``points`` target's ``points``, a
 ``planar`` target's ``nominal`` points — in the file's declared ``length_unit``; a
 planar target named only by its reference carries no points here). A planar
 target is the points it was DESIGNED with only while its ``calibration`` is
-``rigid``: a target calibrated as an affine map, a thin-plate spline, a height
-field or a chain of them has measured points that differ from its nominal ones,
+``rigid``: a target calibrated by any other kind (``euclidean``, ``scale``,
+``aspect``, ``skew``, ``thin_plate_spline``, ``height_field``) or a
+``composition`` of them has measured points that differ from its nominal ones,
 which this module does not apply, so such a target is refused rather than
 handed back as its design. This
 module resolves the references into per-frame point arrays — object points
@@ -44,11 +45,11 @@ def _points_mm(path, unit, tgt):
 
 
 def _target_points(path, tid, body):
-    """A rig/v5 target body's own points (a list), or None for a target named only by reference.
+    """A rig/v6 target body's own points (a list), or None for a target named only by reference.
 
     A planar target's nominal points are its measured ones only under a ``rigid`` calibration; any
-    other calibration (``affine``, ``thin_plate_spline``, ``height_field``, a ``chain``) moves them,
-    and is refused."""
+    other calibration (``euclidean``, ``scale``, ``aspect``, ``skew``, ``thin_plate_spline``,
+    ``height_field``, a ``composition`` of them) moves them, and is refused."""
     if body.get("type") == "points":
         return body["points"]
     if body.get("type") == "planar":
@@ -83,8 +84,8 @@ def load_correspondences(run_dir, convention="opencv"):
     points = {}
     for path in paths:
         t = json.load(open(path))
-        if t.get("schema") != "vgio/rig/v5":
-            raise ValueError(f"{path}: not a vgio/rig/v5 file (a v4 rig: migrate it with "
+        if t.get("schema") != "vgio/rig/v6":
+            raise ValueError(f"{path}: not a vgio/rig/v6 file (a v4 or v5 rig: migrate it with "
                              "VisualGeometryToolkitIO.vgio_migrate)")
         for tgt in t.get("targets", []):
             own = _target_points(path, tgt["id"], tgt["target"])
@@ -116,8 +117,9 @@ def load_correspondences(run_dir, convention="opencv"):
 
 def image_size(run_dir):
     d = json.load(open(os.path.join(run_dir, "camera_mocap.json")))
-    if d.get("schema") != "vgio/cameras/v3":
-        raise ValueError(f"{run_dir}: camera_mocap.json is {d.get('schema')!r}, not vgio/cameras/v3")
+    if d.get("schema") != "vgio/cameras/v4":
+        raise ValueError(f"{run_dir}: camera_mocap.json is {d.get('schema')!r}, not vgio/cameras/v4 (a v3 store: "
+                         "migrate it with VisualGeometryToolkitIO.vgio_migrate)")
     c = d["cameras"][0]
     return int(c["width"]), int(c["height"])
 
@@ -168,7 +170,7 @@ def calibrate_opencv(run_dir, model="default", fix_aspect=False, min_points=6):
                       for f, rv, tv in zip(frames, rvecs, tvecs)]}
 
 
-# --- native output (cameras v3, transforms v2), field for field what VisualGeometryToolkitIO.migrate_opencv writes -----------------
+# --- native output (cameras v4, transforms v3), field for field what VisualGeometryToolkitIO.migrate_opencv writes -----------------
 
 
 
@@ -204,10 +206,11 @@ def _quat_wxyz(R):
 
 
 def opencv_lens_record(dist):
-    """The vgio/cameras/v3 lens record of OpenCV's distortion vector ``dist`` = (k1, k2, p1, p2[, k3[,
+    """The vgio/cameras/v4 lens record of OpenCV's distortion vector ``dist`` = (k1, k2, p1, p2[, k3[,
     k4, k5, k6[, s1, s2, s3, s4[, tx, ty]]]]) — 4, 5, 8, 12 or 14 entries, the terms that length
     evaluates, zeros included: VisualGeometryToolkitIO's ``opencv_lens`` written out (a perspective lens whose
-    radial factor, tangential and thin-prism terms add at one point, the tilt after)."""
+    radial factor, tangential and thin-prism terms add at one point, the tilt after: ``Tilt ∘ Additive``,
+    listed under ``"compose"`` in composition order, the outer stage — the tilt — first)."""
     v = [float(x) for x in np.asarray(dist, dtype=np.float64).ravel()]
     n = len(v)
     if n not in (4, 5, 8, 12, 14):
@@ -218,13 +221,13 @@ def opencv_lens_record(dist):
     if n >= 12:
         terms.append({"thin_prism": [v[8:10], v[10:12]]})
     if n == 14:
-        return {"perspective": [], "chain": [{"add": terms}, {"tilt": v[12:14]}]}
+        return {"perspective": [], "compose": [{"tilt": v[12:14]}, {"add": terms}]}
     return {"perspective": [], "add": terms}
 
 
 def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenance):
     """Write an OpenCV calibration as the two native files VisualGeometryToolkitIO's ``migrate_opencv``
-    writes: ``<stem>_cameras.json`` (vgio/cameras/v3, one camera named ``stem``, the lens record of
+    writes: ``<stem>_cameras.json`` (vgio/cameras/v4, one camera named ``stem``, the lens record of
     OpenCV's model for ``dist``, ``opencv_lens_record``) and ``<stem>_poses.json`` (vgio/transforms/v3, one
     record per posed image, ``target:<target> → view:<image>``, millimetres).
 
@@ -237,7 +240,7 @@ def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenan
               "K": {"fx": float(K[0][0]), "fy": float(K[1][1]), "cx": float(K[0][2]) + 0.5,
                     "cy": float(K[1][2]) + 0.5, "skew": float(K[0][1])},
               "lens": opencv_lens_record(dist)}
-    cams = {"schema": "vgio/cameras/v3", "pixel_frame": "colmap", "cameras": [camera], "provenance": provenance}
+    cams = {"schema": "vgio/cameras/v4", "pixel_frame": "colmap", "cameras": [camera], "provenance": provenance}
     records = []
     for p in poses:
         q = _quat_wxyz(_rotation_from_rvec(p["rvec"]))
@@ -315,7 +318,7 @@ def _main(argv):
     ap = argparse.ArgumentParser(description="BlobBoards correspondences → OpenCV / MATLAB")
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("opencv", help="cv2.calibrateCamera on a run, written natively as "
-                       "calibration_opencv_<model>_cameras.json + _poses.json (vgio cameras v3, transforms v2)")
+                       "calibration_opencv_<model>_cameras.json + _poses.json (vgio cameras v4, transforms v3)")
     a.add_argument("run_dir"); a.add_argument("model", choices=sorted(OPENCV_MODELS)); a.add_argument("out_dir")
     a.add_argument("--fix-aspect", action="store_true")
     m = sub.add_parser("matlab", help="the run's correspondences for MATLAB, as JSON")
