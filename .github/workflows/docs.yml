@@ -26,5 +26,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # the site deploys to github.com/blobboards/blobboards.github.io
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+          # the docs deploy to blobboards/blobboards.github.io, whose own deploy key is this secret
+          # (BlobBoards.jl's DOCUMENTER_KEY is this repository's key, for TagBot and CompatHelper)
+          DOCUMENTER_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
         run: julia --project=docs docs/make.jl
