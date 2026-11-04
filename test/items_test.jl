@@ -13,15 +13,6 @@
 # in its own process, where the pixi `py` environment's interpreter is found.
 # =============================================================================
 
-@testitem "aqua" begin
-    include("suites/aqua.jl")
-end
-
-@testitem "explicit imports" begin
-    using JSON
-    include("suites/explicit_imports.jl")
-end
-
 @testitem "naming" begin
     include("suites/naming.jl")
 end

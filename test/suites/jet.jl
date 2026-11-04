@@ -45,54 +45,6 @@ using JET
         @test isempty(unexpected)
     end
 
-    # ---- core: RATCHET ------------------------------------------------------
-    # A ceiling, not an endorsement: it may only ever go DOWN. Lower it
-    # whenever you fix some.
-    #
-    # Real bugs found this way and ALREADY FIXED (2026-07-26): `_load_tracks`
-    # (called in io.jl but deleted with training.jl in 197beeb) and
-    # `BlobBoards.Makie` (plot_annotations called Makie from CORE, where it is
-    # only a weakdep — moved to BlobBoardsMakieExt).
-    #
-    # Known FALSE positives that remain in the count — do NOT "fix" these:
-    #  * `blob`, `s`: `@index(Group, Linear)` results inside KernelAbstractions
-    #    `@kernel` bodies; JET cannot see through the macro.
-    #  * haskey/getindex/String over Union{Nothing,Bool,Float64,...}: dynamic
-    #    JSON access (a parsed JSON value is a wide union), which JET cannot narrow.
-    # RATCHET: only ever DECREASES. Lowered 25 -> 15 on 2026-08-16; a baseline
-    # sitting 10 above the real count is 10 reports of headroom in which a
-    # regression lands silently and still succeeds.
-    #
-    # MEASURE IT IN THE TEST ENV, not a plain `--project=.` REPL. That REPL
-    # reports 13; under `Pkg.test` it is 15, because the test target loads
-    # CUDA/CairoMakie/PythonCall and their extensions contribute reports the
-    # bare env never sees. Setting the ratchet from the REPL number failed the
-    # suite on the very run that introduced it.
-    # 2026-08-31 (package-cleanup audit): a standalone measurement with CUDA +
-    # cuDNN + CairoMakie + PythonCall loaded gave 14; the suite itself still
-    # reports 15 (it loads more) — and the suite is the authority, so 15 stays.
-    # 2026-09-07 (package-cleanup audit): re-measured at 15 in the suite env
-    # after the audit's edits. Routing refine.jl's pinhole through
-    # `_pinhole_camera` briefly added a `find_absolute_pose` union-split report
-    # (16); pinning the argument type removed it again. The remaining
-    # `AbsolutePoseProblem(::Nothing, ::Any)` split is the pre-existing
-    # `_fit_workspace_builder` three-way dispatch, not new.
-    # 2026-09-21: the suite had reached 16. The regression was a79bbc4
-    # (2026-09-10): training.jl's perspective augmentation called
-    # `forward(_model_to_homography(model, nothing))`, and that union includes
-    # `RadialHomography`, which has no `forward` — a real MethodError on radial-arm
-    # tracks (two reports, one site). `_augmentation_homography` now refuses
-    # non-homography models by name; that removes both reports, 16 -> 14.
-    CORE_BASELINE = 14
-    # (the vendored QR encoder is third-party code kept verbatim: its own reports
-    # are the authoring section's to ignore, above)
-    core_reports = JET.get_reports(
-        JET.report_package(BlobBoards; target_modules = (BlobBoards,), ignored_modules = (BlobBoards.Authoring.QREncode,))
-    )
-    if length(core_reports) > CORE_BASELINE
-        for r in core_reports
-            @info "JET (BlobBoards core)" report = first(replace(sprint(show, r), "\n" => " "), 300)
-        end
-    end
-    @test length(core_reports) <= CORE_BASELINE
+    # ---- core: the whole-package JET ratchet is VisualGeometryToolkitCore's
+    # `test_quality_gates` (suites/quality_gates.jl, `jet_bound`).
 end

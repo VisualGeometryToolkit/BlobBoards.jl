@@ -14,7 +14,7 @@ VgtkCore.test_quality_gates(
     # suites/jet.jl ignores; the rest are the unions that suite filters. A ratchet: it may only move down.
     # (Julia 1.12 infers 15: the same unions plus three more in code this suite does not touch; the bound is per minor version)
     jet_bound = VERSION >= v"1.13" ? 12 : 15,
-    stale_ignore = (:pdftocairo,),   # called inside Cmd interpolation, which the analysis does not see (explicit_imports.jl)
+    stale_ignore = (:pdftocairo,),   # called inside Cmd interpolation, which the analysis does not see
     tag_rules = :report, tag_tables = :report, config_tags = :report,
     stack_dependencies = :report, public_names = :report, contract_generics = :report,
 )
