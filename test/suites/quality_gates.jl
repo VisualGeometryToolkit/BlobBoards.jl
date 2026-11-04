@@ -11,7 +11,7 @@ import VisualGeometryToolkitCore as VgtkCore
 VgtkCore.test_quality_gates(
     BlobBoards;
     # the count the gate's whole-package JET run finds today (2026-10-27): 5 are the vendored QREncode, which
-    # suites/jet.jl ignores in its authoring pass; the rest are unions in the package core. A ratchet: it may only move down.
+    # suites/jet.jl ignores in its authoring run; the rest are unions in the package core. A ratchet: it may only move down.
     # (Julia 1.12 infers 15: the same unions plus three more in code this suite does not touch; the bound is per minor version)
     jet_bound = VERSION >= v"1.13" ? 12 : 15,
     stale_ignore = (:pdftocairo,),   # called inside Cmd interpolation, which the analysis does not see
