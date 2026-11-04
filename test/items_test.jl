@@ -25,6 +25,12 @@ end
     include("suites/agent_docs.jl")
 end
 
+# The README's and Getting started's examples, in a fresh environment built
+# from the README's install line (a child process: this target is not that env).
+@testitem "readme" begin
+    include("suites/readme.jl")
+end
+
 @testitem "JET static analysis" begin
     using JSON
     include("suites/jet.jl")
