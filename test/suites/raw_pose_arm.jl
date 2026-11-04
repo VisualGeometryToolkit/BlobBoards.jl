@@ -88,7 +88,7 @@ end
         scoring = StudentTUniformScoring(AbsolutePoseProblem, 5.0),
         local_optimization = HQ{WelschShape}(; scale_multiple = tuning_constant(:absolute_pose, "welsch").scale_multiple)
     )
-    @test est !== nothing
+    @test est.converged   # a failed search is a :no_model result, not `nothing` (Estimation 0.5)
     @test rad2deg(rotation_angle(RotMatrix{3}(est.estimate.R' * _POSE.R))) < 0.05
     @test norm(est.estimate.t - _POSE.t) < 1.0
     @test count(est.inlier_mask .& (radius .> 1100)) == count(radius .> 1100)   # the rim is kept
