@@ -26,7 +26,7 @@ import VisualGeometryToolkitFeatures   # tilt-schedule guard reaches _imas_tilts
 
 # =============================================================================
 # Data — the package's OWN example artifacts (Artifacts.toml, Zenodo):
-# the 50 board definitions, a calibrated still with its vgio/cameras/v3 store,
+# the 50 board definitions, a calibrated still with its vgio/cameras/v4 store,
 # and a calibrated handheld clip with its own. Fetched lazily on first use, so
 # these tests run wherever the artifacts can be downloaded — no local dataset,
 # no LocalPreferences. Until 2026-09-07 the inputs were `data_dir()` paths that
@@ -162,7 +162,7 @@ end
     @test_throws Exception BlobBoards._render_dpi(3.0)   # dimensionless is a bug
 end
 
-# Cameras are vgio/cameras/v3 stores (the example artifacts ship them that
+# Cameras are vgio/cameras/v4 stores (the example artifacts ship them that
 # way); the store owns the reader.
 _load_camera(path) = VgtkIO.load(CameraModel, path)
 
