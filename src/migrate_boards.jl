@@ -232,10 +232,12 @@ function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::Ab
     end
 end
 
-# A record of the retired schema `from` read with the legacy lift: the bundle, its stored `hashes.config` (required:
-# a migration carries a stored identity over and mints none) and its render block with the quantity objects as the
-# numbers a v5 file holds (`nothing` when it has none). `where_` names the record in a refusal.
-function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::AbstractString)
+# A record of the retired schema `from` read with the legacy lift: the bundle, its stored `hashes.config` and its
+# render block with the quantity objects as the numbers a v5 file holds (`nothing` when it has none). `where_` names
+# the record in a refusal. With `require_hash` (a file migration: it carries a stored identity over and mints none)
+# a record storing no hash is refused; without it (a read) `stored` is `nothing`, and the reader recomputes the
+# identity with a warning, as it does for a current file storing none.
+function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::AbstractString; require_hash::Bool = true)
     get(obj, :schema, nothing) == from ||
         throw(ArgumentError("$(where_): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
     old = if haskey(obj, :preamble)
@@ -246,7 +248,7 @@ function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::Abstra
         throw(ArgumentError("$(where_): neither a board (preamble) nor a pattern (pattern_config)"))
     end
     stored = _stored_config_hash(obj)
-    stored === nothing && throw(
+    stored === nothing && require_hash && throw(
         ArgumentError("$(where_): stores no hashes.config; a migration carries a stored identity over and mints none")
     )
     render = haskey(obj, :render) ? _migrated_render(obj[:render]::_JSONObject) : nothing
@@ -259,8 +261,9 @@ end
 # file form carries them. Nothing is written.
 function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
     obj = JSON.parse(JSON.json(tree))::_ParsedObject
-    (; old, stored, render) = _legacy_record(obj, from, "a $(from) record")
-    return JSON.parse(JSON.json(_bundle_tree(old, stored, render)))::_ParsedObject   # its JSON values, as a file holds them
+    (; old, stored, render) = _legacy_record(obj, from, "a $(from) record"; require_hash = false)
+    # the record as the file save_json writes holds it: the same writer, so the same numbers and key order
+    return JSON.parse(sprint(io -> _write_json(io, _bundle_tree(old, stored, render))))::_ParsedObject
 end
 
 # (`after_write(dst)`: a test hook run on the written file before it is read back)

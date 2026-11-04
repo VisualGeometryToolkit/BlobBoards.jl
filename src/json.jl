@@ -170,8 +170,9 @@ function _declared_units(x; required::Bool = true)
         schema = _getfield(x, "schema", nothing)
         schema in MIGRATED_SCHEMAS && throw(
             ArgumentError(
-                "this is a $(schema) file, the retired {value, unit} quantity form; this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")). " *
-                    "Migrate the file once with VisualGeometryToolkitIO.vgio_migrate (it keeps the stored identity)"
+                "this is a $(schema) record, the retired {value, unit} quantity form, lifted without its version step; " *
+                    "read the file with load_bundle, which runs the step in memory, or rewrite it once with " *
+                    "VisualGeometryToolkitIO.vgio_migrate (both keep the stored identity)"
             )
         )
         throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))

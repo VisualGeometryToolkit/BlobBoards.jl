@@ -121,9 +121,11 @@ end
 # The current file's tree of a bundle: the one serialization path (`save_json`, and the version steps of the
 # retired schemas, src/migrate_boards.jl). lower() is the source of truth. Fresh saves mint identity canonically,
 # so hashes.config IS the canonical hash; a re-save of a loaded bundle gives its stored `config_hash`, which stays
-# the identity across format migrations (a migrated v1 board re-saved as the current schema keeps its uid).
-function _bundle_tree(bundle::AbstractBundle, config_hash::AbstractString, render)
-    output = (schema = _bundle_schema(bundle), _lower(bundle)..., hashes = (config = String(config_hash),))
+# the identity across format migrations (a migrated v1 board re-saved as the current schema keeps its uid). A
+# `nothing` hash (an old record read that stored none) leaves `hashes` out, as that record had it.
+function _bundle_tree(bundle::AbstractBundle, config_hash::Union{Nothing, AbstractString}, render)
+    output = (schema = _bundle_schema(bundle), _lower(bundle)...)
+    config_hash === nothing || (output = merge(output, (; hashes = (config = String(config_hash),))))
     return render === nothing ? output : merge(output, (; render))
 end
 
@@ -469,7 +471,7 @@ function _image_density(image_path::AbstractString, bundle::BoardBundle; density
     # (a PDF is converted on Poppler's pixel grid, at a whole number of dpi)
     lowercase(splitext(image_path)[2]) == ".pdf" && return density === nothing ? _default_density(bundle) : _output_density(density)
     json_path = splitext(image_path)[1] * ".json"
-    rec = isfile(json_path) ? _render_options(JSON.parse(read(json_path, String))::_ParsedObject) : nothing
+    rec = isfile(json_path) ? _render_options(_read_record(read(json_path, String), json_path)) : nothing
     # the record describes the board's LAST output: its density is this raster's
     # only if that output was this format (a PNG and a TIFF share one JSON)
     ext = lowercase(splitext(image_path)[2])
@@ -574,29 +576,39 @@ function load_bundle(path::AbstractString)
     bundle, config_hash = _parse_bundle(json_path)
 
     if image_path === nothing
-        id_label = _render_options(JSON.parse(read(json_path, String))::_ParsedObject).id_label
+        id_label = _render_options(_read_record(read(json_path, String), json_path)).id_label
         image_path = _regenerate_render(json_path, bundle, config_hash; id_label)
     end
 
     return bundle, image_path, config_hash
 end
 
+# A board or pattern file's text as its CURRENT record — the one read every reader of a bundle file takes
+# (`_parse_bundle`, the render options, `rebuild_board`). An earlier schema a published file holds is read, not
+# refused: its version steps (src/migrate_boards.jl, run by VisualGeometryToolkitIO's `migrate_record`) give the
+# current record in memory, the stored identity kept, and the file is not rewritten. A schema with no step comes
+# back as it is, for the caller's refusal; a step's refusal names the file (`where_`).
+function _read_record(json_str::AbstractString, where_::AbstractString)
+    # Top-level typeassert pins the JSON schema — JSON.parse infers as a
+    # wide union otherwise and every haskey/getindex below union-splits
+    # (the 6 JET reports that broke the ratchet, 2026-08-06).
+    obj = JSON.parse(json_str)::_ParsedObject
+    s = get(obj, :schema, nothing)
+    (s isa AbstractString && !(s in READABLE_SCHEMAS)) || return obj
+    migrated = try
+        VgtkIO.migrate_record(obj)
+    catch e
+        e isa Union{ArgumentError, KeyError} || rethrow()
+        throw(ArgumentError("$(where_): its $(s) record does not read through its version steps: " * sprint(showerror, e)))
+    end
+    return JSON.parse(JSON.json(migrated))::_ParsedObject
+end
+
 # A bundle sidecar parsed — the typed bundle and its stored configuration hash —
 # without resolving or regenerating its render (the design resolver reads
 # geometry only).
 function _parse_bundle(json_path::AbstractString)
-    json_str = read(json_path, String)
-    # Top-level typeassert pins the JSON schema — JSON.parse infers as a
-    # wide union otherwise and every haskey/getindex below union-splits
-    # (the 6 JET reports that broke the ratchet, 2026-08-06).
-    json_obj = JSON.parse(json_str)::_ParsedObject
-
-    # An earlier schema a published file holds is read, not refused: its version steps
-    # (src/migrate_boards.jl, through VisualGeometryToolkitIO's migrate_record) give the
-    # current record in memory, the stored identity kept; the file is not rewritten.
-    if get(json_obj, :schema, nothing) in MIGRATED_SCHEMAS
-        json_obj = JSON.parse(JSON.json(VgtkIO.migrate_record(json_obj)))::_ParsedObject
-    end
+    json_obj = _read_record(read(json_path, String), json_path)
     schema = get(json_obj, :schema, nothing)
     schema in READABLE_SCHEMAS || error(
         schema === nothing ?

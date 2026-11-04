@@ -379,7 +379,7 @@ function rebuild_board(
     # (no output keyword without a dir); the recorded options then fill in
     _check_writer(dir, output, id_label)
     # Try to read as BoardBundle first (the common case), extract preamble
-    obj = JSON.parse(json_config)::BlobBoards._ParsedObject
+    obj = BlobBoards._read_record(json_config, isfile(json_or_path) ? String(json_or_path) : "rebuild_board's JSON")   # an earlier schema through its version steps
     bundle = JSON.lift(BoardBundle, obj)
     preamble = bundle.preamble
     rec = BlobBoards._render_options(obj)
