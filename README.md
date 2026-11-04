@@ -122,7 +122,7 @@ using VisualGeometryToolkitEstimation: RansacConfig
 using VisualGeometryToolkitCore: CameraModel
 import VisualGeometryToolkitIO as VgtkIO
 
-camera  = VgtkIO.load(CameraModel, "cameras.json")  # canonical vgio/cameras/v3 store
+camera  = VgtkIO.load(CameraModel, "cameras.json")  # canonical vgio/cameras/v4 store
 network = DescriptorNetwork("descriptor.onnx") # patch size comes from the graph
 
 # The gallery caches per-board features. Keyed on the network hash, the

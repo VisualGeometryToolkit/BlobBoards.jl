@@ -92,7 +92,7 @@ end
 # =============================================================================
 #
 # A board is a CONTENT-ADDRESSED design: its uid names its geometry, so a
-# stored target rig (VisualGeometryToolkitIO's rig/v4) names a board by reference and
+# stored target rig (VisualGeometryToolkitIO's rig/v6) names a board by reference and
 # never restates its points. BlobBoards owns the design, so it resolves the
 # reference: the nominal points are the board's blob centres in its world
 # frame (`blobs(bundle, :world)`: centred on the board, y up, millimetres,
@@ -155,7 +155,7 @@ board_resolver(lib::AbstractDict) = uid -> haskey(lib, uid) ? board_points(lib[u
     board_target(uid::Symbol, boards; texture = nothing) -> PlanarTarget
 
 The board as a resolved VisualGeometryToolkitCore `PlanarTarget` — its whole
-design, as a stored rig (VisualGeometryToolkitIO's `rig/v5`) carries it:
+design, as a stored rig (VisualGeometryToolkitIO's `rig/v6`) carries it:
 
 - the design named by `uid`, and its nominal points [`board_points`](@ref)
   (lengths, in millimetres); the `Rigid` calibration;

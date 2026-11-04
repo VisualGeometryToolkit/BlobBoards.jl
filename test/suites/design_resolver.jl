@@ -1,6 +1,6 @@
 # =============================================================================
 # The design resolver: a board uid → its nominal plane points (pipeline.jl).
-# A stored target rig (VisualGeometryToolkitIO rig/v5) names a board by reference
+# A stored target rig (VisualGeometryToolkitIO rig/v6) names a board by reference
 # and carries the board it is printed on; BlobBoards resolves the reference to the
 # board's blob centres in its world frame, in the bundle's blob order — the order
 # a measurement's point index names.
@@ -74,7 +74,7 @@ using Rotations: QuatRotation
         back = VgtkIO.load(Rig, f; resolve)
         @test points(model(back[uid])) == points(tt) && reference(model(back[uid])) === uid
         @test board(model(back[uid])) == board(tt)
-        # the canvas and its texture: the rig/v5 planar body's `canvas` block, back bit for bit (FlexUnits
+        # the canvas and its texture: the rig/v6 planar body's `canvas` block, back bit for bit (FlexUnits
         # 0.6.16 rounds `x * mm` to the decimal-nearest metre value, Deduction42/FlexUnits.jl#131)
         bt = canvas(model(back[uid])).texture
         @test (bt.path, bt.sha256, bt.size) == (tex.path, tex.sha256, tex.size) && bt.origin ≈ tex.origin

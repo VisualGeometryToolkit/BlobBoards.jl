@@ -33,7 +33,7 @@ import VideoIO
 using CUDA: CUDABackend            # any KA backend; KA.CPU() also works
 import cuDNN                       # ONNXRunTime :cuda execution provider
 using Statistics: mean
-import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v3 camera stores
+import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v4 camera stores
 using VisualGeometryToolkitCore: BoundedCamera, model, extent
 
 const VIDEO = length(ARGS) >= 1 ? ARGS[1] :
