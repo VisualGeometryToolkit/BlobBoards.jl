@@ -54,22 +54,45 @@ Generate deterministic, multi-scale blob patterns and printable calibration boar
 
 ## Quick Start
 
-Patterns and boards both come from the core package:
+### Install
+
+BlobBoards requires Julia 1.12 or later. The examples below also import a few
+names from VisualGeometryToolkitCore, the stack package that owns them:
+
+```julia-repl
+pkg> add BlobBoards VisualGeometryToolkitCore
+```
+
+Until the General registrations of BlobBoards and LocalOptimizationDoneRight
+merge, add [CauRegistry](https://github.com/prittjam/CauRegistry.jl) first:
+
+```julia-repl
+pkg> registry add https://github.com/prittjam/CauRegistry.jl
+```
+
+### Patterns and boards
+
+The `julia` blocks of this section, of Blob Extraction and of Detection on the
+CPU run as written, in order, in a fresh environment with the install line
+above; the package's test suite runs them. Every file goes to a temporary
+directory.
 
 ```julia
-julia --project=.
-using Pkg; Pkg.instantiate()
-
 using BlobBoards      # re-exports the units: mm, inch, px, dpi, …
 
 # Generate pattern (pixels)
-blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234, dir="./out")
+pattern_dir = mktempdir()
+blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234, dir=pattern_dir)
 
 # Generate a PDF calibration board, its smallest disc sized for a 600 dpi printer
-blob_board("A4"; blob_sizes=suggest_blob_sizes(600dpi, "A4"), seed=0xBEEF, dir="./out")
+board_dir = mktempdir()
+blob_board("A4"; blob_sizes=suggest_blob_sizes(600dpi, "A4"), seed=0xBEEF, dir=board_dir)
 
 # Generate a PNG board at 300 pixels per inch (for training data)
-blob_board("A4"; blob_sizes=(4.0mm, 0.2short_side), seed=0xBEEF, dir="./out", output=Png(300dpi))
+png_dir = mktempdir()
+blob_board("A4"; blob_sizes=(4.0mm, 0.2short_side), seed=0xBEEF, dir=png_dir, output=Png(300dpi))
+
+readdir(board_dir)    # the PDF and its JSON sidecar, named by the board's uid
 ```
 
 A board has no pixel density: the PDF prints on any printer. `blob_sizes` is
@@ -83,8 +106,9 @@ re-exported by BlobBoards; do not import them from another units package.
 ## Blob Extraction
 
 ```julia
-# Load board and extract blobs
-bundle, img = BlobBoards.load("board.json")
+# Load the PDF board written above, by its JSON sidecar, and extract blobs
+board_json = only(filter(endswith(".json"), readdir(board_dir; join = true)))
+bundle, img = BlobBoards.load(board_json)
 
 # Get blobs in pixel units (default), at the density of the image they are in
 # (a pixel-grid board's own by default; a point-grid board's layout has no density)
@@ -95,7 +119,7 @@ blobs_px = blobs(bundle, :board; density = 300dpi)     # Board coordinate frame 
 blobs_mm = blobs(bundle, :pattern; units=mm)    # Physical coordinates in mm
 
 # Convert between image origin conventions: a map on plain pixel coordinates
-using BlobBoards: EuclideanMap, PixelFrame, centroid, ustrip
+using VisualGeometryToolkitCore: EuclideanMap, PixelFrame, centroid, ustrip
 to_julia = EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})
 centres_julia = [to_julia(ustrip.(px, centroid(d))) for d in blobs_px]
 ```
@@ -114,7 +138,42 @@ candidate on inlier count *and* on whether those inliers look like the board
 they claim, then spatially arbitrate between competing boards — and returns
 every board it located in the image.
 
+### On the CPU
+
+A board rendered as an image, found in that image with no camera (a homography
+per board) by the package's default descriptor network, which is fetched once
+from the BlobBoards Zenodo record on first use:
+
 ```julia
+using VisualGeometryToolkitCore: is_map_inlier
+
+# A small board rendered at 100 pixels per inch: the image to search
+scene_dir = mktempdir()
+blob_board("A5"; blob_sizes=(4.0mm, 0.2short_side), seed=0xBEEF, dir=scene_dir, output=Png(100dpi))
+scene_json = only(filter(endswith(".json"), readdir(scene_dir; join = true)))
+scene = load_board(scene_json)                   # the board's uid and bundle
+_, scene_image = BlobBoards.load(scene_json)     # the rendered sheet, a grey image
+
+network = DescriptorNetwork(descriptor_network_path(); execution_provider = :cpu)
+gallery = BoardGallery(joinpath(scene_dir, "board_features.jld2"), network)
+boards  = Dict(insert!(gallery, [scene_json], network))      # uid => the board's described blobs
+bundles = Dict(scene.uid => scene.bundle)
+
+config   = FindBoardsConfig(geometry = HomographyGeometry())
+accepted = find_boards(boards, network, scene_image; board_bundles = bundles, config)
+
+uid, H, quality, csponds = only(accepted)    # the board's uid, its board → image homography
+n_inliers = count(is_map_inlier, csponds.weights)
+```
+
+### On a GPU, with a calibrated camera
+
+The calibrated pipeline on your own camera, boards and images. This block is
+an illustration, not part of the runnable example: it needs a CUDA device,
+and `cameras.json`, `board_jsons` and `gray_image` stand for your files.
+
+```julia
+# Illustrative: needs CUDA, your camera, boards and image (not run as written)
 using BlobBoards, CUDA
 import cuDNN                                   # enables the ONNX CUDA provider
 using CUDA: CUDABackend
@@ -123,7 +182,7 @@ using VisualGeometryToolkitCore: CameraModel
 import VisualGeometryToolkitIO as VgtkIO
 
 camera  = VgtkIO.load(CameraModel, "cameras.json")  # canonical vgio/cameras/v4 store
-network = DescriptorNetwork("descriptor.onnx") # patch size comes from the graph
+network = DescriptorNetwork(descriptor_network_path()) # the default network; patch size comes from the graph
 
 # The gallery caches per-board features. Keyed on the network hash, the
 # network-declared patch size, the sampling extent and each board's own
@@ -209,6 +268,7 @@ See [examples/](examples/) for Julia scripts and [python/examples/](python/examp
 ### Pattern Generation
 
 ```julia
+# Illustrative: the signatures (not run as written)
 blob_pattern(width, height; kwargs...)
 blob_pattern(Size2(width, height); kwargs...)
 blob_pattern(pixel_type, Size2(width, height); kwargs...)   # e.g. Gray{N0f16}; the type is positional, never a keyword
@@ -227,6 +287,7 @@ Key options:
 ### Board Generation
 
 ```julia
+# Illustrative: the signatures (not run as written)
 blob_board(paper_size; blob_sizes, kwargs...)
 blob_board(width, height; blob_sizes, kwargs...)
 BlobBoards.rebuild_board(json_or_path; dir=nothing)  # Reconstruct from its JSON, as printed (its `render` block)
@@ -274,18 +335,13 @@ before 2026-10-01 are refused and must be regenerated.
 
 ### As a dependency
 
-BlobBoards and LocalOptimizationDoneRight are in CauRegistry; the rest
-of its stack (VisualGeometryToolkitCore, VisualGeometryToolkitIO,
-VisualGeometryToolkitFeatures, VisualGeometryToolkitEstimation,
-RANSACScoringDoneRight) is in General. Add CauRegistry once (Julia 1.12+):
-
-```julia
-using Pkg
-Pkg.Registry.add("General")
-Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")   # once
-Pkg.add("BlobBoards")
-```
-
+BlobBoards and LocalOptimizationDoneRight are in CauRegistry until their
+General registrations merge; the rest of the stack (VisualGeometryToolkitCore,
+VisualGeometryToolkitIO, VisualGeometryToolkitFeatures,
+VisualGeometryToolkitEstimation, RANSACScoringDoneRight) is in General. A
+package that depends on BlobBoards adds `BlobBoards` alone, after the
+[Quick Start](#install)'s `registry add` line; the Quick Start's install line
+adds VisualGeometryToolkitCore too, for the names its examples import from it.
 Everything else resolves automatically. No pixi or Python is needed: pixi is
 only for the Python interface.
 
@@ -365,6 +421,7 @@ Build tracks of canonicalized blob patches from videos and photos of the boards,
 for training local feature descriptors.
 
 ```julia
+# Illustrative: needs your boards, network and videos (not run as written)
 using BlobBoards
 
 out = BlobBoards.build_tracks_for_sequences(
