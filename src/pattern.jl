@@ -303,20 +303,10 @@ end
 # Pattern API
 # -------------------
 
-"""
-# Pattern Generation Algorithms
-
-This module contains the core algorithms for generating blob patterns:
-
-- Scale calculation and distribution
-- Spatial placement with collision detection
-- Pattern rendering and anti-aliasing
-
-## Main Functions
-- [`blob_pattern`](@ref): Generate patterns in pixel space
-- [`calc_blob_scales`](@ref): The geometric scale ladder from min_scale to max_scale
-- `_place_blobs`: Place blobs with spatial constraints
-"""
+# The pattern generation algorithms: scale calculation and distribution
+# (`calc_blob_scales`, the geometric ladder from min_scale to max_scale),
+# placement with collision detection (`_place_blobs`) and rendering
+# (`blob_pattern`, in pixel space).
 
 # The blob scales are a geometric LADDER from `min_scale` to `max_scale`, BOTH
 # exact: k steps, k the whole number of 1/scales_per_octave-octave steps nearest

@@ -40,8 +40,9 @@ end
 """
     PipelineTrace
 
-A [`PipelineCapture`](@ref) with its OPTIONAL provenance attached as
-`Attributed` attributes — the idiom VisualGeometryToolkitCore uses to carry a record's
+A [`PipelineCapture`](@ref) with its optional provenance attached.
+
+The provenance is carried as `Attributed` attributes, the idiom VisualGeometryToolkitCore uses to carry a record's
 optional payload, and for the same reason: what a trace carries beyond the
 capture genuinely varies, and absence should be a fact about the TYPE rather
 than a `nothing` every reader has to test.

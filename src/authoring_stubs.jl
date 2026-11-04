@@ -209,8 +209,10 @@ function rebuild_board end
     render_board(bundle::BoardBundle; dir, output = Pdf(), id_label = false,
                  config_hash = <the bundle's identity>) -> BoardBundle
 
-Render a STORED board as `output` — [`Pdf`](@ref)`()` (the default),
-[`Tiff`](@ref)`(density)` or [`Png`](@ref)`(density)` — into `dir`: draw the bundle's recorded blobs
+Render a stored board again, without re-running placement.
+
+The `output` is [`Pdf`](@ref)`()` (the default),
+[`Tiff`](@ref)`(density)` or [`Png`](@ref)`(density)`, written into `dir`: it draws the bundle's recorded blobs
 (vector shadings) and its frame, QR and uid glyphs, without re-running
 placement. `config_hash` is the authoritative identity from the bundle's JSON
 (`hashes.config`); supply it so the printed uid matches the physical board even
@@ -232,8 +234,10 @@ function render_board end
     save_canvas_texture(path, bundle::BoardBundle; density, relative_to = dirname(path),
                         id_label = false, config_hash = <the bundle's identity>) -> VisualGeometryToolkitCore.CanvasTexture
 
-Write the board's printed page — the sheet [`render_board`](@ref) draws, as a
-[`Png`](@ref)`(density)` (8-bit grey, linear gamma) — to `path`, and return
+Write the board's printed page as a canvas texture.
+
+The page is the sheet [`render_board`](@ref) draws, as a
+[`Png`](@ref)`(density)` (8-bit grey, linear gamma), written to `path`; the call returns
 the VisualGeometryToolkitCore `CanvasTexture` that names it: the path relative
 to `relative_to` (the directory of the file that will name it), the SHA-256 of
 the bytes written, and the rectangle of the design chart the image covers. The

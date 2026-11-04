@@ -53,8 +53,9 @@ using CoordinateTransformations: PerspectiveMap
 """
     board_quad(camera_or_nothing, model, bundle::BoardBundle) -> GeometryBasics.Polygon
 
-Project a board's world-coordinate bounding rectangle into the image through
-the estimated `model` — the ONE place the model→image quad is built (spatial
+Project a board's world-coordinate bounding rectangle into the image.
+
+The rectangle goes through the estimated `model`; this is the ONE place the model→image quad is built (spatial
 suppression, feature claiming, agenda claim masks all share it). Homography
 path (`camera === nothing`): `model` IS the world→image H. Pose path: the
 VGC `PosedCamera` composes pose + intrinsics. `bundle` is typed so a call in the

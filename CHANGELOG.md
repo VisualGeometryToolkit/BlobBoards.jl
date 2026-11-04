@@ -34,4 +34,15 @@ Installing for a task no longer means adding packages by hand.
 - The README holds the purpose, installation, one example, the documentation
   links and the citation. The reference material it carried is in the
   documentation (the contributors on its home page), and the paper project's
-  cross-validation note in `bmvc2026/README.md`.
+  cross-validation note in `bmvc2026/README.md`. A coverage badge is added.
+- **Documentation gates.** The docs build checks that every public docstring
+  is in the manual, runs the doctests and the link check, and tolerates no
+  warning. A new API page, *Extensions, Tooling and Internals*, holds the 95
+  public names that were missing from the manual; the vendored QR encoder is the
+  one exempt module. A `docs` test item finds public names with no docstring,
+  docstrings detached from their definitions and signature lines no method
+  accepts. `BoardConfig`, `TrainingPair` and `ViewAngleStat` gained docstrings,
+  `BoardConfig`'s was reattached, and the docstrings Documenter flagged now
+  open with a one-sentence summary.
+- CompatHelper adds CauRegistry, where LocalOptimizationDoneRight is until its
+  General registration merges.

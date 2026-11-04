@@ -32,6 +32,11 @@ end
     include("suites/readme.jl")
 end
 
+# Every public name documented, every docstring attached, every shown signature callable.
+@testitem "docs" begin
+    include("suites/docs.jl")
+end
+
 @testitem "readme row: author boards" begin
     include("suites/readme_rows.jl")
     run_row("author boards (pattern, PDF, PNG)")

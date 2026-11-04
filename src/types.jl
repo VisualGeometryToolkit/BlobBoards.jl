@@ -622,10 +622,18 @@ function _frame_fields(
     return rw, cs, major_s, minor_s, major_w, minor_w
 end
 
+# A quantity (or a Size2 of them) in the stored form, VisualGeometryToolkitCore's
+# `base_quantity` (base units, Float64: an integer length such as `14mm` is an
+# exact Rational until stored, and a file reads back the Float64); `nothing` kept.
+_vgc(::Nothing) = nothing
+_vgc(x) = base_quantity.(x)
+
 """
     BoardConfig
 
-Physical board configuration: canvas, board, the frame's marks and the ruler,
+A board's physical configuration.
+
+It holds the canvas, the board, the frame's marks and the ruler,
 in physical units (e.g. `mm` or `inch`), and the `layout_grid` the board is
 laid out on (`PointGrid()`, the default, for every new board; a stored schema
 ≤ v3 board reads as `PixelGrid(density)`). The board is centred on the canvas:
@@ -645,12 +653,6 @@ or raster conversion, recorded with the render.
 is not a keyword of a new one: its `:ruler` or `:none` says whether the ruler is
 on.
 """
-# A quantity (or a Size2 of them) in the stored form, VisualGeometryToolkitCore's
-# `base_quantity` (base units, Float64: an integer length such as `14mm` is an
-# exact Rational until stored, and a file reads back the Float64); `nothing` kept.
-_vgc(::Nothing) = nothing
-_vgc(x) = base_quantity.(x)
-
 struct BoardConfig{L <: Quantity, G <: LayoutGrid, F <: Quantity, P <: Quantity, RS <: RulerSpec}
     canvas_size::Size2{L}
     board_size::Size2{L}

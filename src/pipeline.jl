@@ -103,7 +103,9 @@ end
     board_points(bundle::BoardBundle) -> Vector{SVector{2}} of length quantities
     board_points(uid::Symbol, boards) -> Vector{SVector{2}} of length quantities
 
-A board design's nominal plane points: its blob centres in the board's world
+A board design's nominal plane points.
+
+They are its blob centres in the board's world
 frame (centred, y up — the plane `z = 0` of `TargetFrame{uid}`), in the bundle's
 blob order, the order a measurement's point index refers to. A printed board is
 physical, so each coordinate is a length quantity in the board's native unit,
@@ -526,7 +528,9 @@ _new_rtree() = SpatialIndexing.RTree{Float64, 2}(Int, Nothing; leaf_capacity = 2
 """
     detection_rtree(detc; skip = nothing) -> SpatialIndexing.RTree
 
-R-tree over detection centroids `detc` (point rects), the `rtree` that
+An R-tree over the detection centroids `detc`.
+
+It holds point rects, and is the `rtree` that
 [`guided_search`](@ref) queries; `skip` (a `BitVector` over `detc`) leaves the
 detections already claimed out of the index, so they can never be
 re-associated. The codebase's standard
@@ -727,7 +731,7 @@ end
 
 Final-fit correspondence builder. Project every world blob of `bundle`'s
 pattern into the image through `H` (build it with
-[`_model_to_homography`](@ref)),
+`_model_to_homography`),
 then associate each projected blob to its nearest detection within `max_px` px
 **only if the projected blob and the adapted detection overlap** — exact
 ellipse IoU ≥ `min_iou`, both ellipses at the blob's rendered boundary

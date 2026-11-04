@@ -74,6 +74,15 @@ using VisualGeometryToolkitCore: best_iou_match
 # Find validated correspondences between two frames
 # =============================================================================
 
+"""
+    TrainingPair
+
+One validated correspondence between two frames.
+
+It is the element `symmetric_iou_match` returns: the frame indices (`frame_i`, `frame_j`), the blob indices in each
+(`idx_i`, `idx_j`), and the ellipse IoU of the match each way (`iou_forward`,
+`iou_backward`). A `NamedTuple` type.
+"""
 const TrainingPair = @NamedTuple{
     frame_i::Int, frame_j::Int,
     idx_i::Int, idx_j::Int,
@@ -426,8 +435,9 @@ end
 """
     collect_media(video_dir) -> Vector{String}
 
-Recursively collect every video/image file under `video_dir` (the unit of
-independent work for track building): `walk_media` — the ONE enumeration, in
+Recursively collect every video and image file under `video_dir`.
+
+A file is the unit of independent work for track building: `walk_media` — the ONE enumeration, in
 sorted, reproducible order — behind a loud empty-corpus guard. Shared by
 [`build_tracks_for_sequences`](@ref) and the multi-GPU driver.
 """
@@ -443,12 +453,12 @@ end
 
 Load every board `.json` in `board_dir` (metadata + rendered image), the
 descriptor model, and per-board gallery features + bundles (all keyed by uid).
-Runs [`check_blob_id_collisions`](@ref) to fail fast on blob-id hash-field
+Runs `check_blob_id_collisions` to fail fast on blob-id hash-field
 clashes. Shared by [`build_tracks_for_sequences`](@ref) and the multi-GPU driver
 (`examples/training/slurm/driver_build_tracks.jl`) so every worker builds an
 identical gallery.
 
-`device` is the KA backend used for descriptor extraction — [`default_device`](@ref)
+`device` is the KA backend used for descriptor extraction — `default_device()`
 (`CUDABackend()` when CUDA is loaded, otherwise `KA.CPU()`).
 """
 function load_board_gallery(
@@ -1257,6 +1267,16 @@ end
 # build. `view_angle_figure` / `save_view_angle_figure` (BlobBoardsMakieExt)
 # render them; `print_view_angle_profile` is the no-backend text fallback.
 
+"""
+    ViewAngleStat
+
+One board in one frame of a track build.
+
+It is the element `view_angle_profile` returns: the board's `uid`, the frame (`frame_idx`), its viewing obliquity (`view_angle`,
+radians), the ground-truth blobs matched and those in the image
+(`n_matched_gt`, `n_gt_in_image`), and the detection counts on the board and
+in the frame. A `NamedTuple` type.
+"""
 const ViewAngleStat = @NamedTuple{
     uid::String, frame_idx::Int, view_angle::Float64,
     n_matched_gt::Int, n_gt_in_image::Int, n_sift_on_board::Int,
@@ -1607,8 +1627,9 @@ save_tracks(
     save_board_anchors(output_path, board; inner_extent, patch_type = :logpolar, scale = 32,
                        patch_size = 64, backend = default_device(), sink = nothing)
 
-Write one anchor sequence for a board to the `.tracks` file at `output_path`,
-named by the board's uid: every ground-truth blob (canvas coordinates, sampled
+Write one anchor sequence for a board to the `.tracks` file at `output_path`.
+
+The sequence is named by the board's uid: every ground-truth blob (canvas coordinates, sampled
 from the rendered board image) as one patch of `patch_type` at `scale`. Track
 ids match the video tracks' ids (`blob_track_id`), so a video track's anchor is
 found by id; the sequence is flagged `is_anchor = true` and its masks are

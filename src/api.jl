@@ -88,7 +88,11 @@ export board, board!
 # Each function's methods live in BlobBoardsMakieExt; its fallback, which names
 # the install line when no Makie backend is loaded, is defined from
 # EXTENSION_FUNCTIONS (src/extensions.jl).
-"Plot a grid of accepted find_boards results. Requires a Makie backend."
+"""
+    plot_boards(camera, results, board_bundles, img; n = min(10, length(results)), lens = true)
+
+Plot a grid of accepted `find_boards` results. Requires a Makie backend.
+"""
 function plot_boards end
 
 "Overlay (uid, pose) pairs on one image axis — for poses reloaded from disk. Requires a Makie backend."
@@ -186,7 +190,9 @@ public TrainingPair, ViewAngleStat
 """
     blob_pattern_python(width, height; blob_sizes, seed, cutoff, dir, …)
 
-The Python package's `blobboards.blob_pattern`: [`blob_pattern`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.blob_pattern`.
+
+It is [`blob_pattern`](@ref) for arguments as Python
 objects — Python numbers or pint lengths (bare numbers: pixels) — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -197,7 +203,9 @@ function blob_pattern_python end
 """
     blob_board_python(canvas_size; blob_sizes, seed, margin, board_size, …, dir, format, density, …)
 
-The Python package's `blobboards.blob_board`: [`blob_board`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.blob_board`.
+
+It is [`blob_board`](@ref) for arguments as Python
 objects — a paper name, or Python numbers / pint lengths (bare numbers: mm) — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -208,7 +216,9 @@ function blob_board_python end
 """
     blobs_python(json_path; units = "px", reference_frame = "pattern", image_origin = "colmap", density = nothing)
 
-The Python package's `blobboards.blobs`: [`blobs`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.blobs`.
+
+It is [`blobs`](@ref) for arguments as Python
 objects — a pattern or board JSON path — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -219,7 +229,9 @@ function blobs_python end
 """
     detect_blobs_python(img; peak_threshold = 0.01, edge_threshold = 5.0, polarity = "dark", image_origin = "opencv")
 
-The Python package's `blobboards.detect_blobs`: [`detect_blobs`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.detect_blobs`.
+
+It is [`detect_blobs`](@ref) for arguments as Python
 objects — a 2-D numpy image — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -230,7 +242,9 @@ function detect_blobs_python end
 """
     find_boards_python(board_paths, model_path, img; …)
 
-The Python package's `blobboards.find_boards`: [`find_boards`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.find_boards`.
+
+It is [`find_boards`](@ref) for arguments as Python
 objects — board JSON paths, the descriptor ONNX path and a numpy image — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -241,7 +255,9 @@ function find_boards_python end
 """
     load_board_python(json_path; image_origin = "colmap", density = nothing)
 
-The Python package's `blobboards.load_board`: [`load_board`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.load_board`.
+
+It is [`load_board`](@ref) for arguments as Python
 objects — a board JSON path — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -252,7 +268,9 @@ function load_board_python end
 """
     render_board_python(json_path; dir, format, density, icc_profile, id_label, shading_function, image_origin)
 
-The Python package's `blobboards.render_board`: [`render_board`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.render_board`.
+
+It is [`render_board`](@ref) for arguments as Python
 objects — a board JSON path — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
@@ -263,7 +281,9 @@ function render_board_python end
 """
     track_boards_python(board_paths, model_path, frames; gallery_path, camera_json, device, image_origin)
 
-The Python package's `blobboards.track_boards`: [`track_boards`](@ref) for arguments as Python
+The Julia side of the Python package's `blobboards.track_boards`.
+
+It is [`track_boards`](@ref) for arguments as Python
 objects — board JSON paths, the descriptor ONNX path and numpy frames — returning Python dicts and numpy arrays, with every pixel
 coordinate in the stated `image_origin` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python

@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/VisualGeometryToolkit/BlobBoards.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/VisualGeometryToolkit/BlobBoards.jl/actions/workflows/CI.yml)
 [![Docs](https://img.shields.io/badge/docs-blobboards.github.io-blue.svg)](https://blobboards.github.io)
+[![Coverage](https://codecov.io/gh/VisualGeometryToolkit/BlobBoards.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/VisualGeometryToolkit/BlobBoards.jl)
 
 BlobBoards is a fiducial marker system: printable boards covered in a dense,
 multi-scale field of Gaussian blobs, and a pipeline that finds them in images,

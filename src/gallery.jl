@@ -231,7 +231,9 @@ end
 """
     board_palette(uids) -> Dict{String, Color}
 
-ONE color per board id, deterministic over the SORTED unique id list — the
+One stable color per board id.
+
+The colors are deterministic over the SORTED unique id list — the
 same board gets the same color in every image, every sweep, every call site
 (sweep overlays, `plot_board_poses`, training overlays; this replaced three
 palettes with three different stability conventions). Seeded against white
