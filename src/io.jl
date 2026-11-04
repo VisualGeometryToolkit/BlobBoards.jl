@@ -112,22 +112,19 @@ function save_json(
         throw(ArgumentError("JSON already exist: $json_path"))
     end
 
-    # Single serialization path: lower() is the source of truth. Fresh saves
-    # mint identity canonically, so hashes.config IS the canonical hash; a
-    # re-save of a loaded bundle gives its stored `config_hash`, which stays the
-    # identity across format migrations (a migrated v1 board re-saved as the
-    # current schema keeps its uid).
-    lowered = _lower(bundle)
-    output = (
-        schema = _bundle_schema(bundle), lowered...,
-        hashes = (config = String(config_hash),),
-    )
-    render === nothing || (output = merge(output, (; render)))
-
     open(json_path, "w") do io
-        _write_json(io, output; pretty = pretty_json)
+        _write_json(io, _bundle_tree(bundle, config_hash, render); pretty = pretty_json)
     end
     return @info "Saved metadata" metadata = json_path
+end
+
+# The current file's tree of a bundle: the one serialization path (`save_json`, and the version steps of the
+# retired schemas, src/migrate_boards.jl). lower() is the source of truth. Fresh saves mint identity canonically,
+# so hashes.config IS the canonical hash; a re-save of a loaded bundle gives its stored `config_hash`, which stays
+# the identity across format migrations (a migrated v1 board re-saved as the current schema keeps its uid).
+function _bundle_tree(bundle::AbstractBundle, config_hash::AbstractString, render)
+    output = (schema = _bundle_schema(bundle), _lower(bundle)..., hashes = (config = String(config_hash),))
+    return render === nothing ? output : merge(output, (; render))
 end
 
 

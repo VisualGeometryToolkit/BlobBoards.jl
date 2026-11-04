@@ -260,9 +260,7 @@ end
 function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
     obj = JSON.parse(JSON.json(tree))::_ParsedObject
     (; old, stored, render) = _legacy_record(obj, from, "a $(from) record")
-    output = (schema = _bundle_schema(old), _lower(old)..., hashes = (config = stored,))
-    render === nothing || (output = merge(output, (; render)))
-    return JSON.parse(JSON.json(output; sort_keys = false))::_ParsedObject
+    return JSON.parse(JSON.json(_bundle_tree(old, stored, render)))::_ParsedObject   # its JSON values, as a file holds them
 end
 
 # (`after_write(dst)`: a test hook run on the written file before it is read back)
