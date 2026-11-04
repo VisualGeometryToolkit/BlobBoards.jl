@@ -15,8 +15,8 @@
 # DataArtifacts.zenodo_url form): a published version's files are immutable,
 # and the sha256 below verifies the download regardless.
 #
-# Record 23243553 is the version-1.1.0 draft of the BlobBoards record; its
-# files resolve at these URLs once that version is published.
+# Record 23243553 is version 1.1.0 of the BlobBoards record, 23921651 version
+# 1.2.0; both are published.
 
 [track_logpolar_circ_s96_iter4]
 git-tree-sha1 = "4018efc39186b1f7c287771d69da99817d73afd5"

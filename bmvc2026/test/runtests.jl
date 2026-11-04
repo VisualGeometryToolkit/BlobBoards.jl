@@ -23,8 +23,9 @@
 #   :results  reads a run's artifact under results_root(); records a skip when
 #             the artifact is not there (the results root not bound, or the run
 #             not made)
-# No item runs on a device: one that does gets its own one-worker run (with
-# CUDA_VISIBLE_DEVICES=0) after the pool, as BlobBoards' test/runtests.jl does.
+# No item runs on a device, so the runner has no device run: an item that
+# needs one must add it here first (one worker, CUDA_VISIBLE_DEVICES=0, after
+# the pool), as BlobBoards' test/runtests.jl does.
 # The run: testitem_timeout = 3600 s (BlobBoards' setting); a name pattern
 # that matches no item is an error (ReTestItems' NoTestException).
 # =============================================================================

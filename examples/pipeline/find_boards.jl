@@ -41,7 +41,7 @@ using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustri
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 using CUDA: CUDABackend   # the KA device token
-import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v4 camera stores
+import VisualGeometryToolkitIO as VgtkIO   # the vgio/cameras camera stores
 
 # =============================================================================
 # Config

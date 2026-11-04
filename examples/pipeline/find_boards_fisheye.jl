@@ -47,7 +47,7 @@ using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustri
     PosedCamera, CameraModel, Pinhole, undistort, division_bounded,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
-import VisualGeometryToolkitIO as VgtkIO   # canonical vgio/cameras/v4 camera stores
+import VisualGeometryToolkitIO as VgtkIO   # the vgio/cameras camera stores
 
 # =============================================================================
 # Config
