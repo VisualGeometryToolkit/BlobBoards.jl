@@ -22,7 +22,7 @@
 # `using VisualGeometryToolkitCore`, `using StaticArrays`, `using Base`, and even
 # `using BlobBoards` (a self-import). Between them they pulled 14 names into
 # BlobBoards' namespace implicitly, which is what
-# test/test_explicit_imports.jl's `check_no_implicit_imports` gate fails on —
+# the ExplicitImports `check_no_implicit_imports` gate (test/suites/quality_gates.jl) fails on —
 # and `using VisualGeometryToolkitCore` additionally shadowed `model`, so JET read
 # pipeline.jl's local `(uid, model, ...)` destructuring as a call to VGC's
 # `model`. Everything not listed below is already imported explicitly by

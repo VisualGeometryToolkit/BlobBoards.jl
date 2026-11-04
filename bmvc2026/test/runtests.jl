@@ -23,36 +23,15 @@
 #   :results  reads a run's artifact under results_root(); records a skip when
 #             the artifact is not there (the results root not bound, or the run
 #             not made)
-#   :gpu      the device items, on ONE worker with CUDA_VISIBLE_DEVICES=0, after
-#             the pool has exited: two processes on one card is a false-failure
-#             machine. No item carries it today; the GPU run is kept so that
-#             one that does runs alone.
-# Every run: testitem_timeout = 3600 s (BlobBoards' setting).
+# No item runs on a device: one that does gets its own one-worker run (with
+# CUDA_VISIBLE_DEVICES=0) after the pool, as BlobBoards' test/runtests.jl does.
+# The run: testitem_timeout = 3600 s (BlobBoards' setting); a name pattern
+# that matches no item is an error (ReTestItems' NoTestException).
 # =============================================================================
 
 using ReTestItems
 
 const NAME = isempty(ARGS) ? nothing : Regex(join(ARGS, "|"))
 const NWORKERS = parse(Int, get(ENV, "RETESTITEMS_NWORKERS", string(max(1, Sys.CPU_THREADS ÷ 2))))
-const ONE = NWORKERS == 0 ? 0 : 1          # the GPU run: one worker (serial mode: in-process)
 
-# One run of a selection of items. A run may match no item (the GPU run today,
-# or a name pattern), which ReTestItems reports by throwing; that run is then
-# skipped, and only a selection that matches no item in any run is an error.
-const RAN = Ref(false)
-function run_items(select; kw...)
-    try
-        runtests(select, @__DIR__; name = NAME, testitem_timeout = 3600, nworker_threads = 2, kw...)
-        RAN[] = true
-    catch e
-        e isa ReTestItems.NoTestException || rethrow()
-    end
-end
-
-run_items(ti -> !(:gpu in ti.tags); nworkers = NWORKERS)
-
-withenv("CUDA_VISIBLE_DEVICES" => "0") do
-    run_items(ti -> :gpu in ti.tags; nworkers = ONE)
-end
-
-RAN[] || error("no test item matches $(repr(NAME))")
+runtests(@__DIR__; name = NAME, testitem_timeout = 3600, nworkers = NWORKERS, nworker_threads = 2)
