@@ -144,7 +144,7 @@ end
         @test isempty(bad)
         @test !any(f -> endswith(f, "_tmp.png"), files)
         for c in filter(f -> occursin(r"^\d{6}/calibration/", f), files)
-            @test occursin("\"vgio/cameras/v4\"", read(joinpath(root, c), String))
+            @test occursin("\"vgio/cameras/v3\"", read(joinpath(root, c), String))
         end
     else
         @info "bb_absolute_pose_inputs is not installed — the tier-content check is skipped"

@@ -70,25 +70,6 @@ lazy = true
     sha256 = "71d30e195c2d2927a6d14d1110d4ac22bd26a14ca25ef31e75398f9b55f4d244"
     url = "https://zenodo.org/records/23243553/files/bb_example_video_v3.tar.gz?download=1"
 
-# The same still and clip with their cameras.json as vgio/cameras/v4, migrated
-# once by VisualGeometryToolkitIO.vgio_migrate from the _v3 entries (each store
-# read back and compared); media unchanged. Record version 1.3.0 (23937759).
-[bb_example_still_v4]
-git-tree-sha1 = "c5d4b6563300bc0f12a3919dae057aff5f43e18a"
-lazy = true
-
-    [[bb_example_still_v4.download]]
-    sha256 = "a69edcf4da8adc8dacc938320343851b2649ed0788fa6bdb6fe4a00e936bccb3"
-    url = "https://zenodo.org/records/23937759/files/bb_example_still_v4.tar.gz?download=1"
-
-[bb_example_video_v4]
-git-tree-sha1 = "af6aedb648ecdedbb0277eeb82205086e086ca81"
-lazy = true
-
-    [[bb_example_video_v4.download]]
-    sha256 = "89eba5c7b349041a0293a9c410f282e33908814294654a032e64910675318b5e"
-    url = "https://zenodo.org/records/23937759/files/bb_example_video_v4.tar.gz?download=1"
-
 # Version 1.2.0 of the record (23921651, published 2026-11-03): the board definitions as blobboards/board/v5,
 # one tarball per physical board set (migrated once by vgio_migrate, uids and stored hashes.config kept; print PDFs /
 # PNG renders beside them where they exist). bb_boards_descriptor_training_wood_board5 is bb_example_boards_v5's tree.
