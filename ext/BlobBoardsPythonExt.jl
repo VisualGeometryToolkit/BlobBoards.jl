@@ -412,8 +412,7 @@ end
 # =============================================================================
 
 function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "pattern", image_origin = "colmap", density = nothing)
-    path = string(filepath)
-    bundle = BlobBoards._lift_bundle(BlobBoards._read_record(path), path)   # an earlier schema through its version steps
+    bundle, _ = BlobBoards._parse_bundle(string(filepath))   # its schema checked; an earlier one through its version steps
 
     if bundle isa BoardBundle
         reference_frame_sym = Symbol(reference_frame)

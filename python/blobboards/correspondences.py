@@ -34,9 +34,9 @@ SHIFT = {"colmap": 0.0, "opencv": -0.5, "matlab": 0.5, "julia": 0.5}
 # (``_UNITS`` in contract.jl). ``px`` is in that table too but is not a length, so
 # a target whose points declare it is refused, as a missing or unknown unit is.
 MM_PER_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "um": 1.0e-3, "inch": 25.4}
-# The versions this reader takes. Each later one changed only what it does not read: the
-# covariance storage (target_points2d v2, rig v8) and a planar target stated by its layout
-# (rig v7, a target with no nominal points here, as one named by its reference).
+# The versions this reader takes. Each later one changed what it does not read, the
+# covariance storage (target_points2d v2, rig v8), or added a planar target stated by its
+# layout (rig v7), which it refuses by name (`_target_points`).
 TARGET_POINTS2D_SCHEMAS = ("vgio/target_points2d/v1", "vgio/target_points2d/v2")
 RIG_SCHEMAS = ("vgio/rig/v6", "vgio/rig/v7", "vgio/rig/v8")
 
@@ -63,6 +63,14 @@ def _target_points(path, tid, body):
             raise ValueError(f"{path}: target {tid} is calibrated as {kind!r}, so its nominal points are not its "
                              "measured ones and this reader does not apply the calibration; only a rigid "
                              "planar target (or a points target) is read")
+        if "layout" in body:
+            # rig v7+: the design stated by its layout (VisualGeometryToolkitCore's AprilGrid,
+            # SchoepsPattern), whose points VisualGeometryToolkitCore derives; this reader does not
+            # rebuild them
+            kind = (body["layout"] or {}).get("type")
+            raise ValueError(f"{path}: target {tid} is stated by its layout ({kind!r}), whose points this reader "
+                             "does not derive; save the target by its nominal points (or read the file in Julia, "
+                             "VisualGeometryToolkitIO.load)")
         return body.get("nominal")
     raise ValueError(f"unknown target type {body.get('type')!r}")
 

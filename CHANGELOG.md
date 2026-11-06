@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (breaking)
+## 0.5.0 (Unreleased)
 
 On the 0.6 series of the VisualGeometryToolkit stack, and every JSON file
 through VisualGeometryToolkitIO's file boundary.
