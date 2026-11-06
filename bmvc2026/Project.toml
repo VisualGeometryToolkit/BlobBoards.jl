@@ -49,3 +49,5 @@ version = "12.9"
 
 [sources]
 BlobBoards = { path = ".." }
+# TEMPORARY, until the stack's 0.6 series is registered (the root's other stack sources likewise)
+VisualGeometryToolkitEval = { path = "../../VisualGeometryToolkit.jl/VisualGeometryToolkitEval" }

@@ -36,7 +36,7 @@ using FileIO: load as load_image
 using ImageFiltering: KernelFactors, imfilter
 using ImageTransformations: ImageTransformations, imresize
 using Colors: RGB                   # overlay palette (blob_dataset viewer)
-using VisualGeometryToolkitCore: to_homogeneous, shape_matrix
+using VisualGeometryToolkitCore: to_homogeneous, shape_factor
 
 # =============================================================================
 # Backend selection — no hard CUDA dependency
@@ -1115,9 +1115,9 @@ function _project_quad(H_wi::AbstractMatrix, world_rect)
     return map(((x, y),) -> _project_pt(H_wi, x, y), corners)
 end
 
-# 2×2 linear shape matrix of a frame primitive, unitless. World GT blobs are
+# 2×2 shape factor of a frame primitive, unitless. World GT blobs are
 # isotropic `Disc`s (shape = radius·I); adapted detections are `EllipticFrame`s.
-_overlay_shape(f) = SMatrix{2, 2, Float64}(ustrip.(shape_matrix(f)))   # (audited) whole-frame strip: no target-unit form for a shape matrix
+_overlay_shape(f) = SMatrix{2, 2, Float64}(ustrip.(shape_factor(f)))   # (audited) whole-frame strip: no target-unit form for a shape factor
 _overlay_shape(d::Disc) = (r = ustrip(VgtkCore.scale(d)); SMatrix{2, 2, Float64}(r, 0.0, 0.0, r))   # (audited) whole-Disc strip
 
 # Per-board overlay color, stable for a given board slot `k` across all frames.
@@ -1832,8 +1832,8 @@ function build_absolute_tracks(
         ]
         sample_xy = [g[1] for g in grids]
         inframe = [g[2] for g in grids]
-        # (audited) whole-frame strip: no target-unit form for a shape matrix.
-        affine = [SMatrix{2, 2, Float64}(ustrip.(shape_matrix(feature_frame(f)))) for f in frames]
+        # (audited) whole-frame strip: no target-unit form for a shape factor.
+        affine = [SMatrix{2, 2, Float64}(ustrip.(shape_factor(feature_frame(f)))) for f in frames]
         return (; frames, patches, sample_xy, inframe, affine_shapes = affine)
     end
 
