@@ -139,8 +139,12 @@ julia = "1.12"
 version = "12.9"
 
 # TEMPORARY, until the stack's 0.6 series is registered: the unreleased stack
-# from a checkout of its monorepo beside this one. Removed at the release.
+# from a checkout of its monorepo beside this one, and the unreleased 0.4.1 of
+# LocalOptimizationDoneRight and RANSACScoringDoneRight from their checkouts.
+# Removed at the release.
 [sources]
+LocalOptimizationDoneRight = {path = "../LocalOptimizationDoneRight"}
+RANSACScoringDoneRight = {path = "../RansacScoringDoneRight.jl"}
 VisualGeometryToolkitCore = {path = "../VisualGeometryToolkit.jl/VisualGeometryToolkitCore"}
 VisualGeometryToolkitEstimation = {path = "../VisualGeometryToolkit.jl/VisualGeometryToolkitEstimation"}
 VisualGeometryToolkitFeatures = {path = "../VisualGeometryToolkit.jl/VisualGeometryToolkitFeatures"}
