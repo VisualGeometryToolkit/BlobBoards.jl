@@ -40,15 +40,14 @@ function make_filebase(
 end
 
 
-# Bundle JSON schema. Files are read in ONE format, board v5 and pattern v3:
+# Bundle JSON schema. Files are written in ONE format, board v6 and pattern v4:
 # every quantity a number in the unit the file's `units` block declares
-# (VisualGeometryToolkitIO's quantity format). The schemas before them
-# (board v1–v4, pattern v1–v2) stored each quantity as a `{"value": …,
-# "unit": …}` object; such a file is read through its version step in memory
-# (the `migrate_schema(::Val{schema}, tree)` methods of src/migrate_boards.jl,
-# run by `VisualGeometryToolkitIO.migrate_record`), and can be rewritten once by
-# `VisualGeometryToolkitIO.vgio_migrate`; both keep the stored identity. The history of the
-# schemas the migration still reads:
+# (VisualGeometryToolkitIO's quantity format), the file in the vgio file shape
+# (`VgtkIO.write_record`). Every earlier schema is read through its version
+# step in memory (the `migrate_schema(::Val{schema}, tree)` methods of
+# src/migrate_boards.jl, run by `VgtkIO.read_record`), and can be rewritten
+# once by `VisualGeometryToolkitIO.vgio_migrate`; both keep the stored identity.
+# The history of the schemas the steps read:
 #
 # The pre-v1 ("v0") reader — per-scalar {value, unit} blobs, `α`/Julia-type-name
 # spellings, schema-less files — was REMOVED in 0.19 after every known corpus
@@ -79,8 +78,15 @@ end
 # (the canonical tree's schema field, and the `BB4` tag of the QR code), and it
 # stays "blobboards/board/v4", so no uid moves and no printed QR code is
 # unreadable.
-const BOARD_SCHEMA = "blobboards/board/v5"
-const PATTERN_SCHEMA = "blobboards/pattern/v3"
+#
+# board v6 / pattern v4 (2026-11): the vgio file shape. The records are v5's /
+# v3's, key for key and number for number; the file is written by
+# VisualGeometryToolkitIO's `write_record` (JSON.jl's printing: an integral
+# float keeps its `.0`, an empty array is `[]`) instead of the JSON3.pretty
+# clone v5 and v3 were written by (which printed `3.0` as `3`), so the bytes
+# differ. Their version steps only rename the schema.
+const BOARD_SCHEMA = "blobboards/board/v6"
+const PATTERN_SCHEMA = "blobboards/pattern/v4"
 const IDENTITY_SCHEMA = "blobboards/board/v4"   # frozen: the schema a point-grid board's identity (and its QR code) is minted under
 const READABLE_SCHEMAS = (BOARD_SCHEMA, PATTERN_SCHEMA)
 # the schemas of the retired quantity form: read through their version steps (never written)
@@ -88,6 +94,9 @@ const MIGRATED_SCHEMAS = (
     "blobboards/board/v4", "blobboards/board/v3", "blobboards/board/v2", "blobboards/board/v1",
     "blobboards/pattern/v2", "blobboards/pattern/v1",
 )
+# the schemas of the JSON3-printed files, the current records under an earlier
+# name: read through a step that renames them (never written)
+const RENAMED_SCHEMAS = ("blobboards/board/v5" => BOARD_SCHEMA, "blobboards/pattern/v3" => PATTERN_SCHEMA)
 
 _bundle_schema(::BoardBundle) = BOARD_SCHEMA
 _bundle_schema(::PatternBundle) = PATTERN_SCHEMA
@@ -105,16 +114,13 @@ _bundle_identity(b::PatternBundle) = hash_config(b.pattern_config)
 # (`_render_options`).
 function save_json(
         json_path, bundle::AbstractBundle;
-        overwrite::Bool = false, pretty_json::Bool = true, render = nothing,
+        overwrite::Bool = false, render = nothing,
         config_hash::AbstractString = _bundle_identity(bundle)   # the STORED one for a loaded bundle
     )
     if !overwrite && ispath(json_path)
         throw(ArgumentError("JSON already exist: $json_path"))
     end
-
-    open(json_path, "w") do io
-        _write_json(io, _bundle_tree(bundle, config_hash, render); pretty = pretty_json)
-    end
+    VgtkIO.write_record(json_path, _bundle_tree(bundle, config_hash, render); style = _FILE_STYLE)
     return @info "Saved metadata" metadata = json_path
 end
 
@@ -124,20 +130,20 @@ end
 # the identity across format migrations (a migrated v1 board re-saved as the current schema keeps its uid). A
 # `nothing` hash (an old record read that stored none) leaves `hashes` out, as that record had it.
 function _bundle_tree(bundle::AbstractBundle, config_hash::Union{Nothing, AbstractString}, render)
-    output = (schema = _bundle_schema(bundle), _lower(bundle)...)
+    output = (schema = _bundle_schema(bundle), JSON.lower(_FILE_STYLE, bundle)...)
     config_hash === nothing || (output = merge(output, (; hashes = (config = String(config_hash),))))
     return render === nothing ? output : merge(output, (; render))
 end
 
 
 """
-    save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite=false, pretty_json=true)
+    save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite=false)
 
 Save a grayscale pattern image directly and its JSON sidecar.
 Saves the colorant array directly as a grayscale PNG (single channel, no alpha).
 Returns `(img_path, json_path)`.
 """
-function save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite = false, pretty_json = true)
+function save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite = false)
     valid_dir = validate_dir(dir; create = true)
     base = make_filebase(bundle)
     fig_path = joinpath(valid_dir, base * ".png")
@@ -152,7 +158,7 @@ function save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite = f
     @info "Saved pattern" image = fig_path
 
     json_path = joinpath(valid_dir, base * ".json")
-    save_json(json_path, bundle; overwrite = overwrite, pretty_json = pretty_json)
+    save_json(json_path, bundle; overwrite)
     return fig_path, json_path
 end
 
@@ -471,7 +477,7 @@ function _image_density(image_path::AbstractString, bundle::BoardBundle; density
     # (a PDF is converted on Poppler's pixel grid, at a whole number of dpi)
     lowercase(splitext(image_path)[2]) == ".pdf" && return density === nothing ? _default_density(bundle) : _output_density(density)
     json_path = splitext(image_path)[1] * ".json"
-    rec = isfile(json_path) ? _render_options(_read_record(read(json_path, String), json_path)) : nothing
+    rec = isfile(json_path) ? _render_options(_read_record(json_path)) : nothing
     # the record describes the board's LAST output: its density is this raster's
     # only if that output was this format (a PNG and a TIFF share one JSON)
     ext = lowercase(splitext(image_path)[2])
@@ -576,39 +582,34 @@ function load_bundle(path::AbstractString)
     bundle, config_hash = _parse_bundle(json_path)
 
     if image_path === nothing
-        id_label = _render_options(_read_record(read(json_path, String), json_path)).id_label
+        id_label = _render_options(_read_record(json_path)).id_label
         image_path = _regenerate_render(json_path, bundle, config_hash; id_label)
     end
 
     return bundle, image_path, config_hash
 end
 
-# A board or pattern file's text as its CURRENT record — the one read every reader of a bundle file takes
-# (`_parse_bundle`, the render options, `rebuild_board`). An earlier schema a published file holds is read, not
-# refused: its version steps (src/migrate_boards.jl, run by VisualGeometryToolkitIO's `migrate_record`) give the
-# current record in memory, the stored identity kept, and the file is not rewritten. A schema with no step comes
-# back as it is, for the caller's refusal; a step's refusal names the file (`where_`).
-function _read_record(json_str::AbstractString, where_::AbstractString)
-    # Top-level typeassert pins the JSON schema — JSON.parse infers as a
-    # wide union otherwise and every haskey/getindex below union-splits
-    # (the 6 JET reports that broke the ratchet, 2026-08-06).
-    obj = JSON.parse(json_str)::_ParsedObject
-    s = get(obj, :schema, nothing)
-    (s isa AbstractString && !(s in READABLE_SCHEMAS)) || return obj
-    migrated = try
-        VgtkIO.migrate_record(obj)
-    catch e
-        e isa Union{ArgumentError, KeyError} || rethrow()
-        throw(ArgumentError("$(where_): its $(s) record does not read through its version steps: " * sprint(showerror, e)))
-    end
-    return JSON.parse(JSON.json(migrated))::_ParsedObject
+# A board or pattern file (its path, or its JSON text as an `IO`) as its CURRENT record — the one read every
+# reader of a bundle file takes (`_parse_bundle`, the render options, `rebuild_board`, the Python wrappers):
+# VisualGeometryToolkitIO's `read_record`. An earlier schema a published file holds is read, not refused: its
+# version steps (src/migrate_boards.jl) give the current record in memory, the stored identity kept, and the file
+# is not rewritten. A schema with no step comes back as it is, for the caller's refusal; a step's refusal names
+# the file. The typeassert pins the record's type — a parsed value infers as a wide union otherwise and every
+# haskey/getindex below union-splits (the 6 JET reports that broke the ratchet, 2026-08-06).
+_read_record(src::Union{AbstractString, IO}) = VgtkIO.read_record(src)::_ParsedObject
+
+# A current record as its typed bundle: a board (it has a preamble) or a pattern.
+function _lift_bundle(json_obj, where_::AbstractString)
+    haskey(json_obj, :preamble) && return JSON.lift(_FILE_STYLE, BoardBundle, json_obj)
+    haskey(json_obj, :pattern_config) && return JSON.lift(_FILE_STYLE, PatternBundle, json_obj)
+    return error("Unknown bundle format in $where_ (missing both :preamble and :pattern_config)")
 end
 
 # A bundle sidecar parsed — the typed bundle and its stored configuration hash —
 # without resolving or regenerating its render (the design resolver reads
 # geometry only).
 function _parse_bundle(json_path::AbstractString)
-    json_obj = _read_record(read(json_path, String), json_path)
+    json_obj = _read_record(json_path)
     schema = get(json_obj, :schema, nothing)
     schema in READABLE_SCHEMAS || error(
         schema === nothing ?
@@ -617,15 +618,10 @@ function _parse_bundle(json_path::AbstractString)
             "permanently registered BlobBoards@0.18 " *
             "(BlobBoards.migrate_bundles!(dir))." :
             "$json_path declares unknown bundle schema $(repr(String(schema))); " *
-            "this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")) and, through their version steps, $(join(MIGRATED_SCHEMAS, ", "))"
+            "this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")) and, through their version steps, " *
+            "$(join((first.(RENAMED_SCHEMAS)..., MIGRATED_SCHEMAS...), ", "))"
     )
-    bundle = if haskey(json_obj, :preamble)
-        JSON.lift(BoardBundle, json_obj)
-    elseif haskey(json_obj, :pattern_config)
-        JSON.lift(PatternBundle, json_obj)
-    else
-        error("Unknown bundle format in $json_path (missing both :preamble and :pattern_config)")
-    end
+    bundle = _lift_bundle(json_obj, json_path)
 
     config_hash = _stored_config_hash(json_obj)
     if config_hash === nothing

@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased (breaking)
+
+On the 0.6 series of the VisualGeometryToolkit stack, and every JSON file
+through VisualGeometryToolkitIO's file boundary.
+
+- **Board files `blobboards/board/v6`, pattern files `blobboards/pattern/v4`.**
+  The records are board v5's and pattern v3's, key for key and number for
+  number; the file is written by VisualGeometryToolkitIO's `write_record`
+  (JSON.jl's printing: an integral float keeps its `.0`) instead of the
+  JSON3.pretty clone BlobBoards carried, so the bytes differ. Every earlier
+  file still loads: board v5 and pattern v3 through a step that renames the
+  schema, board v1–v4 and pattern v1–v2 through their steps as before, in
+  memory, the stored identity kept; `VisualGeometryToolkitIO.vgio_migrate`
+  rewrites one once. **No board identity moves**: every uid, `hashes.config`
+  and QR code is the one it was (checked on 386 stored boards and patterns,
+  the published records' included).
+- **Track-trace manifests `blobboards/track_trace/v2`** (`trace.json`), the
+  same keys under a `schema` string, written by `write_record`; a v1 manifest
+  (`"schema_version": 1`) still loads.
+- **Removed: BlobBoards' JSON hooks on JSON.jl's own style.** Its types lower
+  and lift on VisualGeometryToolkitIO's `VgioStyle` only, so loading BlobBoards
+  changes no other package's JSON. `JSON.json(bundle)` and `JSON.parse(text,
+  BoardBundle)` no longer give a board file or a board: use `save_json` and
+  `load_bundle`. The StructUtils dependency is dropped.
+- **Removed: the `pretty_json` keyword** of `save_json` and `save`: every file
+  is written in the one vgio file shape.
+- Every board and pattern file, and a JSON text given to `rebuild_board`, is
+  read by VisualGeometryToolkitIO's `read_record` (`read_record(io)`, new, for
+  the text), so the Python wrappers now read every earlier schema too.
+- Core 0.6: `shape_matrix` is `shape_factor` (the `.tracks` builder's affine
+  shapes and overlays; values unchanged).
+
 ## 0.4.1
 
 Installing for a task no longer means adding packages by hand.

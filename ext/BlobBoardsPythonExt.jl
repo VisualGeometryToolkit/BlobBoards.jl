@@ -412,10 +412,10 @@ end
 # =============================================================================
 
 function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "pattern", image_origin = "colmap", density = nothing)
-    json_str = read(string(filepath), String)
+    path = string(filepath)
+    bundle = BlobBoards._lift_bundle(BlobBoards._read_record(path), path)   # an earlier schema through its version steps
 
-    if occursin("\"board_config\"", json_str)
-        bundle = JSON.lift(BoardBundle, JSON.parse(json_str))
+    if bundle isa BoardBundle
         reference_frame_sym = Symbol(reference_frame)
 
         units_jl = _json_units(units)
@@ -424,7 +424,6 @@ function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "patt
 
         blob_list = BlobBoards.blobs(bundle, reference_frame_sym; units = units_jl, density)
     else
-        bundle = JSON.lift(PatternBundle, JSON.parse(json_str))
         if units != "px" && units != "pd"
             error("PatternBundle only supports pixel units. Use 'px'.")
         end

@@ -3,31 +3,40 @@
 # the retired `{value, unit}` quantity form
 # =============================================================================
 #
-# A board file is read in ONE format, `blobboards/board/v5` (a pattern file,
-# `blobboards/pattern/v3`): every quantity a number in the unit the file's
-# `units` block declares (types.jl, json.jl). The schemas before it stored each
-# quantity as a `{"value": …, "unit": …}` object. Such a file is still READ —
-# published boards keep their schemas (a schema change must not force the
-# published data to be uploaded again): `load_bundle` runs the version step of
-# its schema in memory (`migrate_schema(::Val{schema}, tree)`, through
-# VisualGeometryToolkitIO's `migrate_record`), and the file is untouched. A
-# stored file can also be MIGRATED once, with VisualGeometryToolkitIO's
-# `vgio_migrate` (or the `bin/vgio_migrate.jl` command), which finds the file's
-# schema and calls the file form of `migrate_schema` this file adds for it:
+# A board file is written in ONE format, `blobboards/board/v6` (a pattern
+# file, `blobboards/pattern/v4`): every quantity a number in the unit the
+# file's `units` block declares (types.jl, json.jl), in the vgio file shape.
+# Every earlier schema is still READ — published boards keep their schemas (a
+# schema change must not force the published data to be uploaded again):
+# `load_bundle` runs the version step of its schema in memory
+# (`migrate_schema(::Val{schema}, tree)`, through VisualGeometryToolkitIO's
+# `read_record`), and the file is untouched. A stored file can also be
+# MIGRATED once, with VisualGeometryToolkitIO's `vgio_migrate` (or the
+# `bin/vgio_migrate.jl` command), which finds the file's schema and calls the
+# file form of `migrate_schema` this file adds for it:
 #
 #     VisualGeometryToolkitIO.vgio_migrate("blob_board_ab1_c2d3e.json")
 #
-# A migration reads the old file with the LEGACY lift below (a vendored copy of
-# the reader the board schemas v1–v4 were read with, `{value, unit}` and the
-# v1/v2 ruler and `max_diameter_fraction` spellings included), writes the
-# bundle through the v5 writer (`save_json`, with the file's own stored
-# `hashes.config` and its `render` block), READS THE RESULT BACK with the v5
-# reader and compares every value with what the old file read as, bit for bit.
-# Any difference refuses the file and removes the output. The identity is the
-# stored `hashes.config`, carried over unchanged; the bundle's identity
-# recomputed from the migrated file is checked to be the one recomputed from
-# the old file (`_bundle_identity`, which covers the identity schema and the
-# placed blobs, never the file format, so a format bump moves no uid).
+# Two kinds of step:
+#
+# - board v5 and pattern v3 (`RENAMED_SCHEMAS`) hold the current record under
+#   an earlier name (they were printed by a JSON3.pretty clone): the step
+#   renames the schema, and the file form reads the record with the current
+#   lift.
+# - board v1–v4 and pattern v1–v2 (`MIGRATED_SCHEMAS`) hold the `{value, unit}`
+#   form: they are read with the LEGACY lift below (a vendored copy of the
+#   reader those schemas were read with, `{value, unit}` and the v1/v2 ruler
+#   and `max_diameter_fraction` spellings included).
+#
+# A file migration writes the bundle through the current writer (`save_json`,
+# with the file's own stored `hashes.config` and its `render` block), READS
+# THE RESULT BACK with the current reader and compares every value with what
+# the old file read as, bit for bit. Any difference refuses the file and
+# removes the output. The identity is the stored `hashes.config`, carried over
+# unchanged; the bundle's identity recomputed from the migrated file is checked
+# to be the one recomputed from the old file (`_bundle_identity`, which covers
+# the identity schema and the placed blobs, never the file format, so a format
+# bump moves no uid).
 #
 # What a migration does NOT carry: a key the old reader already ignored
 # (`saddle_points`, `oversampling`, `sigma_cutoff`) and a v4 point-grid
@@ -35,29 +44,27 @@
 # on a point grid).
 
 # A quantity object of the retired form: both keys present.
-_is_legacy_quantity(x) = x isa _JSONObject && _hasfield(x, "value") && _hasfield(x, "unit")
+_is_legacy_quantity(x) = x isa AbstractDict && haskey(x, :value) && haskey(x, :unit)
 
 # The retired form's number or `{value, unit}` object, read: a number as it is,
 # an object as the quantity (any unit name `parse_unit` reads, so every string a
 # stored board holds loads: mm, px, dpi, pd, pt).
 function _legacy_scalar(x)
-    x isa _JSONObject || return x
-    u = parse_unit(String(_getfield(x, "unit")); compound = true)
-    v = _getfield(x, "value")
+    x isa AbstractDict || return x
+    u = parse_unit(String(x.unit); compound = true)
+    v = x.value
     return (dimension(u) == dimension(mm) ? Float64(v) : _snap_integer(v)) * u
 end
-_legacy_size2(x) = Size2(width = _legacy_scalar(_getfield(x, "width")), height = _legacy_scalar(_getfield(x, "height")))
+_legacy_size2(x) = Size2(width = _legacy_scalar(x.width), height = _legacy_scalar(x.height))
 
-function _legacy_ruler_tick(x)
-    return RulerTick(_legacy_scalar(_getfield(x, "spacing")), _legacy_scalar(_getfield(x, "width")))
-end
+_legacy_ruler_tick(x) = RulerTick(_legacy_scalar(x.spacing), _legacy_scalar(x.width))
 
 function _legacy_ruler_spec(x)
-    major_tick = _legacy_ruler_tick(_getfield(x, "major_tick"))
-    minor_tick = _legacy_ruler_tick(_getfield(x, "minor_tick"))
+    major_tick = _legacy_ruler_tick(x.major_tick)
+    minor_tick = _legacy_ruler_tick(x.minor_tick)
     # A pre-v3 ruler (board schema v1/v2) carries `width` and half-extent tick
     # widths: drop the one, double the others.
-    if _getfield(x, "width", nothing) !== nothing
+    if get(x, :width, nothing) !== nothing
         major_tick = RulerTick(major_tick.spacing, 2 * major_tick.width)
         minor_tick = RulerTick(minor_tick.spacing, 2 * minor_tick.width)
     end
@@ -70,23 +77,23 @@ function _legacy_ruler_spec(x)
 end
 
 function _legacy_pattern_config(x)
-    pixel_type = _pixel_type_from_name(String(_getfield(x, "pixel_type")))
-    pattern_resolution = _legacy_size2(_getfield(x, "pattern_resolution"))
-    min_scale = _legacy_scalar(_getfield(x, "min_scale"))
-    seed_raw = _getfield(x, "seed")
+    pixel_type = _pixel_type_from_name(String(x.pixel_type))
+    pattern_resolution = _legacy_size2(x.pattern_resolution)
+    min_scale = _legacy_scalar(x.min_scale)
+    seed_raw = x.seed
     seed = seed_raw isa AbstractString ? parse(UInt64, seed_raw) : UInt64(seed_raw)
-    polarity_raw = _getfield(x, "polarity", nothing)
+    polarity_raw = get(x, :polarity, nothing)
     polarity = polarity_raw !== nothing ? Symbol(polarity_raw) : :dark
     # v2 stores `max_scale`; a v1 file stores `max_diameter_fraction`, converted
     # to the top rung it always produced (same ladder, so the blobs re-place
     # bit-identically; the stored hash stays the identity).
-    max_scale_raw = _getfield(x, "max_scale", nothing)
-    max_fraction_raw = _getfield(x, "max_diameter_fraction", nothing)
+    max_scale_raw = get(x, :max_scale, nothing)
+    max_fraction_raw = get(x, :max_diameter_fraction, nothing)
     (max_scale_raw === nothing) == (max_fraction_raw === nothing) && throw(
         ArgumentError("pattern_config must carry exactly one of max_scale (v2) or max_diameter_fraction (v1)")
     )
-    cutoff = Float64(something(_getfield(x, "cutoff", _getfield(x, "sigma_cutoff", nothing)), DEFAULT_CUTOFF))
-    scales_per_octave = Int(_getfield(x, "scales_per_octave"))
+    cutoff = Float64(something(get(x, :cutoff, get(x, :sigma_cutoff, nothing)), DEFAULT_CUTOFF))
+    scales_per_octave = Int(x.scales_per_octave)
     max_scale = if max_scale_raw !== nothing
         _legacy_scalar(max_scale_raw)
     else
@@ -94,38 +101,38 @@ function _legacy_pattern_config(x)
         k = _ladder_top_from_fraction(ustrip.(px, pattern_resolution), σ_min, Float64(max_fraction_raw), scales_per_octave, cutoff)
         σ_min * 2^(k / scales_per_octave) * px
     end
-    alpha_raw = _getfield(x, "alpha", nothing)
+    alpha_raw = get(x, :alpha, nothing)
     alpha_raw === nothing && throw(ArgumentError("pattern_config missing alpha"))
     return PatternConfig(
         pattern_resolution = pattern_resolution, min_scale = min_scale, seed = seed, pixel_type = pixel_type,
-        max_scale = max_scale, scales_per_octave = scales_per_octave, max_trials = Int(_getfield(x, "max_trials")),
-        α = Float64(alpha_raw), cutoff = cutoff, raster_aligned = Bool(_getfield(x, "raster_aligned")), polarity = polarity,
+        max_scale = max_scale, scales_per_octave = scales_per_octave, max_trials = Int(x.max_trials),
+        α = Float64(alpha_raw), cutoff = cutoff, raster_aligned = Bool(x.raster_aligned), polarity = polarity,
     )
 end
 
 function _legacy_grid(x)
-    g = _getfield(x, "layout_grid", nothing)
+    g = get(x, :layout_grid, nothing)
     if g !== nothing
-        (Float64(_getfield(g, "value")) == 0.01 && String(_getfield(g, "unit")) == "pt") ||
+        (Float64(g.value) == 0.01 && String(g.unit) == "pt") ||
             throw(ArgumentError("board_config.layout_grid must be {value: 0.01, unit: \"pt\"}, got $(g)"))
         return PointGrid()
     end
-    return PixelGrid(_legacy_scalar(_getfield(x, "print_density")))
+    return PixelGrid(_legacy_scalar(x.print_density))
 end
 
 function _legacy_board_config(x)
-    canvas_size = _legacy_size2(_getfield(x, "canvas_size"))
+    canvas_size = _legacy_size2(x.canvas_size)
     layout_grid = _legacy_grid(x)
-    sized = layout_grid isa PixelGrid ? (; board_size = _legacy_size2(_getfield(x, "board_size"))) :
-        (; margin = _legacy_size2(_getfield(x, "margin")))
-    q(k) = _legacy_scalar(_getfield(x, k))
-    frame_padding = q("frame_padding")
-    ruler_spec = _legacy_ruler_spec(_getfield(x, "ruler_spec"))
+    sized = layout_grid isa PixelGrid ? (; board_size = _legacy_size2(x.board_size)) :
+        (; margin = _legacy_size2(x.margin))
+    q(k) = _legacy_scalar(x[k])
+    frame_padding = q(:frame_padding)
+    ruler_spec = _legacy_ruler_spec(x.ruler_spec)
     marks = if layout_grid isa PixelGrid
-        (; ruler_width = q("frame_width"), frame_style = Symbol(_getfield(x, "frame_style")), _tick_kwargs(ruler_spec)...)
+        (; ruler_width = q(:frame_width), frame_style = Symbol(x.frame_style), _tick_kwargs(ruler_spec)...)
     else
-        rw = q("ruler_width")
-        (; ruler_width = rw, corner_size = q("corner_size"), (iszero(rw) ? (;) : _tick_kwargs(ruler_spec))...)
+        rw = q(:ruler_width)
+        (; ruler_width = rw, corner_size = q(:corner_size), (iszero(rw) ? (;) : _tick_kwargs(ruler_spec))...)
     end
     return BoardConfig(; canvas_size, sized..., layout_grid, frame_padding, marks...)
 end
@@ -136,20 +143,20 @@ end
 # records them).
 function _legacy_pattern_from_points(x, bc::BoardConfig)
     function stored(q)
-        u = String(_getfield(q, "unit"))
+        u = String(q.unit)
         u == "pt" || throw(ArgumentError("a point-grid board's pattern lengths are in \"pt\", got \"$u\""))
-        return Dict{String, Any}("value" => _getfield(q, "value"), "unit" => "px")
+        return _object("value" => q.value, "unit" => "px")
     end
-    res = _getfield(x, "pattern_resolution", nothing)
-    d = Dict{String, Any}(string(k) => v for (k, v) in pairs(x))
+    res = get(x, :pattern_resolution, nothing)
+    d = _object(x)
     d["pattern_resolution"] = if res === nothing
         p = _board_pattern_points(bc)
-        Dict{String, Any}(k => Dict{String, Any}("value" => ustrip(px, q), "unit" => "px") for (k, q) in (("width", p.width), ("height", p.height)))
+        _object((k => _object("value" => ustrip(px, q), "unit" => "px") for (k, q) in (("width", p.width), ("height", p.height)))...)
     else
-        Dict{String, Any}("width" => stored(_getfield(res, "width")), "height" => stored(_getfield(res, "height")))
+        _object("width" => stored(res.width), "height" => stored(res.height))
     end
     for k in ("min_scale", "max_scale")
-        v = _getfield(x, k, nothing)
+        v = get(x, k, nothing)
         v === nothing || (d[k] = stored(v))      # (a v1 config has no max_scale)
     end
     t = get(d, "pixel_type", _pixel_type_name(DEFAULT_PIXEL_TYPE))
@@ -165,23 +172,21 @@ end
 # The retired columns declared their own `unit`: it must be the grid's.
 function _legacy_blobs(data, unit::String)
     data isa AbstractVector && return _construct_blobs(data)     # (the retired row form: refused there)
-    String(_getfield(data, "unit")) == unit ||
-        throw(ArgumentError("columnar blobs must declare unit \"$unit\", got \"$(_getfield(data, "unit"))\""))
-    return _construct_blobs((centers = _getfield(data, "centers"), sigmas = _getfield(data, "sigmas")))
+    String(data.unit) == unit ||
+        throw(ArgumentError("columnar blobs must declare unit \"$unit\", got \"$(data.unit)\""))
+    return _construct_blobs((centers = data.centers, sigmas = data.sigmas))
 end
 
 function _legacy_board_bundle(x)
-    pre = _getfield(x, "preamble")
-    bc = _legacy_board_config(_getfield(pre, "board_config"))
-    raw = _getfield(pre, "pattern_config")
+    pre = x.preamble
+    bc = _legacy_board_config(pre.board_config)
+    raw = pre.pattern_config
     pc = _legacy_pattern_config(bc.layout_grid isa PointGrid ? _legacy_pattern_from_points(raw, bc) : raw)
-    blobs = _legacy_blobs(_getfield(x, "blobs"), _blob_unit(bc.layout_grid))
+    blobs = _legacy_blobs(x.blobs, _blob_unit(bc.layout_grid))
     return BoardBundle(BoardPreamble(bc, pc), blobs)
 end
 
-function _legacy_pattern_bundle(x)
-    return PatternBundle(_legacy_pattern_config(_getfield(x, "pattern_config")), _legacy_blobs(_getfield(x, "blobs"), "px"))
-end
+_legacy_pattern_bundle(x) = PatternBundle(_legacy_pattern_config(x.pattern_config), _legacy_blobs(x.blobs, "px"))
 
 # -----------------------------------------------------------------------------
 # The check: two bundles hold the same values, bit for bit
@@ -189,17 +194,19 @@ end
 
 # Same type and the same bits in every leaf (a signed zero, an `Int` quantity
 # and its `Float64` twin all differ). A struct is compared field by field, an
-# array element by element.
+# array element by element. (VisualGeometryToolkitIO's migrations compare a
+# length within 2 ulp, the decimal-exact codec's guarantee; a board's numbers
+# are products, read back bit for bit, so its check is exact.)
 _same_value(a::AbstractArray, b::AbstractArray) = size(a) == size(b) && all(_same_value(x, y) for (x, y) in zip(a, b))
 _same_value(a::Union{Type, Symbol, AbstractString}, b::Union{Type, Symbol, AbstractString}) = isequal(a, b)
 _same_value(a::T, b::T) where {T} =
     isbitstype(T) ? a === b : (fieldcount(T) > 0 ? all(_same_value(getfield(a, f), getfield(b, f)) for f in fieldnames(T)) : isequal(a, b))
 _same_value(a, b) = false
 
-# A render block's quantity objects as the numbers a v5 file holds, key by key
-# in the file's order; every other entry (the format, the profile, the id label,
-# the shading function, even a legacy key name) as it is.
-function _migrated_render(r::_JSONObject)
+# A render block's quantity objects as the numbers a current file holds, key by
+# key in the file's order; every other entry (the format, the profile, the id
+# label, the shading function, even a legacy key name) as it is.
+function _migrated_render(r::AbstractDict)
     out = _ParsedObject()
     for (k, v) in pairs(r)
         out[String(k)] = _is_legacy_quantity(v) ? _file_number(_legacy_scalar(v)) : v
@@ -209,10 +216,10 @@ end
 
 # The migrated block against the old one: a quantity object became the number
 # that reads back as that very quantity; the rest is equal.
-function _render_migrated_ok(old::_JSONObject, new)
-    new isa _JSONObject && Set(String.(keys(old))) == Set(String.(keys(new))) || return false
+function _render_migrated_ok(old::AbstractDict, new)
+    new isa AbstractDict && Set(String.(keys(old))) == Set(String.(keys(new))) || return false
     return all(pairs(old)) do (k, v)
-        w = _getfield(new, String(k))
+        w = new[String(k)]
         if _is_legacy_quantity(v)
             q = _legacy_scalar(v)
             kind = dimension(q) == dimension(mm) ? :length : dimension(q) == dimension(dpi) ? :density : :pixel
@@ -232,15 +239,22 @@ function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::Ab
     end
 end
 
-# A record of the retired schema `from` read with the legacy lift: the bundle, its stored `hashes.config` and its
-# render block with the quantity objects as the numbers a v5 file holds (`nothing` when it has none). `where_` names
-# the record in a refusal. With `require_hash` (a file migration: it carries a stored identity over and mints none)
-# a record storing no hash is refused; without it (a read) `stored` is `nothing`, and the reader recomputes the
-# identity with a warning, as it does for a current file storing none.
+# The current schema a renamed one is (`RENAMED_SCHEMAS`), or `nothing`.
+_renamed_to(from::AbstractString) = (i = findfirst(p -> first(p) == from, RENAMED_SCHEMAS); i === nothing ? nothing : last(RENAMED_SCHEMAS[i]))
+
+# A record of the earlier schema `from`: the bundle, its stored `hashes.config` and its render block with any
+# quantity object as the number a current file holds (`nothing` when it has none) — a renamed schema's read with
+# the current lift, a retired one's with the legacy lift. `where_` names the record in a refusal. With
+# `require_hash` (a file migration: it carries a stored identity over and mints none) a record storing no hash is
+# refused; without it (a read) `stored` is `nothing`, and the reader recomputes the identity with a warning, as it
+# does for a current file storing none.
 function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::AbstractString; require_hash::Bool = true)
     get(obj, :schema, nothing) == from ||
         throw(ArgumentError("$(where_): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
-    old = if haskey(obj, :preamble)
+    to = _renamed_to(from)
+    old = if to !== nothing
+        _lift_bundle(_renamed(obj, to), where_)
+    elseif haskey(obj, :preamble)
         _legacy_board_bundle(obj)
     elseif haskey(obj, :pattern_config)
         _legacy_pattern_bundle(obj)
@@ -251,19 +265,21 @@ function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::Abstra
     stored === nothing && require_hash && throw(
         ArgumentError("$(where_): stores no hashes.config; a migration carries a stored identity over and mints none")
     )
-    render = haskey(obj, :render) ? _migrated_render(obj[:render]::_JSONObject) : nothing
+    render = haskey(obj, :render) ? _migrated_render(obj[:render]::AbstractDict) : nothing
     return (; old, stored, render)
 end
 
-# The STEP of a retired schema, run on load by VisualGeometryToolkitIO's `migrate_record` (the published boards keep
+# A record under another schema name, the rest as it is.
+_renamed(tree::AbstractDict, to::AbstractString) = (t = _object(tree); t["schema"] = to; t)
+
+# The STEP of a retired schema, run on load by VisualGeometryToolkitIO's `read_record` (the published boards keep
 # their old schemas and are read, not rewritten): the record read with the legacy lift, as the current record —
 # exactly the tree `save_json` writes for it, the stored `hashes.config` and the render block carried over as the
 # file form carries them. Nothing is written.
 function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
-    obj = JSON.parse(JSON.json(tree))::_ParsedObject
+    obj = JSON.parse(JSON.json(tree))::_ParsedObject      # nested objects read by property access
     (; old, stored, render) = _legacy_record(obj, from, "a $(from) record"; require_hash = false)
-    # the record as the file save_json writes holds it: the same writer, so the same numbers and key order
-    return JSON.parse(sprint(io -> _write_json(io, _bundle_tree(old, stored, render))))::_ParsedObject
+    return JSON.parse(JSON.json(_bundle_tree(old, stored, render); style = _FILE_STYLE))::_ParsedObject
 end
 
 # (`after_write(dst)`: a test hook run on the written file before it is read back)
@@ -286,25 +302,28 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
         throw(ArgumentError("$(src): the migration does not keep the stored identity; the output is discarded"))
     _bundle_identity(new) == identity_old ||
         throw(ArgumentError("$(src): the identity recomputed from the migration differs from the old file's; the output is discarded"))
+    written = JSON.parse(read(dst, String))::_ParsedObject
     if render !== nothing
-        written = JSON.parse(read(dst, String))::_ParsedObject
-        _render_migrated_ok(obj[:render]::_JSONObject, get(written, :render, nothing)) ||
+        _render_migrated_ok(obj[:render]::AbstractDict, get(written, :render, nothing)) ||
             throw(ArgumentError("$(src): the migrated render block does not read back as the old one; the output is discarded"))
     end
-    return (; to = String(get(JSON.parse(read(dst, String))::_ParsedObject, :schema, "")), uid = uid_from_hash(stored), config_hash = stored)
+    return (; to = String(get(written, :schema, "")), uid = uid_from_hash(stored), config_hash = stored)
 end
 
 """
-    VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, tree)
-    VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, src, dst)
+    VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, tree)
+    VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, src, dst)
 
-BlobBoards' migrations of its retired `{value, unit}` schemas — board v1 to v4
-and pattern v1 and v2 — into `blobboards/board/v5` and `blobboards/pattern/v3`,
-by the contract of [`VisualGeometryToolkitIO.migrate_schema`], in its two forms.
+BlobBoards' migrations of its earlier schemas into `blobboards/board/v6` and
+`blobboards/pattern/v4`, by the contract of
+[`VisualGeometryToolkitIO.migrate_schema`], in its two forms: board v5 and
+pattern v3 (the current record, JSON3-printed: renamed), board v1 to v4 and
+pattern v1 and v2 (the retired `{value, unit}` form: read with the legacy
+lift).
 
 The STEP (`tree`, a parsed record): the record as the current one, in memory,
 its stored identity kept — what `load_bundle` runs, through
-`VisualGeometryToolkitIO.migrate_record`, on an old file, so a published board
+`VisualGeometryToolkitIO.read_record`, on an old file, so a published board
 keeps loading as it is.
 
 The FILE form: write `dst` through the current writer, read it back, compare
@@ -312,15 +331,15 @@ every value bit for bit, keep the stored identity. Run by
 `VisualGeometryToolkitIO.vgio_migrate` (and its command), which stages the
 result and replaces the file only once verified. Returns `(; to, uid, config_hash)`.
 """
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, tree::AbstractDict) = _renamed(tree, BOARD_SCHEMA)
+VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v3")}, tree::AbstractDict) = _renamed(tree, PATTERN_SCHEMA)
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v4")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v3")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v3")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v2")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v2")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v1")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v1")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v2")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/pattern/v2")
 VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v1")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/pattern/v1")
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v4")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v4")
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v3")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v3")
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v2")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v2")
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v1")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/board/v1")
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v2")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/pattern/v2")
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/pattern/v1")}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, "blobboards/pattern/v1")
+for s in ("blobboards/board/v5", "blobboards/pattern/v3", "blobboards/board/v4", "blobboards/board/v3", "blobboards/board/v2",
+          "blobboards/board/v1", "blobboards/pattern/v2", "blobboards/pattern/v1")
+    @eval VgtkIO.migrate_schema(::Val{Symbol($s)}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, $s)
+end

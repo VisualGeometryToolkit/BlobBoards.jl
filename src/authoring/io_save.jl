@@ -119,7 +119,7 @@ function _save_board(
 
     json_path = joinpath(valid_dir, base * ".json")
     save_json(
-        json_path, bundle; overwrite = true, pretty_json = true, render = BlobBoards._render_record(o, id_label), config_hash
+        json_path, bundle; overwrite = true, render =BlobBoards._render_record(o, id_label), config_hash
     )
     return fig_path, json_path
 end

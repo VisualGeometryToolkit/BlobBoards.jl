@@ -1,5 +1,5 @@
 # =============================================================================
-# Bundle serialization: pattern v3, the v1 migration, canonical identity, v0 refusal
+# Bundle serialization: pattern v4, the v1 migration, canonical identity, v0 refusal
 # =============================================================================
 #
 # The golden constants below are the point of this file: if a change to the
@@ -89,7 +89,7 @@ const V0_FIXTURE = """
             @test occursin("0.18", err)
         end
         # direct typed parse of v0 spellings: also refused, not misparsed
-        @test_throws Exception JSON.parse(V0_FIXTURE, PatternBundle)
+        @test_throws Exception JSON.lift(BlobBoards._FILE_STYLE, PatternBundle, JSON.parse(V0_FIXTURE))
     end
 
     @testset "v1 files load and migrate: fraction → max_scale, stored hash kept" begin
@@ -101,7 +101,7 @@ const V0_FIXTURE = """
             @test read(path, String) == V1_FIXTURE                    # the file is not rewritten
             out = joinpath(dir, "migrated", "blob_pattern_abc_12345.json")
             r = VgtkIO.vgio_migrate(path; out)
-            @test r.from == "blobboards/pattern/v1" && r.to == "blobboards/pattern/v3"
+            @test r.from == "blobboards/pattern/v1" && r.to == "blobboards/pattern/v4"
             write(joinpath(dir, "migrated", "blob_pattern_abc_12345.png"), "")
             bundle, _, config_hash = BlobBoards.load_bundle(out)
             pc = bundle.pattern_config
@@ -151,7 +151,7 @@ const V0_FIXTURE = """
             seed = 0x42, cutoff = 2.0))
     end
 
-    @testset "v3 write → read round trip" begin
+    @testset "v4 write → read round trip" begin
         pb = PatternBundle(
             _golden_config(),
             [
@@ -165,7 +165,7 @@ const V0_FIXTURE = """
             read(path, String)
         end
         obj = JSON.parse(str)
-        @test obj.schema == "blobboards/pattern/v3"
+        @test obj.schema == "blobboards/pattern/v4"
         @test VgtkIO.from_json(VgtkIO.UnitContract, obj.units) == VgtkIO.UnitContract()
         @test obj.pattern_config.min_scale == 3 && obj.pattern_config.max_scale == 6 &&
             obj.pattern_config.pattern_resolution.width == 64   # numbers, pixels
@@ -176,10 +176,26 @@ const V0_FIXTURE = """
         @test haskey(obj.pattern_config, :alpha)                          # v1 spelling
         @test obj.pattern_config.pixel_type == "gray8"
 
-        pb2 = JSON.parse(str, PatternBundle)
+        pb2 = JSON.lift(BlobBoards._FILE_STYLE, PatternBundle, JSON.parse(str))
         @test pb2.blobs == pb.blobs
         @test hash_config(pb2.pattern_config) == hash_config(pb.pattern_config)
     end
 
-
+    @testset "track-trace manifest: v2 written, v1 read" begin
+        mktempdir() do dir
+            t = BlobBoards.TrackTrace(; source = "clip.mp4")
+            BlobBoards.save_trace(joinpath(dir, "new.trace"), t)
+            m = JSON.parse(read(joinpath(dir, "new.trace", "trace.json"), String))
+            @test m.schema == "blobboards/track_trace/v2" && !haskey(m, :schema_version) && m.n_frames == 0
+            @test BlobBoards.load_trace(joinpath(dir, "new.trace")).source == "clip.mp4"
+            # a v1 manifest: the same keys, its version an integer
+            old = mkpath(joinpath(dir, "old.trace"))
+            write(joinpath(old, "trace.json"), """{"schema_version": 1, "keep_frames": "none", "source": "clip.mp4", "config": null,
+                "network_hash": null, "frame_size": {"width": 640, "height": 480}, "n_frames": 0, "frame_indices": []}""")
+            t1 = BlobBoards.load_trace(old)
+            @test t1.source == "clip.mp4" && t1.frame_size == BlobBoards.Size2(640, 480) && isempty(t1.records)
+            write(joinpath(old, "trace.json"), """{"schema_version": 3, "keep_frames": "none"}""")
+            @test_throws ErrorException BlobBoards.load_trace(old)
+        end
+    end
 end

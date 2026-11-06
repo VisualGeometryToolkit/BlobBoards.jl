@@ -369,19 +369,14 @@ function rebuild_board(
     )
     _refuse_unknown_kwargs("rebuild_board", (; kwargs...))
     is_text = startswith(lstrip(json_or_path), '{')
-    json_config = if is_text
-        String(json_or_path)
-    elseif isfile(json_or_path)
-        read(json_or_path, String)
-    else
+    is_text || isfile(json_or_path) ||
         throw(ArgumentError("rebuild_board takes a board's JSON, as text or a file's path; got $(repr(first(json_or_path, 80)))"))
-    end
     # the caller's keywords are checked as given, before parsing and placement
     # (no output keyword without a dir); the recorded options then fill in
     _check_writer(dir, output, id_label)
-    # Try to read as BoardBundle first (the common case), extract preamble
-    obj = BlobBoards._read_record(json_config, is_text ? "rebuild_board's JSON" : String(json_or_path))   # an earlier schema through its version steps
-    bundle = JSON.lift(BoardBundle, obj)
+    # an earlier schema through its version steps
+    obj = BlobBoards._read_record(is_text ? IOBuffer(json_or_path) : json_or_path)
+    bundle = JSON.lift(BlobBoards._FILE_STYLE, BoardBundle, obj)
     preamble = bundle.preamble
     rec = BlobBoards._render_options(obj)
     # a v3 board's rasters are at its printer's density; its writers recorded none

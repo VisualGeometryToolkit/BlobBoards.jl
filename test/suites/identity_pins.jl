@@ -6,13 +6,17 @@
 # carried by its QR code), the annotation config hash and the bytes of the JSON a
 # board or pattern is saved as are pinned here. The IDENTITIES were pinned on
 # 2026-10-24 against the JSON3/StructTypes serializer and have not moved since:
-# not for the move to JSON.jl, and not for the file format's bump to board v5 /
-# pattern v3 (2026-10-27, the quantity format), which is why `hash_config` of
-# every board below is the same string it was, and the stored `hashes.config` of
-# every migrated file is untouched. A printed board's uid must never move. The
-# FILE BYTES are pinned too; the v5 pins are those of the v5 writer (a file is
-# byte-identical to what the writer wrote for the same board, and the migration
-# of each tracked file is byte-identical to the file that replaced it).
+# not for the move to JSON.jl, not for the file format's bump to board v5 /
+# pattern v3 (2026-10-27, the quantity format), and not for board v6 / pattern
+# v4 (2026-11-06, VisualGeometryToolkitIO's writer), which is why `hash_config`
+# of every board below is the same string it was, and the stored
+# `hashes.config` of every migrated file is untouched. A printed board's uid
+# must never move. The FILE BYTES are pinned too; the pins are those of the
+# current (v6 / v4) writer, IO's `write_record`. The v5 / v3 writer (a
+# JSON3.pretty clone) is gone; its files are the tracked fixtures, pinned by
+# their sha256 and read through their version step to the value they always
+# held, and the migration of a retired file and of its tracked v5 successor
+# give the same bytes.
 
 using SHA: sha256
 using VisualGeometryToolkitCore: Disc, Point2, px, mm, dpi, pt, ustrip
@@ -20,13 +24,69 @@ using VisualGeometryToolkitCore: Disc, Point2, px, mm, dpi, pt, ustrip
 _sha(bytes) = bytes2hex(sha256(bytes))
 _onlyext(dir, ext) = only(filter(endswith(ext), readdir(dir; join = true)))
 
+# Two parsed records are the same record: the same keys (the schema aside), every
+# number equal as a number (`3` and `3.0`: a v5 file printed an integral float as
+# an integer), every other value equal.
+_same_record(a::AbstractDict, b::AbstractDict) =
+    setdiff(Set(String.(keys(a))), ["schema"]) == setdiff(Set(String.(keys(b))), ["schema"]) &&
+    all(k -> String(k) == "schema" || _same_record(a[k], b[String(k)]), keys(a))
+_same_record(a::AbstractVector, b::AbstractVector) = length(a) == length(b) && all(_same_record(x, y) for (x, y) in zip(a, b))
+_same_record(a::Real, b::Real) = (a isa Bool || b isa Bool) ? a === b : a == b
+_same_record(a, b) = isequal(a, b)
+
 const _FIXTURES = joinpath(@__DIR__, "..", "fixtures", "v3_render")
 
 # The pattern bundle of serialization.jl's golden config, as `save_json` writes
-# it. The integral floats are printed the way JSON3.pretty printed them: an
-# object value 3.0 as `3`, an array's first element 3.0 as `3`, but 40.0 after
-# the float 30.25 in the same array as `40.0`.
+# it (pattern v4: JSON.jl's printing — a Float64 keeps its `.0`, an integral
+# pixel count is an integer).
 const PINNED_PATTERN_JSON = """
+{
+    "schema": "blobboards/pattern/v4",
+    "units": {
+        "world": "mm",
+        "density": "dpi"
+    },
+    "pattern_config": {
+        "pattern_resolution": {
+            "width": 64,
+            "height": 64
+        },
+        "min_scale": 3,
+        "seed": "42",
+        "pixel_type": "gray8",
+        "max_scale": 6,
+        "scales_per_octave": 3,
+        "max_trials": 100,
+        "alpha": 1.6,
+        "cutoff": 2.0,
+        "raster_aligned": true,
+        "polarity": "dark"
+    },
+    "blobs": {
+        "centers": [
+            [
+                10.5,
+                20.5
+            ],
+            [
+                30.25,
+                40.0
+            ]
+        ],
+        "sigmas": [
+            3.0,
+            4.5
+        ]
+    },
+    "hashes": {
+        "config": "ba1b3dc4bd7e068ed6f059a15d305e168dea5c0e6e80c96f578931c8f339708f"
+    }
+}"""
+
+# The same bundle as the retired v3 writer wrote it (the pin it was held to until
+# 2026-11-06, JSON3.pretty's integral floats printed as integers): a v3 file still
+# reads, through its version step, as that bundle.
+const PINNED_PATTERN_V3_JSON = """
 {
     "schema": "blobboards/pattern/v3",
     "units": {
@@ -72,20 +132,7 @@ const PINNED_PATTERN_JSON = """
 
 @testset "identity and byte pins" begin
 
-    @testset "the writer's layout is JSON3.pretty's, quirks included" begin
-        # expected strings as JSON3.pretty printed these values (2026-10-24)
-        pretty(x) = sprint(io -> BlobBoards._write_json(io, x))
-        @test pretty(Any[3.0, 4.5, 5.0]) == "[\n    3,\n    4.5,\n    5\n]"
-        @test pretty(Any[1.5, nothing, 2.0, 2]) == "[\n    1.5,\n    null,\n    2.0,\n    2.0\n]"
-        @test pretty(Any[nothing, 2.0]) == "[\n    null,\n    2\n]"
-        @test pretty(Any[2.5, "a", 3.0]) == "[\n    2.5,\n    \"a\",\n    3\n]"
-        @test pretty((a = 3.0, b = Any[], c = Dict{String, Any}(), d = -0.0, e = 1.0e16, f = Any[Any[1.0], 2.5, 3])) ==
-            "{\n    \"a\": 3,\n    \"b\": [\n    ],\n    \"c\": {\n    },\n    \"d\": 0,\n    \"e\": 10000000000000000,\n" *
-            "    \"f\": [\n        [\n            1\n        ],\n        2.5,\n        3\n    ]\n}"
-        @test sprint(io -> BlobBoards._write_json(io, (a = 3.0, b = Any[1.5, 2]); pretty = false)) == "{\"a\":3.0,\"b\":[1.5,2]}"
-    end
-
-    @testset "pattern bundle JSON bytes" begin
+    @testset "pattern bundle JSON bytes; the v3 bytes read as the same bundle" begin
         pc = BlobBoards.PatternConfig(
             pattern_resolution = BlobBoards.Size2(width = 64.0px, height = 64.0px),
             min_scale = 3.0px, max_scale = 6.0px, seed = UInt64(42),
@@ -96,19 +143,23 @@ const PINNED_PATTERN_JSON = """
         mktempdir() do dir
             BlobBoards.save_json(joinpath(dir, "pretty.json"), pb)
             @test read(joinpath(dir, "pretty.json"), String) == PINNED_PATTERN_JSON
-            BlobBoards.save_json(joinpath(dir, "compact.json"), pb; pretty_json = false)
-            @test _sha(read(joinpath(dir, "compact.json"))) == "5e7d23ee4f191a905d020e559d9247ec09150bd0e1d1bb81911d3b680634db94"
+            write(joinpath(dir, "v3.json"), PINNED_PATTERN_V3_JSON)
+            old, stored = BlobBoards._parse_bundle(joinpath(dir, "v3.json"))
+            @test BlobBoards._same_value(old, pb) && stored == "ba1b3dc4bd7e068ed6f059a15d305e168dea5c0e6e80c96f578931c8f339708f"
+            # and the v3 file migrates to the current bytes
+            r = VgtkIO.vgio_migrate(joinpath(dir, "v3.json"); out = joinpath(dir, "v4.json"))
+            @test r.to == "blobboards/pattern/v4" && read(joinpath(dir, "v4.json"), String) == PINNED_PATTERN_JSON
         end
     end
 
-    @testset "point-grid board: identity, code, JSON bytes (board v5)" begin
+    @testset "point-grid board: identity, code, JSON bytes (board v6)" begin
         mktempdir() do dir
             b = blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir)
             @test hash_config(b.preamble) == "da6009bb31d28be9a193fdfdf1e3f287d1468335e2751b20e6bc2f32830943d4"
             @test _sha(BlobBoards.canonical_config_json(b.preamble)) == "80388c6c81978b0923d85f0a9e95aa2e7c94eff600d09bea40ceaf8e50fc1e4b"
             @test BlobBoards.board_code(b.preamble) ==
                 "BB4/148MM/210MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/1234/2.83464566929/18.1415/3/5000/1.2/2/D/DA6009BB"
-            @test _sha(read(_onlyext(dir, ".json"))) == "d2e6f9e075af835ec73a65727ae3dc1804e07265c02d5691d2d598c3ee77a37b"
+            @test _sha(read(_onlyext(dir, ".json"))) == "6ec3ca0b061c7bb9f3ebcb5a57a177aa7a42cc27d6c934e4cd17a901957063e1"
             @test basename(BlobBoards._render_cache_dir(hash_config(b.preamble), true)) == "da6009bb31d28be9_05984910"
             # write → read → write is byte-identical: the lift paths (margin, ruler_width, corner_size, layout_grid,
             # the blob columns) lose nothing
@@ -117,28 +168,33 @@ const PINNED_PATTERN_JSON = """
             BlobBoards.save_json(joinpath(dir, "again.json"), bundle; config_hash = stored, render = BlobBoards._render_record(BlobBoards.Pdf(), true))
             @test read(joinpath(dir, "again.json")) == read(written)
         end
-        # a tracked board file (docs/hero_board.json, v5) re-saves to the same bytes
+        # a tracked board file (docs/hero_board.json, v5) reads, through its version step, as the board it holds:
+        # its re-save is the same record under the current schema, and re-saves to itself
         mktempdir() do dir
             hero = joinpath(pkgdir(BlobBoards), "docs", "hero_board.json")
             bundle, _, stored = BlobBoards.load_bundle(hero)
             BlobBoards.save_json(joinpath(dir, "hero.json"), bundle; config_hash = stored, render = BlobBoards._render_record(BlobBoards.Pdf(), false))
-            @test read(joinpath(dir, "hero.json")) == read(hero)
+            new, old = JSON.parse(read(joinpath(dir, "hero.json"), String)), JSON.parse(read(hero, String))
+            @test new.schema == "blobboards/board/v6" && old.schema == "blobboards/board/v5"
+            @test _same_record(new, old)
+            again, _, s2 = BlobBoards.load_bundle(joinpath(dir, "hero.json"))
+            @test BlobBoards._same_value(again, bundle) && s2 == stored
         end
         # a raster output records its density (a quantity) in the render block
         mktempdir() do dir
             blob_board("A5"; blob_sizes = (5.0mm, 0.2short_side), seed = 0x77, dir, output = BlobBoards.Png(150dpi), id_label = true)
             json = read(_onlyext(dir, ".json"))
-            @test _sha(json) == "b033504e51517fd276c736f787ed26dc66184661b2d152c8586696f3b574d049"
+            @test _sha(json) == "6c97fa3f92825da732144b7fe44c4e0e53c49736e0f5c0b2a97433d8bd93e629"
             @test occursin("cd5a5372d3c7c38f4b2a3724759421f44d354027b127b9a5623543dc37ec4017", String(json))
         end
     end
 
-    @testset "stored pixel-grid boards: identity, re-save and rebuild bytes (board v5)" begin
+    @testset "stored pixel-grid boards: identity, re-save and rebuild bytes (board v6)" begin
         for (name, h, resave) in (
                 ("odd300", "0ed26d0d3b982d10064a872e75e1dfb5215ef91cac71633083a2da5c6ddadc39",
-                    "16df891e5b78d67dac9a1fbf86f95a22ee31bf4fb5ee3dbbb290c43e675208c7"),
+                    "671dd80da9a4971a7231c9d85dc45fd21778098f2e7ec974a55628d5b49b5719"),
                 ("framed600", "b01c46b2f66b6507175cd68e077f8445cfc538ea550e05101f1e4d062f353768",
-                    "f7e732a06609f6c97efcefb2bde7c4bc4e6b4b5b22637251d8138382a3efd099"),
+                    "48c8ff7e285d8c9d3a53e7bfb8ba481f8892623329e64ceb74654580d3085933"),
             )
             v3, _, stored = BlobBoards.load_bundle(joinpath(_FIXTURES, name * ".json"))
             @test stored == h
@@ -151,7 +207,7 @@ const PINNED_PATTERN_JSON = """
         end
         mktempdir() do dir
             BlobBoards.rebuild_board(joinpath(_FIXTURES, "odd300.json"); dir)
-            @test _sha(read(_onlyext(dir, ".json"))) == "a1181578131b932ecba8bc7ece7cd64b65a6953600cc9b2e5b41ec09834f0d04"
+            @test _sha(read(_onlyext(dir, ".json"))) == "8cc0cdaf50b2e71887c1d28dc65040f9e595a3533eccfdd978fdafba450e8f87"
         end
     end
 
@@ -159,7 +215,7 @@ const PINNED_PATTERN_JSON = """
     @testset "migration: the tracked boards, UIDs invariant, bytes pinned" begin
         legacy = joinpath(@__DIR__, "..", "fixtures", "legacy")
         pkg = pkgdir(BlobBoards)
-        # (legacy file, the tracked file that replaced it, its schema before, the sha256 of the new file)
+        # (legacy file, the tracked v5 file that replaced it, its schema before, its uid)
         cases = (
             ("hero_board_v4.json", joinpath(pkg, "docs", "hero_board.json"), "blobboards/board/v4", "289"),
             ("odd300_v3.json", joinpath(_FIXTURES, "odd300.json"), "blobboards/board/v3", "0ed"),
@@ -176,9 +232,9 @@ const PINNED_PATTERN_JSON = """
             old_path = joinpath(legacy, old)
             old_obj = JSON.parse(read(old_path, String))
             @test old_obj.schema == from
-            # loading the retired form (here through JSON.parse, as the Python wrapper does) names the migration
+            # lifting the retired form without its version step names the migration
             err = try
-                JSON.parse(read(old_path, String), BlobBoards.BoardBundle)
+                JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.BoardBundle, old_obj)
                 nothing
             catch e
                 sprint(showerror, e)
@@ -187,9 +243,14 @@ const PINNED_PATTERN_JSON = """
             mktempdir() do dir
                 out = joinpath(dir, basename(tracked))
                 r = VgtkIO.vgio_migrate(old_path; out)
-                @test r.from == from && r.to == "blobboards/board/v5" && r.uid == uid
-                # the migration IS the tracked file, byte for byte
-                @test read(out) == read(tracked)
+                @test r.from == from && r.to == "blobboards/board/v6" && r.uid == uid
+                # the migration of the retired file and of its tracked v5 successor are the same record (the render
+                # block is carried as the file holds it, so a v5 file's integral float stays the integer it printed)
+                out5 = joinpath(dir, "from_v5.json")
+                r5 = VgtkIO.vgio_migrate(tracked; out = out5)
+                @test r5.from == "blobboards/board/v5" && r5.to == "blobboards/board/v6" && r5.uid == uid
+                @test _same_record(JSON.parse(read(out, String)), JSON.parse(read(out5, String)))
+                @test JSON.parse(read(out, String)).preamble == JSON.parse(read(out5, String)).preamble
                 new_obj = JSON.parse(read(tracked, String))
                 @test new_obj.schema == "blobboards/board/v5"
                 # the uid is invariant: the stored hash is carried over …
@@ -201,13 +262,15 @@ const PINNED_PATTERN_JSON = """
                 # every number reads back as the old file read it
                 legacy_bundle = BlobBoards._legacy_board_bundle(old_obj)
                 @test BlobBoards._same_value(legacy_bundle, bundle)
+                migrated, migrated_stored = BlobBoards._parse_bundle(out)
+                @test BlobBoards._same_value(migrated, bundle) && migrated_stored == stored
                 # the old file itself loads (its version step, in memory) as the migrated file, uid kept
                 old_bundle, old_stored = BlobBoards._parse_bundle(old_path)
                 @test BlobBoards._same_value(old_bundle, bundle) && old_stored == stored
                 @test BlobBoards.uid_from_hash(old_stored) == uid
             end
         end
-        # the new files' bytes
+        # the tracked v5 files' bytes (unchanged: an old version's fixtures)
         @test _sha(read(joinpath(pkg, "docs", "hero_board.json"))) == "eb09ac5696c83c75f314ed564b6bcfb75d912c4e9f56a76e9408b606a7fc73ce"
         @test _sha(read(joinpath(_FIXTURES, "odd300.json"))) == "6b2e3dfcf442bcdea35d7d9472fd05827cfdeef792de22d4832df4292f86473c"
         @test _sha(read(joinpath(_FIXTURES, "framed600.json"))) == "c2829bab15087ca8656add8cf73a32f4fead9351414f9711b8f576a923579249"
@@ -239,9 +302,6 @@ const PINNED_PATTERN_JSON = """
     end
 
     @testset "the identity tree is the frozen {value, unit} form, whole (no quantity leaks a bare number)" begin
-        leaves(x::AbstractDict) = (l = Any[]; for (k, v) in x; append!(l, [(k, w) for w in leaves(v)]); end; l)
-        leaves(x::AbstractVector) = reduce(vcat, [leaves(v) for v in x]; init = Any[])
-        leaves(x) = Any[x]
         quantity_object(d, k) = d[k] isa AbstractDict && keys(d[k]) == Set(["value", "unit"])
         pt_board = blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir = mktempdir())
         bc = BlobBoards._plain(pt_board.preamble)["board_config"]
@@ -262,17 +322,22 @@ const PINNED_PATTERN_JSON = """
     end
 
     @testset "the file format is not part of an identity" begin
-        @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v5" && BlobBoards.PATTERN_SCHEMA == "blobboards/pattern/v3"
+        @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v6" && BlobBoards.PATTERN_SCHEMA == "blobboards/pattern/v4"
         @test BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"            # frozen: a bump of the file schema moves no uid
         b = blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir = mktempdir())
         # the identity tree names the identity schema and holds the quantities in its own form
         tree = BlobBoards._plain(b.preamble)
         @test tree["board_config"]["canvas_size"]["width"] == Dict{String, Any}("value" => 148, "unit" => "mm") ||
             tree["board_config"]["canvas_size"]["width"] == Dict{String, Any}("value" => 148.0, "unit" => "mm")
-        # … while the file holds numbers, and the two forms never leak into each other
-        @test BlobBoards._lower(148.0mm) == 148.0 && BlobBoards._lower(300dpi) == 300 && BlobBoards._lower(64px) == 64
+        # … while the file holds numbers, and the two forms never leak into each other: they are two styles
+        file(q) = BlobBoards._lowered(BlobBoards._FILE_STYLE, q)
+        @test file(148.0mm) == 148.0 && file(300dpi) == 300 && file(64px) == 64
         @test BlobBoards._plain(148.0mm) == Dict{String, Any}("value" => 148.0, "unit" => "mm")
-        @test BlobBoards._lower(148.0mm) == 148.0                              # after `_plain`, still a file's number
+        @test file(148.0mm) == 148.0                              # after `_plain`, still a file's number
+        # no BlobBoards lowering lands on JSON.jl's own style
+        for T in (typeof(b), typeof(b.preamble), typeof(b.preamble.board_config), typeof(b.preamble.pattern_config), typeof(148.0mm))
+            @test parentmodule(which(JSON.lower, Tuple{JSON.JSONStyle, T})) !== BlobBoards
+        end
     end
 
     @testset "IO reads what a board writes: units block, roles, numbers" begin

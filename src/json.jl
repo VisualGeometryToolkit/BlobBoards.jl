@@ -1,89 +1,72 @@
 # =============================================================================
-# JSON (JSON.jl 1.x): field access, and the one writer of every JSON file
+# JSON: the board's numbers, and its two lowerings (a file, an identity)
 # =============================================================================
 #
-# Each serialized type gets JSON.jl's two hooks (types.jl): `JSON.lower(::JSON.JSONStyle, x)`
-# returns the plain value written, `JSON.lift(::Type{T}, obj)` builds `T` from a
-# parsed object, and `StructUtils.structlike(::Type{T}) = false` makes
-# `JSON.parse(str, T)` hand `lift` the whole object. VisualGeometryToolkitFeatures
-# does the same for `Size2` and quantities.
+# Every JSON file is written and read at VisualGeometryToolkitIO's file
+# boundary, `VgtkIO.write_record(path, record; style)` and
+# `VgtkIO.read_record(path)` (the vgio file shape; an earlier schema read
+# through the version steps of src/migrate_boards.jl). Each BlobBoards type
+# is lowered and lifted on IO's style, `JSON.lower(::VgtkIO.VgioStyle, x)` and
+# `JSON.lift(::VgtkIO.VgioStyle, T, record)` (types.jl): no method lands on
+# JSON.jl's own style, so no other package's JSON changes when BlobBoards loads.
+# A lift reads a parsed record by property access (`x.key`, `get(x, :key,
+# default)`): a `JSON.Object`, or a NamedTuple built in memory.
 #
-# THE WRITER IS BYTE-PINNED (test/suites/identity_pins.jl). Until 2026-10 every
-# file was written by JSON3 (`JSON3.pretty`, or `JSON3.write`), and a file written
-# now must be byte-identical to the one that writer wrote for the same board.
-# The compact form is: JSON.jl and JSON3 print every value the same way (keys
-# in the lowered order — a Dict's in its iteration order, `sort_keys = false` —,
-# floats in Base's shortest round-trip form, the same characters escaped). The
-# pretty form is not, so `_write_pretty` reproduces JSON3.pretty exactly,
-# quirks included:
-#
-#   - 4-space indent, `"key": value`, one element per line;
-#   - an empty object or array spans two lines (`{` newline, indent, `}`);
-#   - JSON3.pretty re-read the compact text with JSON3.read, which reads an
-#     integral float (`3.0`) as an integer, so it printed `3` — except inside an
-#     array whose earlier elements were all floats (or nulls) with at least one
-#     float: there it stayed `3.0` (`[30.25, 40.0]` but `[3, 4.5]`), and an
-#     integer was read, and printed, as a float (`[1.5, 2]` as `[1.5, 2.0]`).
-#
-# Checked against JSON3.pretty on 20 000 random trees (nested objects and
-# arrays, empties, nulls, Bools, integers, integral and non-integral floats,
-# -0.0, 1e16, escaped strings) when it was written: no byte differed.
-
-# A parsed JSON object (`JSON.Object`, any AbstractDict) or a NamedTuple standing
-# in for one, accessed by field name. Symbol-keyed dictionaries are accepted
-# too: a caller may build the input by hand.
-_hasfield(x::AbstractDict, key::String) = haskey(x, key) || haskey(x, Symbol(key))
-_hasfield(x::NamedTuple, key::String) = haskey(x, Symbol(key))
-
-_getfield(x::AbstractDict, key::String) = haskey(x, key) ? x[key] : x[Symbol(key)]
-_getfield(x::NamedTuple, key::String) = getproperty(x, Symbol(key))
-_getfield(x, key::String, default) = _hasfield(x, key) ? _getfield(x, key) : default
-
-const _JSONObject = Union{AbstractDict, NamedTuple}
-
-# A value's JSON lowering (types.jl: each BlobBoards type's `JSON.lower`; a
-# quantity or a `Size2` through `_lower`/`_jv` below), the value itself when it
-# has none: what the writer serializes and what the canonical identity encoding
-# (`_plain`) is computed over. The style is private; every lowering method takes
-# any `JSON.JSONStyle`.
-struct _LowerStyle <: JSON.JSONStyle end
-_lower(x) = JSON.lower(_LowerStyle(), x)
+# What stays here is what is the board's own: the conversion of its numbers
+# and the frozen form its identity is minted in.
 
 # -----------------------------------------------------------------------------
 # A quantity in a board file, and in a board's identity
 # -----------------------------------------------------------------------------
 #
-# FILE (board/v5, pattern/v3): a quantity is a NUMBER in the unit the file's
-# `units` block declares — VisualGeometryToolkitIO's quantity format, the one
-# every stack file uses, and the ONLY place a file declares a unit: a length in
-# the declared `world` unit (mm), a density in the declared `density` unit
-# (dpi), a pixel count in pixels; the point-grid board's own numbers (the σ
-# range, the layout grid, the blobs) are plain numbers in the declared `pattern`
-# length role (pt). A pixel count or a density is an integer when it is one.
+# FILE (board/v6, pattern/v4): a quantity is a NUMBER in the unit the file's
+# `units` block declares — a length in the declared `world` unit (mm), a
+# density in the declared `density` unit (dpi), a pixel count in pixels; the
+# point-grid board's own numbers (the σ range, the layout grid, the blobs) are
+# plain numbers in the declared `pattern` length role (pt). A pixel count or a
+# density is an integer when it is one.
 #
-# TEMPORARY: every conversion between a quantity and a file number goes through
-# ONE pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(unit, q)`
+# Every conversion between a quantity and a file number goes through ONE
+# pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(unit, q)`
 # and `number * unit`, NOT VisualGeometryToolkitIO's decimal-exact
-# `write_quantity`/`read_quantity`. The reason is an IO gap: its writer is not
-# exact for a quantity built as `v * unit` — a board is built from literals
-# (`9.0mm`, which is 0.009000000000000001 m), so IO would print
-# `9.000000000000002` for it, and its reader would hold a value an ulp from the
-# one the board was built with (identity, byte pins and placement were computed
-# with `v * unit`). When IO's writer writes `v` back for `v * unit`, this pair is
-# replaced by `write_quantity`/`read_quantity` under the file's `UnitContract`
-# (roles included) and nothing else changes: no other code converts a file
-# number. (`test/suites/identity_pins.jl` reads a written board with IO's reader.)
+# `write_quantity`/`read_quantity`. A board is built from literals (`9.0mm`,
+# `8.5inch`): its values are products, and its identity, its placement and
+# every stored board were computed with them. IO's codec is decimal-exact in
+# metres instead, and the two disagree (measured 2026-11-06, FlexUnits
+# 0.6.16): `read_length(v, mm) !== v * mm` for 24% of the decimals 0–2000 mm
+# in steps of 0.1, `write_length(v * mm, mm) != ustrip(mm, v * mm)` for 6% of
+# millimetre and 19% of inch-built lengths, and `ustrip(dpi, read_quantity(d,
+# :density, …)) != d` for 580 of the integers 1–5000 (a density read back as
+# a Float64 product, where a board holds the exact `300 * dpi`). A loaded board
+# must hold the values it was built with, so the board keeps the product pair.
+# (`test/suites/identity_pins.jl` reads a written board with IO's reader.)
 #
 # IDENTITY: a board's identity (`hashes.config`, the uid printed in its corners
 # and carried by its QR code) is the SHA-256 of a canonical tree built from the
 # same lowering, in the form every board's identity has ever been minted from:
 # each quantity an object `{value, unit}`. That form is the identity's own
 # encoding, frozen — not a file format; nothing reads it back — and it is what
-# keeps a uid from moving when the file format does. `_plain` turns it on for
-# the duration of one canonical encoding (`_IDENTITY`); everything else is a file.
-# `_lowered` is the one function every lowering calls for a quantity, and
-# `_identity_form` the one place the frozen form is written.
-const _IDENTITY = ScopedValue(false)
+# keeps a uid from moving when the file format does. It is a STYLE of its own,
+# `_IdentityStyle` (`_plain` lowers on it); a file is lowered on IO's
+# `VgioStyle`. `_lowered(style, q)` is the one function every lowering calls
+# for a quantity, and `_identity_form` the one place the frozen form is written.
+
+"""
+    _IdentityStyle <: JSON.JSONStyle
+
+The style a board's identity tree is lowered on (`_plain`): every BlobBoards
+type's lowering is the file's, except that each quantity is the frozen
+`{value, unit}` object (`_identity_form`).
+"""
+struct _IdentityStyle <: JSON.JSONStyle end
+
+# The styles a BlobBoards type is lowered on: a file's (IO's) and the identity's.
+const _Style = Union{VgtkIO.VgioStyle, _IdentityStyle}
+
+# The style every BlobBoards file is written on: lengths in mm, the unit the
+# file's `units` block declares (the quantities themselves go through
+# `_lowered`, never through the style's own length codec).
+const _FILE_STYLE = VgtkIO.VgioStyle(; length_unit = mm)
 
 # The units a file being READ declares (`units`: world, density). The default is
 # what every file this package writes declares.
@@ -127,16 +110,20 @@ function _identity_form(q::Quantity; role::Symbol = :world)
 end
 
 # The one function every lowering calls for a quantity: the file's number, or
-# (inside `_plain`) the identity's frozen object.
-_lowered(q::Quantity; role::Symbol = :world) = _IDENTITY[] ? _identity_form(q; role) : _file_number(q; role)
+# the identity's frozen object.
+_lowered(::VgtkIO.VgioStyle, q::Quantity; role::Symbol = :world) = _file_number(q; role)
+_lowered(::_IdentityStyle, q::Quantity; role::Symbol = :world) = _identity_form(q; role)
 
-# A field's value as the writer writes it.
-_jv(q::Quantity) = _lowered(q)
-_jv(s::Size2) = (width = _jv(s.width), height = _jv(s.height))
-_jv(x) = x
+# A field's value as the style writes it.
+_jv(s::_Style, q::Quantity) = _lowered(s, q)
+_jv(s::_Style, z::Size2) = (width = _jv(s, z.width), height = _jv(s, z.height))
+_jv(::_Style, x) = x
 
-_lower(q::Quantity) = _jv(q)
-_lower(s::Size2) = _jv(s)
+# A quantity or a size left in an identity tree (a run configuration's,
+# `config_dict`) lowers in the identity's form. (A file's lowerings convert
+# their quantities themselves, through `_jv`.)
+JSON.lower(s::_IdentityStyle, q::Quantity) = _jv(s, q)
+JSON.lower(s::_IdentityStyle, z::Size2) = _jv(s, z)
 
 # A file's number as the quantity of its kind (`:length`, `:pixel`, `:density`;
 # `:pattern` and `:blob`, the point-grid board's own numbers, stored-unit pixels:
@@ -158,16 +145,15 @@ function _file_quantity(x, kind::Symbol)
     kind === :blob && return Float64(x) * px
     throw(ArgumentError("a quantity's kind is :length, :pixel, :density, :pattern or :blob, got $(repr(kind))"))
 end
-_file_size2(x, kind::Symbol) =
-    Size2(width = _file_quantity(_getfield(x, "width"), kind), height = _file_quantity(_getfield(x, "height"), kind))
+_file_size2(x, kind::Symbol) = Size2(width = _file_quantity(x.width, kind), height = _file_quantity(x.height, kind))
 
 # The `units` block a file declares, read: a VisualGeometryToolkitIO
 # `UnitContract`. A board declares a world length (mm), a density (dpi) and, on a
 # point grid, the length role `pattern` (pt); any other role is refused.
 function _declared_units(x; required::Bool = true)
-    if !_hasfield(x, "units")
+    if !haskey(x, :units)
         required || return (mm, dpi)
-        schema = _getfield(x, "schema", nothing)
+        schema = get(x, :schema, nothing)
         schema in MIGRATED_SCHEMAS && throw(
             ArgumentError(
                 "this is a $(schema) record, the retired {value, unit} quantity form, lifted without its version step; " *
@@ -177,72 +163,26 @@ function _declared_units(x; required::Bool = true)
         )
         throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))
     end
-    c = VgtkIO.from_json(VgtkIO.UnitContract, _getfield(x, "units"))
+    c = VgtkIO.from_json(VgtkIO.UnitContract, x.units)
     extra = setdiff(keys(c.lengths), (:world, :pattern))
     isempty(extra) || throw(ArgumentError("a board file's units declare no length role $(first(extra)); only `pattern`"))
     haskey(c.lengths, :pattern) && (c.lengths.pattern == pt || throw(ArgumentError("the length role `pattern` is in pt, got $(c.lengths.pattern)")))
     return (VgtkIO.role_unit(c), c.density)
 end
 
-# The type `JSON.parse(str)` returns for an object.
+# The type a parsed JSON object is (`VgtkIO.read_record`, `JSON.parse`): read
+# by property access, its keys in order.
 const _ParsedObject = JSON.Object{String, Any}
+# What a lift reads (its type keeps the lift off JSON.jl's own methods for its
+# lazy values): a parsed object, or a NamedTuple built in memory.
+const _Record = Union{JSON.Object, NamedTuple}
 
-"""
-    _write_json(io, x; pretty = true)
-
-Write `x` as JSON: JSON.jl's compact form, or (`pretty`) the 4-space layout
-every BlobBoards file has always had (see the header of src/json.jl).
-"""
-function _write_json(io::IO, x; pretty::Bool = true)
-    s = JSON.json(x; sort_keys = false)    # a Dict in its iteration order, as JSON3 wrote it (JSON.jl sorts a Dict's keys by default)
-    pretty || return write(io, s)
-    _write_pretty(io, JSON.parse(s), 0, false)    # (a bare scalar: JSON3.pretty wrote it as it was)
-    return nothing
-end
-
-const _INDENT = 4
-
-# `checkint`: whether JSON3.read would have read an integral float here as an
-# integer (true everywhere but late in an all-float array).
-function _write_pretty(io::IO, x::AbstractDict, level::Int, ::Bool)
-    write(io, "{\n")
-    isempty(x) && return write(io, ' '^(_INDENT * level), "}")
-    for (i, (k, v)) in enumerate(x)
-        write(io, ' '^(_INDENT * (level + 1)), JSON.json(String(k)), ": ")
-        _write_pretty(io, v, level + 1, true)
-        write(io, i == length(x) ? "\n" * ' '^(_INDENT * level) * "}" : ",\n")
+# A JSON object built in code, in the form a lift reads.
+function _object(kv::Pair...)
+    o = _ParsedObject()
+    for (k, v) in kv
+        o[String(k)] = v
     end
-    return nothing
+    return o
 end
-
-function _write_pretty(io::IO, x::AbstractVector, level::Int, ::Bool)
-    write(io, "[\n")
-    isempty(x) && return write(io, ' '^(_INDENT * level), "]")
-    floats = false     # an element read as a float so far
-    others = false     # an element of any other kind (an integer, a string, a container, …)
-    for (i, v) in enumerate(x)
-        write(io, ' '^(_INDENT * (level + 1)))
-        checkint = !floats || others
-        _write_pretty(io, v, level + 1, checkint)
-        if v === nothing
-        elseif (v isa Real && !(v isa Bool)) && !(checkint && _reads_as_integer(v))
-            floats = true
-        else
-            others = true
-        end
-        write(io, i == length(x) ? "\n" * ' '^(_INDENT * level) * "]" : ",\n")
-    end
-    return nothing
-end
-
-# A number: an integral one in integer form where JSON3.read checked for
-# integers, every one in float form where it did not (it read `-2` there as
-# -2.0).
-_write_pretty(io::IO, x::Real, ::Int, checkint::Bool) =
-    write(io, checkint && _reads_as_integer(x) ? string(Int64(x)) : JSON.json(Float64(x)))
-_write_pretty(io::IO, x::Bool, ::Int, ::Bool) = write(io, JSON.json(x))
-_write_pretty(io::IO, x, ::Int, ::Bool) = write(io, JSON.json(x))
-
-# JSON3.read's test: integral and within Int64's range (an integer literal past
-# it was read as a float).
-_reads_as_integer(x::Real) = isinteger(x) && -0x1p63 <= x < 0x1p63
+_object(x) = _object((String(k) => v for (k, v) in pairs(x))...)

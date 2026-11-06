@@ -18,13 +18,18 @@
 # append, random access, crash-tolerant):
 #
 #   x.trace/
-#   ├── trace.json       manifest: schema_version, source, keep_frames,
-#   │                    n_frames, gallery uids
+#   ├── trace.json       manifest (`blobboards/track_trace/v2`): source,
+#   │                    keep_frames, n_frames, frame indices, configuration
 #   ├── frames/000001.jld2   one TrackFrameRecord per frame
 #   └── images/000001.png    only for keep_frames ∈ (:thumbs, :full)
+#
+# The manifest is written in the vgio file shape (`VgtkIO.write_record`).
+# Version 1 (`"schema_version": 1`, no `schema`) held the same keys, printed by
+# BlobBoards' JSON3.pretty clone; it is read as it is. The frame records are a
+# diagnostic replay of Julia structs, kept in JLD2.
 # =============================================================================
 
-const _TRACE_SCHEMA_VERSION = 1
+const _TRACE_SCHEMA = "blobboards/track_trace/v2"
 
 """
     BoardFrameEntry
@@ -218,22 +223,19 @@ function save_trace(dir::AbstractString, trace::TrackTrace)
             )
         end
     end
-    manifest = Dict(
-        "schema_version" => _TRACE_SCHEMA_VERSION,
-        "keep_frames" => String(trace.keep_frames),
-        # `null` for an unset field, exactly as before the sentinels landed —
-        # the manifest schema is unchanged.
-        "source" => isempty(trace.source) ? nothing : trace.source,
-        "config" => isempty(trace.config) ? nothing : trace.config,
-        "network_hash" => isempty(trace.network_hash) ? nothing : trace.network_hash,
-        "frame_size" => iszero(trace.frame_size.width) ? nothing :
-            Dict("width" => trace.frame_size.width, "height" => trace.frame_size.height),
-        "n_frames" => length(trace.records),
-        "frame_indices" => [r.frame_idx for r in trace.records],
+    manifest = (
+        schema = _TRACE_SCHEMA,
+        keep_frames = String(trace.keep_frames),
+        # `null` for an unset field, as before the sentinels landed
+        source = isempty(trace.source) ? nothing : trace.source,
+        config = isempty(trace.config) ? nothing : trace.config,
+        network_hash = isempty(trace.network_hash) ? nothing : trace.network_hash,
+        frame_size = iszero(trace.frame_size.width) ? nothing :
+            (width = trace.frame_size.width, height = trace.frame_size.height),
+        n_frames = length(trace.records),
+        frame_indices = [r.frame_idx for r in trace.records],
     )
-    open(joinpath(dir, "trace.json"), "w") do io
-        _write_json(io, manifest)
-    end
+    VgtkIO.write_record(joinpath(dir, "trace.json"), manifest; style = _FILE_STYLE)
     return dir
 end
 
@@ -248,10 +250,11 @@ load_trace(path::AbstractString) =
     isdir(path) ? _load_track_trace(path) : _load_pipeline_trace(path)
 
 function _load_track_trace(dir::AbstractString)
-    manifest = JSON.parse(read(joinpath(dir, "trace.json"), String))::_ParsedObject
-    schema = manifest["schema_version"]::Int64
-    schema == _TRACE_SCHEMA_VERSION ||
-        error("trace schema version $schema ≠ $_TRACE_SCHEMA_VERSION")
+    manifest = _read_record(joinpath(dir, "trace.json"))
+    # v1 named its version `schema_version` (the same keys otherwise)
+    schema = get(manifest, :schema, get(manifest, :schema_version, nothing) == 1 ? "blobboards/track_trace/v1" : nothing)
+    schema in (_TRACE_SCHEMA, "blobboards/track_trace/v1") ||
+        error("$(joinpath(dir, "trace.json")): not a track trace manifest this BlobBoards reads ($(_TRACE_SCHEMA), or v1); got $(repr(schema))")
     keep = manifest["keep_frames"]::String
     src = manifest["source"]::Union{Nothing, String}
     trace = TrackTrace(;

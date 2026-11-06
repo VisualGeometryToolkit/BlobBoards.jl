@@ -26,7 +26,7 @@
 
         # Load and regenerate
         json_file = only(filter(f -> endswith(f, ".json"), readdir(dir; join = true)))
-        bundle = JSON.parse(read(json_file, String), BlobBoards.PatternBundle)
+        bundle = JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.PatternBundle, JSON.parse(read(json_file, String)))
 
         @test bundle.pattern_config.seed == config1.seed
         @test length(bundle.blobs) == length(blobs1)

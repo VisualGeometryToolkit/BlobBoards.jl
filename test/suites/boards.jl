@@ -98,8 +98,8 @@ end
                 obj = JSON.parse(read(onlyjson(dir), String); dicttype = Dict{String, Any})
                 @test !haskey(obj, "saddle_points")              # no longer written
                 obj["saddle_points"] = []
-                back = JSON.parse(JSON.json(obj), BlobBoards.BoardBundle)
-                @test back.blobs == JSON.parse(read(onlyjson(dir), String), BlobBoards.BoardBundle).blobs
+                back = JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.BoardBundle, JSON.parse(JSON.json(obj)))
+                @test back.blobs == JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.BoardBundle, JSON.parse(read(onlyjson(dir), String))).blobs
             end
         end
 
@@ -177,7 +177,7 @@ end
                 @test !in(:blank, kinds)
                 # stored and coded, and rebuilt from either (the bundle's code needs no placement)
                 @test hash_config(BlobBoards.parse_board_code(BlobBoards.board_code(b))) == BlobBoards._bundle_identity(b)
-                back = JSON.parse(JSON.json(b), BlobBoards.BoardBundle)
+                back = JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.BoardBundle, JSON.parse(JSON.json(b; style = BlobBoards._FILE_STYLE)))
                 @test hash_config(back.preamble) == hash_config(b.preamble) && back.preamble.board_config.corner_size == bc.corner_size
             end
             # corner cells and band are sized apart: a 6 mm band runs between 14 mm cells
@@ -189,7 +189,7 @@ end
             @test grid_mm(m[:top].h) ≈ 6 atol = 0.01
             @test m[:top].x == m[:qr].w                          # the band starts where the cell ends
             # a v4 board records its corner cells; its pattern size is the board's, not recorded
-            obj = JSON.parse(JSON.json(b); dicttype = Dict{String, Any})
+            obj = JSON.parse(JSON.json(b; style = BlobBoards._FILE_STYLE); dicttype = Dict{String, Any})
             @test haskey(obj["preamble"]["board_config"], "corner_size")
             @test !haskey(obj["preamble"]["pattern_config"], "pattern_resolution")
             # a keyword the style draws nothing with is refused, not stored in the identity
@@ -268,7 +268,7 @@ end
         @test rs.major_tick.width == 16.0mm && rs.minor_tick.width == 8.0mm
     end
 
-    @testset "A pre-v3 board's ruler migrates (board v1/v2 → v5)" begin
+    @testset "A pre-v3 board's ruler migrates (board v1/v2 → v6)" begin
         # board v1/v2 stored `ruler_spec.width` and HALF-extent tick widths in the
         # `{value, unit}` form; the migration drops the one and doubles the others,
         # keeping the stored hash. Built from the migrated v3 pixel-grid fixture's
@@ -285,8 +285,8 @@ end
             legacy = joinpath(dir, "legacy", "blob_board_legacy.json")
             mkpath(dirname(legacy))
             open(io -> JSON.json(io, d), legacy, "w")
-            out = joinpath(dir, "v5.json")
-            @test VgtkIO.vgio_migrate(legacy; out).to == "blobboards/board/v5"
+            out = joinpath(dir, "v6.json")
+            @test VgtkIO.vgio_migrate(legacy; out).to == "blobboards/board/v6"
             b, h = BlobBoards._parse_bundle(out)
             want, hw = BlobBoards._parse_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "framed600.json"))
             @test b.preamble.board_config.ruler_spec == want.preamble.board_config.ruler_spec
@@ -339,7 +339,7 @@ end
         end
         @test isempty(readdir(root))                          # every rejection came before writing
         bundle = blob_board("A5"; kw...)                       # in memory: no output keyword, no file
-        json = JSON.json(bundle)
+        json = JSON.json(bundle; style = BlobBoards._FILE_STYLE)
         @test_throws ArgumentError BlobBoards.rebuild_board(json; output = Png(400dpi))      # no dir
         @test_throws ArgumentError BlobBoards.rebuild_board(json; dir = root, format = "png")
         @test_throws ArgumentError BlobBoards.rebuild_board(json; dir = root, frame_style = :none)   # a rebuild takes the output only
@@ -845,7 +845,7 @@ end
     AE = BlobBoards.Authoring
     # a sidecar's preamble, read back, equals the bundle's — same schema, same values
     sidecar_matches(bundle, json_path) =
-        JSON.parse(JSON.json(bundle.preamble); dicttype = Dict{String, Any}) ==
+        JSON.parse(JSON.json(bundle.preamble; style = BlobBoards._FILE_STYLE); dicttype = Dict{String, Any}) ==
         JSON.parse(read(json_path, String); dicttype = Dict{String, Any})["preamble"]
     # what a board's QR carries (`make_qr_code`)
     qr_text(bundle, h) = AE._qr_text(AE._code_or_nothing(bundle.preamble, bundle.blobs, h), h)
@@ -927,7 +927,7 @@ end
     rendered(d, res) = Int16.(reinterpret(UInt8, BlobBoards.rasterize_pdf(onlypdf(d), res)))
     # the converted pattern against the exact sampler, max |difference| in 8-bit levels
     sheet_vs_sampler(d) = vs_sampler(
-        BlobBoards.rasterize_pdf(onlypdf(d), 300), JSON.parse(read(onlyjson(d), String), BlobBoards.BoardBundle), 300
+        BlobBoards.rasterize_pdf(onlypdf(d), 300), first(BlobBoards._parse_bundle(onlyjson(d))), 300
     )
     mk(dir; kw...) = blob_board(
         "A5"; blob_sizes = (1.6mm, 0.2short_side), seed = 0x42, dir, id_label = false, kw...
@@ -1205,9 +1205,9 @@ end
     # the tag is the schema's version: another schema's code is refused by name
     err = try; BlobBoards.parse_board_code(replace(code, r"^BB4" => "BB5")); nothing; catch e; e; end
     @test err isa ArgumentError && occursin("schema v5", err.msg)
-    # ... of the IDENTITY schema, not of the file format: a board file is v5 and its printed QR code stays BB4
+    # ... of the IDENTITY schema, not of the file format: a board file is v6 and its printed QR code stays BB4
     @test BlobBoards.BOARD_CODE_TAG == "BB" * last(split(BlobBoards.IDENTITY_SCHEMA, "/v")) == "BB4"
-    @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v5" && BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"
+    @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v6" && BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"
     # a stored v3 board's identity is still its configuration's alone (its stored hash)
     v3, _, h3 = BlobBoards.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
     @test hash_config(v3.preamble) == h3 == BlobBoards._bundle_identity(v3)
@@ -1230,7 +1230,7 @@ end
         @test all(in(alnum), code) && startswith(code, "BB4/")
         p = BlobBoards.parse_board_code(code)
         @test hash_config(p) == hash_config(b.preamble)
-        @test JSON.json(p) == JSON.json(b.preamble)
+        @test JSON.json(p; style = BlobBoards._FILE_STYLE) == JSON.json(b.preamble; style = BlobBoards._FILE_STYLE)
         @test BlobBoards._place_board_blobs(p) == b.blobs                       # the same board
     end
     code = BlobBoards.board_code(boards[1].preamble)
@@ -1432,7 +1432,7 @@ end
     end
     # a stored v3 board is drawn from its JSON's blobs, never re-placed
     v3json = read(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"), String)
-    @test BlobBoards.rebuild_board(v3json).blobs == JSON.parse(v3json, BlobBoards.BoardBundle).blobs
+    @test BlobBoards.rebuild_board(v3json).blobs == BlobBoards._lift_bundle(BlobBoards._read_record(IOBuffer(v3json)), "odd300").blobs
 end
 
 @testset "SOURCE_DATE_EPOCH: byte-identical print masters" begin

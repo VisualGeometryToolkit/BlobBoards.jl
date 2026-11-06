@@ -274,7 +274,7 @@ Every board is saved as a print file plus a JSON sidecar, `blob_board_<uid>_<has
 
 ```
 {
-  "schema": "blobboards/board/v5",
+  "schema": "blobboards/board/v6",
   "units":  { "world": "mm", "density": "dpi", "lengths": { "pattern": "pt" } },
   "preamble": {
     "board_config":   { canvas_size, margin, layout_grid: 0.01,
@@ -290,7 +290,7 @@ Every board is saved as a print file plus a JSON sidecar, `blob_board_<uid>_<has
   "hashes":        { "config": "<sha256 of the identity schema, the canonical preamble and the blobs>" },
   "render":        { "format": "pdf", "icc_profile": "linear",
                      "id_label": true, "shading_function": "calculator",
-                     "density": null, "bleed": 0 }
+                     "density": null, "bleed": 0.0 }
 }
 ```
 
@@ -314,7 +314,10 @@ A pixel-grid board (the former schema v3: `board_size`, `print_density`,
 `frame_width`, `frame_style`, a `pattern_config` with a `pattern_resolution`, a
 `pixel_type` and `raster_aligned`, blobs in `px`) is the same schema; its grid
 key (`print_density` or `layout_grid`) tells them apart. A pattern file is
-`blobboards/pattern/v3`, in the same format.
+`blobboards/pattern/v4`, in the same format. Both are written in
+VisualGeometryToolkitIO's file shape (`write_record`); every earlier schema
+(board v1–v5, pattern v1–v3) is read, and `VisualGeometryToolkitIO.vgio_migrate`
+rewrites one in the current version, its uid kept.
 
 - **Identity** is `hashes.config`, the SHA-256 of the schema, the canonical
   `preamble` and the blobs; the

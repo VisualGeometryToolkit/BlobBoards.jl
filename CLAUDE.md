@@ -98,7 +98,7 @@ BlobBoards generates deterministic multi-scale blob patterns and printable calib
 src/                        (include order)
 ├── BlobBoards.jl        # Entry point, includes all files in order
 ├── config_defaults.jl   # Defaults read from configs/default.toml (run) and configs/authoring.toml (boards, patterns), before every config struct
-├── json.jl              # JSON field access and the one (byte-pinned) JSON writer
+├── json.jl              # a board's file numbers and frozen identity form; the styles its types lower on
 ├── types.jl             # PatternConfig, BoardConfig, PatternBundle, BoardBundle
 ├── coordinates.jl       # Coordinate maps, reference frames, unit conversion
 ├── pattern.jl           # blob_pattern() — level-grid collision placement, blob rendering
@@ -269,53 +269,59 @@ Both `image_origin` and `reference_frame` are **positional arguments with no def
 
 ## Serialization
 
-JSON.jl 1.x: each serialized type has `JSON.lower(::JSON.JSONStyle, x)` /
-`JSON.lift(::Type{T}, obj)` and `StructUtils.structlike(::Type{T}) = false`
-(src/types.jl; VisualGeometryToolkitFeatures does the same for `Size2` and
-quantities). Configuration captures everything needed for bit-exact
+Every JSON file crosses VisualGeometryToolkitIO's file boundary:
+`VgtkIO.write_record(path, record; style)` writes it (the vgio file shape,
+JSON.jl's printing, a NaN refused by its field) and `VgtkIO.read_record(path)`
+reads it, an earlier schema through its version steps. Each serialized
+BlobBoards type has `JSON.lower(::VgtkIO.VgioStyle, x)` /
+`JSON.lift(::VgtkIO.VgioStyle, T, record)` (src/types.jl), on IO's style only:
+no method lands on JSON.jl's own style, so `JSON.json(bundle)` is not a board
+file (`save_json` and `load_bundle` are). A lift reads a parsed record by
+property access. Configuration captures everything needed for bit-exact
 reproduction. Board identities are SHA-256 over a canonical encoding
 independent of any JSON library (`canonical_config_json`, VisualGeometryToolkitIO's
-`canonical_json`).
+`canonical_json`). `test/suites/identity_pins.jl` pins board uids, the
+annotation config hash, the render-cache key and the saved bytes of patterns,
+point-grid boards and the stored pixel-grid fixtures; a serializer change that
+moves a uid or an identity is a bug, never a re-pin, and one that moves a
+file's bytes is a new schema version.
 
-Every JSON file is written by ONE writer, `_write_json` (src/json.jl), which
-reproduces byte for byte what the retired JSON3 writer (`JSON3.pretty`) wrote,
-quirks included (integral floats printed as integers except late in an all-float
-array; two-line empty containers). `test/suites/identity_pins.jl` pins board
-uids, the annotation config hash, the render-cache key and the saved bytes of
-patterns, point-grid boards and the stored pixel-grid fixtures; a serializer
-change that moves a uid or an identity is a bug, never a re-pin.
+### Board and pattern files: board v6, pattern v4
 
-### Board and pattern files: board v5, pattern v3
-
-A board file is `blobboards/board/v5` and a pattern file `blobboards/pattern/v3`
-(2026-10-27): every quantity a NUMBER in the unit the file's `units` block
+A board file is `blobboards/board/v6` and a pattern file `blobboards/pattern/v4`
+(2026-11-06): every quantity a NUMBER in the unit the file's `units` block
 declares (VisualGeometryToolkitIO's `UnitContract`: `world` mm, `density` dpi,
-the length role `pattern` pt on a point-grid board, pixels undeclared). Nothing
-reads the earlier `{value, unit}` schemas (board v1–v4, pattern v1–v2): they are
-MIGRATED once by `VgtkIO.vgio_migrate(path)`, through the `migrate_schema`
-methods of src/migrate_boards.jl, which hold the retired reader (the one place
-that parses a `{value, unit}` object). A migration keeps the stored
+the length role `pattern` pt on a point-grid board, pixels undeclared), written
+by IO's `write_record`. Board v5 / pattern v3 (2026-10-27) are the same records,
+printed by the JSON3.pretty clone BlobBoards had (an integral float as an
+integer); their step renames the schema. The earlier `{value, unit}` schemas
+(board v1–v4, pattern v1–v2) are read through the steps that hold the retired
+reader (the one place that parses a `{value, unit}` object). Every step lives in
+src/migrate_boards.jl, runs on load in memory, and is also the file form
+`VgtkIO.vgio_migrate(path)` runs to rewrite a file once; both keep the stored
 `hashes.config`. IO's command knows these migrations only once BlobBoards is
 loaded: `julia --project=. -e 'using BlobBoards; import VisualGeometryToolkitIO as
 VgtkIO; include(joinpath(pkgdir(VgtkIO), "bin", "vgio_migrate.jl"))' tree --apply DIR`.
 
-Two forms of the same lowering, never mixed (src/json.jl): a FILE holds numbers,
-and a board's IDENTITY is minted over a canonical tree in which each quantity is
-the object `{value, unit}` (`_IDENTITY`, set by `_plain`) — frozen, because it is
-what every printed uid was minted from. The file format version is not in the
+Two forms of the same lowering, never mixed (src/json.jl): a FILE holds numbers
+(lowered on `VgioStyle`), and a board's IDENTITY is minted over a canonical tree
+in which each quantity is the object `{value, unit}` (lowered on BlobBoards'
+`_IdentityStyle`, by `_plain`) — frozen, because it is what every printed uid
+was minted from. The file format version is not in the
 identity: `IDENTITY_SCHEMA` ("blobboards/board/v4", frozen) is the tree's schema
 field and the source of the QR code's `BB4` tag; `BOARD_SCHEMA` is the file's.
 A change to the file format therefore moves no uid and no printed QR code; a
 change to what a configuration places is a new IDENTITY schema and a new tag.
 The memory ↔ number conversion is ONE pair, `_file_number`/`_file_quantity`
 (src/json.jl), for every file number including the point grid's pt values and
-the blob columns, and it is TEMPORARY: it is `ustrip(unit, q)` and
-`number * unit` because IO's decimal-exact `write_quantity`/`read_quantity` is
-not exact for a quantity built as `v * unit` (a board is built from literals
-such as `9.0mm`; IO would write `9.000000000000002`). When IO's writer writes `v`
-back for `v * unit`, the pair is replaced by IO's under the file's
-`UnitContract` and nothing else changes. The file declares its unit once: the
-`units` block (blobs carry none).
+the blob columns: `ustrip(unit, q)` and `number * unit`, not IO's decimal-exact
+`write_quantity`/`read_quantity`. A board is built from literals (`9.0mm`,
+`8.5inch`), so its values are products, and its identity, placement and every
+stored board were computed with them; IO's codec is decimal-exact in metres and
+disagrees with the products for 6–24% of decimals (measured 2026-11-06, the
+numbers in src/json.jl), and reads a density back as a Float64 where a board
+holds the exact `300 * dpi`. The file declares its unit once: the `units` block
+(blobs carry none).
 
 ## GLMakie off the main thread — thread 1
 

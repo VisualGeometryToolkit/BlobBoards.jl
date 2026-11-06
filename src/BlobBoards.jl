@@ -109,9 +109,8 @@ using FixedPointNumbers: Normed, N0f16, N0f8
 import KernelAbstractions as KA   # KA devices are the backend dispatch tokens
 
 # Serialization and I/O
-using JSON: JSON             # every JSON file (src/json.jl: the writer, byte-pinned)
-using Base.ScopedValues: ScopedValue, @with   # the unit declaration a file is read under; identity vs file lowering (json.jl)
-using StructUtils: StructUtils   # `structlike(T) = false`: `JSON.parse(str, T)` lifts the whole object
+using JSON: JSON             # lower/lift on VgtkIO.VgioStyle (types.jl); files cross VgtkIO's write_record/read_record
+using Base.ScopedValues: ScopedValue, @with   # the unit declaration a file is read under (json.jl)
 using Preferences: @load_preference
 using SHA: SHA, sha256
 using Base64: base64encode, base64decode   # an ICC profile embedded in a sidecar
@@ -206,7 +205,7 @@ end
 
 # Core includes in dependency order (flat, consolidated)
 include("config_defaults.jl") # configs/default.toml -> the keyword defaults of every config struct below
-include("json.jl")        # JSON field access and the one JSON writer
+include("json.jl")        # a board's file numbers and its frozen identity form (the styles it lowers on)
 include("types.jl")        # Structs and their JSON lowering/lifting
 include("coordinates.jl")  # Coordinate maps, reference frames, unit conversion
 include("pattern.jl")      # Pattern subsystem (placement, rendering, API)
