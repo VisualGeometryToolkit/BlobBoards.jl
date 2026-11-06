@@ -84,7 +84,8 @@ end
 # VisualGeometryToolkitIO's `write_record` (JSON.jl's printing: an integral
 # float keeps its `.0`, an empty array is `[]`) instead of the JSON3.pretty
 # clone v5 and v3 were written by (which printed `3.0` as `3`), so the bytes
-# differ. Their version steps only rename the schema.
+# differ. Their version step reads the record with the current lift and gives
+# the tree the current writer writes (a render block's `"bleed": 0` is `0.0`).
 const BOARD_SCHEMA = "blobboards/board/v6"
 const PATTERN_SCHEMA = "blobboards/pattern/v4"
 const IDENTITY_SCHEMA = "blobboards/board/v4"   # frozen: the schema a point-grid board's identity (and its QR code) is minted under
@@ -95,8 +96,8 @@ const MIGRATED_SCHEMAS = (
     "blobboards/pattern/v2", "blobboards/pattern/v1",
 )
 # the schemas of the JSON3-printed files, the current records under an earlier
-# name: read through a step that renames them (never written)
-const RENAMED_SCHEMAS = ("blobboards/board/v5" => BOARD_SCHEMA, "blobboards/pattern/v3" => PATTERN_SCHEMA)
+# name: read with the current lift through their version steps (never written)
+const PRINTED_SCHEMAS = ("blobboards/board/v5", "blobboards/pattern/v3")
 
 _bundle_schema(::BoardBundle) = BOARD_SCHEMA
 _bundle_schema(::PatternBundle) = PATTERN_SCHEMA
@@ -608,24 +609,27 @@ end
 # A bundle sidecar parsed — the typed bundle and its stored configuration hash —
 # without resolving or regenerating its render (the design resolver reads
 # geometry only).
-function _parse_bundle(json_path::AbstractString)
-    json_obj = _read_record(json_path)
+_parse_bundle(json_path::AbstractString) = _bundle_and_hash(_read_record(json_path), json_path)
+
+# A current record (read by `_read_record`) as its typed bundle and stored
+# configuration hash; `where_` names it in a refusal.
+function _bundle_and_hash(json_obj::_ParsedObject, where_::AbstractString)
     schema = get(json_obj, :schema, nothing)
     schema in READABLE_SCHEMAS || error(
         schema === nothing ?
-            "$json_path has no schema key — a pre-v1 bundle. The v0 reader " *
+            "$where_ has no schema key — a pre-v1 bundle. The v0 reader " *
             "was removed in 0.19; migrate the corpus once with the " *
             "permanently registered BlobBoards@0.18 " *
             "(BlobBoards.migrate_bundles!(dir))." :
-            "$json_path declares unknown bundle schema $(repr(String(schema))); " *
+            "$where_ declares unknown bundle schema $(repr(String(schema))); " *
             "this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")) and, through their version steps, " *
-            "$(join((first.(RENAMED_SCHEMAS)..., MIGRATED_SCHEMAS...), ", "))"
+            "$(join((PRINTED_SCHEMAS..., MIGRATED_SCHEMAS...), ", "))"
     )
-    bundle = _lift_bundle(json_obj, json_path)
+    bundle = _lift_bundle(json_obj, where_)
 
     config_hash = _stored_config_hash(json_obj)
     if config_hash === nothing
-        @warn "No stored config hash in $json_path, recomputing"
+        @warn "No stored config hash in $where_, recomputing"
         config_hash = _bundle_identity(bundle)
     end
     return bundle, config_hash

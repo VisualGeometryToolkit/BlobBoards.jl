@@ -10,8 +10,9 @@ through VisualGeometryToolkitIO's file boundary.
   number; the file is written by VisualGeometryToolkitIO's `write_record`
   (JSON.jl's printing: an integral float keeps its `.0`) instead of the
   JSON3.pretty clone BlobBoards carried, so the bytes differ. Every earlier
-  file still loads: board v5 and pattern v3 through a step that renames the
-  schema, board v1–v4 and pattern v1–v2 through their steps as before, in
+  file still loads: board v5 and pattern v3 through a step that reads the
+  record with the current reader, board v1–v4 and pattern v1–v2 through their
+  steps as before, in
   memory, the stored identity kept; `VisualGeometryToolkitIO.vgio_migrate`
   rewrites one once. **No board identity moves**: every uid, `hashes.config`
   and QR code is the one it was (checked on 386 stored boards and patterns,
@@ -24,6 +25,13 @@ through VisualGeometryToolkitIO's file boundary.
   changes no other package's JSON. `JSON.json(bundle)` and `JSON.parse(text,
   BoardBundle)` no longer give a board file or a board: use `save_json` and
   `load_bundle`. The StructUtils dependency is dropped.
+- **A board's lengths round-trip exactly.** A board stores each length on the
+  millimetre grid (the value its file number reads back as), so a board built
+  in inches (`8.5inch`, a `0.33inch` margin) saves and loads to the same
+  values; before, about one inch-built length in forty came back one ulp off.
+  No identity moves (the identity reads the same millimetre number).
+- A migrated board v5 file is byte for byte what a fresh write of the board
+  gives (a render block's `"bleed": 0` is written `0.0`).
 - **Removed: the `pretty_json` keyword** of `save_json` and `save`: every file
   is written in the one vgio file shape.
 - Every board and pattern file, and a JSON text given to `rebuild_board`, is

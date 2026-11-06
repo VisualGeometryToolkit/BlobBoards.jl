@@ -294,7 +294,8 @@ declares (VisualGeometryToolkitIO's `UnitContract`: `world` mm, `density` dpi,
 the length role `pattern` pt on a point-grid board, pixels undeclared), written
 by IO's `write_record`. Board v5 / pattern v3 (2026-10-27) are the same records,
 printed by the JSON3.pretty clone BlobBoards had (an integral float as an
-integer); their step renames the schema. The earlier `{value, unit}` schemas
+integer); their step reads them with the current lift and gives the tree the
+current writer writes (a migrated v5 file is byte for byte a fresh v6 write). The earlier `{value, unit}` schemas
 (board v1–v4, pattern v1–v2) are read through the steps that hold the retired
 reader (the one place that parses a `{value, unit}` object). Every step lives in
 src/migrate_boards.jl, runs on load in memory, and is also the file form
@@ -314,13 +315,15 @@ A change to the file format therefore moves no uid and no printed QR code; a
 change to what a configuration places is a new IDENTITY schema and a new tag.
 The memory ↔ number conversion is ONE pair, `_file_number`/`_file_quantity`
 (src/json.jl), for every file number including the point grid's pt values and
-the blob columns: `ustrip(unit, q)` and `number * unit`, not IO's decimal-exact
-`write_quantity`/`read_quantity`. A board is built from literals (`9.0mm`,
-`8.5inch`), so its values are products, and its identity, placement and every
-stored board were computed with them; IO's codec is decimal-exact in metres and
-disagrees with the products for 6–24% of decimals (measured 2026-11-06, the
-numbers in src/json.jl), and reads a density back as a Float64 where a board
-holds the exact `300 * dpi`. The file declares its unit once: the `units` block
+the blob columns: `ustrip(mm, q)` and `number * mm` (a density and a pixel
+count likewise in theirs), not IO's decimal-exact `write_quantity`/
+`read_quantity`, which every stored board's numbers were not written with. No
+millimetre file number reads back to every metre double under either codec, so
+a board STORES its lengths on the millimetre grid (`_on_mm_grid`, applied by
+`BoardConfig` and `Pdf(; bleed)`), on which the pair round-trips every length
+exactly, millimetre- and inch-built (measured 2026-11-06 in src/json.jl, pinned
+in identity_pins.jl). The grid moves no identity: the identity tree reads
+`ustrip(mm, q)`, the same number on and off it. The file declares its unit once: the `units` block
 (blobs carry none).
 
 ## GLMakie off the main thread — thread 1

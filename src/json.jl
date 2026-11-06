@@ -27,19 +27,27 @@
 # density is an integer when it is one.
 #
 # Every conversion between a quantity and a file number goes through ONE
-# pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(unit, q)`
-# and `number * unit`, NOT VisualGeometryToolkitIO's decimal-exact
-# `write_quantity`/`read_quantity`. A board is built from literals (`9.0mm`,
-# `8.5inch`): its values are products, and its identity, its placement and
-# every stored board were computed with them. IO's codec is decimal-exact in
-# metres instead, and the two disagree (measured 2026-11-06, FlexUnits
-# 0.6.16): `read_length(v, mm) !== v * mm` for 24% of the decimals 0–2000 mm
-# in steps of 0.1, `write_length(v * mm, mm) != ustrip(mm, v * mm)` for 6% of
-# millimetre and 19% of inch-built lengths, and `ustrip(dpi, read_quantity(d,
-# :density, …)) != d` for 580 of the integers 1–5000 (a density read back as
-# a Float64 product, where a board holds the exact `300 * dpi`). A loaded board
-# must hold the values it was built with, so the board keeps the product pair.
-# (`test/suites/identity_pins.jl` reads a written board with IO's reader.)
+# pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(mm, q)`
+# and `number * mm` (a density, a pixel count likewise in its unit), NOT
+# VisualGeometryToolkitIO's decimal-exact `write_quantity`/`read_quantity`.
+#
+# EXACT ROUND TRIP. No file number in millimetres reads back to EVERY metre
+# double, under either codec: some metre values are not the image of any
+# millimetre double (measured 2026-11-06, FlexUnits 0.6.16, on v·mm and v·inch
+# for v in 0:0.01:200 and 200 000 random lengths up to 4 m: the product pair
+# misses 486 inch-built values and 3.4% of the random ones, with the
+# neighbouring file numbers tried too; IO's `write_length`/`read_length` misses
+# 4498 millimetre- and 1737 inch-built ones). So a board's lengths are STORED on
+# the millimetre grid, `_on_mm_grid(q) = ustrip(mm, q) * mm` (types.jl, `_vgc`),
+# on which the product pair is exact: 0 misses on all 240 002 values, and the
+# grid moves no identity (`ustrip(mm, q)` is the same number on and off it,
+# which is all the identity tree reads). A length built in inches (`8.5inch`,
+# a 0.33 inch margin) is held one ulp from the bare product in about one value
+# in forty; every board read from a file or a QR code already held this form.
+# The product pair, not IO's codec, because it is what every stored board's
+# numbers were written with and read back as (IO's reader puts `read_length(v,
+# mm) !== v * mm` for 24% of millimetre decimals, and reads a density as a
+# Float64 product where a board holds the exact `300 * dpi`).
 #
 # IDENTITY: a board's identity (`hashes.config`, the uid printed in its corners
 # and carried by its QR code) is the SHA-256 of a canonical tree built from the
@@ -77,6 +85,11 @@ _snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
 # an exact quantity's magnitude (`300px` is a Rational): an integer, else its Float64
 _snap_integer(v::Rational) = isinteger(v) ? Int(v) : Float64(v)
 _snap_integer(v) = v
+
+# A quantity in the form a board stores it: a length on the millimetre grid (the
+# value its file number reads back as: see the header), any other quantity as
+# VisualGeometryToolkitCore's `base_quantity`.
+_on_mm_grid(q::Quantity) = dimension(q) == dimension(mm) ? base_quantity(Float64(ustrip(mm, q)) * mm) : base_quantity(q)
 
 # A quantity as the number a file holds. `role = :world` (the default): by
 # dimension, a length in mm, a density in dpi, a pixel count in px. `role =
@@ -177,7 +190,9 @@ const _ParsedObject = JSON.Object{String, Any}
 # lazy values): a parsed object, or a NamedTuple built in memory.
 const _Record = Union{JSON.Object, NamedTuple}
 
-# A JSON object built in code, in the form a lift reads.
+# A JSON object built in code, in the form a lift reads: the pairs given, or a
+# dictionary or NamedTuple with every nested one converted (a version step's
+# tree is plain `Dict`s, which have no property access).
 function _object(kv::Pair...)
     o = _ParsedObject()
     for (k, v) in kv
@@ -185,4 +200,7 @@ function _object(kv::Pair...)
     end
     return o
 end
-_object(x) = _object((String(k) => v for (k, v) in pairs(x))...)
+_object(x) = _object((String(k) => _as_record(v) for (k, v) in pairs(x))...)
+_as_record(x::Union{AbstractDict, NamedTuple}) = _object(x)
+_as_record(x::AbstractVector) = Any[_as_record(v) for v in x]
+_as_record(x) = x

@@ -111,7 +111,7 @@ end
 function _check_bleed(bleed)
     bleed isa Quantity && dimension(bleed) == dimension(mm) && ustrip(mm, bleed) >= 0 ||
         throw(ArgumentError("bleed must be a length ≥ 0 (e.g. Pdf(bleed = 2mm)), got $(repr(bleed))"))
-    return Float64(ustrip(mm, bleed)) * mm
+    return _on_mm_grid(bleed)
 end
 
 """

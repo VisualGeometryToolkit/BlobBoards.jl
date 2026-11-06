@@ -612,8 +612,10 @@ end
 # A quantity (or a Size2 of them) in the stored form, VisualGeometryToolkitCore's
 # `base_quantity` (base units, Float64: an integer length such as `14mm` is an
 # exact Rational until stored, and a file reads back the Float64); `nothing` kept.
+# A length is stored on the millimetre grid (`_on_mm_grid`, json.jl): the value
+# its file number reads back as, so a board saved and loaded holds what it held.
 _vgc(::Nothing) = nothing
-_vgc(x) = base_quantity.(x)
+_vgc(x) = _on_mm_grid.(x)
 
 """
     BoardConfig
