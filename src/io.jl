@@ -130,10 +130,26 @@ end
 # so hashes.config IS the canonical hash; a re-save of a loaded bundle gives its stored `config_hash`, which stays
 # the identity across format migrations (a migrated v1 board re-saved as the current schema keeps its uid). A
 # `nothing` hash (an old record read that stored none) leaves `hashes` out, as that record had it.
-function _bundle_tree(bundle::AbstractBundle, config_hash::Union{Nothing, AbstractString}, render)
-    output = (schema = _bundle_schema(bundle), JSON.lower(_FILE_STYLE, bundle)...)
+#
+# The file declares its world `unit`: by default the first in which every length of the bundle and its render
+# block reads back bit for bit (`_file_length_unit`, json.jl); a migration keeps the unit of the file it migrates,
+# whose numbers it carries.
+function _bundle_tree(
+        bundle::AbstractBundle, config_hash::Union{Nothing, AbstractString}, render; unit = _bundle_length_unit(bundle, render)
+    )
+    s = _file_style(unit)
+    output = (schema = _bundle_schema(bundle), JSON.lower(s, bundle)...)
     config_hash === nothing || (output = merge(output, (; hashes = (config = String(config_hash),))))
-    return render === nothing ? output : merge(output, (; render))
+    return render === nothing ? output : merge(output, (; render = _lower_render(s, render)))
+end
+
+# The lengths a bundle's file holds (its configuration's, its render block's bleed), and the world unit they
+# read back in. A pattern holds none: millimetres.
+function _bundle_length_unit(bundle::AbstractBundle, render)
+    p = _LengthProbe()
+    bundle isa BoardBundle && JSON.lower(p, bundle.preamble)
+    _lower_render(p, render)
+    return _file_length_unit(p.lengths)
 end
 
 
@@ -260,10 +276,12 @@ const _RENDER_LOCK = ReentrantLock()
 # schema (what its QR carries and its blobs are placed under): a render made
 # otherwise (or by an older writer — a QR carrying an older schema's preamble)
 # is a different file, never served for this JSON. (The file format is not in
-# it: the same board is the same render in v4 and v5.)
+# it: the same board is the same render in v4 and v5; the record as a millimetre
+# file holds it, as the key has always been spelled.)
 _render_cache_dir(config_hash::AbstractString, id_label::Bool) = joinpath(
     @get_scratch!("board_renders"),
-    String(config_hash)[1:16] * "_" * bytes2hex(sha256(codeunits(string(_render_record(Pdf(), id_label), IDENTITY_SCHEMA))))[1:8]
+    String(config_hash)[1:16] * "_" *
+        bytes2hex(sha256(codeunits(string(_lower_render(_FILE_STYLE, _render_record(Pdf(), id_label)), IDENTITY_SCHEMA))))[1:8]
 )
 
 """
@@ -612,8 +630,21 @@ end
 _parse_bundle(json_path::AbstractString) = _bundle_and_hash(_read_record(json_path), json_path)
 
 # A current record (read by `_read_record`) as its typed bundle and stored
-# configuration hash; `where_` names it in a refusal.
+# configuration hash (minted, with a warning, for a record that stores none);
+# `where_` names it in a refusal.
 function _bundle_and_hash(json_obj::_ParsedObject, where_::AbstractString)
+    bundle = _bundle_of(json_obj, where_)
+    config_hash = _stored_config_hash(json_obj)
+    if config_hash === nothing
+        @warn "No stored config hash in $where_, recomputing"
+        config_hash = _bundle_identity(bundle)
+    end
+    return bundle, config_hash
+end
+
+# A current record as its typed bundle, its schema checked (a caller that does
+# not need the identity: `_bundle_and_hash`, the Python wrappers).
+function _bundle_of(json_obj::_ParsedObject, where_::AbstractString)
     schema = get(json_obj, :schema, nothing)
     schema in READABLE_SCHEMAS || error(
         schema === nothing ?
@@ -625,14 +656,7 @@ function _bundle_and_hash(json_obj::_ParsedObject, where_::AbstractString)
             "this BlobBoards reads $(join(READABLE_SCHEMAS, ", ")) and, through their version steps, " *
             "$(join((PRINTED_SCHEMAS..., MIGRATED_SCHEMAS...), ", "))"
     )
-    bundle = _lift_bundle(json_obj, where_)
-
-    config_hash = _stored_config_hash(json_obj)
-    if config_hash === nothing
-        @warn "No stored config hash in $where_, recomputing"
-        config_hash = _bundle_identity(bundle)
-    end
-    return bundle, config_hash
+    return _lift_bundle(json_obj, where_)
 end
 
 # A bundle JSON's stored identity, `hashes.config` — authoritative across

@@ -20,34 +20,35 @@
 # -----------------------------------------------------------------------------
 #
 # FILE (board/v6, pattern/v4): a quantity is a NUMBER in the unit the file's
-# `units` block declares — a length in the declared `world` unit (mm), a
-# density in the declared `density` unit (dpi), a pixel count in pixels; the
-# point-grid board's own numbers (the σ range, the layout grid, the blobs) are
-# plain numbers in the declared `pattern` length role (pt). A pixel count or a
+# `units` block declares — a length in the declared `world` unit, a density in
+# the declared `density` unit (dpi), a pixel count in pixels; the point-grid
+# board's own numbers (the σ range, the layout grid, the blobs) are plain
+# numbers in the declared `pattern` length role (pt). A pixel count or a
 # density is an integer when it is one.
 #
 # Every conversion between a quantity and a file number goes through ONE
-# pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(mm, q)`
-# and `number * mm` (a density, a pixel count likewise in its unit), NOT
-# VisualGeometryToolkitIO's decimal-exact `write_quantity`/`read_quantity`.
+# pair, `_file_number` / `_file_quantity`, and that pair is `ustrip(u, q)` and
+# `number * u` in the file's declared unit `u`, NOT VisualGeometryToolkitIO's
+# decimal-exact `write_quantity`/`read_quantity`: every stored board's numbers
+# were written with the pair and read back with it (IO's reader puts
+# `read_length(v, mm) !== v * mm` for 24% of millimetre decimals, and reads a
+# density as a Float64 product where a board holds the exact `300 * dpi`).
 #
-# EXACT ROUND TRIP. No file number in millimetres reads back to EVERY metre
-# double, under either codec: some metre values are not the image of any
-# millimetre double (measured 2026-11-06, FlexUnits 0.6.16, on v·mm and v·inch
-# for v in 0:0.01:200 and 200 000 random lengths up to 4 m: the product pair
-# misses 486 inch-built values and 3.4% of the random ones, with the
-# neighbouring file numbers tried too; IO's `write_length`/`read_length` misses
-# 4498 millimetre- and 1737 inch-built ones). So a board's lengths are STORED on
-# the millimetre grid, `_on_mm_grid(q) = ustrip(mm, q) * mm` (types.jl, `_vgc`),
-# on which the product pair is exact: 0 misses on all 240 002 values, and the
-# grid moves no identity (`ustrip(mm, q)` is the same number on and off it,
-# which is all the identity tree reads). A length built in inches (`8.5inch`,
-# a 0.33 inch margin) is held one ulp from the bare product in about one value
-# in forty; every board read from a file or a QR code already held this form.
-# The product pair, not IO's codec, because it is what every stored board's
-# numbers were written with and read back as (IO's reader puts `read_length(v,
-# mm) !== v * mm` for 24% of millimetre decimals, and reads a density as a
-# Float64 product where a board holds the exact `300 * dpi`).
+# THE WORLD UNIT IS THE FILE'S. A board in memory holds its lengths as they were
+# built (`210.0mm`, `8.5inch`, a `0.33inch` margin), and no one unit's file
+# number reads back to every metre double (measured 2026-11-06, FlexUnits
+# 0.6.16, on v·mm and v·inch for v in 0:0.01:200: the pair in millimetres misses
+# 486 inch-built values, in inches 1785 millimetre-built ones; IO's codec misses
+# 4498 millimetre- and 1737 inch-built ones). So a board file declares, as its
+# `world`, the first of millimetres, inches and metres in which EVERY length it
+# holds (a PDF's bleed included) reads back bit for bit (`_file_length_unit`):
+# millimetres for every board built in them (every stored and published board),
+# inches for one built in inches, metres — exact for any double — for one that
+# mixes values neither holds. Memory → file → memory is then exact for every
+# board; the in-memory values, so every identity and every QR code, are what
+# they were. The reader has always honoured the declared `world`. A file that
+# this writer did not write (an earlier schema, another unit) may change bytes
+# when re-saved, never values.
 #
 # IDENTITY: a board's identity (`hashes.config`, the uid printed in its corners
 # and carried by its QR code) is the SHA-256 of a canonical tree built from the
@@ -68,13 +69,46 @@ type's lowering is the file's, except that each quantity is the frozen
 """
 struct _IdentityStyle <: JSON.JSONStyle end
 
-# The styles a BlobBoards type is lowered on: a file's (IO's) and the identity's.
-const _Style = Union{VgtkIO.VgioStyle, _IdentityStyle}
+"""
+    _LengthProbe <: JSON.JSONStyle
 
-# The style every BlobBoards file is written on: lengths in mm, the unit the
-# file's `units` block declares (the quantities themselves go through
-# `_lowered`, never through the style's own length codec).
-const _FILE_STYLE = VgtkIO.VgioStyle(; length_unit = mm)
+A style that lowers a value only to collect the lengths a file of it holds
+(`_file_length_unit`): exactly the quantities a file's lowering writes in its
+`world` unit, gathered in `lengths`.
+"""
+struct _LengthProbe <: JSON.JSONStyle
+    lengths::Vector{Quantity}
+end
+_LengthProbe() = _LengthProbe(Quantity[])
+
+# The styles a BlobBoards type is lowered on: a file's (IO's), the identity's, a probe's.
+const _Style = Union{VgtkIO.VgioStyle, _IdentityStyle, _LengthProbe}
+
+# A file's style: its declared `world` unit (the quantities themselves go
+# through `_lowered`, never through the style's own length codec). Lifting
+# reads the units a file declares (`_FILE_UNITS`), whatever style it is given.
+_file_style(u) = VgtkIO.VgioStyle(; length_unit = u)
+const _FILE_STYLE = _file_style(mm)
+
+# The world units a file may declare, in the order they are tried.
+const _FILE_LENGTH_UNITS = (mm, inch, m)
+
+# A length as the number a file in `u` holds, read back (`_file_quantity`'s product).
+_reads_back(q::Quantity, u) = Float64(ustrip(u, q)) * u === q
+
+"""
+    _file_length_unit(lengths) -> Units
+
+The world unit a file holding `lengths` declares: the first of mm, inch and m
+in which every one reads back bit for bit (see the header). Metres hold any
+length exactly.
+"""
+function _file_length_unit(lengths)
+    for u in _FILE_LENGTH_UNITS
+        all(q -> _reads_back(q, u), lengths) && return u
+    end
+    return m
+end
 
 # The units a file being READ declares (`units`: world, density). The default is
 # what every file this package writes declares.
@@ -86,20 +120,15 @@ _snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
 _snap_integer(v::Rational) = isinteger(v) ? Int(v) : Float64(v)
 _snap_integer(v) = v
 
-# A quantity in the form a board stores it: a length on the millimetre grid (the
-# value its file number reads back as: see the header), any other quantity as
-# VisualGeometryToolkitCore's `base_quantity`.
-_on_mm_grid(q::Quantity) = dimension(q) == dimension(mm) ? base_quantity(Float64(ustrip(mm, q)) * mm) : base_quantity(q)
-
 # A quantity as the number a file holds. `role = :world` (the default): by
-# dimension, a length in mm, a density in dpi, a pixel count in px. `role =
-# :pattern`: a point-grid board's own number (σ range, layout grid, blob
-# coordinate), the stored-unit magnitude — the points the print master holds —
-# always a Float64.
-function _file_number(q::Quantity; role::Symbol = :world)
+# dimension, a length in the file's world unit `unit`, a density in dpi, a pixel
+# count in px. `role = :pattern`: a point-grid board's own number (σ range,
+# layout grid, blob coordinate), the stored-unit magnitude — the points the
+# print master holds — always a Float64.
+function _file_number(q::Quantity; role::Symbol = :world, unit = mm)
     role === :pattern && return Float64(ustrip(px, q))
     d = dimension(q)
-    d == dimension(mm) && return Float64(ustrip(mm, q))
+    d == dimension(mm) && return Float64(ustrip(unit, q))
     d == dimension(dpi) && return _snap_integer(ustrip(dpi, q))
     d == dimension(px) && return _snap_integer(ustrip(px, q))
     throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
@@ -122,10 +151,14 @@ function _identity_form(q::Quantity; role::Symbol = :world)
     return (value = u === mm ? Float64(v) : _snap_integer(v), unit = unit_string(u))
 end
 
-# The one function every lowering calls for a quantity: the file's number, or
-# the identity's frozen object.
-_lowered(::VgtkIO.VgioStyle, q::Quantity; role::Symbol = :world) = _file_number(q; role)
+# The one function every lowering calls for a quantity: the file's number (in the
+# style's world unit), the identity's frozen object, or a probe's record of a length.
+_lowered(s::VgtkIO.VgioStyle, q::Quantity; role::Symbol = :world) = _file_number(q; role, unit = s.length_unit)
 _lowered(::_IdentityStyle, q::Quantity; role::Symbol = :world) = _identity_form(q; role)
+function _lowered(p::_LengthProbe, q::Quantity; role::Symbol = :world)
+    role === :world && dimension(q) == dimension(mm) && push!(p.lengths, q)
+    return 0
+end
 
 # A field's value as the style writes it.
 _jv(s::_Style, q::Quantity) = _lowered(s, q)

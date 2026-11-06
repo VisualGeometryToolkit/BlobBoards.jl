@@ -315,16 +315,18 @@ A change to the file format therefore moves no uid and no printed QR code; a
 change to what a configuration places is a new IDENTITY schema and a new tag.
 The memory ↔ number conversion is ONE pair, `_file_number`/`_file_quantity`
 (src/json.jl), for every file number including the point grid's pt values and
-the blob columns: `ustrip(mm, q)` and `number * mm` (a density and a pixel
-count likewise in theirs), not IO's decimal-exact `write_quantity`/
-`read_quantity`, which every stored board's numbers were not written with. No
-millimetre file number reads back to every metre double under either codec, so
-a board STORES its lengths on the millimetre grid (`_on_mm_grid`, applied by
-`BoardConfig` and `Pdf(; bleed)`), on which the pair round-trips every length
-exactly, millimetre- and inch-built (measured 2026-11-06 in src/json.jl, pinned
-in identity_pins.jl). The grid moves no identity: the identity tree reads
-`ustrip(mm, q)`, the same number on and off it. The file declares its unit once: the `units` block
-(blobs carry none).
+the blob columns: `ustrip(u, q)` and `number * u` in the file's declared world
+unit `u` (a density and a pixel count likewise in theirs), not IO's
+decimal-exact `write_quantity`/`read_quantity`, which every stored board's
+numbers were not written with. No one unit's file number reads back to every
+metre double, so a file declares as its `world` the first of mm, inch and m in
+which every length it holds (its bleed included) reads back bit for bit
+(`_file_length_unit`, src/json.jl): mm for every board built in millimetres and
+every stored one, inch for one built in inches, m (exact for any double) for
+one mixing values neither holds. Memory → file → memory is exact; the values in
+memory are the ones built, so identities and QR codes are untouched. A
+migration keeps the unit the old file declares. The file declares its unit
+once: the `units` block (blobs carry none).
 
 ## GLMakie off the main thread — thread 1
 

@@ -379,7 +379,7 @@ function _construct_blobs(data)
 end
 
 JSON.lower(s::VgtkIO.VgioStyle, pb::PatternBundle) =
-    (units = _bundle_units(pb), pattern_config = JSON.lower(s, pb.pattern_config), blobs = _file_blobs(pb.blobs))
+    (units = _bundle_units(s, pb), pattern_config = JSON.lower(s, pb.pattern_config), blobs = _file_blobs(pb.blobs))
 
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:PatternBundle}, x::_Record)
     @with _FILE_UNITS => _declared_units(x) begin
@@ -612,10 +612,8 @@ end
 # A quantity (or a Size2 of them) in the stored form, VisualGeometryToolkitCore's
 # `base_quantity` (base units, Float64: an integer length such as `14mm` is an
 # exact Rational until stored, and a file reads back the Float64); `nothing` kept.
-# A length is stored on the millimetre grid (`_on_mm_grid`, json.jl): the value
-# its file number reads back as, so a board saved and loaded holds what it held.
 _vgc(::Nothing) = nothing
-_vgc(x) = _on_mm_grid.(x)
+_vgc(x) = base_quantity.(x)
 
 """
     BoardConfig
@@ -1069,7 +1067,7 @@ _blob_unit(::PixelGrid) = "px"
 _blob_unit(::PointGrid) = "pt"
 
 JSON.lower(s::VgtkIO.VgioStyle, bb::BoardBundle) =
-    (units = _bundle_units(bb), preamble = JSON.lower(s, bb.preamble), blobs = _file_blobs(bb.blobs))
+    (units = _bundle_units(s, bb), preamble = JSON.lower(s, bb.preamble), blobs = _file_blobs(bb.blobs))
 
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardBundle}, x::_Record)
     units = _declared_units(x)
@@ -1087,10 +1085,11 @@ _declares_pattern_role(x) = (u = x.units; haskey(u, :lengths) && haskey(u.length
 
 # The `units` a bundle's file declares: the world length, the density and, on a
 # point grid, the length role `pattern` (VisualGeometryToolkitIO's `UnitContract`).
-_units_contract(::PixelGrid) = VgtkIO.UnitContract(world = mm, density = dpi)
-_units_contract(::PointGrid) = VgtkIO.UnitContract(world = mm, density = dpi, lengths = (pattern = pt,))
-_bundle_units(b::BoardBundle) = VgtkIO.json_value(_units_contract(b.preamble.board_config.layout_grid))
-_bundle_units(::PatternBundle) = VgtkIO.json_value(VgtkIO.UnitContract(world = mm, density = dpi))
+# The world unit is the style's (`_file_length_unit`, json.jl).
+_units_contract(::PixelGrid, world) = VgtkIO.UnitContract(; world, density = dpi)
+_units_contract(::PointGrid, world) = VgtkIO.UnitContract(; world, density = dpi, lengths = (pattern = pt,))
+_bundle_units(s::VgtkIO.VgioStyle, b::BoardBundle) = VgtkIO.json_value(_units_contract(b.preamble.board_config.layout_grid, s.length_unit))
+_bundle_units(s::VgtkIO.VgioStyle, ::PatternBundle) = VgtkIO.json_value(VgtkIO.UnitContract(world = s.length_unit, density = dpi))
 
 # =============================================================================
 # Constants

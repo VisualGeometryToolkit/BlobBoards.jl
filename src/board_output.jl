@@ -111,7 +111,7 @@ end
 function _check_bleed(bleed)
     bleed isa Quantity && dimension(bleed) == dimension(mm) && ustrip(mm, bleed) >= 0 ||
         throw(ArgumentError("bleed must be a length ≥ 0 (e.g. Pdf(bleed = 2mm)), got $(repr(bleed))"))
-    return _on_mm_grid(bleed)
+    return Float64(ustrip(mm, bleed)) * mm
 end
 
 """
@@ -171,13 +171,21 @@ _recorded_density(o::BoardOutput) = (d = _density(o); d === nothing ? nothing : 
 # The JSON `render` block — how the file was made, so a reconstruction
 # reproduces the sheet: one set of keys whatever the format, and whether the id
 # label was actually drawn. The inverse of `_recorded_output ∘ _render_options`.
+# A PDF's bleed is the length itself, written in the file's world unit when the
+# block is (`_lower_render`); a raster has none (it is the default PDF, converted).
 _render_record(o::BoardOutput, id_label) = (;
     format = _format(o), icc_profile = _recorded_icc(o), id_label,
     shading_function = _recorded_shading(o), density = _recorded_density(o), bleed = _recorded_bleed(o),
 )
-# A PDF's bleed, in mm (the file's world unit); a raster has none (it is the default PDF, converted).
-_recorded_bleed(o::Pdf) = _file_number(o.bleed)
+_recorded_bleed(o::Pdf) = o.bleed
 _recorded_bleed(::BoardOutput) = nothing
+
+# A render block as a file in style `s` holds it: a quantity (a fresh record's
+# bleed) as the style's number; a number (a block read from a file and carried
+# over) as it is.
+_lower_render(s, r::NamedTuple) = map(v -> v isa Quantity ? _lowered(s, v) : v, r)
+_lower_render(s, r::AbstractDict) = r           # a block read from a file: its numbers as they are
+_lower_render(s, ::Nothing) = nothing
 
 # The output a render record describes (`opts`: `_render_options`; the Python
 # bridge hands its flat keywords through the same reading). A raster without a

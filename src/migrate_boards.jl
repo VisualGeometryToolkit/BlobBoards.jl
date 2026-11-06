@@ -204,42 +204,63 @@ _same_value(a::T, b::T) where {T} =
     isbitstype(T) ? a === b : (fieldcount(T) > 0 ? all(_same_value(getfield(a, f), getfield(b, f)) for f in fieldnames(T)) : isequal(a, b))
 _same_value(a, b) = false
 
-# The render block's quantities, by key: a PDF's bleed, a raster's density (and
-# the key it had before 2026-10-14). Every other entry is not a quantity.
+# The render block's quantities, by key, with their kinds: a PDF's bleed, a
+# raster's density (and the key it had before 2026-10-14). Every other entry is
+# not a quantity.
 const _RENDER_QUANTITIES = (bleed = :length, density = :density, print_density = :density)
 
-# A render entry's quantity, read: a retired `{value, unit}` object, or a number
-# under a quantity key (as its file wrote it); `nothing` for any other entry.
+# A render entry's quantity and its kind, read under the units its file declares
+# (`_FILE_UNITS`): a retired `{value, unit}` object (its kind its dimension's), or
+# a number under a quantity key; `nothing` for any other entry.
 function _render_quantity(k, v)
-    _is_legacy_quantity(v) && return _legacy_scalar(v)
+    if _is_legacy_quantity(v)
+        q = _legacy_scalar(v)
+        return (q, dimension(q) == dimension(mm) ? :length : dimension(q) == dimension(dpi) ? :density : :pixel)
+    end
     kind = get(_RENDER_QUANTITIES, Symbol(k), nothing)
-    return kind !== nothing && v isa Real && !(v isa Bool) ? _file_quantity(v, kind) : nothing
+    return kind !== nothing && v isa Real && !(v isa Bool) ? (_file_quantity(v, kind), kind) : nothing
 end
 
-# A render block as a current file holds it, key by key in the file's order:
-# each quantity as the number the current writer writes for it (a v5 file printed
-# an integral float as an integer: `"bleed": 0` is `0.0` now), every other entry
+# A render block as a current file in the world unit `unit` holds it, key by key
+# in the file's order. A number is carried VERBATIM, never through the unit
+# conversion: a v5 file's numbers are in the unit the migrated file keeps (a
+# length only takes the Float64 form the writer gives every length, so v5's
+# `"bleed": 0` is `0.0`; a density stays as stated, `52.4` included). A retired
+# `{value, unit}` object becomes its `value` when its unit is the file's for its
+# kind (mm, dpi, px), and is converted only when it is not. Every other entry
 # (the format, the profile, the id label, the shading function, even a legacy
-# key name) as it is.
-function _migrated_render(r::AbstractDict)
+# key name) is as it is.
+function _migrated_render(r::AbstractDict, unit)
     out = _ParsedObject()
     for (k, v) in pairs(r)
-        q = _render_quantity(k, v)
-        out[String(k)] = q === nothing ? v : _file_number(q)
+        out[String(k)] = _migrated_render_value(k, v, unit)
     end
     return out
 end
+function _migrated_render_value(k, v, unit)
+    qk = _render_quantity(k, v)
+    qk === nothing && return v
+    q, kind = qk
+    if _is_legacy_quantity(v)
+        stated = parse_unit(String(v.unit); compound = true)
+        own = kind === :length ? unit : kind === :density ? dpi : px
+        stated == own || return _file_number(q; unit)        # a unit the file does not declare: converted
+        v = v.value
+    end
+    return kind === :length ? Float64(v) : _snap_integer(v)
+end
 
-# The migrated block against the old one: a quantity became the number that
-# reads back as that very quantity; the rest is equal.
-function _render_migrated_ok(old::AbstractDict, new)
+# The migrated block against the old one, each read under the units its own file
+# declares (`old_units`, `new_units`): every quantity reads back as that very
+# quantity, the rest is equal.
+function _render_migrated_ok(old::AbstractDict, new, old_units, new_units)
     new isa AbstractDict && Set(String.(keys(old))) == Set(String.(keys(new))) || return false
     return all(pairs(old)) do (k, v)
         w = new[String(k)]
-        q = _render_quantity(k, v)
-        q === nothing && return isequal(v, w)
-        kind = dimension(q) == dimension(mm) ? :length : dimension(q) == dimension(dpi) ? :density : :pixel
-        w isa Real && _same_value(_file_quantity(w, kind), q)
+        qk = @with _FILE_UNITS => old_units _render_quantity(k, v)
+        qk === nothing && return isequal(v, w)
+        q, kind = qk
+        w isa Real && _same_value(@with(_FILE_UNITS => new_units, _file_quantity(w, kind)), q)
     end
 end
 
@@ -252,12 +273,13 @@ function _migrate_bundle_file(src::AbstractString, dst::AbstractString, from::Ab
     end
 end
 
-# A record of the earlier schema `from`: the bundle, its stored `hashes.config` and its render block with each
-# quantity as the number a current file holds (`nothing` when it has none) — a printed schema's read with the
-# current lift, a retired one's with the legacy lift. `where_` names the record in a refusal. With
-# `require_hash` (a file migration: it carries a stored identity over and mints none) a record storing no hash is
-# refused; without it (a read) `stored` is `nothing`, and the reader recomputes the identity with a warning, as it
-# does for a current file storing none.
+# A record of the earlier schema `from`: the bundle, its stored `hashes.config`, the world `unit` the migrated
+# file declares and its render block as that file holds it (`nothing` when it has none) — a printed schema's read
+# with the current lift, in the unit the file declared (its numbers, the render block's too, carried in it); a
+# retired one's with the legacy lift, in the unit its lengths read back in. `units` is what the old file declares
+# (world, density). `where_` names the record in a refusal. With `require_hash` (a file migration: it carries a
+# stored identity over and mints none) a record storing no hash is refused; without it (a read) `stored` is
+# `nothing`, and the reader recomputes the identity with a warning, as it does for a current file storing none.
 function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::AbstractString; require_hash::Bool = true)
     get(obj, :schema, nothing) == from ||
         throw(ArgumentError("$(where_): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
@@ -274,9 +296,11 @@ function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::Abstra
     stored === nothing && require_hash && throw(
         ArgumentError("$(where_): stores no hashes.config; a migration carries a stored identity over and mints none")
     )
+    units = _declared_units(obj; required = false)
+    unit = from in PRINTED_SCHEMAS ? first(units) : _bundle_length_unit(old, nothing)
     render = haskey(obj, :render) ?
-        (@with _FILE_UNITS => _declared_units(obj; required = false) _migrated_render(obj[:render]::AbstractDict)) : nothing
-    return (; old, stored, render)
+        (@with _FILE_UNITS => units _migrated_render(obj[:render]::AbstractDict, unit)) : nothing
+    return (; old, stored, unit, units, render)
 end
 
 # The STEP of an earlier schema, run on load by VisualGeometryToolkitIO's `read_record` (the published boards keep
@@ -284,14 +308,14 @@ end
 # the tree `save_json` writes for it, the stored `hashes.config` and the render block carried over as the file form
 # carries them. Nothing is written.
 function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
-    (; old, stored, render) = _legacy_record(_object(tree), from, "a $(from) record"; require_hash = false)
-    return _bundle_tree(old, stored, render)
+    (; old, stored, unit, render) = _legacy_record(_object(tree), from, "a $(from) record"; require_hash = false)
+    return _bundle_tree(old, stored, render; unit)
 end
 
 # (`after_write(dst)`: a test hook run on the written file before it is read back)
 function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString, after_write)
     obj = JSON.parse(read(src, String))::_ParsedObject
-    (; old, stored, render) = _legacy_record(obj, from, src)
+    (; old, stored, unit, units, render) = _legacy_record(obj, from, src)
     # The uid must not move: the stored `hashes.config` is authoritative for every board kind and is carried over
     # unchanged, and the identity recomputed from the migrated file must be the one recomputed from the old file
     # (under the current, frozen encoding). Whether either equals the stored hash is information, never a refusal:
@@ -299,7 +323,7 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
     identity_old = _bundle_identity(old)
     identity_old == stored ||
         @info "migrating $(basename(src)): the identity recomputed under the current encoding ($(identity_old[1:8])…) is not the stored hashes.config ($(stored[1:8])…); the stored hash is carried over"
-    save_json(dst, old; overwrite = true, config_hash = stored, render)
+    VgtkIO.write_record(dst, _bundle_tree(old, stored, render; unit); style = _FILE_STYLE)
     after_write(dst)
     written = _read_record(dst)                     # the file as written, read once
     new, config_hash = _bundle_and_hash(written, dst)
@@ -310,13 +334,18 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
     _bundle_identity(new) == identity_old ||
         throw(ArgumentError("$(src): the identity recomputed from the migration differs from the old file's; the output is discarded"))
     if render !== nothing
-        _render_migrated_ok(obj[:render]::AbstractDict, get(written, :render, nothing)) ||
+        _render_migrated_ok(obj[:render]::AbstractDict, get(written, :render, nothing), units, _declared_units(written)) ||
             throw(ArgumentError("$(src): the migrated render block does not read back as the old one; the output is discarded"))
     end
     return (; to = String(get(written, :schema, "")), uid = uid_from_hash(stored), config_hash = stored)
 end
 
-"""
+for s in (PRINTED_SCHEMAS..., MIGRATED_SCHEMAS...)
+    @eval VgtkIO.migrate_schema(::Val{Symbol($s)}, tree::AbstractDict) = _migrate_bundle_record(tree, $s)
+    @eval VgtkIO.migrate_schema(::Val{Symbol($s)}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, $s)
+end
+
+@doc """
     VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, tree)
     VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, src, dst)
 
@@ -336,9 +365,4 @@ The FILE form: write `dst` through the current writer, read it back, compare
 every value bit for bit, keep the stored identity. Run by
 `VisualGeometryToolkitIO.vgio_migrate` (and its command), which stages the
 result and replaces the file only once verified. Returns `(; to, uid, config_hash)`.
-"""
-VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, tree::AbstractDict) = _migrate_bundle_record(tree, "blobboards/board/v5")
-for s in (PRINTED_SCHEMAS..., MIGRATED_SCHEMAS...)
-    s == "blobboards/board/v5" || @eval VgtkIO.migrate_schema(::Val{Symbol($s)}, tree::AbstractDict) = _migrate_bundle_record(tree, $s)
-    @eval VgtkIO.migrate_schema(::Val{Symbol($s)}, src::AbstractString, dst::AbstractString) = _migrate_bundle_file(src, dst, $s)
-end
+""" VgtkIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, ::AbstractDict)

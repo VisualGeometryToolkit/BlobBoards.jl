@@ -289,6 +289,35 @@ const PINNED_PATTERN_V3_JSON = """
     end
 
 
+    @testset "a v5 file migrates in the units it declares, its render numbers as it states them" begin
+        mktempdir() do dir
+            sq(v) = BlobBoards.Size2(width = v, height = v)
+            b = blob_board("Letter"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x5150, margin = sq(0.33inch), dir = joinpath(dir, "b"))
+            o = JSON.parse(read(_onlyext(joinpath(dir, "b"), ".json"), String); dicttype = Dict{String, Any})
+            @test o["units"]["world"] == "inch"
+            # a v5 file declaring inches, its PDF's bleed in them
+            o["schema"] = "blobboards/board/v5"
+            o["render"]["bleed"] = 0.125
+            v5 = joinpath(dir, "v5.json")
+            write(v5, JSON.json(o))
+            @test VgtkIO.vgio_migrate(v5; out = joinpath(dir, "v6.json")).to == "blobboards/board/v6"
+            n = JSON.parse(read(joinpath(dir, "v6.json"), String))
+            @test n.units.world == "inch" && n.render.bleed === 0.125
+            old, _ = BlobBoards._parse_bundle(v5)
+            new, _ = BlobBoards._parse_bundle(joinpath(dir, "v6.json"))
+            @test BlobBoards._same_value(old, new) && BlobBoards._same_value(new, b)
+            @test BlobBoards._render_options(BlobBoards._read_record(joinpath(dir, "v6.json"))).bleed == 0.125inch
+            # a raster's density, migrated as the file states it (52.4 dpi does not survive a unit round trip)
+            o["render"] = Dict{String, Any}(
+                "format" => "png", "icc_profile" => nothing, "id_label" => false, "shading_function" => nothing,
+                "density" => 52.4, "bleed" => nothing,
+            )
+            write(v5, JSON.json(o))
+            VgtkIO.vgio_migrate(v5; out = joinpath(dir, "v6b.json"))
+            @test JSON.parse(read(joinpath(dir, "v6b.json"), String)).render.density === 52.4
+        end
+    end
+
     @testset "the migration enforces the uid: stored hash carried, identity(migrated) == identity(old); a doctored output is refused" begin
         legacy = joinpath(@__DIR__, "..", "fixtures", "legacy", "hero_board_v4.json")
         mig(src, dst; kw...) = BlobBoards._migrate_bundle_file(src, dst, "blobboards/board/v4"; kw...)
@@ -351,25 +380,33 @@ const PINNED_PATTERN_V3_JSON = """
         end
     end
 
-    @testset "every length round-trips exactly, millimetre- and inch-built, and the grid moves no identity" begin
-        # a board stores its lengths on the millimetre grid, on which the file's number reads back bit for bit
+    @testset "memory → file → memory is exact: a board file declares the world unit its lengths read back in" begin
+        # the unit a length is written in is the first of mm, inch and m in which it reads back bit for bit
         misses = 0
-        moved_identity = 0
-        for v in 0:0.01:200, u in (mm, inch)
-            q = BlobBoards._on_mm_grid(v * u)
-            misses += BlobBoards._file_quantity(BlobBoards._file_number(q), :length) !== q
-            moved_identity += BlobBoards._identity_form(q) != BlobBoards._identity_form(v * u)
+        for v in 0:0.01:200, u in (mm, inch)      # millimetre- and inch-built lengths
+            q = BlobBoards.base_quantity(v * u)
+            w = BlobBoards._file_length_unit((q,))
+            misses += BlobBoards.@with(BlobBoards._FILE_UNITS => (w, dpi), BlobBoards._file_quantity(BlobBoards._file_number(q; unit = w), :length)) !== q
         end
-        @test misses == 0 && moved_identity == 0
-        # a board with an inch-built margin saves and loads to the very same values
+        @test misses == 0
+        @test all(v -> BlobBoards._file_length_unit((BlobBoards.base_quantity(v * mm),)) == mm, 0:0.01:200)   # every mm-built length stays mm
+        # boards built in inches, or mixing inches and millimetres: saved and loaded to the very same values, the
+        # values they were built with (a 0.33 inch margin is 0.33 inch), under the unit the file declares
         sq(v) = BlobBoards.Size2(width = v, height = v)
         for (paper, kw) in (("Letter", (; margin = sq(0.33inch))), ("A4", (; margin = sq(0.33inch), corner_size = 0.37inch, frame_padding = 0.03inch)))
             mktempdir() do dir
                 b = blob_board(paper; blob_sizes = (4.0mm, 0.2short_side), seed = 0x5150, dir, kw...)
-                back, stored = BlobBoards._parse_bundle(_onlyext(dir, ".json"))
+                @test b.preamble.board_config.margin.width == 0.33inch
+                file = _onlyext(dir, ".json")
+                # not millimetres: no file number in them reads back to a 0.33 inch margin
+                @test BlobBoards.parse_unit(JSON.parse(read(file, String)).units.world) != mm
+                back, stored = BlobBoards._parse_bundle(file)
                 @test BlobBoards._same_value(back, b) && stored == hash_config(b.preamble) == BlobBoards._bundle_identity(back)
             end
         end
+        # the Letter board's code spells its margin as built
+        b = blob_board("Letter"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x5150, margin = sq(0.33inch))
+        @test occursin("/0.33INCH/0.33INCH/", BlobBoards.board_code(b.preamble))
     end
 
     @testset "IO reads what a board writes: units block, roles, numbers" begin
