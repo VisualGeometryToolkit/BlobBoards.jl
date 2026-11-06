@@ -32,7 +32,7 @@
         # VisualGeometryToolkitCore's `strip_or_bare` since 2026-10-15)
         "ext/BlobBoardsMakieExt.jl" => 1,
         "ext/BlobBoardsPythonExt.jl" => 9, # export loops over values already stripped in the requested unit
-        # Training pipeline. Audited 2026-08-19: `shape_matrix` strips and
+        # Training pipeline. Audited 2026-08-19: `shape_factor` strips and
         # defensive centroid strips over adapted `EllipticFrame{Float64}`s,
         # which are bare px by contract off the ASIFT path — `ustrip(px, ...)`
         # throws on those. Each call site carries its own `(audited)` note.
