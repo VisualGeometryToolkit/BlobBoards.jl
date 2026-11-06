@@ -1,9 +1,9 @@
 """The 2D-3D correspondences of a BlobBoards run, in the shape OpenCV and MATLAB take.
 
-A run directory carries ``observations.json`` (vgio/target_points2d/v1: per frame,
+A run directory carries ``observations.json`` (vgio/target_points2d/v1 or v2: per frame,
 the image, the sensor and each measured point's pixel and reference into a target's
 point list, in the pixel frame the file declares — the canonical COLMAP frame,
-top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v6: each
+top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v6 to v8: each
 member target's points in its own frame — a ``points`` target's ``points``, a
 ``planar`` target's ``nominal`` points — in the file's declared ``length_unit``; a
 planar target named only by its reference carries no points here). A planar
@@ -34,6 +34,11 @@ SHIFT = {"colmap": 0.0, "opencv": -0.5, "matlab": 0.5, "julia": 0.5}
 # (``_UNITS`` in contract.jl). ``px`` is in that table too but is not a length, so
 # a target whose points declare it is refused, as a missing or unknown unit is.
 MM_PER_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "um": 1.0e-3, "inch": 25.4}
+# The versions this reader takes. Each later one changed only what it does not read: the
+# covariance storage (target_points2d v2, rig v8) and a planar target stated by its layout
+# (rig v7, a target with no nominal points here, as one named by its reference).
+TARGET_POINTS2D_SCHEMAS = ("vgio/target_points2d/v1", "vgio/target_points2d/v2")
+RIG_SCHEMAS = ("vgio/rig/v6", "vgio/rig/v7", "vgio/rig/v8")
 
 
 def _points_mm(path, unit, tgt):
@@ -45,7 +50,7 @@ def _points_mm(path, unit, tgt):
 
 
 def _target_points(path, tid, body):
-    """A rig/v6 target body's own points (a list), or None for a target named only by reference.
+    """A rig target body's own points (a list), or None for a target named only by reference.
 
     A planar target's nominal points are its measured ones only under a ``rigid`` calibration; any
     other calibration (``euclidean``, ``scale``, ``aspect``, ``skew``, ``thin_plate_spline``,
@@ -67,12 +72,12 @@ def load_correspondences(run_dir, convention="opencv"):
     if convention not in SHIFT:
         raise ValueError(f"unknown pixel convention {convention!r}; one of {sorted(SHIFT)}")
     obs = json.load(open(os.path.join(run_dir, "observations.json")))
-    if obs.get("schema") != "vgio/target_points2d/v1":
+    if obs.get("schema") not in TARGET_POINTS2D_SCHEMAS:
         stamp = obs.get("schema")
         hint = (" — a retired v1 file: migrate it with BlobBoards.migrate_pixel_convention(path)"
                 if stamp == "vgio/observations/v1" else
                 " — a retired kind: re-export it from its producer" if stamp == "vgio/observations/v2" else "")
-        raise ValueError(f"{run_dir}: observations.json is {stamp!r}, not vgio/target_points2d/v1{hint}")
+        raise ValueError(f"{run_dir}: observations.json is {stamp!r}, not one of {TARGET_POINTS2D_SCHEMAS}{hint}")
     frame = obs.get("pixel_frame")
     if frame not in SHIFT:
         raise ValueError(f"{run_dir}: observations.json declares pixel_frame {frame!r}; one of {sorted(SHIFT)}")
@@ -84,8 +89,8 @@ def load_correspondences(run_dir, convention="opencv"):
     points = {}
     for path in paths:
         t = json.load(open(path))
-        if t.get("schema") != "vgio/rig/v6":
-            raise ValueError(f"{path}: not a vgio/rig/v6 file (a v4 or v5 rig: migrate it with "
+        if t.get("schema") not in RIG_SCHEMAS:
+            raise ValueError(f"{path}: not one of {RIG_SCHEMAS} (a v4 or v5 rig: migrate it with "
                              "VisualGeometryToolkitIO.vgio_migrate)")
         for tgt in t.get("targets", []):
             own = _target_points(path, tgt["id"], tgt["target"])

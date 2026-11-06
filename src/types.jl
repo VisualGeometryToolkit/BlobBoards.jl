@@ -383,7 +383,7 @@ JSON.lower(s::VgtkIO.VgioStyle, pb::PatternBundle) =
 
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:PatternBundle}, x::_Record)
     @with _FILE_UNITS => _declared_units(x) begin
-        pc = JSON.lift(s, PatternConfig, x.pattern_config)
+        pc = JSON.lift(s, PatternConfig, x.pattern_config)::PatternConfig   # (a parsed field is `Any`: asserted)
         blobs_vec = _construct_blobs(x.blobs)
         return PatternBundle(pc, blobs_vec)
     end
@@ -997,8 +997,8 @@ JSON.lower(s::_Style, bp::BoardPreamble) =
 # pattern size (it is the board, `_board_pattern_points`) nor `raster_aligned`
 # (always false: its centres sit on the 0.01 pt grid): none is part of its
 # identity.
-_lower_pattern(s, pc::PatternConfig, ::PixelGrid) = JSON.lower(s, pc)
-function _lower_pattern(s, pc::PatternConfig, g::PointGrid)
+_lower_pattern(s::_Style, pc::PatternConfig, ::PixelGrid) = JSON.lower(s, pc)
+function _lower_pattern(s::_Style, pc::PatternConfig, g::PointGrid)
     pc.pixel_type == DEFAULT_PIXEL_TYPE ||
         throw(ArgumentError("a point-grid board has no pixel type; got a pattern config with $(pc.pixel_type)"))
     stored(q) = _lowered(s, q; role = :pattern)
@@ -1022,9 +1022,10 @@ function _pattern_from_points(x, bc::BoardConfig)
 end
 
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardPreamble}, x::_Record)
-    bc = JSON.lift(s, BoardConfig, x.board_config)
+    # (a parsed field is `Any`, so each lift is asserted)
+    bc = JSON.lift(s, BoardConfig, x.board_config)::BoardConfig
     raw = x.pattern_config
-    pc = JSON.lift(s, PatternConfig, bc.layout_grid isa PointGrid ? _pattern_from_points(raw, bc) : raw)
+    pc = JSON.lift(s, PatternConfig, bc.layout_grid isa PointGrid ? _pattern_from_points(raw, bc) : raw)::PatternConfig
     return BoardPreamble(bc, pc)
 end
 
@@ -1071,7 +1072,7 @@ JSON.lower(s::VgtkIO.VgioStyle, bb::BoardBundle) =
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardBundle}, x::_Record)
     units = _declared_units(x)
     @with _FILE_UNITS => units begin
-        preamble = JSON.lift(s, BoardPreamble, x.preamble)
+        preamble = JSON.lift(s, BoardPreamble, x.preamble)::BoardPreamble   # (a parsed field is `Any`: asserted)
         grid = preamble.board_config.layout_grid
         grid isa PointGrid && !_declares_pattern_role(x) &&
             throw(ArgumentError("a point-grid board's `units` declare the length role `pattern` (pt): its σ range and layout grid are numbers in it"))
