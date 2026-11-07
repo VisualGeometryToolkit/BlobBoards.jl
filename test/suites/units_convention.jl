@@ -100,7 +100,7 @@ end
     bundle, _, _ = BB.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
     bc = BB.board_config(bundle)
     world = BB.blobs(bundle, :world)
-    ppm = BB.px_per_mm(BB.stored_density(bc))
+    ppm = BB.ustrip(px / mm, BB.stored_density(bc))
     canvas = bundle.blobs .+ Ref(BB._frame_offset(bundle, :canvas))
     @test all(w.σ === BB.ustrip(px, b.σ) / ppm for (w, b) in zip(world, canvas))
     @test any(w.σ !== BB.ustrip(mm, b.σ / BB.stored_density(bc)) for (w, b) in zip(world, canvas))

@@ -34,7 +34,6 @@ export Size2                               # Pattern/board dimensions
 export blobs                               # Bundle accessor: blobs(bundle, frame; units=px)
 export cutoff, pattern_config, board_config
 export hash_config, uid_from_hash  # config → SHA-256 hash / 3-char UID
-export px_per_mm, mm_per_px                # Print density ↔ scale conversion
 export mm, cm, m, inch, ft, dpi, px, pt, μm  # Units (VGC's FlexUnits constants, re-exported)
 # Pixel types — the leading positional argument of `blob_pattern(T, size)`,
 # never a keyword (a board has none) — come from Colors/FixedPointNumbers

@@ -102,7 +102,7 @@ function _pdf_file(objects::Vector{PdfObject}; root::Int, info::Int, version::Ab
         o.data === nothing || write(io, "stream\n", o.data, "\nendstream\n")
         write(io, "endobj\n")
     end
-    id = bytes2hex(sha256(take!(copy(io)))[1:16])
+    id = VgtkCore.sha256_hex(take!(copy(io)))[1:32]
     xref = position(io)
     write(io, "xref\n0 $(length(objects) + 1)\n0000000000 65535 f \n")
     for off in offsets
@@ -287,7 +287,7 @@ function _print_master(;
     icc_path, condition = _icc_profile(icc_profile)
     creator = "BlobBoards $(pkgversion(BlobBoards))"
     info_date, xmp_date = _pdf_dates()
-    h = bytes2hex(sha256(content * title)[1:16])
+    h = VgtkCore.sha256_hex(content * title)[1:32]
     document_id = join((h[1:8], h[9:12], h[13:16], h[17:20], h[21:32]), "-")
     # object numbers, in the order the objects are written
     catalog, pages, metadata, intent_x, intent_a, icc, page_obj, contents, shading_obj, fn, info = 1:11

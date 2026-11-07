@@ -33,6 +33,8 @@
 
 using VisualGeometryToolkitCore: logpolar_map, canonical_map, image_warp,
     image_warp_batch_to!, region, Circle
+# the supersampling downfilter: Feat's block mean, in Float32 for a Gray{Float32} patch
+using VisualGeometryToolkitFeatures: box_downsample
 
 # `_interpolant` is the host BSpline sampler shared with src/training.jl's
 # `image_warp`-style augmentation; the batched KA path below does not use it.
@@ -131,7 +133,7 @@ function _canonicalize(
         # per-frame image_warp! loop ran: byte-identical patches.
         cube = Array{Gray{Float32}, 3}(undef, P_hi, P_hi, N)
         image_warp_batch_to!(cube, warps, gray_f32(img); fillvalue = 0.5f0)
-        return [_downsample_patch(cube[:, :, k], supersample) for k in 1:N]
+        return [box_downsample(view(cube, :, :, k), supersample) for k in 1:N]
     end
     # GPU backends: upload once (skipped when the caller pre-uploaded Float32
     # on this device), run the same batched kernel, download + reshape into
@@ -148,29 +150,7 @@ function _canonicalize(
     d_cube = KA.zeros(device, Float32, P_hi, P_hi, N)
     image_warp_batch_to!(d_cube, d_warps, d_img; fillvalue = 0.5f0)
     cube = Array(d_cube)
-    return [_downsample_patch(Gray{Float32}.(view(cube, :, :, k)), supersample) for k in 1:N]
-end
-
-_downsample_patch(patch::AbstractMatrix, S::Int) =
-    S == 1 ? Matrix{Gray{Float32}}(patch) : _box_downsample(patch, S)
-
-# Box-average `S×S` blocks of `hi` (a `P·S × P·S` patch) into a `P × P` patch.
-# The area-average of the finer samples over each output texel — the downfilter
-# half of supersampling.
-function _box_downsample(hi::AbstractMatrix, S::Int)
-    P = size(hi, 1) ÷ S
-    (P * S == size(hi, 1) && P * S == size(hi, 2)) ||
-        throw(DimensionMismatch("supersampled patch $(size(hi)) not divisible by S=$S"))
-    out = Matrix{Gray{Float32}}(undef, P, P)
-    invn = 1.0f0 / (S * S)
-    @inbounds for j in 1:P, i in 1:P
-        acc = 0.0f0
-        for jj in 1:S, ii in 1:S
-            acc += Float32(hi[(i - 1) * S + ii, (j - 1) * S + jj])
-        end
-        out[i, j] = Gray{Float32}(acc * invn)
-    end
-    return out
+    return [box_downsample(Gray{Float32}.(view(cube, :, :, k)), supersample) for k in 1:N]
 end
 
 function _interpolant(img)

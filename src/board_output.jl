@@ -158,7 +158,7 @@ _recorded_icc(o::Union{Pdf, Tiff}) = _icc_record(o.icc_profile)
 _icc_record(::Nothing) = "linear"
 function _icc_record(path::String)
     bytes = read(path)
-    return (; name = basename(path), sha256 = bytes2hex(sha256(bytes)), data = base64encode(bytes))
+    return (; name = basename(path), sha256 = sha256_hex(bytes), data = base64encode(bytes))
 end
 _recorded_icc(::Png) = nothing
 _recorded_shading(o::Pdf) = String(o.shading_function)

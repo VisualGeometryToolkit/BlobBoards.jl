@@ -148,7 +148,7 @@ const PINNED_PATTERN_V3_JSON = """
             @test read(joinpath(dir, "pretty.json"), String) == PINNED_PATTERN_JSON
             write(joinpath(dir, "v3.json"), PINNED_PATTERN_V3_JSON)
             old, stored = BlobBoards._parse_bundle(joinpath(dir, "v3.json"))
-            @test BlobBoards._same_value(old, pb) && stored == "ba1b3dc4bd7e068ed6f059a15d305e168dea5c0e6e80c96f578931c8f339708f"
+            @test VgtkIO.same_value(old, pb; length_ulps = 0) && stored == "ba1b3dc4bd7e068ed6f059a15d305e168dea5c0e6e80c96f578931c8f339708f"
             # and the v3 file migrates to the current bytes
             r = VgtkIO.vgio_migrate(joinpath(dir, "v3.json"); out = joinpath(dir, "v4.json"))
             @test r.to == "blobboards/pattern/v4" && read(joinpath(dir, "v4.json"), String) == PINNED_PATTERN_JSON
@@ -185,7 +185,7 @@ const PINNED_PATTERN_V3_JSON = """
             @test VgtkIO.vgio_migrate(hero; out = joinpath(dir, "migrated.json")).to == "blobboards/board/v6"
             @test read(joinpath(dir, "migrated.json")) == read(joinpath(dir, "hero.json"))
             again, _, s2 = BlobBoards.load_bundle(joinpath(dir, "hero.json"))
-            @test BlobBoards._same_value(again, bundle) && s2 == stored
+            @test VgtkIO.same_value(again, bundle; length_ulps = 0) && s2 == stored
         end
         # a raster output records its density (a quantity) in the render block
         mktempdir() do dir
@@ -272,12 +272,12 @@ const PINNED_PATTERN_V3_JSON = """
                 @test BlobBoards.hash_config(bundle.preamble) == stored
                 # every number reads back as the old file read it
                 legacy_bundle = BlobBoards._legacy_board_bundle(old_obj)
-                @test BlobBoards._same_value(legacy_bundle, bundle)
+                @test VgtkIO.same_value(legacy_bundle, bundle; length_ulps = 0)
                 migrated, migrated_stored = BlobBoards._parse_bundle(out)
-                @test BlobBoards._same_value(migrated, bundle) && migrated_stored == stored
+                @test VgtkIO.same_value(migrated, bundle; length_ulps = 0) && migrated_stored == stored
                 # the old file itself loads (its version step, in memory) as the migrated file, uid kept
                 old_bundle, old_stored = BlobBoards._parse_bundle(old_path)
-                @test BlobBoards._same_value(old_bundle, bundle) && old_stored == stored
+                @test VgtkIO.same_value(old_bundle, bundle; length_ulps = 0) && old_stored == stored
                 @test BlobBoards.uid_from_hash(old_stored) == uid
             end
         end
@@ -305,7 +305,7 @@ const PINNED_PATTERN_V3_JSON = """
             @test n.units.world == "inch" && n.render.bleed === 0.125
             old, _ = BlobBoards._parse_bundle(v5)
             new, _ = BlobBoards._parse_bundle(joinpath(dir, "v6.json"))
-            @test BlobBoards._same_value(old, new) && BlobBoards._same_value(new, b)
+            @test VgtkIO.same_value(old, new; length_ulps = 0) && VgtkIO.same_value(new, b; length_ulps = 0)
             @test BlobBoards._render_options(BlobBoards._read_record(joinpath(dir, "v6.json"))).bleed == 0.125inch
             # a raster's density, migrated as the file states it (52.4 dpi does not survive a unit round trip)
             o["render"] = Dict{String, Any}(
@@ -401,7 +401,7 @@ const PINNED_PATTERN_V3_JSON = """
                 # not millimetres: no file number in them reads back to a 0.33 inch margin
                 @test BlobBoards.parse_unit(JSON.parse(read(file, String)).units.world) != mm
                 back, stored = BlobBoards._parse_bundle(file)
-                @test BlobBoards._same_value(back, b) && stored == hash_config(b.preamble) == BlobBoards._bundle_identity(back)
+                @test VgtkIO.same_value(back, b; length_ulps = 0) && stored == hash_config(b.preamble) == BlobBoards._bundle_identity(back)
             end
         end
         # the Letter board's code spells its margin as built

@@ -79,7 +79,7 @@ function config_hash(; config::FindBoardsConfig, cutoff, patch_size, outer_exten
         "cutoff" => Float64(cutoff), "patch_size" => Int(patch_size),
         "outer_extent" => Float64(outer_extent), "min_iou" => Float64(min_iou),
     )
-    return bytes2hex(sha256(codeunits(canonical_config_json(tree))))
+    return hash_config(tree)
 end
 
 # =============================================================================
@@ -332,7 +332,7 @@ function _board_mask_image(bundle, image, density)
     H, W = size(image)
     board_rect_mm = GeometryBasics.Rect(bundle, :board)
     canvas_rect_mm = GeometryBasics.Rect(bundle, :canvas)
-    pmm = Float64(px_per_mm(density))
+    pmm = Float64(ustrip(px / mm, density))
 
     dx_mm = ustrip(mm, board_rect_mm.origin[1] - canvas_rect_mm.origin[1])
     dy_mm = ustrip(mm, board_rect_mm.origin[2] - canvas_rect_mm.origin[2])

@@ -16,7 +16,7 @@ using cuDNN  # trigger only — loaded so NNlib's GPU conv path uses real cuDNN
 using Random: Random
 using Statistics: Statistics
 using LinearAlgebra: LinearAlgebra
-using SHA: sha256
+using VisualGeometryToolkitCore: sha256_hex
 using JLD2: JLD2
 
 using BlobBoards
@@ -61,7 +61,7 @@ functional — otherwise stays on CPU. Caller never has to deal with device
 placement manually.
 """
 function LuxDescriptorNetwork(checkpoint_path::AbstractString)
-    h = BlobBoards._file_sha256(checkpoint_path)
+    h = open(sha256_hex, checkpoint_path)
     ckpt = JLD2.load(checkpoint_path)
     cfg = ckpt["cfg"]
     model = BlobDescriptorNetwork(;

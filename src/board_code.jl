@@ -56,9 +56,9 @@ const _BOARD_CODE_FIELDS = 21
 _code_number(x::Real) = uppercase(canonical_json(Float64(x)))
 
 # A length's code spelling: the number in a unit, then the unit's registry
-# symbol (FlexUnits' own printing, `string(u)`) upper-cased. The shortest of mm
+# symbol (the stack's printer, `unit_string(u)`) upper-cased. The shortest of mm
 # and inch that decodes (`_parse_length`) to the identical value; mm always does.
-_spell_length(q, u) = _code_number(ustrip(u, q)) * uppercase(string(u))
+_spell_length(q, u) = _code_number(ustrip(u, q)) * uppercase(unit_string(u))
 function _code_length(q)
     best = _spell_length(q, mm)
     inches = _spell_length(q, inch)

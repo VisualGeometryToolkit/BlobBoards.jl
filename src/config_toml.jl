@@ -48,7 +48,7 @@ using TOML: TOML
 # lookup and the sorted writer. What stays here is BlobBoards': the retired-key
 # set, the tag registries and the hook methods for its own types.
 using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table,
-    allowed_keys, write_toml
+    allowed_keys, write_toml, TagRegistry, tag_of
 import VisualGeometryToolkitCore: toml_key, toml_skip_fields, toml_field
 
 _present_kwargs(d::AbstractDict, spec::Pair{String}...; fallback = nothing) =
@@ -65,43 +65,29 @@ function _nms_kwargs(d, type::AbstractString, spec::Pair{String}...)
     return _present_kwargs(d, spec...; fallback = fd["type"] == type ? fd : nothing)
 end
 
-const NMS_TAGS = Dict(
-    "none" => (_) -> nothing,
-    "ellipse" => d -> EllipseNms(;
-        _nms_kwargs(
-            d, "ellipse", "cutoff" => Float32,
-            "band_octaves" => Float32, "band_reach" => Int
-        )...
-    ),
-    "mxm" => d -> MxmNms(;
-        _nms_kwargs(
-            d, "mxm", "window_half" => Int,
-            "band_octaves" => Float32, "band_reach" => Int
-        )...
-    ),
+const NMS_TAGS = TagRegistry(
+    :nms, "Nms", "none" => nothing, "ellipse" => EllipseNms, "mxm" => MxmNms;
+    paths = [r"find_boards\.detect\.nms\.type"],
 )
 
+_nms_from_toml(::Nothing, _) = nothing
+_nms_from_toml(::Type{EllipseNms}, d) = EllipseNms(;
+    _nms_kwargs(d, "ellipse", "cutoff" => Float32, "band_octaves" => Float32, "band_reach" => Int)...
+)
+_nms_from_toml(::Type{MxmNms}, d) = MxmNms(;
+    _nms_kwargs(d, "mxm", "window_half" => Int, "band_octaves" => Float32, "band_reach" => Int)...
+)
 
-_tag(registry, d, section) = begin
+function _nms_table(d, section)
     t = get(d, "type", nothing)
-    t === nothing && throw(
-        ArgumentError(
-            "[$section] needs a `type` key; one of $(sort(collect(keys(registry))))"
-        )
-    )
-    f = get(registry, t, nothing)
-    f === nothing && throw(
-        ArgumentError(
-            "unknown $section type $(repr(t)); expected one of $(sort(collect(keys(registry))))"
-        )
-    )
-    v = f(d)
+    t isa AbstractString || throw(ArgumentError("[$section] needs a `type` key; one of $(keys(NMS_TAGS))"))
+    v = _nms_from_toml(NMS_TAGS[t], d)   # an unknown tag: the registry's ArgumentError, naming the known ones
     # Validate the INNER keys too. `_check_keys` upstream only sees the parent
     # table, so `nms = { type = "ellipse", cutof = 2.0 }` used to construct an
     # EllipseNms at the DEFAULT cutoff and report success — the typo'd-knob
     # failure this loader exists to prevent, one nesting level down.
     _check_keys(d, v === nothing ? ["type"] : _allowed_keys(typeof(v), :type), section)   # `none` too
-    v
+    return v
 end
 
 # Reject unknown keys rather than ignoring them. A typo'd knob that silently
@@ -151,7 +137,7 @@ function _detect_from_toml(d)
     haskey(d, "tilts") && !isempty(d["tilts"]) &&
         push!(kw, :tilts => _tilts_from_toml(d["tilts"]))
     haskey(d, "nms") &&
-        push!(kw, :nms => _tag(NMS_TAGS, d["nms"], "find_boards.detect.nms"))
+        push!(kw, :nms => _nms_table(d["nms"], "find_boards.detect.nms"))
     return DetectConfig(; kw...)
 end
 
@@ -202,55 +188,61 @@ function _geometry_from_toml(d, camera, image_size = nothing)
     )
     # A tag this package does not own goes to the extension point; its
     # fallback refuses with the valid set.
-    t in _GEOMETRY_TAGS || return geometry_from_toml(Val(Symbol(t)), d; camera, image_size)
-    if t == "radial_homography"
-        _check_keys(d, _allowed_keys(RadialHomographyGeometry, :type), "find_boards.geometry")
-        # The image size is data, like the pose arm's camera: the sensor extent
-        # that fixes the distortion centre (the image middle), and it differs
-        # per capture session — a value in the file would drift.
-        image_size === nothing && throw(
-            ArgumentError(
-                "[find_boards.geometry] type = \"radial_homography\" needs the image " *
-                    "size: FindBoardsConfig(path; image_size = (width, height))"
-            )
+    haskey(GEOMETRY_TAGS, t) || return geometry_from_toml(Val(Symbol(t)), d; camera, image_size)
+    return _geometry_arm(GEOMETRY_TAGS[t], d, camera, image_size)
+end
+
+function _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size)
+    _check_keys(d, _allowed_keys(RadialHomographyGeometry, :type), "find_boards.geometry")
+    # The image size is data, like the pose arm's camera: the sensor extent
+    # that fixes the distortion centre (the image middle), and it differs
+    # per capture session — a value in the file would drift.
+    image_size === nothing && throw(
+        ArgumentError(
+            "[find_boards.geometry] type = \"radial_homography\" needs the image " *
+                "size: FindBoardsConfig(path; image_size = (width, height))"
         )
-        camera === nothing ||
-            @warn "geometry type = \"radial_homography\" ignores the `camera` keyword"
-        return RadialHomographyGeometry(
-            image_size;
-            _present_kwargs(
-                d,
-                "outlier_halfwidth" => Float64,
-                "min_inliers" => Int,
-                "local_optimization" => t -> _local_optimization_from_toml(t, :radial_homography)
-            )...
+    )
+    camera === nothing ||
+        @warn "geometry type = \"radial_homography\" ignores the `camera` keyword"
+    return RadialHomographyGeometry(
+        image_size;
+        _present_kwargs(
+            d,
+            "outlier_halfwidth" => Float64,
+            "min_inliers" => Int,
+            "local_optimization" => t -> _local_optimization_from_toml(t, :radial_homography)
+        )...
+    )
+end
+
+function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
+    # `resolve_pose_ambiguity` is not merely unknown here, it is
+    # inapplicable, and "unknown key" would send the reader hunting for a
+    # typo. The plane-induced H is a unique 8-DOF map; the two-fold
+    # ambiguity belongs to its decomposition into (R, t, n) given K, so
+    # with no camera there is no second branch to select.
+    haskey(d, "resolve_pose_ambiguity") && throw(
+        ArgumentError(
+            "[find_boards.geometry] resolve_pose_ambiguity applies only to " *
+                "type = \"pose\" — the planar pose ambiguity arises when a " *
+                "homography is DECOMPOSED into a pose, which needs a camera; the " *
+                "uncalibrated arm estimates H directly and has no second branch"
         )
-    end
-    if t == "homography"
-        # `resolve_pose_ambiguity` is not merely unknown here, it is
-        # inapplicable, and "unknown key" would send the reader hunting for a
-        # typo. The plane-induced H is a unique 8-DOF map; the two-fold
-        # ambiguity belongs to its decomposition into (R, t, n) given K, so
-        # with no camera there is no second branch to select.
-        haskey(d, "resolve_pose_ambiguity") && throw(
-            ArgumentError(
-                "[find_boards.geometry] resolve_pose_ambiguity applies only to " *
-                    "type = \"pose\" — the planar pose ambiguity arises when a " *
-                    "homography is DECOMPOSED into a pose, which needs a camera; the " *
-                    "uncalibrated arm estimates H directly and has no second branch"
-            )
-        )
-        _check_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
-        camera === nothing || @warn "geometry type = \"homography\" ignores the `camera` keyword"
-        return HomographyGeometry(;
-            _present_kwargs(
-                d,
-                "outlier_halfwidth" => Float64,
-                "min_inliers" => Int,
-                "local_optimization" => t -> _local_optimization_from_toml(t, :homography)
-            )...
-        )
-    end
+    )
+    _check_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
+    camera === nothing || @warn "geometry type = \"homography\" ignores the `camera` keyword"
+    return HomographyGeometry(;
+        _present_kwargs(
+            d,
+            "outlier_halfwidth" => Float64,
+            "min_inliers" => Int,
+            "local_optimization" => t -> _local_optimization_from_toml(t, :homography)
+        )...
+    )
+end
+
+function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
     _check_keys(d, _allowed_keys(PoseGeometry, :type), "find_boards.geometry")
     camera === nothing && throw(
         ArgumentError(
@@ -270,8 +262,14 @@ function _geometry_from_toml(d, camera, image_size = nothing)
     )
 end
 
-# The tags this package's own arms are written and read under.
-const _GEOMETRY_TAGS = ("pose", "homography", "radial_homography")
+# The tags this package's own arms are written and read under. An arm defined
+# outside the package is loaded through the extension point below (a registry
+# is closed).
+const GEOMETRY_TAGS = TagRegistry(
+    :geometry, "Geometry",
+    "pose" => PoseGeometry, "homography" => HomographyGeometry, "radial_homography" => RadialHomographyGeometry;
+    paths = [r"find_boards\.geometry\.type"],
+)
 
 """
     geometry_from_toml(::Val{tag}, table; camera, image_size) -> GeometryConfig
@@ -294,7 +292,7 @@ An unknown tag throws `ArgumentError`.
 geometry_from_toml(::Val{T}, d; camera = nothing, image_size = nothing) where {T} = throw(
     ArgumentError(
         "unknown [find_boards.geometry] type $(repr(String(T))); expected one of " *
-            "$(join(repr.(_GEOMETRY_TAGS), ", ")), or a tag a loaded package registers " *
+            "$(join(repr.(keys(GEOMETRY_TAGS)), ", ")), or a tag a loaded package registers " *
             "(`BlobBoards.geometry_from_toml`)"
     )
 )
@@ -308,9 +306,7 @@ inverse of [`geometry_from_toml`](@ref) for an arm defined outside this package.
 geometry_tag(g::GeometryConfig) = throw(
     ArgumentError("$(nameof(typeof(g))) has no TOML tag; define `BlobBoards.geometry_tag` for it")
 )
-geometry_tag(::HomographyGeometry) = "homography"
-geometry_tag(::PoseGeometry) = "pose"
-geometry_tag(::RadialHomographyGeometry) = "radial_homography"
+geometry_tag(g::Union{HomographyGeometry, PoseGeometry, RadialHomographyGeometry}) = tag_of(GEOMETRY_TAGS, g)
 
 # -----------------------------------------------------------------------------
 # Entry points
@@ -495,9 +491,8 @@ toml_field(g::GeometryConfig, ::Val{:local_optimization}) =
 
 # Tagged unions: the discriminator plus the type's own fields, so a new field
 # on either NMS strategy or either geometry is picked up automatically.
-_nms_toml(::Nothing) = Dict{String, Any}("type" => "none")
-_nms_toml(n::EllipseNms) = merge(Dict{String, Any}("type" => "ellipse"), toml_table(n))
-_nms_toml(n::MxmNms) = merge(Dict{String, Any}("type" => "mxm"), toml_table(n))
+_nms_toml(::Nothing) = Dict{String, Any}("type" => tag_of(NMS_TAGS, nothing))
+_nms_toml(n) = merge(Dict{String, Any}("type" => tag_of(NMS_TAGS, n)), toml_table(n))
 
 _geometry_toml(g::GeometryConfig) =
     merge(Dict{String, Any}("type" => geometry_tag(g)), toml_table(g))

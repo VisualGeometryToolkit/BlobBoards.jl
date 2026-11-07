@@ -179,7 +179,7 @@ end
     using TiffImages: TiffImages          # reads the TIFF back (test-only)
     using JSON
     import VisualGeometryToolkitIO as VgtkIO
-    using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert
+    using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert, intersects, sha256_hex
     include("suites/boards.jl")
 end
 

@@ -33,7 +33,7 @@ using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_hom
     find_radial_homography, RadialHomographyProblem
 # The constraint-problem protocol is VisualGeometryToolkitCore's; RVG's problems add
 # methods to it.
-using VisualGeometryToolkitCore: residuals!
+using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map
 # Every fit scores with the Student-t + uniform marginal (Jeffreys scale
 # prior) at the geometry's `outlier_halfwidth` — RANSACScoringDoneRight's
 # scorer, stated explicitly: RVG's own default is MSAC at a threshold.
@@ -191,13 +191,13 @@ _board_bundle(uid::Symbol, boards_dir::AbstractString) = _board_bundle(uid, boar
 # A reference frame's rectangle (`:pattern`, `:board`, `:canvas`) in the world
 # chart, plain mm: its lower-left corner and its (width, height). `Rect(bundle,
 # f)` holds it in pattern coordinates (y down, from the pattern's top-left);
-# the world is the canvas centred, y up — the map `blobs(bundle, :world)` uses.
+# the world is the canvas centred, y up — the map `blobs(bundle, :world)` uses,
+# `_physical_to_world`.
 function _world_rect(bundle::BoardBundle, f::Symbol)
     r, c = Rect(bundle, f), Rect(bundle, :canvas)
-    W, H = _canvas_mm(board_config(bundle))
     x, y = ustrip.(mm, r.origin .- c.origin)              # top-left, from the canvas's top-left
     w, h = ustrip.(mm, widths(r))
-    return SVector(x - W / 2, H / 2 - (y + h)), SVector(w, h)
+    return _physical_to_world(bundle)(SVector(x, y + h)), SVector(w, h)
 end
 
 # =============================================================================
@@ -660,21 +660,12 @@ _model_to_homography(m::VgtkCore.RadialHomography, _) = m
 # prediction, so model error never enters the shape estimate. Guided search
 # exists precisely because the current model is imperfect.
 
-# Forward: undistorted image point -> distorted pixel. Exact (the model's own
-# map); `nothing` outside the representable field, as `project` reports.
-@inline function _radial_distort(m::VgtkCore.RadialHomography{T}, u) where {T}
-    ray = SVector{3, T}(T(u[1]) - T(m.center[1]), T(u[2]) - T(m.center[2]), one(T))
-    p = VgtkCore.project(m, ray)
-    return p
-end
-
-# The radial model's undistortion as a MAP — the pixel-domain division lens
-# about `center` — so the local affinity is `transform_deriv` (the chain rule
-# through the translation, the lens inverse and the translation back), the
-# same derivative every other undistortion in the stack uses.
-@inline _radial_undistortion_map(m::VgtkCore.RadialHomography{T}) where {T} =
-    Translation(SVector{2, T}(m.center[1], m.center[2])) ∘ inv(VgtkCore.Division(m.k)) ∘
-    Translation(SVector{2, T}(-m.center[1], -m.center[2]))
+# The radial model's distortion and undistortion are Core's maps:
+# `distortion_map(m)` takes an undistorted image point to its distorted pixel
+# (NaN past the model's field), and its inverse is the pixel-domain division
+# lens about `center`, so the local affinity of the undistortion is
+# `transform_deriv`, the same derivative every other undistortion in the stack
+# uses.
 
 # One detection ellipse carried into the undistorted domain by that affinity —
 # VGC's `transfer_ellipse`, the one implementation of `c′ = U(c)`,
@@ -686,7 +677,7 @@ end
 # `_guided_accept!` reads `nothing` as a rejected candidate. Elsewhere the
 # result is unchanged (measured: centre and axes identical, θ within an ulp).
 @inline _undistort_ellipse(m::VgtkCore.RadialHomography, e) =
-    transfer_ellipse(_radial_undistortion_map(m), e)
+    transfer_ellipse(inv(distortion_map(m)), e)
 
 # The two operands guided association needs, per projected blob:
 #   (ellipse to COMPARE, centre to SEARCH at)
@@ -702,8 +693,8 @@ end
 @inline function _guided_transfer(m::VgtkCore.RadialHomography, wreg)
     ep = transfer_ellipse(HomographyMap(m.H), wreg)
     ep === nothing && return nothing
-    q = _radial_distort(m, ep.center)
-    q === nothing && return nothing
+    q = distortion_map(m)(ep.center)
+    all(isfinite, q) || return nothing
     return (ep, q)
 end
 # Full camera (the :none policy): the transferred conic already lives in the
@@ -1227,12 +1218,12 @@ function _resolve_pose_ambiguity(
 
     blog = telemetry === nothing ? "" : telemetry.branch_log
     if !isempty(blog)
-        # discriminability d: inter-branch residual gap over the noise floor
+        # discriminability d: inter-branch distance gap over the noise floor
         prob = VgtkEstimation.AbsolutePoseProblem(camera, pt_csponds)
         n = length(pt_csponds)
         rA = zeros(n); rB = zeros(n)
-        residuals!(rA, prob, inc.estimate)
-        residuals!(rB, prob, alt.estimate)
+        mahalanobis_distances!(rA, prob, inc.estimate)
+        mahalanobis_distances!(rB, prob, alt.estimate)
         inl = inc.inlier_mask
         gap = sqrt(sum(i -> inl[i] ? abs2(rA[i] - rB[i]) : 0.0, 1:n))
         d = gap / max(inc.scale, 0.3)

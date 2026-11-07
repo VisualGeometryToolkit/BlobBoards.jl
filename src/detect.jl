@@ -6,7 +6,7 @@
 #
 # =============================================================================
 
-using VisualGeometryToolkitFeatures: VisualGeometryToolkitFeatures, Detection
+using VisualGeometryToolkitFeatures: VisualGeometryToolkitFeatures, Detection, strongest
 using VisualGeometryToolkitCore: EllipticFrame, feature_frame
 
 # The float-gray input ladder is VisualGeometryToolkitFeatures' `gray_f32` since 0.7.1
@@ -73,13 +73,10 @@ function detect_blobs(
         device::KA.Backend = default_device(),
     )
     detections = _detect(img, device; config)
-
-    if length(detections) > max_detections
-        sort!(detections; by = d -> abs(d.metadata.response), rev = true)
-        resize!(detections, max_detections)
-    end
-
-    return detections
+    # the cap is Feat's selection (the largest |response|, ties to the earlier);
+    # the capped set is then ordered by response, as the detector's consumers read it
+    length(detections) > max_detections || return detections
+    return sort!(strongest(detections, max_detections); by = d -> abs(d.response), rev = true)
 end
 
 # =============================================================================

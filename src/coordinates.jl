@@ -6,32 +6,15 @@
 # Unit Conversion Helpers
 # =============================================================================
 
-"""
-    px_per_mm(density) -> Float64
-
-Convert a density to pixels per millimeter.
-"""
-px_per_mm(density::Quantity) = ustrip(px / mm, density)   # a ConversionError unless a density
-
-"""
-    mm_per_px(density) -> Quantity
-
-The pixel pitch of a density, as a length-per-pixel quantity — the inverse
-of the density (`ustrip(mm / px, mm_per_px(300dpi)) ≈ 0.0847`). Until 2026-09
-it returned a bare length in mm, dropping the `px` dimension its callers then
-had to supply by convention.
-"""
-function mm_per_px(density::Quantity)
-    dimension(density) == dimension(dpi) ||
-        throw(ArgumentError("density must be a density (px per length), got $(density)"))
-    return base_quantity((1 / density)::Quantity)   # a quantity: the assertion narrows FlexUnits' inferred union
-end
+# A density's conversions are FlexUnits' own (units.md: no density-taking
+# conversion verb): `ustrip(px / mm, d)` is pixels per millimetre and `inv(d)`
+# the pixel pitch, a length per pixel.
 
 # A physical length at a density as plain px: mm × px/mm, the arithmetic the
 # rendered sheets were made with (a length quantity is held in metres, and its
 # product with a density differs from this in the last ulp — enough to move a
 # floor at a whole pixel).
-_length_to_px(q::Quantity, density::Quantity) = ustrip(mm, q) * px_per_mm(density)
+_length_to_px(q::Quantity, density::Quantity) = ustrip(mm, q) * ustrip(px / mm, density)
 
 # =============================================================================
 # Reference Frame Coordinate Maps
@@ -131,7 +114,7 @@ end
 _to_length_units(discs::AbstractVector{<:Disc}, units, density) =
     [Disc(Point2(d.center[1] / density, d.center[2] / density), d.σ / density) for d in discs]
 function _to_length_units(pts::AbstractVector{<:Point2}, units, density)
-    scale = ustrip(units / px, mm_per_px(density))
+    scale = ustrip(units / px, inv(density))
     return [Point2(ustrip.(px, p) .* scale) for p in pts]
 end
 
@@ -178,18 +161,15 @@ u = [to_julia(ustrip.(px, centroid(d))) for d in b]
 function blobs(bundle::BoardBundle, reference_frame::Symbol; units::Union{Real, Units} = px, density::Union{Nothing, Quantity} = nothing)
     # :world is special: centered, y-up, unitless mm (ignores units parameter)
     if reference_frame === :world
-        bc = board_config(bundle)
-        half_extents = _canvas_mm(bc) ./ 2
         # the stored canvas blobs ÷ the stored density's px per mm, as plain
         # numbers: a length quantity is held in metres, and the mm round trip
         # through it would perturb the board geometry every pose is solved
-        # against by an ulp.
-        ppm = px_per_mm(stored_density(bc))
+        # against by an ulp. Then the world chart (exact: a flip and a shift).
+        ppm = ustrip(px / mm, stored_density(board_config(bundle)))
+        to_world = _physical_to_world(bundle)
         canvas = bundle.blobs .+ Ref(_frame_offset(bundle, :canvas))
         return map(canvas) do blob
-            c = ustrip.(px, blob.center) ./ ppm
-            σ = ustrip(px, blob.σ) / ppm
-            Disc(Point2(c[1] - half_extents[1], half_extents[2] - c[2]), σ)
+            Disc(Point2(to_world(ustrip.(px, blob.center) ./ ppm)), ustrip(px, blob.σ) / ppm)
         end
     end
     offset = _frame_offset(bundle, reference_frame)
@@ -374,7 +354,7 @@ function GeometryBasics.Rect(bundle::BoardBundle, reference_frame::Symbol)
 
     # Get position of the reference frame's origin in pattern coordinates
     T = Translation(config, reference_frame, :pattern)
-    offset_mm = (T.translation .* px) .* mm_per_px(stored_density(config))
+    offset_mm = (T.translation .* px) .* inv(stored_density(config))
 
     return GeometryBasics.Rect2(offset_mm[1], offset_mm[2], width, height)
 end
@@ -390,6 +370,6 @@ end
 function _frame_size(g::PointGrid, config, reference_frame::Symbol)
     sizes = BoardLayout(config)
     s = reference_frame == :canvas ? sizes.canvas_size : reference_frame == :board ? sizes.board_size : sizes.pattern_size
-    l, f = _stored_size(g, s), mm_per_px(stored_density(g))
+    l, f = _stored_size(g, s), inv(stored_density(g))
     return (l.width * f, l.height * f)
 end

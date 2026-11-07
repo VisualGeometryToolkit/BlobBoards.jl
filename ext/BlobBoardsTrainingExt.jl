@@ -21,7 +21,6 @@ using Zygote
 using Random: Random
 using Statistics: Statistics
 using LinearAlgebra: LinearAlgebra
-using SHA: sha256
 using JLD2: JLD2
 
 using BlobBoards

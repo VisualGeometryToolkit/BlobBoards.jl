@@ -281,7 +281,7 @@ const _RENDER_LOCK = ReentrantLock()
 _render_cache_dir(config_hash::AbstractString, id_label::Bool) = joinpath(
     @get_scratch!("board_renders"),
     String(config_hash)[1:16] * "_" *
-        bytes2hex(sha256(codeunits(string(_lower_render(_FILE_STYLE, _render_record(Pdf(), id_label)), IDENTITY_SCHEMA))))[1:8]
+        sha256_hex(string(_lower_render(_FILE_STYLE, _render_record(Pdf(), id_label)), IDENTITY_SCHEMA))[1:8]
 )
 
 """
@@ -401,7 +401,7 @@ function _icc_from_record(c::_ParsedObject)
     (data isa AbstractString && recorded isa AbstractString && name isa AbstractString) ||
         throw(ArgumentError("render.icc_profile: an embedded profile records its name, sha256 and data (base64), got $(c)"))
     bytes = base64decode(data)
-    h = bytes2hex(sha256(bytes))
+    h = sha256_hex(bytes)
     h == recorded || throw(ArgumentError("render.icc_profile: the embedded profile does not match its recorded sha256"))
     path = joinpath(@get_scratch!("icc_profiles"), h, basename(name))
     if !isfile(path)
@@ -566,7 +566,7 @@ function _board_raster(image_path::AbstractString, bundle, config_hash::Abstract
     render_dpi = _raster_dpi(image_path, bundle, density)
     key = string(
         String(config_hash)[1:16], "_", render_dpi, "dpi_", _RASTERIZER, "_",
-        bytes2hex(open(sha256, image_path))[1:16]
+        open(sha256_hex, image_path)[1:16]
     )
     path = joinpath(@get_scratch!("board_rasters"), key * ".png")
     isfile(path) && return PNGFiles.load(String(path); gamma = 1.0)

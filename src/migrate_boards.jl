@@ -193,16 +193,11 @@ _legacy_pattern_bundle(x) = PatternBundle(_legacy_pattern_config(x.pattern_confi
 # The check: two bundles hold the same values, bit for bit
 # -----------------------------------------------------------------------------
 
-# Same type and the same bits in every leaf (a signed zero, an `Int` quantity
-# and its `Float64` twin all differ). A struct is compared field by field, an
-# array element by element. (VisualGeometryToolkitIO's migrations compare a
-# length within 2 ulp, the decimal-exact codec's guarantee; a board's numbers
-# are products, read back bit for bit, so its check is exact.)
-_same_value(a::AbstractArray, b::AbstractArray) = size(a) == size(b) && all(_same_value(x, y) for (x, y) in zip(a, b))
-_same_value(a::Union{Type, Symbol, AbstractString}, b::Union{Type, Symbol, AbstractString}) = isequal(a, b)
-_same_value(a::T, b::T) where {T} =
-    isbitstype(T) ? a === b : (fieldcount(T) > 0 ? all(_same_value(getfield(a, f), getfield(b, f)) for f in fieldnames(T)) : isequal(a, b))
-_same_value(a, b) = false
+# VisualGeometryToolkitIO's `same_value` at `length_ulps = 0`: the same type and
+# the same bits in every leaf (a signed zero, an `Int` quantity and its
+# `Float64` twin all differ). IO's migrations compare a length within 2 ulp, the
+# decimal-exact codec's guarantee; a board's numbers are products, read back
+# bit for bit, so its check is exact.
 
 # The render block's quantities, by key, with their kinds: a PDF's bleed, a
 # raster's density (and the key it had before 2026-10-14). Every other entry is
@@ -260,7 +255,7 @@ function _render_migrated_ok(old::AbstractDict, new, old_units, new_units)
         qk = @with _FILE_UNITS => old_units _render_quantity(k, v)
         qk === nothing && return isequal(v, w)
         q, kind = qk
-        w isa Real && _same_value(@with(_FILE_UNITS => new_units, _file_quantity(w, kind)), q)
+        w isa Real && VgtkIO.same_value(@with(_FILE_UNITS => new_units, _file_quantity(w, kind)), q; length_ulps = 0)
     end
 end
 
@@ -327,7 +322,7 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
     after_write(dst)
     written = _read_record(dst)                     # the file as written, read once
     new, config_hash = _bundle_and_hash(written, dst)
-    _same_value(old, new) ||
+    VgtkIO.same_value(old, new; length_ulps = 0) ||
         throw(ArgumentError("$(src): the migration does not read back as the file read (a number moved); the output is discarded"))
     config_hash == stored ||
         throw(ArgumentError("$(src): the migration does not keep the stored identity; the output is discarded"))

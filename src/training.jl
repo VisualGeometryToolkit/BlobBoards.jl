@@ -37,6 +37,7 @@ using ImageFiltering: KernelFactors, imfilter
 using ImageTransformations: ImageTransformations, imresize
 using Colors: RGB                   # overlay palette (blob_dataset viewer)
 using VisualGeometryToolkitCore: to_homogeneous, shape_factor
+using CoordinateTransformations: PerspectiveMap, transform_deriv   # a homography's dehomogenized action and its Jacobian
 
 # =============================================================================
 # Backend selection — no hard CUDA dependency
@@ -269,14 +270,10 @@ function _n_gt_in_image(world_frames, H::SMatrix{3, 3}, cx::Real, cy::Real, img_
     return n
 end
 
+# The viewing obliquity at (x, y): the tilt of the dehomogenized homography's
+# local affinity, Core's chain rule `transform_deriv(PerspectiveMap() ∘ HomographyMap(H), x)`.
 function _view_angle(H::SMatrix{3, 3}, x::Real, y::Real)
-    w = H[3, 1] * x + H[3, 2] * y + H[3, 3]
-    u = (H[1, 1] * x + H[1, 2] * y + H[1, 3]) / w
-    v = (H[2, 1] * x + H[2, 2] * y + H[2, 3]) / w
-    J = SMatrix{2, 2, Float64}(
-        (H[1, 1] - u * H[3, 1]) / w, (H[2, 1] - v * H[3, 1]) / w,   # column 1
-        (H[1, 2] - u * H[3, 2]) / w, (H[2, 2] - v * H[3, 2]) / w,   # column 2
-    )
+    J = transform_deriv(PerspectiveMap() ∘ HomographyMap(H), SVector{2, Float64}(x, y))
     s = svdvals(J)
     t = s[1] / s[2]                       # ASIFT tilt σ_max/σ_min ≥ 1
     return acos(clamp(inv(t), -1.0, 1.0))
@@ -1053,8 +1050,8 @@ end
 # twin did not — 2026-09 audit), so it is spelled ONCE.
 function _horizon_ref(H_wi, H_iw, world_rect)
     lo, hi = minimum(world_rect), maximum(world_rect)
-    cx, cy = _project_pt(H_wi, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2)
-    return VgtkCore.homogeneous_w(H_iw, SVector(cx, cy))
+    c = (PerspectiveMap() ∘ HomographyMap(H_wi))(SVector((lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2))
+    return VgtkCore.homogeneous_w(H_iw, c)
 end
 
 # Board∩in-frame mask for one patch: start from the (board-agnostic) `inframe`
@@ -1100,19 +1097,14 @@ end
 # `draw_polyline!`) are VisualGeometryToolkitCore's since 0.21.1.
 using VisualGeometryToolkitCore: draw_ellipse!, draw_projected_ellipse!, draw_polyline!
 
-@inline function _project_pt(H, x, y)
-    w = H * SVector(x, y, 1.0)
-    return (w[1] / w[3], w[2] / w[3])
-end
-
 # Project the four corners of a world-space rectangle through `H_wi` (world→image,
 # detector coords) into image (x,y) points. The homography leads, as in VGC's
 # `draw_projected_ellipse!`; typed so the retired `(world_rect, H_wi)` order is a
 # MethodError.
 function _project_quad(H_wi::AbstractMatrix, world_rect)
     lo, hi = minimum(world_rect), maximum(world_rect)
-    corners = ((lo[1], lo[2]), (hi[1], lo[2]), (hi[1], hi[2]), (lo[1], hi[2]))
-    return map(((x, y),) -> _project_pt(H_wi, x, y), corners)
+    corners = (SVector(lo[1], lo[2]), SVector(hi[1], lo[2]), SVector(hi[1], hi[2]), SVector(lo[1], hi[2]))
+    return map(PerspectiveMap() ∘ HomographyMap(H_wi), corners)
 end
 
 # 2×2 shape factor of a frame primitive, unitless. World GT blobs are

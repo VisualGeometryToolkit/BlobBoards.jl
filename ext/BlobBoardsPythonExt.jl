@@ -14,11 +14,6 @@ using VisualGeometryToolkitCore: ustrip, m, mm, cm, μm
 using VisualGeometryToolkitCore: px, dpi, pt, inch, Size2, parse_unit, strip_or_bare
 using FlexUnits: Quantity, dimension
 using VisualGeometryToolkitCore: EuclideanMap, PixelFrame  # pixel-origin frame maps (VGC 0.7)
-
-# Origin shift over the blob list: the labeled frame map acts on feature
-# frames directly (VisualGeometryToolkitCore 0.21.1 gave `EuclideanMap{2}` the
-# primitive actions only `Translation` had, so the `.t` rewrap is gone).
-_origin_shift(from::Symbol, to::Symbol) = EuclideanMap(PixelFrame{from}, PixelFrame{to})
 using VisualGeometryToolkitFeatures: is_dark
 using StaticArrays: SMatrix
 using Colors: Gray
@@ -256,7 +251,7 @@ function _py_board_result(bundle::BoardBundle, image_origin, config_hash::Abstra
     blob_list = BlobBoards.blobs(bundle, :pattern; units = px, density)
     # px by the `units = px` call above, stripped in px; the per-field ustrip
     # in the loop below is then an identity.
-    blob_list = _origin_shift(:colmap, image_origin_sym).(ustrip.(px, blob_list))
+    blob_list = EuclideanMap(PixelFrame{:colmap}, PixelFrame{image_origin_sym}).(ustrip.(px, blob_list))
 
     blobs_array = zeros(Float64, length(blob_list), 3)
     for (i, blob) in enumerate(blob_list)
@@ -431,7 +426,7 @@ function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "patt
     end
 
     if (units == "px" || units == "pd")
-        blob_list = _origin_shift(:colmap, Symbol(image_origin)).(ustrip.(px, blob_list))
+        blob_list = EuclideanMap(PixelFrame{:colmap}, PixelFrame{Symbol(image_origin)}).(ustrip.(px, blob_list))
     else
         # a length, stripped in the unit asked for (:world blobs are bare mm already)
         blob_list = [strip_or_bare(units_jl, b) for b in blob_list]

@@ -133,13 +133,6 @@ For image-origin conventions (`:colmap`/`:julia`/`:opencv`), use
 not exported by BlobBoards, so `using BlobBoards: EuclideanMap, PixelFrame`). It
 acts on plain pixel coordinates: `ustrip.(px, centroid(d))`.
 
-## Unit Conversion Helpers
-
-```@docs
-px_per_mm
-mm_per_px
-```
-
 ## Training Pipeline
 
 ```@docs

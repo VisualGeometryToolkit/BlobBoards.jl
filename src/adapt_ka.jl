@@ -90,6 +90,10 @@ end
 # since 0.21.1 (hoisted verbatim from here — same op sequences).
 using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
     trigamma_stirling, lu_solve!, tree_sum!
+# The E-step is Core's Student-t + uniform mixture, built in the kernel's float
+# type with the backend's lgamma (one per blob per iteration: ν and ŝ² change per
+# blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
+using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_weight, is_peak, is_valid_shape
 
 
 # =============================================================================
@@ -322,20 +326,10 @@ end
     return lg_j - ν_half * log(Ta(3.141592653589793) * RSS_safe) - outlier_term
 end
 
-# log C of the Student-t density at (ν, ŝ²) — the constant of the E-step.
-@inline _weight_logC(ν::Ta, s2::Ta, lgamma_f::F) where {Ta, F} =
-    lgamma_f((ν + Ta(1.0)) / Ta(2.0)) - lgamma_f(ν / Ta(2.0)) -
-    Ta(0.5) * log(ν * Ta(3.141592653589793) * s2)
-
-# Posterior responsibility and IRLS weight of one pixel (spatial factor is the
-# caller's — it reads the θ layout).
-@inline function _posterior_weight(r2i::Ta, ν::Ta, s2::Ta, half_νp1::Ta, log_C::Ta, log_pout::Ta) where {Ta}
-    ti = r2i / (ν * s2)
-    log_pin = log_C - half_νp1 * log1p(ti)
-    p_in = Ta(1.0) / (Ta(1.0) + exp(log_pout - log_pin))
-    u_i = (ν + Ta(1.0)) / (ν * s2 + r2i)
-    return p_in, p_in * u_i
-end
+# The E-step is Core's mixture at (ν, ŝ²) for a d_g = 1 residual, π = ½:
+# `StudentTMixture{Ta}(ν, s2, log(2·outlier_halfwidth), 1; lgamma)`, whose
+# `inlier_posterior` and `posterior_weight` are a pixel's responsibility and
+# IRLS weight (the spatial factor is the caller's — it reads the θ layout).
 
 # One pixel's contribution to the ν-Newton objective: (dq_i, d2q_data_i).
 @inline function _nu_point_terms(τ_i::Ta, ν::Ta, inv_ν::Ta, inv_ν2::Ta, ψ_half_νp1::Ta, ψ_half_ν::Ta) where {Ta}
@@ -356,22 +350,13 @@ end
     return ν_new, abs(dQ / sum_w) < Ta(1.0e-8)
 end
 
-# The apply-time shape gate on (θ₄, θ₅, θ₆): the fitted quadratic must be a
-# concave paraboloid (tr < 0, det > 0) with eigenvalue ratio within the aspect
-# cap. Returns true when the update is ACCEPTABLE.
-@inline function _shape_ok(θ4::Ta, θ5::Ta, θ6::Ta, max_aspect_sq) where {Ta}
-    tr_C = θ4 + θ6
-    det_C = θ4 * θ6 - θ5 * θ5
-    (tr_C < zero(Ta) && det_C > zero(Ta)) || return false
-    disc = tr_C * tr_C - Ta(4.0) * det_C
-    disc < zero(Ta) && (disc = zero(Ta))
-    sqrt_disc = sqrt(disc)
-    denom = tr_C + sqrt_disc
-    if abs(denom) > Ta(1.0e-30)
-        λ_ratio = (tr_C - sqrt_disc) / denom
-        λ_ratio > max_aspect_sq && return false
-    end
-    return true
+# The apply-time shape gate on (θ₄, θ₅, θ₆), the quadratic form
+# C = [θ₄ θ₅; θ₅ θ₆]: a peak (`is_peak(C)`, a concave paraboloid) whose shape
+# `-C` is within the aspect cap (`is_valid_shape`). True when the update is
+# ACCEPTABLE.
+@inline function _shape_ok(θ4::Ta, θ5::Ta, θ6::Ta, max_aspect_ratio) where {Ta}
+    C = SMatrix{2, 2, Ta, 4}(θ4, θ5, θ5, θ6)
+    return is_peak(C) && is_valid_shape(-C; max_aspect_ratio)
 end
 
 # PAIRED COPY (2026-09 audit): the residual + soft-weight arithmetic lives in
@@ -510,13 +495,13 @@ end
         base = offsets[blob]
         ν = nu[blob]
         s2 = max(s_hat_sq[blob], Ta(1.0e-30))
-        half_νp1 = (ν + Ta(1.0)) / Ta(2.0)
-        log_C = _weight_logC(ν, s2, lgamma_f)
-        log_pout = -log(Ta(2.0) * outlier_halfwidth[blob])
+        mix = StudentTMixture{Ta}(ν, s2, log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
         i = tid
         while i <= n
             gid = base + i
-            p_in, wi = _posterior_weight(Ta(r2[gid]), ν, s2, half_νp1, log_C, log_pout)
+            r2i = Ta(r2[gid])
+            p_in = inlier_posterior(mix, r2i)
+            wi = posterior_weight(mix, r2i)
             pin[gid] = p_in
             if spatial
                 q = theta[4, blob] * Ta(A[gid, 4]) +
@@ -612,7 +597,7 @@ end
 # reverts to θ_old and stops; otherwise apply + rtol convergence check.
 @kernel inbounds = true cpu = false unsafe_indices = true function _apply_check_ka!(
         theta, @Const(theta_old), @Const(AtWz), @Const(info), valid, converged,
-        @Const(np), rtol, max_aspect_ratio_sq
+        @Const(np), rtol, max_aspect_ratio
     )
     blob = @index(Global, Linear)
     if blob <= size(theta, 2) && valid[blob] && converged[blob] == Int32(0)
@@ -621,7 +606,7 @@ end
             valid[blob] = false
         else
             m = np[blob]
-            if !_shape_ok(AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob], max_aspect_ratio_sq)
+            if !_shape_ok(AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob], max_aspect_ratio)
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
                 end
@@ -779,15 +764,14 @@ end
 
         # --- Phase 4: soft weights + spatial (stores pin for next ν M-step) ---
         s2 = max(s_hat_sq[blob], Ta(1.0e-30))
-        log_two_outlier_halfwidth = log(Ta(2.0) * outlier_halfwidth[blob])
-        half_νp1 = (ν + Ta(1.0)) / Ta(2.0)
-        log_C = _weight_logC(ν, s2, lgamma_f)
-        log_pout = -log_two_outlier_halfwidth
+        mix = StudentTMixture{Ta}(ν, s2, log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
 
         i = tid
         while i <= n
             gid = base + i
-            p_in, wi = _posterior_weight(Ta(r2[gid]), ν, s2, half_νp1, log_C, log_pout)
+            r2i = Ta(r2[gid])
+            p_in = inlier_posterior(mix, r2i)
+            wi = posterior_weight(mix, r2i)
             pin[gid] = p_in
             if spatial
                 q = theta[4, blob] * Ta(A[gid, 4]) +
@@ -1006,7 +990,7 @@ function _adapt_ka_gpu(
 
         _apply_check_ka!(device, 256)(
             d_theta, d_theta_old, d_AtWz, d_info, d_valid_gpu, d_converged,
-            d_np, Ta(cfg.rtol), Ta(cfg.max_aspect_ratio^2);
+            d_np, Ta(cfg.rtol), Ta(cfg.max_aspect_ratio);
             ndrange = 256 * cld(N, 256)
         )
 
@@ -1042,7 +1026,7 @@ function _finalize_frames(sites, valid, theta_out::AbstractMatrix, σ_vec, cfg::
         θ = SVector{6, Float64}(Float64(theta_out[j, i]) for j in 1:6)
         p = Paraboloid3D(θ)
         is_peak(p) || continue
-        Σ = moment_matrix(p)
+        Σ = shape_matrix(p)
         is_valid_shape(Symmetric(Σ)) || continue
 
         cx, cy = Float64.(centroid(sites[i]))
@@ -1181,7 +1165,6 @@ function _adapt_cpu_one!(
     A6 = StaticArrays.MMatrix{6, 6, Float64}(undef)
     b6 = StaticArrays.MVector{6, Float64}(undef)
     θ_old = StaticArrays.MVector{6, Float64}(undef)
-    max_aspect_sq = cfg.max_aspect_ratio^2
     for _ in 1:cfg.max_irls_iter
         θ_old .= θ
 
@@ -1226,7 +1209,7 @@ function _adapt_cpu_one!(
         info != Int32(0) && return false
 
         # Apply + check (mirrors _apply_check_ka!).
-        if !_shape_ok(b6[4], b6[5], b6[6], max_aspect_sq)
+        if !_shape_ok(b6[4], b6[5], b6[6], cfg.max_aspect_ratio)
             θ .= θ_old
             break
         end
@@ -1293,11 +1276,11 @@ end
 function _cpu_weights!(w, pin, r2, θ, a4v, a5v, a6v, ν, s2, outlier_halfwidth, spatial)
     T = eltype(w)
     s2 = max(s2, 1.0e-30)                      # kernel parity: the device path clamps on entry too
-    half_νp1 = (ν + 1.0) / 2.0
-    log_C = _weight_logC(ν, s2, loggamma)
-    log_pout = -log(2.0 * outlier_halfwidth)
+    mix = StudentTMixture{Float64}(ν, s2, log(2.0 * outlier_halfwidth), 1; lgamma = loggamma)
     @inbounds for i in eachindex(w)
-        p_in, wi = _posterior_weight(Float64(r2[i]), ν, s2, half_νp1, log_C, log_pout)
+        r2i = Float64(r2[i])
+        p_in = inlier_posterior(mix, r2i)
+        wi = posterior_weight(mix, r2i)
         pin[i] = T(p_in)
         if spatial
             q = θ[4] * Float64(a4v[i]) + θ[5] * Float64(a5v[i]) + θ[6] * Float64(a6v[i])

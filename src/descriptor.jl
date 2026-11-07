@@ -3,7 +3,6 @@
 # =============================================================================
 
 import ONNXRunTime
-using SHA: sha256
 
 # =============================================================================
 # Abstract interface
@@ -143,10 +142,6 @@ end
 # cap below the working set is fatal. Err high; `reserve_workspace!` makes the
 # real claim, and an unreasonable `max_batch` now fails at construction on an
 # empty card rather than mid-run against a loaded one.
-# Content hash of a model file — keys the gallery cache for BOTH backends (ONNX
-# here, the Lux checkpoint in BlobBoardsLuxExt).
-_file_sha256(path::AbstractString) = bytes2hex(open(sha256, path))
-
 function _arena_cap(max_batch::Integer)
     max_batch <= 0 && return 3 << 30      # uncapped batch: keep the old ceiling
     need_mib = 14 + 8 * Int(max_batch)
@@ -274,7 +269,7 @@ function DescriptorNetwork(
         gpu_mem_limit::Integer = _arena_cap(max_batch),
         allow_cpu_fallback::Bool = false
     )
-    h = _file_sha256(path)
+    h = open(sha256_hex, path)   # the model file's content hash keys the gallery cache (the Lux checkpoint's likewise)
     provider_options = execution_provider === :cuda ?
         (; gpu_mem_limit = Int(gpu_mem_limit)) : (;)
     session = try

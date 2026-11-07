@@ -126,7 +126,7 @@ end
                 # four keep-outs, each a corner cell grown by the clearance (10 mm + 1 mm), and no blob touches one
                 ko = BlobBoards._keepouts(bc)
                 @test length(ko) == 4 && all(r -> isapprox(r.widths, [11 * 72 / 25.4, 11 * 72 / 25.4]; atol = 0.05), ko)   # to the 0.01 pt grid
-                @test !any(c -> any(r -> BlobBoards._overlaps(c, r), ko), footprints(b))
+                @test !any(c -> any(r -> intersects(c, r), ko), footprints(b))
                 # blobs reach the board's edges (no band): within 3 mm of every side
                 fp = footprints(b); W, H = ustrip.(px, (pc.pattern_resolution.width, pc.pattern_resolution.height))
                 mm3 = 3 * 72 / 25.4
@@ -168,7 +168,7 @@ end
                 ko = BlobBoards._keepouts(bc)
                 @test !any(b.blobs) do d
                     c = BlobBoards.Circle(BlobBoards.Disc(ustrip(px, d.center[1]), ustrip(px, d.center[2]), ustrip(px, d.σ)), pc.cutoff)
-                    any(r -> BlobBoards._overlaps(c, r), ko)
+                    any(r -> intersects(c, r), ko)
                 end
                 # the marks: four cells (unless :none) and four ruled bands (:ruler only); never a blank band
                 kinds = [m.kind for m in BlobBoards._frame_marks(bc)]
@@ -294,7 +294,7 @@ end
             @test hash_config(b.preamble) == hash_config(want.preamble)
             # the v1 file itself loads, through its version step, as its migration, the stored identity kept
             b1, h1 = BlobBoards._parse_bundle(legacy)
-            @test BlobBoards._same_value(b1, b) && h1 == h
+            @test VgtkIO.same_value(b1, b; length_ulps = 0) && h1 == h
         end
     end
 
@@ -1025,7 +1025,7 @@ end
         @test occursin("/OutputCondition (my-grey)", s) && count("/DestOutputProfile", s) == 2
         # recorded with its bytes, not its path: the rebuild needs the original file no more
         rec = JSON.parse(read(onlyjson(d("icc_pdf")), String)).render.icc_profile
-        @test rec.name == "my-grey.icc" && rec.sha256 == bytes2hex(BlobBoards.sha256(read(icc)))
+        @test rec.name == "my-grey.icc" && rec.sha256 == sha256_hex(read(icc))
         blob_board("A5"; kw..., dir = d("icc_tiff"), output = Tiff(100dpi; icc_profile = icc))
         rm(icc)
         BlobBoards.rebuild_board(read(onlyjson(d("icc_pdf")), String); dir = d("icc_re"))            # rebuilt with the recorded profile

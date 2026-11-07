@@ -112,7 +112,6 @@ import KernelAbstractions as KA   # KA devices are the backend dispatch tokens
 using JSON: JSON             # lower/lift on VgtkIO.VgioStyle (types.jl); files cross VgtkIO's write_record/read_record
 using Base.ScopedValues: ScopedValue, @with   # the unit declaration a file is read under (json.jl)
 using Preferences: @load_preference
-using SHA: SHA, sha256
 using Base64: base64encode, base64decode   # an ICC profile embedded in a sidecar
 using FileIO: FileIO
 using PNGFiles: PNGFiles      # a board's and a pattern's PNGs, read and written without a FileIO backend lookup

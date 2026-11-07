@@ -56,8 +56,7 @@ include("makie/view_angle_profile.jl")
 _uid_of(t) = String(t[1])
 _model_of(t) = t[2]
 _scored_of(t) = length(t) >= 4 ? t[4] : nothing
-_n_inliers(t, threshold = 0.5) =
-    (sc = _scored_of(t)) === nothing ? 0 : count(>(threshold), sc.weights)
+_n_inliers(t) = (sc = _scored_of(t)) === nothing ? 0 : count(VgtkCore.is_map_inlier, sc.weights)
 
 
 
@@ -114,15 +113,16 @@ end
 # method below touch NO BlobBoards type — they are weights + targets + frame +
 # ellipses!, all of which VGC owns. They belong beside VGC's `matches!`, which
 # is already the correspondence painter. Only the result-set method is ours,
-# because only the (uid, model, quality, scored) tuple is.
-_inlier_frames(sc; threshold = 0.5) =
-    [VgtkCore.feature_frame(sc.targets[i]) for (i, w) in enumerate(sc.weights) if w > threshold]
+# because only the (uid, model, quality, scored) tuple is. An inlier is the MAP
+# rule's, `is_map_inlier` of its posterior weight.
+_inlier_frames(sc) =
+    [VgtkCore.feature_frame(sc.targets[i]) for (i, w) in enumerate(sc.weights) if VgtkCore.is_map_inlier(w)]
 
 function inliers!(
         ax::Makie.Axis, sc::VgtkCore.Csponds;
-        cutoff = DEFAULT_CUTOFF, color = :cyan, threshold = 0.5, kwargs...
+        cutoff = DEFAULT_CUTOFF, color = :cyan, kwargs...
     )
-    ells = _inlier_frames(sc; threshold)
+    ells = _inlier_frames(sc)
     isempty(ells) && return ax
     ellipses!(ax, ells; cutoff, strokecolor = color, kwargs...)
     return ax
@@ -132,13 +132,13 @@ end
 # one per board, which is what keeps a 17-board 12 MP frame interactive.
 function inliers!(
         ax::Makie.Axis, results;
-        cutoff = DEFAULT_CUTOFF, color = :cyan, threshold = 0.5, kwargs...
+        cutoff = DEFAULT_CUTOFF, color = :cyan, kwargs...
     )
     ells = EllipticFrame{Float64}[]
     for t in results
         sc = _scored_of(t)
         sc === nothing && continue
-        append!(ells, _inlier_frames(sc; threshold))
+        append!(ells, _inlier_frames(sc))
     end
     isempty(ells) && return ax
     ellipses!(ax, ells; cutoff, strokecolor = color, kwargs...)

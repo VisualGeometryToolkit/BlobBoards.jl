@@ -30,8 +30,13 @@
 # the last bit, so the switch was measured, not assumed: on 88 stored boards
 # (2.6·10⁹ pair checks, 40 exact ties) and 241 new ones (9.7·10⁸ checks) the two
 # decided every pair alike, and every placement was bit-for-bit unchanged.
+# Since 0.5.0 the test is Core's `intersects`, |c₁ − c₂| < r₁ + r₂ (the norm,
+# not its square: the two differ within an ulp of tangency); the 50 example
+# boards rebuilt from their definitions place every blob as before, and the
+# identity pins hold.
 
 const _Shape = Union{Circle{Float64}, Rect2{Float64}}
+using VisualGeometryToolkitCore: intersects   # Circle–Circle and Circle–Rect, strict
 
 struct _LevelGrid
     cell::Float64
@@ -59,22 +64,9 @@ end
     return nothing
 end
 
-# Two shapes overlap when their gap is under zero: strict `<`, so tangent
-# shapes do not (a blob may touch a keep-out, and another blob, at its rim).
-@inline function _overlaps(a::Circle{Float64}, b::Circle{Float64})
-    d = a.center - b.center
-    R = a.r + b.r
-    return dot(d, d) < R * R
-end
-# the distance from the circle's centre to the rectangle (0 inside it), against its radius
-@inline function _overlaps(c::Circle{Float64}, r::Rect2{Float64})
-    lo = origin(r)
-    hi = lo + widths(r)
-    dx = c.center[1] - clamp(c.center[1], lo[1], hi[1])
-    dy = c.center[2] - clamp(c.center[2], lo[2], hi[2])
-    return dx * dx + dy * dy < c.r * c.r
-end
-
+# Two shapes overlap when they `intersect` (Core's predicates, strict: tangent
+# shapes do not, so a blob may touch a keep-out, and another blob, at its rim).
+#
 # Exact collision check of a candidate against every placed shape: scan the
 # 3×3 ring in EVERY level grid (levels are few — the keep-outs', then one per
 # scale). Enumeration order does not affect the boolean, only which collision
@@ -86,8 +78,7 @@ function _grids_collide(grids::Vector{_LevelGrid}, shapes::Vector{_Shape}, q::Ci
         for jx in max(1, ix - 1):min(g.nx, ix + 1)
             for jy in max(1, iy - 1):min(g.ny, iy + 1)
                 for j in g.buckets[jy, jx]
-                    s = shapes[j]
-                    (s isa Circle{Float64} ? _overlaps(s, q) : _overlaps(q, s)) && return true
+                    intersects(shapes[j], q) && return true
                 end
             end
         end

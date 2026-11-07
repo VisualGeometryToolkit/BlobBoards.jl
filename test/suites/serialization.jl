@@ -110,7 +110,7 @@ const V0_FIXTURE = """
             @test config_hash == "abc12345000000000000000000000000000000000000000000000000000000ff"
             @test JSON.parse(read(out, String)).pattern_config.min_scale == 3     # a number, in the declared unit
             # the v1 file loads as its migration, its stored identity kept
-            @test BlobBoards._same_value(old_bundle, bundle) && old_hash == config_hash
+            @test VgtkIO.same_value(old_bundle, bundle; length_ulps = 0) && old_hash == config_hash
         end
     end
 

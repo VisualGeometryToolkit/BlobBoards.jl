@@ -429,7 +429,7 @@ end
 # The point grid's two facts: its stored unit is the typographic point (PDF's
 # unit, 72 per inch), and it divides the point into hundredths. Its density,
 # its record and every points-per-unit ratio derive from these.
-const POINT_DENSITY = 72.0dpi
+const POINT_DENSITY = base_quantity(1px / pt)   # 72 dpi, from the stack's `pt` (identical to 72.0dpi)
 const _POINT_GRID_PER_PT = 100
 
 "Grid units per inch (as a density)."
@@ -1174,7 +1174,8 @@ end
 # rest, loud on non-finite numbers) is VisualGeometryToolkitIO's `canonical_json` since
 # 0.7.6; the LOWERING of a config into that tree (`_plain`) stays here with the
 # schema. Board identities are `sha256_hex` over exactly that string.
-using VisualGeometryToolkitIO: canonical_json, sha256_hex
+using VisualGeometryToolkitIO: canonical_json
+using VisualGeometryToolkitCore: sha256_hex
 
 """
     canonical_config_json(config) -> String

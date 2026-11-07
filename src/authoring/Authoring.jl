@@ -16,7 +16,6 @@ using FreeTypeAbstraction: FreeTypeAbstraction, FTFont
 using FreeType: FT_Get_Postscript_Name
 using Zlib_jll: libz
 using Libtiff_jll: libtiff
-using SHA: sha256
 using Dates: Dates
 
 using ..BlobBoards

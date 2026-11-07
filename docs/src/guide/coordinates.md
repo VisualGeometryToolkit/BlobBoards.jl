@@ -205,16 +205,16 @@ Convert between physical units and pixels:
 
 ```julia
 using BlobBoards                     # re-exports mm, px, dpi
-using VisualGeometryToolkitCore: uconvert
+using VisualGeometryToolkitCore: uconvert, ustrip
 using GeometryBasics: Point2
 
 bundle, _ = BlobBoards.load("blob_board.json")
 # A board's layout has no density: pixels are those of a conversion at one you name
 density = 300dpi
 
-# Use helper functions
-scale = px_per_mm(density)  # pixels per mm
-scale = mm_per_px(density)  # mm per pixel (with units)
+# A density's own conversions (FlexUnits)
+scale = ustrip(px / mm, density)  # pixels per mm
+pitch = inv(density)              # the pixel pitch, a length per pixel
 
 # Physical to pixels
 physical_point = Point2(10.0mm, 20.0mm)

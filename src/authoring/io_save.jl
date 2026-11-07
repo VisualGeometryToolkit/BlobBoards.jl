@@ -143,5 +143,5 @@ function save_canvas_texture(
     W, H = BlobBoards._canvas_mm(preamble.board_config)
     size = Size2(width = w * px / density, height = h * px / density)
     origin = SVector(-W / 2 * mm, H / 2 * mm - size.height)        # lower-left: the top-left corner less the height
-    return VgtkCore.CanvasTexture(relpath(path, relative_to), bytes2hex(open(sha256, path)), size, origin)
+    return VgtkCore.CanvasTexture(relpath(path, relative_to), open(VgtkCore.sha256_hex, path), size, origin)
 end
