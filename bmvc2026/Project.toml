@@ -39,7 +39,7 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [compat]
 ReTestItems = "1.35"
-VisualGeometryToolkitEval = "0.5"
+VisualGeometryToolkitEval = "0.6"
 
 [extras]
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
@@ -49,5 +49,3 @@ version = "12.9"
 
 [sources]
 BlobBoards = { path = ".." }
-# TEMPORARY, until the stack's 0.6 series is registered (the root's other stack sources likewise)
-VisualGeometryToolkitEval = { path = "../../VisualGeometryToolkit.jl/VisualGeometryToolkitEval" }

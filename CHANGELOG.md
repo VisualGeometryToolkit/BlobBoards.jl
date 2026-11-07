@@ -46,6 +46,47 @@ through VisualGeometryToolkitIO's file boundary.
 - Core 0.6: `shape_matrix` is `shape_factor` (the `.tracks` builder's affine
   shapes and overlays; values unchanged).
 
+### On the 0.7 stack
+
+Breaking: BlobBoards 0.5.0 requires the VisualGeometryToolkit 0.7 series and
+LocalOptimizationDoneRight / RANSACScoringDoneRight 0.5.
+
+- The 0.7 renames: a paraboloid's shape is `shape_matrix` (M), and the
+  branch log's inter-branch gap reads `mahalanobis_distances!`.
+- **Removed: `px_per_mm` and `mm_per_px`.** A density's conversions are
+  FlexUnits' own: `ustrip(px / mm, density)` and `inv(density)` (the stack has
+  no density-taking conversion verb). Values unchanged.
+- **Removed: `inliers!`'s `threshold` keyword.** An inlier is the stack's MAP
+  rule, `is_map_inlier` of its posterior weight (the same decision as the
+  former default, 0.5).
+- What BlobBoards had copied is the stack's, every number unchanged (measured
+  on the example data: the 4057 detections of the still, the 50 boards rebuilt
+  from their definitions, the gallery's features, and `find_boards` under the
+  homography, pose and radial arms, models and weights bit for bit):
+  - the adapt E-step is Core's `StudentTMixture{T}` (built in the kernel's
+    float type with the backend's lgamma), and its apply-time shape gate Core's
+    closed-form `is_peak` / `is_valid_shape`;
+  - blob placement's collision tests are Core's `intersects` (Circle–Circle
+    in its norm form, Circle–Rect); no example board's placement moves;
+  - the detection cap is VisualGeometryToolkitFeatures' `strongest` (the capped
+    set is then ordered by response, as before), and the supersampled patch's
+    downfilter its `box_downsample`;
+  - the radial arm's distortion and undistortion are Core's
+    `distortion_map(::RadialHomography)` and its inverse;
+  - the config tags are `TagRegistry`s (`NMS_TAGS`, `GEOMETRY_TAGS`), written
+    through `tag_of`; an unknown tag's error is the registry's, naming the
+    known ones;
+  - the migration check is VisualGeometryToolkitIO's `same_value(…;
+    length_ulps = 0)`; every SHA-256 is Core's `sha256_hex` (the SHA dependency
+    is dropped); a QR length's unit is spelled by `unit_string`; the point
+    grid's density is the stack's `px/pt`;
+  - the `.tracks` builder's view angle and overlays use Core's
+    `PerspectiveMap() ∘ HomographyMap(H)` and its `transform_deriv` (the view
+    angle moves by rounding only, at most 1.3e-15 rad).
+- The adapt ν M-step keeps its own Newton step: Core's `next_nu_from_sums`
+  adds an ascent safeguard that moves results (on the example still, inlier
+  counts 177/39 → 174/37 under the homography arm), which awaits a decision.
+
 ## 0.4.1
 
 Installing for a task no longer means adding packages by hand.

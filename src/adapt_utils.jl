@@ -24,7 +24,7 @@ import VisualGeometryToolkitEstimation
 
 using VisualGeometryToolkitCore:
     Disc, EllipticFrame, Paraboloid3D,
-    moment_matrix, region, iou, coverage,
+    shape_matrix, region, iou, coverage,
     is_valid_shape, is_peak, characteristic_scale, coeffs
 
 using VisualGeometryToolkitFeatures: Detection

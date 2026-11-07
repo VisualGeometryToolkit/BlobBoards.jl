@@ -12,7 +12,7 @@ using Rotations: RotMatrix, RotXYZ, rotation_angle
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
     EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, PosedCamera, HomographyMap,
-    centroid, moment_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points
+    centroid, shape_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points
 using RANSACScoringDoneRight: StudentTUniformScoring
 using VisualGeometryToolkitEstimation: AbsolutePoseProblem
 using LocalOptimizationDoneRight: HQ, tuning_constant
@@ -56,7 +56,7 @@ end
     # and the conic centre is what the imaged blob actually has
     exact = SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(60.0, -40.0, 0.0)))
     @test isapprox(SVector{2, Float64}(ep.center), exact; atol = 0.05)
-    Σi = inv(SMatrix{2, 2, Float64}(moment_matrix(ep)))
+    Σi = inv(SMatrix{2, 2, Float64}(shape_matrix(ep)))
     worst = maximum(boundary_points(wreg, 48)) do p
         q = SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(p[1], p[2], 0.0)))
         d = q - SVector{2, Float64}(ep.center)
