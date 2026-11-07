@@ -36,7 +36,7 @@ SHIFT = {"colmap": 0.0, "opencv": -0.5, "matlab": 0.5, "julia": 0.5}
 MM_PER_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "um": 1.0e-3, "inch": 25.4}
 # The versions this reader takes. Each later one changed what it does not read, the
 # covariance storage (target_points2d v2, rig v8), or added a planar target stated by its
-# layout (rig v7), which it refuses by name (`_target_points`).
+# layout (rig v7), which it refuses by name where an observation names it.
 TARGET_POINTS2D_SCHEMAS = ("vgio/target_points2d/v1", "vgio/target_points2d/v2")
 RIG_SCHEMAS = ("vgio/rig/v6", "vgio/rig/v7", "vgio/rig/v8")
 
@@ -65,14 +65,18 @@ def _target_points(path, tid, body):
                              "planar target (or a points target) is read")
         if "layout" in body:
             # rig v7+: the design stated by its layout (VisualGeometryToolkitCore's AprilGrid,
-            # SchoepsPattern), whose points VisualGeometryToolkitCore derives; this reader does not
-            # rebuild them
-            kind = (body["layout"] or {}).get("type")
-            raise ValueError(f"{path}: target {tid} is stated by its layout ({kind!r}), whose points this reader "
-                             "does not derive; save the target by its nominal points (or read the file in Julia, "
-                             "VisualGeometryToolkitIO.load)")
+            # SchoepsPattern), whose points VisualGeometryToolkitCore derives and this reader does
+            # not: refused where an observation names it (`load_correspondences`)
+            return _Layout((body["layout"] or {}).get("type"))
         return body.get("nominal")
     raise ValueError(f"unknown target type {body.get('type')!r}")
+
+
+class _Layout:
+    """A planar target stated by its layout record (its ``type``, e.g. ``'april_grid'``)."""
+
+    def __init__(self, kind):
+        self.kind = kind
 
 
 def load_correspondences(run_dir, convention="opencv"):
@@ -95,6 +99,7 @@ def load_correspondences(run_dir, convention="opencv"):
         raise ValueError(f"{run_dir}: observations.json resolves against {len(obs.get('targets', []))} "
                          f"targets file(s), the run holds {len(paths)}")
     points = {}
+    layouts = {}
     for path in paths:
         t = json.load(open(path))
         if t.get("schema") not in RIG_SCHEMAS:
@@ -102,6 +107,9 @@ def load_correspondences(run_dir, convention="opencv"):
                              "VisualGeometryToolkitIO.vgio_migrate)")
         for tgt in t.get("targets", []):
             own = _target_points(path, tgt["id"], tgt["target"])
+            if isinstance(own, _Layout):
+                layouts[tgt["id"]] = (path, own.kind)
+                continue
             if own is None:
                 continue
             pts = _points_mm(path, t.get("length_unit"), own)
@@ -112,6 +120,12 @@ def load_correspondences(run_dir, convention="opencv"):
             if tgt["id"] in points and not np.allclose(points[tgt["id"]], pts):
                 raise ValueError(f"target {tgt['id']} carries different points in two targets files")
             points[tgt["id"]] = pts
+    # a layout target an observation names is refused by its layout; one no observation names is skipped
+    for tid in sorted({o["target"] for f in obs["frames"] for o in f["points"]} & layouts.keys()):
+        path, kind = layouts[tid]
+        raise ValueError(f"{path}: target {tid} is stated by its layout ({kind!r}), whose points this reader "
+                         "does not derive; save the target by its nominal points (or read the file in Julia, "
+                         "VisualGeometryToolkitIO.load)")
     if not points:
         raise ValueError(f"{run_dir}: no targets_*.json with points")
     shift = SHIFT[convention] - SHIFT[frame]

@@ -323,12 +323,19 @@
             e
         end
         @test err isa PythonCall.PyException && occursin("calibrated as 'composition'", sprint(showerror, err))
-        # a rigid planar target stated by its layout (rig v7+) is refused naming the layout record, not read as
-        # a target with no points: a real AprilGrid target's record, as IO writes it
-        VgtkIO.save(rigfile, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(:b1 => VGC.PosedTarget(
-            VGC.PlanarTarget(VGC.AprilGrid(; tag_rows = 2, tag_cols = 3, tag_size = 20.0VGC.mm, tag_spacing = 6.0VGC.mm)),
-            VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0) .* VGC.m),
-        ))))
+        # a rigid planar target stated by its layout (rig v7+), a real AprilGrid target's record as IO writes it:
+        # skipped while no observation names it (a mixed rig reads its other target as before) …
+        apriltarget = VGC.PlanarTarget(VGC.AprilGrid(; tag_rows = 2, tag_cols = 3, tag_size = 20.0VGC.mm, tag_spacing = 6.0VGC.mm))
+        origin = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0) .* VGC.m)
+        plane = [VGC.Vec2{Float64}(X[1], X[2]) .* VGC.mm for X in grid]
+        VgtkIO.save(rigfile, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(
+            :b1 => VGC.PosedTarget(VGC.PlanarTarget(plane), origin), :b9 => VGC.PosedTarget(apriltarget, origin),
+        )))
+        mixed = JSON.parse(read(rigfile, String))
+        @test any(t -> haskey(t["target"], "layout"), mixed["targets"]) && any(t -> haskey(t["target"], "nominal"), mixed["targets"])
+        @test pyconvert(Int, PythonCall.pybuiltins.len(corr.load_correspondences(bent, "opencv"))) == length(poses)
+        # … and refused, naming the layout record, once an observation names it
+        VgtkIO.save(rigfile, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(:b1 => VGC.PosedTarget(apriltarget, origin))))
         laid = JSON.parse(read(rigfile, String))
         @test laid["targets"][1]["target"]["layout"]["type"] == "april_grid" && !haskey(laid["targets"][1]["target"], "nominal")
         err = try
