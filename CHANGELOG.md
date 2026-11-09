@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1 (2026-11-09)
+
+On the VisualGeometryToolkit 0.8 stack, from General: VisualGeometryToolkitCore, IO and
+Estimation 0.8, Features 0.6.1, RANSACScoringDoneRight 0.6 and LocalOptimizationDoneRight
+0.5.1 (bmvc2026 also Eval 0.6.1). The radial-homography arm runs on Core 0.8's
+`RadialHomography{T, 1}` unchanged. Nothing else changes.
+
 ## 0.5.0 (2026-11-09)
 
 On the 0.7 series of the VisualGeometryToolkit stack, every dependency from
