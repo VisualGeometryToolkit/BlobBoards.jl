@@ -37,8 +37,19 @@ jobs:
       - name: "Run CompatHelper"
         run: |
           import CompatHelper
-          CompatHelper.main(; subdirs = ["", "docs", "examples", "authoring", "gpu"])
+          CompatHelper.main(; subdirs = ["", "authoring", "bmvc2026", "docs", "examples", "gpu", "test"])
         shell: julia --color=yes {0}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPATHELPER_PRIV: ${{ secrets.DOCUMENTER_KEY }}
+      # CompatHelper's own open PRs (opened by github-actions, branch compathelper/…) merge themselves once the CI jobs
+      # required on main (branch protection) pass. Every other PR is untouched. Merging is not a release: the stack's
+      # cascade still bumps the version, narrows compat to the latest only, and registers.
+      - name: "Auto-merge CompatHelper's PRs once the required checks pass"
+        run: |
+          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --state open --author app/github-actions \
+                        --json number,headRefName --jq '.[] | select(.headRefName | startswith("compathelper/")) | .number'); do
+            gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --auto --squash || echo "PR #$pr: auto-merge not enabled"
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
