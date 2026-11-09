@@ -349,16 +349,14 @@ def _init():
     # Without this, a fresh depot (e.g. /root/.julia in a clean container)
     # has the workspace unresolved and `using BlobBoards` fails with cryptic
     # precompile errors. No Manifest is committed (the repository is one Pkg
-    # workspace), so the first instantiate RESOLVES it, and the stack packages
-    # are in CauRegistry until they are registered in General: both are
-    # needed. First import on a fresh box pays the download/precompile cost
-    # once; subsequent imports no-op. Nothing here writes a Project.toml.
+    # workspace), so the first instantiate RESOLVES it, against General, which
+    # holds the whole stack. First import on a fresh box pays the
+    # download/precompile cost once; subsequent imports no-op. Nothing here
+    # writes a Project.toml.
     _jl.seval("""
         let
             names = [r.name for r in Pkg.Registry.reachable_registries()]
             "General" in names || Pkg.Registry.add("General")
-            "CauRegistry" in names ||
-                Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")
             Pkg.instantiate(io=devnull)
         end
     """)

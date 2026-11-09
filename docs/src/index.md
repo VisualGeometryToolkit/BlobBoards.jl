@@ -70,13 +70,7 @@ none.
 
 ## Install
 
-BlobBoards requires Julia 1.12 or later. Until the General registrations of
-BlobBoards and LocalOptimizationDoneRight merge, add
-[CauRegistry](https://github.com/prittjam/CauRegistry.jl) first:
-
-```julia-repl
-pkg> registry add https://github.com/prittjam/CauRegistry.jl
-```
+BlobBoards requires Julia 1.12 or later.
 
 The example below finds a board on the CPU:
 

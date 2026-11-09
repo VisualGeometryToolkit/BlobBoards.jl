@@ -11,12 +11,10 @@ a generated macro file re-typed as a literal in the prose.
 
 ## Install
 
-Julia 1.12 (juliaup). The stack is registered in CauRegistry (and submitted to
-General); until it is in General, add both registries once (General first: Pkg
-adds it on its own only to an empty depot), then instantiate the project:
+Julia 1.12 (juliaup). The whole stack is registered in General; instantiate the
+project:
 
 ```bash
-julia -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")'   # once per depot
 julia --startup-file=no --project=bmvc2026 -e 'using Pkg; Pkg.instantiate()'
 ```
 

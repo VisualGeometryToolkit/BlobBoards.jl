@@ -40,9 +40,8 @@ jobs:
       # the GPU paths are skipped — so this checkout drops the pin.
       - name: Drop the CUDA runtime pin (no GPU driver here)
         run: julia -e 'using TOML; for f in filter(isfile, ["Project.toml"; joinpath.(readdir(), "Project.toml")]); p = TOML.parsefile(f); prefs = get(p, "preferences", Dict()); haskey(prefs, "CUDA_Runtime_jll") || continue; delete!(prefs, "CUDA_Runtime_jll"); isempty(prefs) && delete!(p, "preferences"); open(io -> TOML.print(io, p), f, "w"); end'
-      # CauRegistry as well as General until the stack is in General.
       - name: Registries
-        run: julia -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl")'
+        run: julia -e 'using Pkg; Pkg.Registry.add("General")'
       - name: Narrow the workspace to the package and test/
         run: julia -e 'using TOML; p = TOML.parsefile("Project.toml"); p["workspace"]["projects"] = ["test"]; open(io -> TOML.print(io, p), "Project.toml", "w")'
       - uses: julia-actions/julia-downgrade-compat@v2

@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.5.0 (Unreleased)
+## 0.5.0 (2026-11-09)
 
-On the 0.6 series of the VisualGeometryToolkit stack, and every JSON file
-through VisualGeometryToolkitIO's file boundary.
+On the 0.7 series of the VisualGeometryToolkit stack, every dependency from
+General, and every JSON file through VisualGeometryToolkitIO's file boundary.
 
 - **Board files `blobboards/board/v6`, pattern files `blobboards/pattern/v4`.**
   The records are board v5's and pattern v3's, key for key and number for
@@ -131,5 +131,6 @@ Installing for a task no longer means adding packages by hand.
   accepts. `BoardConfig`, `TrainingPair` and `ViewAngleStat` gained docstrings,
   `BoardConfig`'s was reattached, and the docstrings Documenter flagged now
   open with a one-sentence summary.
-- CompatHelper adds CauRegistry, where LocalOptimizationDoneRight is until its
-  General registration merges.
+- Every dependency is in General: CI, CompatHelper, the Downgrade and docs
+  workflows, the install instructions and the Python interface's first-import
+  bootstrap add General only (CauRegistry is no longer needed).

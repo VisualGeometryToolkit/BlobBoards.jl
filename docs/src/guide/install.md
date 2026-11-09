@@ -9,14 +9,8 @@ exactly the packages its task needs, and the example under it loads exactly
 those. Calling an extension's function without its packages raises an error
 that names the line to run.
 
-BlobBoards requires Julia 1.12 or later. Until the General registrations of
-BlobBoards and LocalOptimizationDoneRight merge, add
-[CauRegistry](https://github.com/prittjam/CauRegistry.jl) first; the rest of
-the stack comes from General:
-
-```julia-repl
-pkg> registry add https://github.com/prittjam/CauRegistry.jl
-```
+BlobBoards requires Julia 1.12 or later; it and every package below come from
+General.
 
 | Task | Install | Example |
 |------|---------|---------|
@@ -264,7 +258,7 @@ member is the environment for one kind of work; instantiate the one you need:
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
 git config core.hooksPath .githooks     # re-resolve the Manifest after a pull moves a Project.toml
-julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(url = "https://github.com/prittjam/CauRegistry.jl"); Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 julia --project=. -e 'using BlobBoards; blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), dir = mktempdir())'
 ```
 

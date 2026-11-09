@@ -5,14 +5,8 @@ This guide walks through the basics of generating blob patterns and calibration 
 ## Installation
 
 Julia 1.12+ is the only requirement; board authoring needs no external tools and no
-pixi (pixi is only for the [Python interface](python.md)). Until the General
-registrations of BlobBoards and LocalOptimizationDoneRight merge, add
-[CauRegistry](https://github.com/prittjam/CauRegistry.jl) first; the rest of
-the stack comes from General:
-
-```julia-repl
-pkg> registry add https://github.com/prittjam/CauRegistry.jl
-```
+pixi (pixi is only for the [Python interface](python.md)). Everything comes
+from General.
 
 Every example on this page authors boards and needs BlobBoards alone:
 
