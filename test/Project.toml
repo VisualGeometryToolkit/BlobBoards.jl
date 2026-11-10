@@ -1,39 +1,11 @@
-# The test environment (Pkg >= 1.11 form; replaces [extras]/[targets]). A
-# workspace member of ../Project.toml, so Pkg.test() runs it without a sandbox,
-# against the workspace's one Manifest. CUDA and cuDNN are ordinary deps here
-# (BlobBoards' weakdeps): the CUDA and Lux-inference paths are exercised when a
-# GPU is present.
-#
-# TWO EXTENSIONS NEVER LOAD UNDER `Pkg.test`, because their triggers are not
-# deps here. An extension whose triggers are absent is not merely untested — it
-# cannot even fail to compile, so edits to it ship unverified. Each omission is
-# deliberate:
-#
-#   BlobBoardsTrainingExt  Reactant — cannot coexist with the cuDNN the
-#                          evaluation path needs (Reactant bundles its own);
-#                          that conflict is why Lux inference and training are
-#                          separate extensions in the first place.
-#   BlobBoardsLuxExt       Lux + NNlib — adding them pulls the whole Lux stack
-#                          into the test env for one inference backend.
-#
-# So verify them BY HAND when you touch them. LuxExt: the bmvc2026 member
-# already has Lux + cuDNN. TrainingExt: a scratch Project.toml (outside the
-# workspace) carrying every trigger (Reactant, Lux, NNlib, …) with
-# `[sources] BlobBoards = { path = "<checkout>" }`, then
-#
-#   julia --project=<scratch> -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
-#
-# and read the "BlobBoards → BlobBoardsTrainingExt" line. Pkg.precompile
-# compiles each extension with exactly its own triggers.
 [deps]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
-cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
@@ -43,33 +15,33 @@ Libtiff_jll = "89763e89-9b03-5906-acba-b20f662cd828"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LocalOptimizationDoneRight = "87a2e6a3-7afc-471f-bd1b-aa3740a29cd9"
 PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RANSACScoringDoneRight = "084d9f33-8b05-4903-a655-8a8c4926d033"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 ReTestItems = "817f1d60-ba6b-4fd5-9520-3cf149f6a823"
-VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TiffImages = "731e570b-9d59-4bfa-96dc-6df516fadf69"
-TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 VideoIO = "d6d074c3-1acf-5d4c-9a43-ef38773959a2"
 VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
+VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
 VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
 VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
-[sources]
-BlobBoards = {path = ".."}
+[sources.BlobBoards]
+path = ".."
 
 [compat]
 Accessors = "0.1.45"
 Aqua = "0.8.18"
-CairoMakie = "0.15.16"
-Colors = "0.13.3"
 CUDA = "5.11.0"
 CUDA_Runtime_jll = "0.21"
-cuDNN = "1.4.7"
+CairoMakie = "0.15.16"
+Colors = "0.13.3"
 ExplicitImports = "1.15"
 FileIO = "1.20"
 JET = "0.12.2"
@@ -79,25 +51,23 @@ Libtiff_jll = "4.7"
 LinearAlgebra = "1"
 LocalOptimizationDoneRight = "0.5.1"
 PythonCall = "0.9.35"
-Random = "1"
 RANSACScoringDoneRight = "0.6"
+Random = "1"
 ReTestItems = "1.35"
-VisualGeometryToolkitEstimation = "0.8"
 Rotations = "1.7"
 SHA = "0.7, 1"
 StaticArrays = "1.9"
 StructArrays = "0.7.4"
+TOML = "1"
 Test = "1"
 TiffImages = "0.11.9"
-TOML = "1"
 VideoIO = "1.10"
 VisualGeometryToolkitCore = "0.8"
+VisualGeometryToolkitEstimation = "0.8"
 VisualGeometryToolkitFeatures = "0.6.1"
 VisualGeometryToolkitIO = "0.8"
+cuDNN = "1.4.7, 6"
 julia = "1.12"
 
-# ORT's CUDA provider requires a CUDA runtime >= 12.8 and < 13.0 (the machine
-# default is 13.2): pin 12.9 in the environment the suite runs in, as the root,
-# gpu/, examples/, authoring/ and bmvc2026 projects do.
 [preferences.CUDA_Runtime_jll]
 version = "12.9"
