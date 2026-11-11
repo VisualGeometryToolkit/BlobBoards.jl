@@ -46,23 +46,25 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   `_TOML_DEFAULTS` by LODR; audit 20): not the same concept but each package's own data, read through Core's one
   `parse_defaults` (BlobBoards now parses its two files with it) and `toml_default` — the idiom `parse_defaults`'
   docstring states. DUPLICATION.toml entries with the proof, per the owner's ruling (eef3144).
-- [ ] hoist `_Record` (an exact copy) and `_snap_integer` → VisualGeometryToolkitIO, public (IO src/style.jl:93,
+- [x] hoist `_Record` (an exact copy) and `_snap_integer` → VisualGeometryToolkitIO, public (IO src/style.jl:93, — CLOSED: VisualGeometryToolkitIO `Record`, `snap_integer` (with its Integer and Rational methods) public (monorepo 9c6d3e76); the copies deleted, the lifts read `VgtkIO.Record` (cd4ff03)
   src/core_json.jl:74). Proposed: `Record = Union{JSON.Object, NamedTuple}` and `snap_integer(v)` with BlobBoards'
   `Integer` and `Rational` methods beside IO's float one. Callers: BlobBoards src/json.jl, src/types.jl,
   src/migrate_boards.jl. The switch: `using VisualGeometryToolkitIO: Record as _Record, snap_integer as _snap_integer`.
-- [ ] hoist the README install-row runner (`test/suites/readme_rows.jl`'s `examples`, `loaded_packages` and the
+- [x] hoist the README install-row runner (`test/suites/readme_rows.jl`'s `examples`, `loaded_packages` and the — CLOSED: VisualGeometryToolkitCore's README toolkit in its Test extension (`readme_examples`, `install_table`, `install_packages`, `loaded_packages`, `readme_environment`, `run_readme_child`, `test_readme_row`; monorepo 27d80244, a1022944); test/suites/readme_rows.jl keeps the pages, the rows and `run_row` on it (cd4ff03)
   per-row fresh-environment runner; audit 6; CaliBlobs' test/readme_rows.jl restates it) → VisualGeometryToolkitCore's
   Test extension, beside `test_docs`: `test_readme_rows(M; pages, rows, row_lines)`. Callers: BlobBoards
   test/suites/readme_rows.jl, CaliBlobs test/readme_rows.jl.
-- [ ] hoist `.githooks/sync-manifest.jl` (a byte-identical copy of RSDR's; audit 20) → one copy owned by the stack's
+- [x] hoist `.githooks/sync-manifest.jl` (a byte-identical copy of RSDR's; audit 20) → one copy owned by the stack's — CLOSED: one copy, VisualGeometryToolkitCore's `githooks/` with `sync_manifest`/`install_githooks` (monorepo, in ae154f63), not cau-tooling vendoring: the stack package owns it and every repository installs it; .githooks/ deleted here, CLAUDE.md and the install guide name `install_githooks` (cd4ff03)
   release tooling (cau-tooling), vendored into each repo through `VENDORED.toml`. Callers: BlobBoards, RSDR.
-- [ ] hoist `linear_to_srgb` → VisualGeometryToolkitFeatures (audit 16; `test_duplication` pattern `srgb_transfer`):
+- [x] hoist `linear_to_srgb` → VisualGeometryToolkitFeatures (audit 16; `test_duplication` pattern `srgb_transfer`): — CLOSED: Features' `linear_to_srgb` (plane-maps, in the 0.9 branch); docs/make_hero.jl calls it, Features in docs/Project.toml (cd4ff03)
   it is on plane-maps (7a50364d), not yet in the 0.9 branch. Caller: docs/make_hero.jl:42 `srgb`, which also needs
   Features in docs/Project.toml.
-- [ ] hoist the paper-support copies shared with CaliBlobs' icra2026 (audit 6) → VisualGeometryToolkitEval:
+- [x] hoist the paper-support copies shared with CaliBlobs' icra2026 (audit 6) → VisualGeometryToolkitEval: — CLOSED: VisualGeometryToolkitEval `Experiments.assert_active_project`, `save_hand_eye`/`load_hand_eye`/`hand_eye_mount_file`, `Render.station_cells` (monorepo 3ce4cf1c); `_diag` is not hoisted (a reflective field probe, against the accessors rule): the fit's `metadata.σ_rot`/`σ_trans` are read directly (cd4ff03)
   `_assert_project` (bmvc2026/src/data.jl:21), `_diag` (bmvc2026/src/calibration.jl:165), the station cells
   (bmvc2026/scripts/plots/error_distributions.jl `_cells`) and `load_hand_eye` (bmvc2026/src/pose_error.jl). The
   paper tree leaves the package repository in 0.5.1 (owner decision 11).
+
+- [ ] the ONNX descriptor's own session handling (src/descriptor.jl: `ONNXRunTime.load_inference` with its CUDA arena cap and CPU fallback) → VisualGeometryToolkitFeatures' ONNX runtime (src/onnx_runtime.jl: the execution-provider resolution, the sm_100-capable CUDA provider, the capped arena). OPEN: Features' session builder is private (`_onnx_session`, a fixed 8 GiB cap); the hoist makes it public with the arena cap as a keyword, then DescriptorNetwork calls it (the GPU smoke and the four annotate-smoke B200 errors to be checked on the GPU).
 
 ## Public names an upstream package owns: an API decision
 
@@ -70,7 +72,7 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   no `load`/`save` binding; its reader is the method `load(T::Type{<:AbstractBundle}, path)` (was `load(path)`) and
   its writer the method `save(pattern, bundle::PatternBundle; dir)` (f0fe0d8). Until the hoist below lands,
   the two methods are the contract_generics gate's only findings (report mode; the suite pins exactly them).
-- [ ] hoist: IO lists load/save in CONTRACT_GENERICS.
+- [x] hoist: IO lists load/save in CONTRACT_GENERICS. — CLOSED: IO `CONTRACT_GENERICS = (migrate_schema, load, save)` (monorepo 46aa2c56); the gate is a plain `@test isempty(cv)` (cd4ff03)
 - [x] `board`/`board!` (BlobBoards' Makie recipe), a name Core's Cameras owns (`board(t::PlanarTarget)`): not the
   same concept (a recipe that draws a board vs the accessor of a target's physical board); a DUPLICATION.toml entry
   with the proof, per the owner's ruling (eef3144).
