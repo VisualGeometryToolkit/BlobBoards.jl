@@ -9,6 +9,8 @@ using BlobBoards: FindBoardsConfig, write_config, read_run_config, config_dict,
     DetectConfig, EllipseNms, MxmNms, PoseGeometry, HomographyGeometry,
     AdaptConfig, DetectConfig
 using VisualGeometryToolkitEstimation: RansacConfig
+import VisualGeometryToolkitEstimation as VgtkEstimation
+using VisualGeometryToolkitCore: StudentTUniformScoring
 using LocalOptimizationDoneRight: StudentTUniform, HQ, tuning_constant
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, Lens, Perspective, Additive, Radial, Tangential, WelschShape
@@ -761,4 +763,29 @@ end
     @test_throws ArgumentError FindBoardsConfig(path)
     write(path, "[calibrate]\nncoef = 2\n")
     @test_throws ArgumentError read_run_config(path)
+end
+
+# The Student-t keyword rule (owner ruling 2026-11-11): the geometry's scorer is the Student-t + uniform marginal, which
+# takes its outlier half-width (`outlier_halfwidth`) and never a `threshold`. A geometry table carrying `threshold` is
+# refused, the table's `outlier_halfwidth` reaches the scorer exactly, and the fit path refuses a `threshold` beside it.
+@testset "the Student-t path: outlier_halfwidth, never threshold (2026-11-11)" begin
+    dir = mktempdir()
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "h.toml", "[find_boards.geometry]\ntype = \"homography\"\nthreshold = 3.0\n"))
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "p.toml", "[find_boards.geometry]\ntype = \"pose\"\nthreshold = 3.0\n"); camera = _CAM)
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "r.toml", "[find_boards.geometry]\ntype = \"radial_homography\"\nthreshold = 3.0\n");
+                                                image_size = (640, 480))
+    a = 0.9646329181191862   # bmvc2026's half-width of record
+    for (arm, P, kw) in (("homography", VgtkEstimation.HomographyProblem{Float64}, (;)),
+                         ("pose", VgtkEstimation.AbsolutePoseProblem, (; camera = _CAM)))
+        c = FindBoardsConfig(_write(dir, "a_$arm.toml", "[find_boards.geometry]\ntype = \"$arm\"\noutlier_halfwidth = $a\n"); kw...)
+        @test c.geometry.outlier_halfwidth === a
+        sc = BlobBoards._scoring(P, c.geometry.outlier_halfwidth)
+        @test sc isa StudentTUniformScoring && VgtkCore.outlier_halfwidth(sc) === a
+    end
+    HP = VgtkEstimation.HomographyProblem{Float64}
+    @test_throws ArgumentError VgtkEstimation.scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "threshold" => 3.0); problem = HP)
+    @test_throws MethodError StudentTUniformScoring(HP, a; threshold = 3.0, scale_prior = VgtkCore.JeffreysPrior(),
+                                                    label_prior = VgtkCore.FlatLabelPrior())
+    pts = [VgtkCore.Point2(x, y) => VgtkCore.Point2(x + 1.0, y + 2.0) for x in 0.0:10:40 for y in 0.0:10:40]
+    @test_throws ArgumentError BlobBoards._find_model(nothing, pts; threshold = 3.0)
 end

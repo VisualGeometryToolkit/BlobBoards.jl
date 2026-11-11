@@ -34,10 +34,11 @@ using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_hom
 # The constraint-problem protocol is VisualGeometryToolkitCore's; RVG's problems add
 # methods to it.
 using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map
-# Every fit scores with the Student-t + uniform marginal (Jeffreys scale
-# prior) at the geometry's `outlier_halfwidth` — RANSACScoringDoneRight's
-# scorer, stated explicitly: RVG's own default is MSAC at a threshold.
-using RANSACScoringDoneRight: StudentTUniformScoring
+# Every fit scores with the Student-t + uniform marginal at the geometry's
+# `outlier_halfwidth`, stated explicitly: RVG's own default is MSAC at a
+# threshold. The scorer is VisualGeometryToolkitCore's, built by
+# VisualGeometryToolkitEstimation's one scorer-table reader (`_scoring` below).
+using VisualGeometryToolkitEstimation: scoring_from_toml
 
 # =============================================================================
 # load_board — parse JSON metadata only (no rasterization)
@@ -426,8 +427,13 @@ _describe_patches(model, cube) = describe(model, _host_patches(cube))
 _default_lo(::Nothing) = _dflt_local_optimization(:homography)
 _default_lo(::CameraModel) = _dflt_local_optimization(:absolute_pose)
 # The scorer of every fit and refine: the Student-t + uniform marginal at the
-# arm's outlier half-width (`P` the arm's problem type).
-_scoring(::Type{P}, outlier_halfwidth) where {P} = StudentTUniformScoring(P, outlier_halfwidth)
+# arm's outlier half-width (`P` the arm's problem type). Its table states the
+# half-width and nothing else: the scale and label priors are the stack's
+# configuration of record (VisualGeometryToolkitEstimation's
+# `[scoring.student_t_uniform]`: Jeffreys and flat, the priors this scorer
+# always defaulted to), so no prior is restated here.
+_scoring(::Type{P}, outlier_halfwidth) where {P} = scoring_from_toml(
+    Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => Float64(outlier_halfwidth)); problem = P)
 # The half-width a fit falls back to when `fit_kw` carries none (a bare
 # `find_board` call), px. Every engine path supplies the geometry's own value.
 # Homography: 5.0. The bmvc2026 outlier half-width CV's run of record
@@ -1652,8 +1658,8 @@ homography, so it needs one fewer support point than the homography path
 (min_inliers=7). (The gate is INCLUSIVE — `nin >= min_inliers` — since
 2026-08-11; the default went 5 → 6 in the same change, keeping the effective
 tuned threshold: a 5-inlier P3P fit against a 50-board gallery measured as a
-false accept on DSC02847.) Half-width is 5.0 px — the same inlier band as the
-homography path — since BB residuals come from adapt-refined sub-pixel
+false accept on DSC02847.) The outlier half-width is 5.0 px, the homography
+path's, since BB residuals come from adapt-refined sub-pixel
 detections.
 """
 struct PoseGeometry{C, L} <: GeometryConfig

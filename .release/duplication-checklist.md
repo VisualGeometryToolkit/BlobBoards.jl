@@ -86,6 +86,24 @@ Source: cpu-gpu-twin-audit.md ("BlobBoards"), hoists-09.md ("the one-kernel gate
   its floors) → DEFERRED by the owner (ruling 3, 2026-11-11): the kernel and its parameters stay as they are for 0.9; not a blocker
   of this leg (robust-schema audit, borderline 5)
 
+### The Student-t keyword (owner ruling 2026-11-11: "there is no threshold for the Student-t, only the outlier half-width")
+
+Every scorer takes its own keyword: `StudentTUniformScoring` its `outlier_halfwidth` (and its priors), never `threshold`; the
+threshold scorers (RANSAC, MSAC, the loss-width families) `threshold`, never `outlier_halfwidth`. No number may cross between
+the two meanings. Audit: studentt-keyword-overload.md.
+
+The package's keys, keywords and constructions already take a half-width (`[find_boards.geometry] outlier_halfwidth`,
+`_scoring(P, outlier_halfwidth)`, the Python `outlier_halfwidth`); the overloads left were prose, and one reuse of the number.
+
+- [x] bmvc2026/papers/bmvc_supp.tex:279 the settings table's row "inlier half-width $a$" → "outlier half-width $a$" (this commit)
+- [x] bmvc2026/configs/bmvc2026_260527.toml:158, bmvc2026_260527_noflip.toml:161 "Reprojection inlier half-width" → "Reprojection outlier half-width" (comments: the run keys hash the parsed tables, unchanged) (this commit)
+- [x] src/pipeline.jl:1655 (PoseGeometry's docstring) "the same inlier band as the homography path" → "the homography path's" outlier half-width (this commit)
+- [x] ext/BlobBoardsPythonExt.jl:575 and python/blobboards/__init__.py:1318 "`min_inliers`, `outlier_halfwidth`: geometry gates" → the inlier-count gate and the scorer's outlier half-width, not a gate (this commit)
+- [x] test/suites/config_toml.jl "the Student-t path: outlier_halfwidth, never threshold": a geometry table with `threshold` is refused on every arm, the table's `outlier_halfwidth` reaches the scorer exactly (`===`), the scorer refuses `threshold`, and `_find_model` refuses a `threshold` beside its scorer (this commit)
+- [x] src/pipeline.jl:430 `_scoring` and test/suites/raw_pose_arm.jl:88: `StudentTUniformScoring(P, a)` (RANSACScoringDoneRight's constructor, its priors defaulted in code) → VisualGeometryToolkitEstimation's `scoring_from_toml` of the table `{ type = "student_t_uniform", outlier_halfwidth = a }`, its priors the stack's `[scoring.student_t_uniform]` (Jeffreys, flat: the defaults it had). The scorer moved to VisualGeometryToolkitCore with both priors required (monorepo c7b8106e, 74db20d2), so the bare call no longer builds; the half-width is the one number the table states (this commit)
+- [ ] src/pipeline.jl:1362-1379 (`find_board`'s guided final fit) and its docstring at :761-763: the Student-t's `outlier_halfwidth` is fed to `guided_search` as `max_px`, a hard association radius (a gate), "so guided association uses the same inlier band as the RANSAC fit". That reads the half-width as a threshold; configs/default.toml:34 itself says it is "NOT a gate". Separating them (an association radius of its own, e.g. `[find_boards] guided_max_px`, at today's value) leaves the results unchanged only if its value is the half-width, and changes the config_dict and so every run key; any other value changes results. Waits on the owner's decision (src/track.jl:200/235/465 thread the same `oh` to the warm track, as the fit's half-width only: fine)
+
+
 ## Public names an upstream package owns: an API decision
 
 - [x] `load`/`save`, names VisualGeometryToolkitIO owns → IO's functions (owner decision, Option A): BlobBoards owns

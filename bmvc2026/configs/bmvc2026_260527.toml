@@ -155,7 +155,7 @@ local_optimization = { type = "student_t_uniform" }   # posterior-weight IRLS LO
 # the authored value moves up one to keep the tuned effective threshold. This
 # changes config_dict and therefore the run key — a fresh run directory.
 min_inliers = 9
-# Reprojection inlier half-width, PIXELS — the support of the uniform outlier
+# Reprojection outlier half-width, PIXELS — the support of the uniform outlier
 # component of the Student-t + uniform scorer and LO, and the guided-association
 # band. CROSS-VALIDATED, jointly with [find_boards.detect] peak_threshold and
 # [find_boards] min_similarity: the record of configs/detection_cv.toml,

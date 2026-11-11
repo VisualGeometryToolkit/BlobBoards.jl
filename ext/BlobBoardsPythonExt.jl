@@ -572,7 +572,8 @@ end
 #   omit for the homography path
 # - `device`: "cuda" (default; needs a functional CUDA backend on the Julia
 #   side) or "cpu" — one KernelAbstractions backend for gallery AND query
-# - `min_inliers`, `outlier_halfwidth`: geometry gates
+# - `min_inliers` (a geometry gate), `outlier_halfwidth` (the Student-t + uniform
+#   scorer's outlier half-width, not a gate)
 # - `verify_similarity`, `min_appearance_support`: appearance-verification
 #   knobs (the mandatory per-inlier descriptor gate; Julia-side defaults
 #   0.6 / 0.5)

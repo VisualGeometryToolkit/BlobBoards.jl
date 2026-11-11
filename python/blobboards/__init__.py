@@ -1316,7 +1316,8 @@ def find_boards(board_paths, model_path, img, *, gallery_path,
         provider) run on the same device. `blobboards.device()` resolves it
         without running detection; each result also says where it ran.
     min_inliers, outlier_halfwidth : optional
-        Geometry gates (defaults from the Julia side).
+        The geometry's inlier-count gate and its Student-t + uniform scorer's
+        outlier half-width in pixels (not a gate; defaults from the Julia side).
     verify_similarity, min_appearance_support : optional
         Appearance-verification knobs — the mandatory per-inlier descriptor
         gate (defaults 0.6 / 0.5 on the Julia side).
