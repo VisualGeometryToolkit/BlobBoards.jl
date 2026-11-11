@@ -1,40 +1,30 @@
 #=
 cache.jl — derived artifacts through the stack's keyed result cache
-(VisualGeometryToolkitEval.Experiments `cached_result`: the file name DrWatson's
-`produce_or_load(…; filename = hash, prefix)` builds, loaded with `wload`,
-saved with `tagsave` — but a save error PROPAGATES, where `produce_or_load`
-swallows it, DrWatson saving_files.jl:107-116).
+(VisualGeometryToolkitEval.Experiments `cached_result`: `<dir>/<prefix>_<key>.jld2`,
+loaded with `wload`, saved tagged like `tagsave` — a save error PROPAGATES,
+where DrWatson's `produce_or_load` swallows it, saving_files.jl:107-116).
 
 This file is deliberately thin. It fixes the project's conventions in ONE place
 (where artifacts land) and adds no naming machinery of its own.
 
-WHY `filename = hash` AND NOT `savename`. `savename` filters values by TYPE:
-`default_allowed` is `(Real, String, SubString, Symbol, TimeType)`, so nested
-tables and arrays are silently DROPPED from the name. Our configs are almost
-entirely nested (`detect`, `adapt`, `geometry`, `ransac`), so two configs
-differing only in `detect.peak_threshold` would `savename` to the same string —
-and the cache would then load the first run's result and return it as
-the second's. That is the exact silent-stale failure keying exists to prevent,
-reintroduced by the keying. `hash` sees the whole container: verified
-order-independent, sensitive to nested differences, and identical across
-separate Julia processes.
+WHY `key = run_key` AND NOT `savename` OR `hash`. `savename` filters values
+by TYPE (`default_allowed` is `(Real, String, SubString, Symbol, TimeType)`), so
+nested tables and arrays are silently DROPPED from the name — two configs
+differing only in a nested value would share one artifact. `hash` sees the whole
+container but is not stable across Julia versions (Eval's `legacy_hash_key`,
+which `cached_result` falls back to, is that). `run_key` is the stack's one run
+identity: the SHA-256 of the sorted TOML of the config, stable across key order,
+processes and Julia versions. Every call here passes `key = run_key`.
 
-`hash` carries no cross-VERSION stability guarantee. Accepted deliberately: if
-it ever moved, the cache would compute a new name, fail to find it, and
-recompute — orphaned files and wasted time, never a wrong answer. A custom
-version-stable digest was written and removed; it bought protection against a
-rare, recoverable, non-silent failure at the cost of code to maintain forever.
-
-`prefix` keeps the artifacts greppable, since `hash` alone yields a bare
-integer: `handeye_bb_14300935657883058264.jld2`.
+`prefix` keeps the artifacts greppable: `pose_<run_key>.jld2`.
 
 WHAT IS NOT CACHED HERE. The detections (`<run>/poses/<system>/`): each is a
 whole keyed run directory of its own (src/runs.jl), the same layout for all
 three marker systems.
 =#
 
-using VisualGeometryToolkitEval.Experiments: cached_result
+using VisualGeometryToolkitEval.Experiments: cached_result, run_key
 
-# The cache is called directly (`cached_result(f, prefix, cfg, dir; force)`,
+# The cache is called directly (`cached_result(f, prefix, cfg, dir; key = run_key, force)`,
 # `dir` under `results_root()`): a project wrapper around it was a second copy
 # of the same one line in each paper project, and is deleted.

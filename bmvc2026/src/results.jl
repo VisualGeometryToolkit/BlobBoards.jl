@@ -63,6 +63,11 @@ nothing older to select against.
 """
 results_dir(src::Sources) = derived_dir(src, "pose_results", CELL_SOURCES)
 
+# The cache key of one cell: the dataset, the marker system and the occlusion
+# level (`"none"` unoccluded); the directory carries the sources' run keys.
+_cell_config(src::Sources, system, level) =
+    Dict{String, Any}("dataset" => src.dataset, "system" => String(system), "level" => String(level))
+
 """
     write_pose_results(src; occlusion_level = nothing, force = false)
 
@@ -81,7 +86,7 @@ function write_pose_results(
     level = something(occlusion_level, "none")
     files = String[]
     for (system, r) in results
-        cfg = Dict{String, Any}("dataset" => src.dataset, "system" => system, "level" => level)
+        cfg = _cell_config(src, system, level)
         _, file = cached_result(
             _ -> merge(
                 copy(cfg),
@@ -95,7 +100,7 @@ function write_pose_results(
                     "script" => isempty(PROGRAM_FILE) ? "src/results.jl" : basename(PROGRAM_FILE),
                 ),
             ),
-            "pose", cfg, results_dir(src); force
+            "pose", cfg, results_dir(src); key = run_key, force
         )
         push!(files, file)
         println("cell $(system)@$(level): $(nrow(r.table)) observations -> $file")

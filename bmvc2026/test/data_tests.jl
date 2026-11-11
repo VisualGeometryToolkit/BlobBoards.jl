@@ -151,3 +151,32 @@ end
         @test_skip false
     end
 end
+
+# A pose-error cell already in the results cache is REUSED: `write_pose_results`
+# asks the cache for every cell before it evaluates anything, so a rerun with
+# every cell present evaluates nothing (the sources below have no detections:
+# an evaluation throws). It once ran `evaluate_dataset` first and only then
+# asked the cache, so every rerun recomputed every cell.
+@testitem "write_pose_results reuses cached cells without evaluating" setup = [BBEval] begin
+    using .BBEval.BlobBoardsEval: Sources, PoseRun, write_pose_results, BOARD_TYPES
+    using VisualGeometryToolkitEval.Experiments: cached_result, run_key
+    const BBE = BBEval.BlobBoardsEval
+    mktempdir() do tmp
+        withenv("VGTK_RESULTS_ROOT" => mkpath(joinpath(tmp, "results"))) do
+            none = joinpath(tmp, "nothing-here")
+            src = Sources("260527", none, none, Dict(bt.name => PoseRun(none, none, bt.name) for bt in BOARD_TYPES),
+                Dict("records" => "r", "baselines" => "b", "bb" => "k", "occlusion" => "o", "bb_noflip" => "n"))
+            # nothing cached: the cells are evaluated, and the evaluation reads detections that are not there
+            @test_throws Exception write_pose_results(src)
+            # every cell cached (through the cache itself, under the cell's key): nothing is evaluated
+            cache(bt) = last(cached_result(c -> Dict{String, Any}("cached" => true), "pose",
+                BBE._cell_config(src, bt.system, "none"), BBE.results_dir(src); key = run_key))
+            files = [cache(bt) for bt in BOARD_TYPES]
+            @test allunique(files)
+            @test sort(write_pose_results(src)) == sort(files)
+            # one cell missing: it is evaluated again (and the evaluation throws here)
+            rm(first(files))
+            @test_throws Exception write_pose_results(src)
+        end
+    end
+end
