@@ -177,13 +177,13 @@ backend, a blob one workgroup — 256 work items on a GPU, ONE on `KA.CPU()`,
 which then walks the blob's pixels in scan order (the threaded host twin the
 CPU used to run was deleted 2026-11; its frames and the kernels' agree to
 ~2e-7 px). Barriers in those kernels follow KA's CPU rules (the header of
-"The per-blob kernels" in adapt_ka.jl). CUDA keeps two bit-exactness hooks in
-BlobBoardsCUDAExt — the cuBLAS batched 6×6 LU (its getrf `info` decides which
-near-degenerate blobs are invalidated) and the `__nv_lgamma` libdevice call;
-other backends get a per-blob register LU, and the CPU SpecialFunctions'
-`loggamma` (the rest a pure-Julia Lanczos lgamma). Adapt output was
-ALREADY nondeterministic run-to-run on CUDA (atomic pixel-slot assignment),
-so cross-backend parity is frame-level with tolerances, never bitwise.
+"The per-blob kernels" in adapt_ka.jl). There is no backend hook: one
+per-blob register LU (`_lu6_kernel!`) and one lgamma (Core's `lgamma_lanczos`)
+on every backend (the owner's ruling of 2026-11-11 retired CUDA's cuBLAS LU and
+`__nv_lgamma` and the CPU's SpecialFunctions `loggamma`). The ν step is Core's
+(`next_nu_from_sums`, with its ascent safeguard). CPU and CUDA frames agree to
+~1e-8 px, but atomic accumulation order still differs, so cross-backend parity
+is frame-level with tolerances, never bitwise.
 
 The per-blob solver is FIXED: the Student-t / uniform mixture IRLS with the
 sort-and-sweep posterior partition, whitened normal equations. It used to be

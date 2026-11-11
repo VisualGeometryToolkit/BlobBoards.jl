@@ -32,6 +32,13 @@ LocalOptimizationDoneRight. Breaking (the next release is a minor bump, 0.6.0):
 - **One adaptation implementation on every backend**: the per-blob
   KernelAbstractions kernels run on `KA.CPU()` (one work item per blob); the
   threaded host twin is deleted. CPU frames move by at most ~2e-7 px.
+- **The adaptation computes the same numbers on every backend**: its ν step is
+  VisualGeometryToolkitCore's (`nu_point_terms`, `next_nu_from_sums`: Newton only
+  where the objective is concave), and one lgamma (Core's `lgamma_lanczos`) and
+  one 6×6 solve run on every backend (CUDA's cuBLAS LU and `__nv_lgamma`, and the
+  CPU's SpecialFunctions `loggamma`, are gone; SpecialFunctions is no longer a
+  dependency). Frames change: blobs whose ν Newton step went downhill move, so the
+  CPU and CUDA frames now agree to ~1e-8 px (they differed by up to 0.3 px).
 - The docstring gates are VisualGeometryToolkitCore's `test_docs`; the suite runs
   Core's `check_duplication` (its open findings listed, each an item of
   `.release/duplication-checklist.md`).

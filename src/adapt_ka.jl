@@ -20,15 +20,14 @@
 #   regime, never claimed as parity). Per-pixel storage stays
 #   Float32 staging (the deleted `AdaptConfig.store`'s only value) exactly as before.
 #
-# - `lgamma` is supplied TO the kernels as an argument: the CUDA extension
-#   supplies the `__nv_lgamma` libdevice ccall (bit-identical to legacy);
-#   the CPU gets SpecialFunctions.loggamma, every other backend the
-#   pure-Julia Lanczos below (SpecialFunctions.loggamma does not GPU-compile).
+# - ONE lgamma on every backend: Core's `lgamma_lanczos` (device-safe; the
+#   owner's ruling of 2026-11-11 retired SpecialFunctions' `loggamma` on the CPU
+#   and CUDA's `__nv_lgamma`, which made the same kernel give different numbers
+#   per backend).
 #
-# - The 6×6 normal-equation solve is the `_solve_6x6_batched!` hook: cuBLAS
-#   getrf/getrs on CUDA (bit-identical, including which near-degenerate
-#   blobs its `info` invalidates), a per-blob register LU with partial
-#   pivoting everywhere else (the CPU included).
+# - ONE 6×6 normal-equation solve on every backend: the per-blob register LU
+#   with partial pivoting (`_lu6_kernel!`; the same ruling retired CUDA's cuBLAS
+#   getrf/getrs override).
 #
 # - The legacy fused kernel's thread-1 `break` past a barrier (formally UB
 #   on CUDA, a deadlock elsewhere) is replaced by a shared-memory stop flag
@@ -47,7 +46,6 @@
 
 using KernelAbstractions: @kernel, @Const, @index, @groupsize,
     @localmem, @private, @synchronize, @uniform
-using SpecialFunctions: loggamma
 
 # The per-blob scan samples a canonical (2·31 + 1)² = 3969-point grid, which
 # is what `_SORT_PADDED` (the next power of two) sizes the sweep's bitonic
@@ -96,7 +94,7 @@ end
 using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
     trigamma_stirling, lu_solve!, ka_upload, on_device
 # The E-step is Core's Student-t + uniform mixture, built in the kernel's float
-# type with the backend's lgamma (one per blob per iteration: ν and ŝ² change per
+# type with the kernels' lgamma (one per blob per iteration: ν and ŝ² change per
 # blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
 using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_weight, is_peak, is_valid_shape
 # The ν M-step is Core's: a point's Q-derivative terms and the safeguarded Newton
@@ -109,21 +107,13 @@ const _JEFFREYS = IGPrior()
 
 
 # =============================================================================
-# Backend hooks
+# The per-blob 6×6 solve
 # =============================================================================
 
-"""
-    _device_lgamma(backend) -> function
-
-The lgamma the adaptation kernels use on `backend`. The CUDA extension
-overrides this with the `__nv_lgamma` libdevice ccall so CUDA results stay
-bit-identical to the legacy kernels; the CPU uses SpecialFunctions'
-`loggamma`; the default is the device-safe Lanczos approximation below. Every
-call site has argument ≥ 1, so no reflection.
-"""
-_device_lgamma(::KA.Backend) = lgamma_lanczos
-_device_lgamma(::KA.CPU) = loggamma
-
+# The per-blob 6×6 solve, on every backend: θ_new replaces `AtWz[:, 1, blob]`;
+# `info[blob] ≠ 0` flags a singular system (the apply/check step invalidates
+# those blobs). One work item per blob (invalid/converged blobs skipped: the
+# apply step ignores them).
 @kernel inbounds = true unsafe_indices = true function _lu6_kernel!(
         AtWA, AtWz, info, @Const(valid), @Const(converged)
     )
@@ -146,22 +136,6 @@ _device_lgamma(::KA.CPU) = loggamma
             end
         end
     end
-end
-
-"""
-    _solve_6x6_batched!(backend, AtWA, AtWz, pivot, info, valid, converged)
-
-Per-blob 6×6 solve: θ_new replaces `AtWz[:, 1, blob]`; `info[blob] ≠ 0`
-flags a singular system (the apply/check step invalidates those blobs).
-Generic method: one-thread-per-blob register LU (skips invalid/converged
-blobs, whose results the apply step ignores anyway). The CUDA extension
-overrides with cuBLAS getrf/getrs_strided_batched! — bit-identical to the
-legacy implementation; `pivot` exists for that method alone.
-"""
-function _solve_6x6_batched!(backend::KA.Backend, AtWA, AtWz, pivot, info, valid, converged)
-    N = length(info)
-    _lu6_kernel!(backend, 256)(AtWA, AtWz, info, valid, converged; ndrange = 256 * cld(N, 256))
-    return nothing
 end
 
 # =============================================================================
@@ -341,8 +315,8 @@ end
 # EXPRESSION TREES ARE LOAD-BEARING. The device path is compared against the
 # legacy CUDA trajectory — do not re-associate, do not introduce muladd/fma,
 # do not "simplify". `Ta` is the accumulation type (Float64 on CPU/CUDA,
-# Float32 on Metal); `lgamma_f` is the backend's loggamma (libdevice
-# `__nv_lgamma` on CUDA, SpecialFunctions.loggamma on the CPU).
+# Float32 on Metal); `lgamma_f` is the kernels' loggamma
+# (Core's `lgamma_lanczos` on every backend).
 
 # Squared log-space residual of one pixel: r = (log f − z_pred)·f, guarded for
 # non-positive inverted intensity.
@@ -804,7 +778,7 @@ function _adapt_ka(
     # Accumulation/solve precision by backend capability: Float64 on
     # CUDA/CPU (identical to the legacy kernels), Float32 on Metal.
     Ta = KA.supports_float64(device) ? Float64 : Float32
-    lgamma_f = _device_lgamma(device)
+    lgamma_f = lgamma_lanczos
     gs = _adapt_groupsize(device)
 
     cutoff = cfg.cutoff
@@ -931,7 +905,6 @@ function _adapt_ka(
 
     d_AtWA = KA.zeros(device, Ta, 6, 6, N)
     d_AtWz = KA.zeros(device, Ta, 6, 1, N)
-    d_pivot = KA.zeros(device, Int32, 6, N)
     d_info = KA.zeros(device, Int32, N)
     d_theta_old = KA.zeros(device, Ta, 6, N)
     d_converged = KA.zeros(device, Int32, N)
@@ -965,9 +938,9 @@ function _adapt_ka(
             ndrange = gs * N
         )
 
-        _solve_6x6_batched!(
-            device, d_AtWA, d_AtWz, d_pivot, d_info,
-            d_valid_live, d_converged
+        _lu6_kernel!(device, 256)(
+            d_AtWA, d_AtWz, d_info, d_valid_live, d_converged;
+            ndrange = 256 * cld(N, 256)
         )
 
         _apply_check_ka!(device, 256)(

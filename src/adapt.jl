@@ -112,10 +112,8 @@ function adapt(discs::AbstractVector{<:Disc}, img::AbstractMatrix; config::Adapt
 end
 
 # Backend-generic KernelAbstractions adaptation (src/adapt_ka.jl): the same
-# KA kernels on KA.CPU() and on any GPU backend.
-# The CUDA extension specializes only the hooks `_solve_6x6_batched!`
-# (cuBLAS batched LU) and `_device_lgamma` (libdevice `__nv_lgamma`) —
-# there is no CUDA-specific `_adapt` method anymore.
+# KA kernels on KA.CPU() and on any GPU backend, with no backend hook (one
+# lgamma, one 6×6 solve).
 _adapt(
     img, sites::AbstractVector{<:Union{Disc, EllipticFrame}},
     cfg::AdaptConfig, device::KA.Backend = default_device()

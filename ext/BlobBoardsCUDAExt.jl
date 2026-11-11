@@ -108,31 +108,6 @@ BlobBoards._describe_patches(model::BlobBoards.DescriptorNetwork, cube::CuArray{
     BlobBoards.describe(model, BlobBoards._host_patches(cube))
 
 # =============================================================================
-# CUDA hooks for the backend-generic KA adaptation (src/adapt_ka.jl)
-# =============================================================================
-#
-# The adaptation kernels are backend-generic; CUDA keeps the two
-# bit-exactness hooks of the original implementation. Both are open items of
-# the CPU/GPU twin audit (B1: the cuBLAS batched LU vs `_lu6_kernel!`; B2: a
-# third lgamma), AWAITING THE OWNER'S RULING: removing either changes CUDA results.
-
-# __nv_lgamma keeps the sweep S-score and the weight kernels' log_C
-# bit-identical to the legacy CUDA kernels.
-_lgamma_nv(x::Float64) = ccall("extern __nv_lgamma", llvmcall, Cdouble, (Cdouble,), x)
-BlobBoards._device_lgamma(::CUDABackend) = _lgamma_nv
-
-# cuBLAS batched LU — bit-identical to legacy, including which
-# near-degenerate blobs getrf's `info` invalidates.
-function BlobBoards._solve_6x6_batched!(
-        ::CUDABackend, AtWA, AtWz, pivot, info, valid, converged
-    )
-    CUDA.CUBLAS.getrf_strided_batched!(AtWA, pivot, info)
-    CUDA.CUBLAS.getrs_strided_batched!('N', AtWA, AtWz, pivot)
-    return nothing
-end
-
-
-# =============================================================================
 # Training-pipeline backend hooks (src/training.jl)
 # =============================================================================
 #

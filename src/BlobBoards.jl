@@ -62,9 +62,6 @@ import VisualGeometryToolkitIO as VgtkIO
 # Core Julia packages
 using LinearAlgebra: LinearAlgebra, dot, norm, normalize
 using Statistics: Statistics
-# SpecialFunctions: loggamma consumed directly by the adaptation host path
-# (src/adapt_ka.jl, which is where the `using` lives); the device kernels use
-# their own Lanczos/libdevice lgamma
 using Random: Random, MersenneTwister, RandomDevice, Xoshiro
 import Artifacts   # descriptor-network catalog lookups (config_toml.jl)
 import Pkg         # Pkg.Artifacts.ensure_artifact_installed — lazy artifact fetch

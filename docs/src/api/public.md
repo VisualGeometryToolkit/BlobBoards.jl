@@ -49,8 +49,8 @@ so a camera/geometry mismatch is unrepresentable rather than a runtime error.
 
 Adaptation is **backend-generic** (KernelAbstractions): `device = KA.CPU()`
 runs the threaded host implementation, `CUDABackend()` (or any KA GPU
-backend) the device kernels. Results agree to within the pipeline's own
-run-to-run jitter; CUDA additionally provides cuBLAS/libdevice fast paths.
+backend) the same kernels on the device. Results agree to rounding (the
+accumulation order of the device's atomics).
 
 ```@docs
 find_boards
