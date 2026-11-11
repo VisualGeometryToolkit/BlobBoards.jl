@@ -14,6 +14,11 @@ Breaking (the next release is a minor bump, 0.6.0):
   `VisualGeometryToolkitIO.load(BoundedCamera, path)` (a camera store records
   the extent). The estimators are handed the model; nothing else moves.
 
+- **`read_run_config` (and `FindBoardsConfig(path)`) admit a top-level
+  `[inputs]` table**, unchecked like `[experiment]` and `[gallery]`: the paper
+  projects' `[inputs.<id>]` statement of what a run reads (tier, path,
+  provenance, sha256; VisualGeometryToolkitEval's convention).
+
 - **The geometry's strategy is `local_optimization_strategy`** (the stack's 0.9
   rename: a `find_*` takes `local_optimization_strategy`, a `refine_*` and a
   `fit_*` take `optimization_strategy`). The `[find_boards.geometry]` key, the
