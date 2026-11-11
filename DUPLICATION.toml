@@ -1,0 +1,24 @@
+# BlobBoards' entries for VisualGeometryToolkitCore's `check_duplication`. Owner ruling
+# (2026-11-11): every duplicate is hoisted into its one owner; an entry is allowed only
+# where the two things are NOT the same concept, and its reason is the one-line proof.
+# An entry that stops matching anything is itself a finding: remove it.
+
+[[name]]
+module = "BlobBoards"
+name = "_TOML_DEFAULTS"
+reason = "not code but each package's own data: BlobBoards' parsed configs/default.toml [find_boards] tree and LODR's/Estimation's are different files with different tables; each is parsed by Core's one `parse_defaults` and read through Core's `toml_default` (the idiom parse_defaults' docstring states)"
+
+[[name]]
+module = "BlobBoards"
+name = "_dflt"
+reason = "each package's own data: BlobBoards' `_dflt` looks up BlobBoards' configs/default.toml, Estimation's its own file; both are one line over Core's one `toml_default`"
+
+[[name]]
+module = "BlobBoards"
+name = "default_config_path"
+reason = "each package's own data: the path of BlobBoards' configs/default.toml (the run configuration of record), not Estimation's RANSAC defaults file; the stack idiom `parse_defaults(default_config_path())`"
+
+[[name]]
+module = "BlobBoards"
+name = "board"
+reason = "different concepts: BlobBoards' `board(args...)` is its Makie recipe that DRAWS a board's blobs into an image axis; Core's `board(t::PlanarTarget)` is the accessor returning the physical Board a target is printed on; no call of one is a call of the other"

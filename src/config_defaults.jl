@@ -28,8 +28,7 @@
 # notice — the exact invisible-drift class this file exists to remove.
 # =============================================================================
 
-using TOML: TOML
-using VisualGeometryToolkitCore: toml_default
+using VisualGeometryToolkitCore: toml_default, parse_defaults
 
 """
     default_config_path() -> String
@@ -39,11 +38,12 @@ point that is not handed an explicit config.
 """
 default_config_path() = normpath(joinpath(@__DIR__, "..", "configs", "default.toml"))
 
-include_dependency(normpath(joinpath(@__DIR__, "..", "configs", "default.toml")))
-include_dependency(normpath(joinpath(@__DIR__, "..", "configs", "authoring.toml")))
-
-const _TOML_DEFAULTS = TOML.parsefile(normpath(joinpath(@__DIR__, "..", "configs", "default.toml")))["find_boards"]
-const _AUTHORING_DEFAULTS = TOML.parsefile(normpath(joinpath(@__DIR__, "..", "configs", "authoring.toml")))
+# Read through Core's one defaults parser (`parse_defaults`: the file, and its
+# precompilation dependency) and looked up through `toml_default`; the
+# `_TOML_DEFAULTS`/`_dflt`/`default_config_path` names are the stack's
+# per-package idiom for this package's own data (DUPLICATION.toml).
+const _TOML_DEFAULTS = parse_defaults(default_config_path())["find_boards"]
+const _AUTHORING_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "configs", "authoring.toml")))
 
 """
     _dflt(key), _dflt(table, key)
@@ -113,7 +113,7 @@ _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
 # :radial_homography); `section` only names the table in error messages.
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, local_optimization_from_toml
 import LocalOptimizationDoneRight
-const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.LO_TAGS)
+const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.STRATEGY_TAGS)
 """
     geometry_local_optimization(d, class::Symbol) -> AbstractLocalOptimization
 
