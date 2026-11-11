@@ -113,7 +113,7 @@ Each item names the contract step it waits for.
 
 - [x] `[sources]` of every workspace member (root, test, docs, gpu, examples, authoring, bmvc2026) → the integration branch
   robust-core, through a PINNED snapshot worktree `vgtk-pin-<sha>` (never the integrator's live worktree, which merges
-  move under running suites); now `vgtk-pin-5bb4e363`, with LocalOptimizationDoneRight at `lodr-pin-2fc594d` (temporary, like the hoists pointer it replaces)
+  move under running suites); now `vgtk-pin-5fb1627d`, with LocalOptimizationDoneRight at `lodr-pin-2fc594d` (temporary, like the hoists pointer it replaces)
 - [x] `decision_boundary` (Core 648cd520): BlobBoards binds none of the three retired names (Core's RETIRED_NAMES); the one left was
   prose, configs/default.toml's note on the Student-t boundary → Core's `decision_boundary` (this commit)
 - [x] R12 (the Student-t scorer has no threshold): test/suites/config_toml.jl's two refusal tests named the refused word beside the
