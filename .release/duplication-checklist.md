@@ -110,8 +110,9 @@ The package's keys, keywords and constructions already take a half-width (`[find
 The stack's one contract for robust stages (verbs, the scale hand-off, weights, termination) lands in BlobBoards as follows.
 Each item names the contract step it waits for.
 
-- [x] `[sources]` of every workspace member (root, test, docs, gpu, examples, authoring, bmvc2026) → the integration worktree
-  `vgtk-robust-core` (temporary, like the hoists pointer it replaces) (this commit)
+- [x] `[sources]` of every workspace member (root, test, docs, gpu, examples, authoring, bmvc2026) → the integration branch
+  robust-core, through a PINNED snapshot worktree `vgtk-pin-<sha>` (never the integrator's live worktree, which merges
+  move under running suites); now `vgtk-pin-8a5a6109` (temporary, like the hoists pointer it replaces)
 - [x] `decision_boundary` (Core 648cd520): BlobBoards binds none of the three retired names (Core's RETIRED_NAMES); the one left was
   prose, configs/default.toml's note on the Student-t boundary → Core's `decision_boundary` (this commit)
 - [x] R12 (the Student-t scorer has no threshold): test/suites/config_toml.jl's two refusal tests named the refused word beside the
