@@ -21,13 +21,18 @@ julia --startup-file=no --project=bmvc2026 -e 'using Pkg; Pkg.instantiate()'
 ## One command
 
 ```bash
-julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/regenerate_paper.jl        # results + CPU assets (the sweeps need CUDA)
-julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/regenerate_paper.jl --gpu  # + the GPU figures
-cd bmvc2026/papers && make                                                           # supplement, then paper
+bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh --dry-run      # the job graph and every missing input, nothing run
+bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh                # dgx01 (Slurm): every stage, the GPU ones on a GPU each
+bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh            # the desktop: the same stages, in order, here
+cd bmvc2026/papers && make                                              # supplement, then paper
 ```
 
-(`make figures` / `make figures-gpu` in `papers/` run the same.) The run
-starts from the INPUTS alone and regenerates every result on the way to the
+The stage graph of record is `configs/reproduce.toml` (VisualGeometryToolkitEval's
+runner: which driver on which config of record, after what; `--only=<stage>,…`
+runs a subset with its prerequisites, `--no-deps` without; `make figures` in
+`papers/` runs the desktop launcher). The inputs every stage reads are its
+configs' `[inputs.<id>]` (tier, path, provenance, sha256), reported before
+anything runs. The run starts from the INPUTS alone and regenerates every result on the way to the
 paper's assets; nothing is promoted, copied into the dataset or read from a
 previous run by name.
 
@@ -116,8 +121,10 @@ Tuned values are selected on the validation side of a registered scene split
 260521/bb, report on 260527/bb — 260527 is never read by a tuning step) by
 VisualGeometryToolkitEval's coarse-fine search and stored in its tuning artifacts
 (`save_coarse_fine_artifact`) in the keyed, add-only run directory
-`results_root()/tuning/<step>-<run_key>`, beside its `_config.toml` and
-`_provenance.toml`. A consumer reads them through VisualGeometryToolkitEval
+Eval's `keyed_cell_dir` (`<dataset>/<matcher>/<problem>/bmvc2026/<step>-<run_key>`,
+the run config's key folded in), beside its `_config.toml` and
+`_provenance.toml`. The record below predates that layout: it stays where it
+was made, `results_root()/tuning/<step>-<run_key>` under its 0.8 run key. A consumer reads them through VisualGeometryToolkitEval
 `deployed_setting` (paths in src/operating_points.jl), which refuses a search
 that hit its window's edge on any axis, and `test/operating_points_tests.jl`
 holds the configs of record to the artifact each value was adopted from
@@ -148,7 +155,7 @@ says by whom, how and from what). `config` is the generator's config of record
 under `configs/figures/`: every parameter it uses (frame picks, crops, seeds,
 panel lists, sizes, inputs, output names) lives there, not in the script, and
 the script declares it (`# reproduce: reads`). The evaluation drivers
-(`error_distributions.jl`, `flip_table.jl`, …) are run by `regenerate_paper.jl`
+(`error_distributions.jl`, `flip_table.jl`, …) are stages of `configs/reproduce.toml`
 and read their config of record `evaluation.toml`. Every run
 writes a record — effective `_config.toml`, `_provenance.toml` (DrWatson
 `tag!` git commit, config source, run key, inputs) and `_outputs.toml` — to
@@ -157,33 +164,33 @@ the keyed directory `plots/records/<generator>-<run_key>/`
 
 | label | asset | kind | generator | config | data | provenance |
 |---|---|---|---|---|---|---|
-| macros | `papers/figures/floorplan/bb_stats.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| macros | `papers/figures/floorplan/bb_occ_stats.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs), occlusion-* | |
-| macros | `papers/figures/floorplan/timing_stats.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| macros | `papers/figures/floorplan/det_stats.tex` | generated | `scripts/make_detection_stats.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| macros | `papers/figures/floorplan/handeye_stats.tex` | generated | `scripts/make_hand_eye_table.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) (hand-eye records of `make_hand_eye.jl`) | |
-| macros | `papers/figures/floorplan/flip_stats.tex` | generated | `scripts/flip_table.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) (+ the no-disambiguation run) | |
-| macros (`tab:supp:params`) | `papers/figures/floorplan/board_params.tex` | generated | `scripts/make_supp_tables.jl`, `scripts/regenerate_paper.jl` | `configs/figures/supp_tables.toml` | inputs (boards) | |
-| macros (`tab:supp:settings`) | `papers/figures/floorplan/run_settings.tex` | generated | `scripts/make_supp_tables.jl`, `scripts/regenerate_paper.jl` | `configs/figures/supp_tables.toml` | inputs (camera); the BlobBoards run's `_config.toml` | |
+| macros | `papers/figures/floorplan/bb_stats.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| macros | `papers/figures/floorplan/bb_occ_stats.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs), occlusion-* | |
+| macros | `papers/figures/floorplan/timing_stats.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| macros | `papers/figures/floorplan/det_stats.tex` | generated | `scripts/make_detection_stats.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| macros | `papers/figures/floorplan/handeye_stats.tex` | generated | `scripts/make_hand_eye_table.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) (hand-eye records of `make_hand_eye.jl`) | |
+| macros | `papers/figures/floorplan/flip_stats.tex` | generated | `scripts/flip_table.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) (+ the no-disambiguation run) | |
+| macros (`tab:supp:params`) | `papers/figures/floorplan/board_params.tex` | generated | `scripts/make_supp_tables.jl`, `scripts/copy_tex.jl` | `configs/figures/supp_tables.toml` | inputs (boards) | |
+| macros (`tab:supp:settings`) | `papers/figures/floorplan/run_settings.tex` | generated | `scripts/make_supp_tables.jl`, `scripts/copy_tex.jl` | `configs/figures/supp_tables.toml` | inputs (camera); the BlobBoards run's `_config.toml` | |
 | `fig:teaser` | `papers/images/intro_overlay.png` | generated | `scripts/make_bmvc2026_intro.jl` (GPU) | `configs/figures/intro.toml` | inputs (teaser), assets | |
 | `fig:params` | `papers/images/blob_variations_squared/*.png` | generated | `scripts/make_param_variations.jl` | `configs/figures/param_variations.toml` | — (one fixed seed, in the config) | The submitted 2026-08 PNGs came from a lost script whose seeds were drawn from `RandomDevice`; every other parameter was recovered from the images (40 mm at 1200 dpi = 1890 px, σ_min = round(s·1200/25.4) px, the v1 max-diameter-fraction top rung, 3 scales per octave, linear 8-bit PNG). A regeneration matches the originals in scale ladder, per-rung blob counts, spacing and dark-area fraction, not pixel for pixel. The `<uid>_<hash5>` in each file name is the historical identity of the lost original (SHA-256 of its config including the seed), not the hash of the regenerated config. |
-| `fig:pipeline` | `papers/images/bb_pipe_*.pdf` | generated | `scripts/make_pipeline_panels.jl` (GPU), `scripts/regenerate_paper.jl` | `configs/figures/pipeline_panels.toml` | `bb_pipeline_figure` (DSC02800 + its session camera, a `vgio/cameras/v3` record converted exactly from the session's OpenCV calibration) + `bb_assets` (the board definitions, the network) | The submitted panels (2026-05-30) were drawn on DSC02800, board 6b0, crop rows 612-1111 / cols 126-500 of the undistorted image — recovered 2026-10-08 by registering board 6b0 in the rasterized submitted panels (adapt: 115 inliers, median 2.2 px) and in DSC02800 (197 inliers, 0.33 px), a similarity. The tracked PDFs are this generator's output under the EVALUATION's run config of record (`configs/bmvc2026_260527.toml`, read by reference: detector, adaptation, matching, verification, network) — replaced 2026-10-08 after review; the 2026-05 originals (VulkanSift backend, unbanded NMS, peak 0.02) stay in git history. |
+| `fig:pipeline` | `papers/images/bb_pipe_*.pdf` | generated | `scripts/make_pipeline_panels.jl` (GPU) | `configs/figures/pipeline_panels.toml` | `bb_pipeline_figure` (DSC02800 + its session camera, a `vgio/cameras/v3` record converted exactly from the session's OpenCV calibration) + `bb_assets` (the board definitions, the network) | The submitted panels (2026-05-30) were drawn on DSC02800, board 6b0, crop rows 612-1111 / cols 126-500 of the undistorted image — recovered 2026-10-08 by registering board 6b0 in the rasterized submitted panels (adapt: 115 inliers, median 2.2 px) and in DSC02800 (197 inliers, 0.33 px), a similarity. The tracked PDFs are this generator's output under the EVALUATION's run config of record (`configs/bmvc2026_260527.toml`, read by reference: detector, adaptation, matching, verification, network) — replaced 2026-10-08 after review; the 2026-05 originals (VulkanSift backend, unbanded NMS, peak 0.02) stay in git history. |
 | `fig:network_architecture` | `papers/images/DescriptorArchitecture_v3_5.pdf` | static | — | — | — | Diagram of the descriptor network, drawn by the authors in Inkscape 1.4.2 (2026-07-10) from the network definition (`authoring/` training code; the s96 log-polar model in the assets tier). Carries no data. |
 | `fig:evaluation_setup_results`, `fig:supp:setup` | `papers/images/experiment/*/DSC*_val.png` | generated | `scripts/copy_val_overlays.jl` | `configs/figures/val_overlays.toml` | the detection runs' overlays | |
-| `fig:eval:scale_ecdf` | `papers/figures/floorplan/error_scale_ecdfs_table.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| `fig:eval:scale_ecdf` | `papers/figures/floorplan/hist_*_small.tex`, `papers/figures/floorplan/hist_*_medium.tex`, `papers/figures/floorplan/hist_*_large.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| `fig:floorplan` | `papers/figures/floorplan/error_floorplan_ab.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| `fig:floorplan` | `papers/figures/floorplan/floorplan_*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:eval:scale_ecdf` | `papers/figures/floorplan/error_scale_ecdfs_table.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:eval:scale_ecdf` | `papers/figures/floorplan/hist_*_small.tex`, `papers/figures/floorplan/hist_*_medium.tex`, `papers/figures/floorplan/hist_*_large.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:floorplan` | `papers/figures/floorplan/error_floorplan_ab.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:floorplan` | `papers/figures/floorplan/floorplan_*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
 | `fig:occexamples` | `papers/images/adapted/original.jpg`, `papers/images/adapted/adapted_*.png` | generated | `scripts/make_adapted_panels.jl` (GPU) | `configs/figures/adapted_panels.toml` | inputs (teaser), assets | |
 | `fig:occexamples` | `papers/images/occ_setup/70/compressed_*.png` | generated | `scripts/make_occlusion_picks.jl` | `configs/figures/occlusion_picks.toml` | occlusion-70 | |
-| `fig:eval:occlusion` | `papers/figures/floorplan/occlusion_sweep_table.tex`, `papers/figures/floorplan/occ_*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs), occlusion-* | |
-| `tab:flips` | `papers/figures/floorplan/flip_table.tex` | generated | `scripts/flip_table.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) (+ the no-disambiguation run) | |
-| `tab:handeye` | `papers/figures/floorplan/handeye_table.tex` | generated | `scripts/make_hand_eye_table.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| `fig:supp:pod_trans` | `papers/figures/floorplan/error_histograms_table.tex`, `papers/figures/floorplan/hist_rot.tex`, `papers/figures/floorplan/hist_trans.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| `fig:supp:unoccluded` | `papers/figures/floorplan/unoccluded_table.tex`, `papers/figures/floorplan/unocc_*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
-| `fig:supp:occlusion10` | `papers/figures/floorplan_occ_10/*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | occlusion-10 | |
-| `fig:supp:occlusion50` | `papers/figures/floorplan_occ_50/*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | occlusion-50 | |
-| `fig:supp:occlusion70` | `papers/figures/floorplan_occ_70/*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/regenerate_paper.jl` | `configs/figures/evaluation.toml` | occlusion-70 | |
+| `fig:eval:occlusion` | `papers/figures/floorplan/occlusion_sweep_table.tex`, `papers/figures/floorplan/occ_*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs), occlusion-* | |
+| `tab:flips` | `papers/figures/floorplan/flip_table.tex` | generated | `scripts/flip_table.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) (+ the no-disambiguation run) | |
+| `tab:handeye` | `papers/figures/floorplan/handeye_table.tex` | generated | `scripts/make_hand_eye_table.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:supp:pod_trans` | `papers/figures/floorplan/error_histograms_table.tex`, `papers/figures/floorplan/hist_rot.tex`, `papers/figures/floorplan/hist_trans.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:supp:unoccluded` | `papers/figures/floorplan/unoccluded_table.tex`, `papers/figures/floorplan/unocc_*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | inputs, images (the runs) | |
+| `fig:supp:occlusion10` | `papers/figures/floorplan_occ_10/*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | occlusion-10 | |
+| `fig:supp:occlusion50` | `papers/figures/floorplan_occ_50/*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | occlusion-50 | |
+| `fig:supp:occlusion70` | `papers/figures/floorplan_occ_70/*.tex` | generated | `scripts/plots/error_distributions.jl`, `scripts/copy_tex.jl` | `configs/figures/evaluation.toml` | occlusion-70 | |
 
 Numbers in prose: every number the paper derives from data is a macro from
 one of the generated macro files above. The check flags a macro's value
@@ -192,10 +199,10 @@ re-typed as a literal; a line where the coincidence is not that number carries
 
 ## Reviewing a regeneration
 
-Generators write under `papers/images` and `papers/figures` unless
-`BB_PAPER_IMAGES` / `BB_PAPER_FIGURES` point elsewhere
-(`src/paper_assets.jl`). To change a submitted asset, regenerate into a
-scratch tree, compare against the tracked file (rasterise PDFs at a fixed
+Generators write under `papers/images` and `papers/figures`
+(`src/paper_assets.jl`; no override), where git tracks the submitted assets. To
+change a submitted asset, regenerate, compare the working tree against the
+tracked file (rasterise PDFs at a fixed
 DPI; SSIM/PSNR and a difference image for rasters, exact equality for tables
 and macros, detection-level deltas for overlays), and replace the tracked
 asset only once the comparison is signed off.

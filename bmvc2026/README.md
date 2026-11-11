@@ -6,9 +6,9 @@ only** (captures, the motion tracker's raw exports, the cameras of record,
 board definitions, the synthetic occlusion images, the networks); every
 result — the motion-capture records, the detections of all three marker
 systems, the hand-eye fits, the pose-error cells — is regenerated from them by
-`scripts/regenerate_paper.jl` into keyed run directories under
-`results_root()` (`src/runs.jl`; the stages and their configs of record are
-tabled in REPRODUCE.md).
+the stages of `configs/reproduce.toml` (VisualGeometryToolkitEval's runner:
+`scripts/reproduce/reproduce_results_{dgx,desktop}.sh`) into keyed run
+directories under `results_root()` (`src/runs.jl`; REPRODUCE.md).
 
 A DrWatson project nested inside the BlobBoards package repo. The package
 (`../src`, `../test`, `../ext`) stays a pure registered library; everything
@@ -19,8 +19,9 @@ paper-related lives here and never enters its dependency graph.
     |-- REPRODUCE.md        every paper asset: label -> asset -> generator -> data
     |-- test/               the reproducible-figures check (`make check` in papers/)
     |-- src/                BlobBoardsEval - reusable evaluation machinery
-    |-- scripts/            the drivers; plots/, training/(+slurm)
-    |-- configs/            bmvc2026_260527.toml (the method), detection_cv.toml
+    |-- scripts/            the drivers; plots/, training/, reproduce/ (the launchers)
+    |-- configs/            bmvc2026_260527.toml (the method), detection_cv.toml,
+    |                       reproduce.toml (the stage graph), figures/, training/
     |-- _research/          probes, one-offs, findings/ write-ups
     |-- data/
     |   |-- exp_raw ->      symlink; IMMUTABLE inputs (images, boards, cameras,
@@ -192,7 +193,8 @@ silently wrong the moment the config changes.
 dev chain) as path dependencies:
 
 ```sh
-julia --project=bmvc2026 bmvc2026/scripts/regenerate_paper.jl     # every result + the paper's assets
+bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh           # every result + the paper's assets (dgx01, Slurm)
+bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh       # the same here, stage by stage
 julia --project=bmvc2026 bmvc2026/scripts/make_pose_results.jl     # just the result cells (after the detections)
 julia --project=bmvc2026 bmvc2026/scripts/plots/absolute_pose.jl   # working figures
 ```
@@ -202,13 +204,11 @@ in the pixi environment `baselines` of `bmvc2026/pixi.toml` (pinned to the
 versions the external evaluation code ran with); `detect_baselines.jl`
 invokes it.
 
-**The training track is currently unrunnable from anything checked in.** This
-README used to claim `scripts/training/` has its own Project.toml; it does
-not — `bmvc2026/Project.toml` is the only one in the subtree, and it declares
-neither Reactant nor Enzyme; no training script uses `@quickactivate`. The
-Reactant/cuDNN conflict that motivates a separate environment is real (it is
-why BlobBoardsLuxExt and BlobBoardsTrainingExt are separate extensions), but
-the environment itself was never created.
+**The training track** is two stages (`annotations`, `train_descriptor`;
+`default = false`), each one config of record under `configs/training/` and one
+driver (scripts/training/README.md). `bmvc2026/Project.toml` declares neither
+Reactant nor Enzyme: the training loop needs BlobBoardsTrainingExt's triggers
+on the load path (the Reactant/cuDNN split of the extensions).
 
 ## Pipeline
 

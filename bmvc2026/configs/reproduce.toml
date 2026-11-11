@@ -1,0 +1,255 @@
+# The stage graph of record of the paper: every result and generated asset from the published inputs, in one command
+# (VisualGeometryToolkitEval Reproduce, the runner). This file is data only: which driver runs on which config of record,
+# after what. How a stage runs (Slurm or here, the CPUs, the GPUs) is the site's, a machine profile shipped with
+# VisualGeometryToolkitEval (configs/sites/dgx01.toml, desktop.toml); where this project's data and results are on each
+# machine is [sites.<name>] below.
+#
+#   bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
+#   bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
+#
+# Without --only: every stage below that is not `default = false`. A finished stage is reused by its run key (the
+# runner's manifests under <results root>/_reproduce), and every driver itself skips a keyed run that is complete
+# (Eval's run_complete), so a rerun redoes only what changed. Each driver stays callable on its own:
+# julia --project=bmvc2026 bmvc2026/scripts/<driver>.jl. Paths are relative to the repository root, where the jobs
+# are submitted from.
+
+[project]
+name = "bmvc2026"
+workdir = "../.."
+julia_project = "bmvc2026"
+# the code every stage runs: a change here re-keys every stage; a change elsewhere (the paper's text, the docs)
+# reuses the finished stages
+code = ["Project.toml", "src", "ext", "configs", "bmvc2026/Project.toml", "bmvc2026/src", "bmvc2026/scripts",
+        "bmvc2026/pixi.toml", "bmvc2026/pixi.lock"]
+
+[sites.dgx01]
+# the BlobBoards 0.9 data root on dgx01 (the published inputs); the runner's results beside it, never a tree of record
+data_root = "/raid/data/jpr/bb-0.9-data-root"
+results_root = "/raid/data/jpr/bmvc2026-results-0.9"
+
+[sites.desktop]
+# the owner's workstation: the data ladder's own binding (bmvc2026/data/exp_raw: a link, or the artifact view) and a
+# results base of this checkout's own (ignored by git)
+data_root = "bmvc2026/data/exp_raw"
+results_root = "bmvc2026/data/results"
+
+# ---- the environment ----------------------------------------------------------------------------------------------
+[[stage]]
+name = "setup"
+what = "the bmvc2026 environment, inside the scheduler: Pkg.instantiate and precompile (the workspace's one Manifest), the pixi env baselines"
+command = ["bash", "-c", "julia --startup-file=no --project=bmvc2026 -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' && pixi install --manifest-path bmvc2026/pixi.toml -e baselines"]
+time = "02:00:00"
+
+# ---- the results (the inputs → keyed runs) -----------------------------------------------------------------------
+[[stage]]
+name = "import_cameras"
+what = "the ONE-TIME port of the upstream calibration exports (its output is published in the inputs tier: only with --only)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/import_cameras.jl"]
+driver = "bmvc2026/scripts/import_cameras.jl"
+config = "bmvc2026/configs/import_cameras.toml"
+default = false
+
+[[stage]]
+name = "records"
+what = "the motion-capture records (convert_formats-<key>)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/convert_formats.jl"]
+driver = "bmvc2026/scripts/convert_formats.jl"
+config = "bmvc2026/configs/convert_formats.toml"
+
+[[stage]]
+name = "bb"
+what = "BlobBoards on bb + calibration_bb (bb-<key>), one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "-t", "auto", "bmvc2026/scripts/go_bmvc2026.jl"]
+driver = "bmvc2026/scripts/go_bmvc2026.jl"
+config = "bmvc2026/configs/bmvc2026_260527.toml"
+gpu = true
+
+[[stage]]
+name = "bb_noflip"
+what = "BlobBoards without the pose disambiguation: the flip table's base (bb-<key>), one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "-t", "auto", "bmvc2026/scripts/go_bmvc2026.jl",
+           "--run-config=bmvc2026_260527_noflip.toml"]
+driver = "bmvc2026/scripts/go_bmvc2026.jl"
+config = "bmvc2026/configs/bmvc2026_260527_noflip.toml"
+gpu = true
+
+[[stage]]
+name = "occlusion"
+what = "BlobBoards on every occlusion level (occlusion-<key>), one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "-t", "auto", "bmvc2026/scripts/go_bmvc2026_occlusion.jl"]
+driver = "bmvc2026/scripts/go_bmvc2026_occlusion.jl"
+config = "bmvc2026/configs/bmvc2026_260527.toml"
+gpu = true
+
+[[stage]]
+name = "baselines"
+what = "AprilTag + ArUco on every subset and occlusion level (baselines-<key>; pixi env baselines)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/detect_baselines.jl"]
+driver = "bmvc2026/scripts/detect_baselines.jl"
+config = "bmvc2026/configs/baselines.toml"
+
+[[stage]]
+name = "detection_cv"
+what = "the joint detection operating-point CV (detection_cv-<key>), one GPU; its record is the configs' operating point (only with --only)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/detection_cv.jl"]
+driver = "bmvc2026/scripts/detection_cv.jl"
+config = "bmvc2026/configs/detection_cv.toml"
+gpu = true
+default = false
+
+[[stage]]
+name = "hand_eye"
+what = "the hand-eye records from the calibration subsets (hand_eye-<key>)"
+after = ["records", "bb", "baselines"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_hand_eye.jl"]
+driver = "bmvc2026/scripts/make_hand_eye.jl"
+config = "bmvc2026/configs/figures/evaluation.toml"
+inputs_from = [{ config = "bmvc2026/configs/figures/evaluation.toml", key = "runs.*", base = "bmvc2026/configs" }]
+
+[[stage]]
+name = "pose_results"
+what = "the per-(system, level) pose-error cells (pose_results-<key>); --force: the runner reruns this stage only when the code or a config changed, and a code change is never served a stale cell"
+after = ["records", "bb", "occlusion", "baselines"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_pose_results.jl", "--force"]
+driver = "bmvc2026/scripts/make_pose_results.jl"
+config = "bmvc2026/configs/figures/evaluation.toml"
+inputs_from = [{ config = "bmvc2026/configs/figures/evaluation.toml", key = "runs.*", base = "bmvc2026/configs" }]
+
+# ---- the descriptor training (the paper's network of record is an input: only with --only) ---------------------------
+[[stage]]
+name = "annotations"
+what = "the descriptor training corpus: annotate + split (annotations-<key>), one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/training/build_annotations.jl"]
+driver = "bmvc2026/scripts/training/build_annotations.jl"
+config = "bmvc2026/configs/training/annotations.toml"
+gpu = true
+time = "24:00:00"
+default = false
+
+[[stage]]
+name = "train_descriptor"
+what = "a descriptor trained on that corpus (descriptor-<key>), one GPU; needs BlobBoardsTrainingExt's triggers on the load path"
+after = ["annotations"]
+command = ["julia", "-O0", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/training/train_descriptor.jl"]
+driver = "bmvc2026/scripts/training/train_descriptor.jl"
+config = "bmvc2026/configs/training/train_descriptor.toml"
+inputs_from = [{ config = "bmvc2026/configs/training/train_descriptor.toml", key = "runs.annotations", base = "bmvc2026/configs" }]
+gpu = true
+time = "48:00:00"
+default = false
+
+# ---- the paper's generated assets ------------------------------------------------------------------------------------
+[[stage]]
+name = "error_distributions"
+what = "floor plans, ECDFs, histograms, occlusion sweep and the macro files bb_stats / bb_occ_stats / timing_stats (plots/)"
+after = ["pose_results"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/plots/error_distributions.jl"]
+driver = "bmvc2026/scripts/plots/error_distributions.jl"
+config = "bmvc2026/configs/figures/evaluation.toml"
+
+[[stage]]
+name = "flip_table"
+what = "the flip table + flip_stats.tex (plots/)"
+after = ["records", "bb", "bb_noflip", "baselines"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/flip_table.jl"]
+driver = "bmvc2026/scripts/flip_table.jl"
+config = "bmvc2026/configs/figures/evaluation.toml"
+
+[[stage]]
+name = "detection_stats"
+what = "det_stats.tex (plots/)"
+after = ["bb", "baselines"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_detection_stats.jl"]
+driver = "bmvc2026/scripts/make_detection_stats.jl"
+config = "bmvc2026/configs/figures/evaluation.toml"
+
+[[stage]]
+name = "hand_eye_table"
+what = "handeye_table.tex + handeye_stats.tex (plots/)"
+after = ["hand_eye"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_hand_eye_table.jl"]
+driver = "bmvc2026/scripts/make_hand_eye_table.jl"
+config = "bmvc2026/configs/figures/evaluation.toml"
+
+[[stage]]
+name = "supp_tables"
+what = "board_params.tex + run_settings.tex (plots/)"
+after = ["bb"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_supp_tables.jl"]
+driver = "bmvc2026/scripts/make_supp_tables.jl"
+config = "bmvc2026/configs/figures/supp_tables.toml"
+
+[[stage]]
+name = "copy_tex"
+what = "the generated plots/*.tex (and plots/occ_<L>/*.tex) into papers/figures"
+after = ["error_distributions", "flip_table", "detection_stats", "hand_eye_table", "supp_tables"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/copy_tex.jl"]
+driver = "bmvc2026/scripts/copy_tex.jl"
+config = "bmvc2026/configs/figures/copy_tex.toml"
+
+[[stage]]
+name = "val_overlays"
+what = "the detection-overlay panels (the runs' overlays, papers/images/experiment)"
+after = ["bb", "baselines"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/copy_val_overlays.jl"]
+driver = "bmvc2026/scripts/copy_val_overlays.jl"
+config = "bmvc2026/configs/figures/val_overlays.toml"
+
+[[stage]]
+name = "occlusion_picks"
+what = "the occlusion-example panels (papers/images/occ_setup)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_occlusion_picks.jl"]
+driver = "bmvc2026/scripts/make_occlusion_picks.jl"
+config = "bmvc2026/configs/figures/occlusion_picks.toml"
+
+[[stage]]
+name = "param_variations"
+what = "the pattern-parameter panels (fig:params)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_param_variations.jl"]
+driver = "bmvc2026/scripts/make_param_variations.jl"
+config = "bmvc2026/configs/figures/param_variations.toml"
+
+[[stage]]
+name = "intro"
+what = "intro_overlay.png, one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_bmvc2026_intro.jl"]
+driver = "bmvc2026/scripts/make_bmvc2026_intro.jl"
+config = "bmvc2026/configs/figures/intro.toml"
+gpu = true
+
+[[stage]]
+name = "adapted_panels"
+what = "adapted/{original.jpg, adapted_*.png}, one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_adapted_panels.jl"]
+driver = "bmvc2026/scripts/make_adapted_panels.jl"
+config = "bmvc2026/configs/figures/adapted_panels.toml"
+gpu = true
+
+[[stage]]
+name = "pipeline_panels"
+what = "bb_pipe_{detect,adapt,logpolar,register}.pdf, one GPU"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/make_pipeline_panels.jl"]
+driver = "bmvc2026/scripts/make_pipeline_panels.jl"
+config = "bmvc2026/configs/figures/pipeline_panels.toml"
+gpu = true
+
+[[stage]]
+name = "paper_pdf"
+what = "the paper's PDF (make -C bmvc2026/papers): of the regenerated assets (only with --only)"
+after = ["copy_tex", "val_overlays", "occlusion_picks", "param_variations", "intro", "adapted_panels", "pipeline_panels"]
+command = ["make", "-C", "bmvc2026/papers"]
+time = "01:00:00"
+default = false

@@ -52,8 +52,7 @@ Every asset the two documents read is indexed in `bmvc2026/REPRODUCE.md`
 inputs alone (every result on the way is a keyed run under `results_root()`):
 
 ```bash
-make figures       # scripts/regenerate_paper.jl: tables, macros, floor plans, overlays, picks
-make figures-gpu   # ... plus the CUDA figures (teaser, adapted and pipeline panels)
+make figures       # configs/reproduce.toml on this machine: every result, table, macro, floor plan, overlay and panel
 make check         # the reproducible-figures contract
 ```
 

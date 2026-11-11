@@ -49,7 +49,7 @@ end
         "supp_tables" => ["make_supp_tables.jl"], "val_overlays" => ["copy_val_overlays.jl"],
         "occlusion_picks" => ["make_occlusion_picks.jl"], "param_variations" => ["make_param_variations.jl"],
         "adapted_panels" => ["make_adapted_panels.jl"], "intro" => ["make_bmvc2026_intro.jl"],
-        "pipeline_panels" => ["make_pipeline_panels.jl"], "regenerate_paper" => ["regenerate_paper.jl"],
+        "pipeline_panels" => ["make_pipeline_panels.jl"], "copy_tex" => ["copy_tex.jl"],
         "evaluation" => ["plots/error_distributions.jl", "flip_table.jl", "make_detection_stats.jl", "make_hand_eye_table.jl"],
     )
     for f in filter(endswith(".toml"), readdir(dir))

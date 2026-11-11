@@ -6,8 +6,7 @@
 #   make watch      # continuous rebuild of the paper on save
 #   make view       # build then open the paper
 #   make notes      # build the technical note (notes/dog_scale_bias)
-#   make figures    # regenerate every generated asset (scripts/regenerate_paper.jl)
-#   make figures-gpu  # ... plus the CUDA figures (teaser, adapted and pipeline panels)
+#   make figures    # regenerate every result and generated asset (configs/reproduce.toml, the desktop site)
 #   make check      # the reproducible-figures contract (REPRODUCE.md) + config tests
 #   make clean      # remove LaTeX aux files (keeps PDFs)
 #   make cleanall   # remove aux files and PDFs
@@ -26,7 +25,7 @@ else
 endif
 
 .PHONY: all $(DOCS) paper supp watch view notes clean cleanall \
-        figures figures-gpu check figcheck
+        figures check figcheck
 
 # Each document target is phony and always calls latexmk, which is
 # dependency-aware and idempotent: it rebuilds only what changed.
@@ -58,13 +57,14 @@ notes:
 	cd notes && $(LATEXMK) $(LFLAGS) dog_scale_bias
 
 # ------------------------------------------------------------------------------
-# Figure regeneration — ONE entry point. `make figures` runs
-# scripts/regenerate_paper.jl, which regenerates every result FROM THE INPUTS
-# (the detections, the motion-capture records, the hand-eye fits, the cells:
-# keyed runs under results_root(), src/runs.jl) and every generated asset the
-# paper reads (REPRODUCE.md indexes each: label -> asset -> generator -> data);
-# `make figures-gpu` adds the CUDA figures. Nothing is selected by hand: the
-# configs of record name the runs.
+# Figure regeneration — ONE entry point. `make figures` runs the stage graph of
+# record (../configs/reproduce.toml, VisualGeometryToolkitEval's runner) on this
+# machine: every result FROM THE INPUTS (the detections, the motion-capture
+# records, the hand-eye fits, the cells: keyed runs under results_root(),
+# src/runs.jl) and every generated asset the paper reads, the GPU figures
+# included (REPRODUCE.md indexes each: label -> asset -> generator -> data).
+# Nothing is selected by hand: the configs of record name the runs. On dgx01:
+# bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh.
 BB_REPO  := ../..
 BB_JL    := julia --startup-file=no --project=bmvc2026
 
@@ -83,10 +83,7 @@ figcheck:
 $(DOCS): figcheck
 
 figures:
-	cd $(BB_REPO) && $(BB_JL) bmvc2026/scripts/regenerate_paper.jl
-
-figures-gpu:
-	cd $(BB_REPO) && $(BB_JL) bmvc2026/scripts/regenerate_paper.jl --gpu
+	cd $(BB_REPO) && bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh
 
 # The reproducible-figures contract: every asset the two documents read is
 # indexed in ../REPRODUCE.md with an existing generator that writes it (or is

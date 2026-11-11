@@ -1,0 +1,9 @@
+# Config of record of scripts/copy_tex.jl: the generated .tex of plots/ (the
+# evaluation drivers' tables and macro files) into papers/figures.
+
+[experiment]
+generator = "copy_tex"
+
+[copy]
+# Driver .tex never copied into papers/figures (compilable previews).
+exclude_suffixes = ["_standalone.tex"]
