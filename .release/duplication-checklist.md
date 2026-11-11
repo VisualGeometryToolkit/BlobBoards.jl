@@ -40,7 +40,7 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 
 - [x] `_sweep_score` → RANSACScoringDoneRight's `partition_score` (audit 7; `test_duplication`: a name RSDR owned):
   RSDR made its per-partition score public and device-callable (rsdr-09 6ddd808); the sweep kernel calls it at the
-  Jeffreys prior (COMMIT_LOADSAVE). CPU frames unchanged against the earlier port (max 2.2e-7 px vs the old twin, as
+  Jeffreys prior (f0fe0d8). CPU frames unchanged against the earlier port (max 2.2e-7 px vs the old twin, as
   before).
 - [x] the package defaults reader (`test_duplication`: `_dflt` and `default_config_path` owned by Estimation,
   `_TOML_DEFAULTS` by LODR; audit 20): not the same concept but each package's own data, read through Core's one
@@ -68,7 +68,7 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 
 - [x] `load`/`save`, names VisualGeometryToolkitIO owns → IO's functions (owner decision, Option A): BlobBoards owns
   no `load`/`save` binding; its reader is the method `load(T::Type{<:AbstractBundle}, path)` (was `load(path)`) and
-  its writer the method `save(pattern, bundle::PatternBundle; dir)` (COMMIT_LOADSAVE). Until the hoist below lands,
+  its writer the method `save(pattern, bundle::PatternBundle; dir)` (f0fe0d8). Until the hoist below lands,
   the two methods are the contract_generics gate's only findings (report mode; the suite pins exactly them).
 - [ ] hoist: IO lists load/save in CONTRACT_GENERICS.
 - [x] `board`/`board!` (BlobBoards' Makie recipe), a name Core's Cameras owns (`board(t::PlanarTarget)`): not the
