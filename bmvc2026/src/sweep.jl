@@ -44,14 +44,10 @@ using Rotations: RotMatrix
 using CUDA: CUDABackend
 using JSON
 import TOML
-using VisualGeometryToolkitEval.Experiments: read_provenance, warn_commit_drift
+using VisualGeometryToolkitEval.Experiments: run_complete
 using VisualGeometryToolkitFeatures: KnnMatch
 using VisualGeometryToolkitCore: ustrip, mm, CameraModel, Pinhole, PosedCamera, undistort, imshow, EuclideanMap, CameraFrame,
     BoundedCamera, TargetPoses
-
-# The repo whose commit `tag!` records into the provenance sidecar — same
-# expression as provenance.jl's default `repo`.
-const _REPO_ROOT = dirname(dirname(@__DIR__))
 
 export SweepUnit, SweepContext, run_sweep
 
@@ -328,51 +324,19 @@ function _warmup(ctx::SweepContext, unit::SweepUnit)
     return nothing
 end
 
-# A unit is complete when the provenance sidecar exists — it is written AFTER
-# the unit's frame loop (2026-08-11), so its presence genuinely means the run
-# finished — AND the JSON count matches the sidecar's recorded n_frames AND
-# the recorded frame_limit equals the current one (a finished limit=6 smoke
-# run is NOT a complete full run, and must not be silently overwritten
-# either). Pre-fix sidecars (no n_frames) fall back to the on-disk image
-# count. Code is deliberately NOT keyed (config ⊕ network only, src/runs.jl):
-# a completed run under a different source state is still "complete", and
-# this function WARNS on a commit mismatch with the sidecar rather than
-# invalidating. Restorability comes from provenance — `tag!` records the
-# commit + dirty patch at run time — while registered-dep drift is recorded by
-# the dependency snapshot.
-function _is_complete(unit::SweepUnit, limit::Integer)
-    isdir(unit.poses) || return false
-    prov_file = joinpath(unit.poses, "_provenance.toml")
-    isfile(prov_file) || return false
-    # The record through the stack's reader: the current flat layout and the
-    # former [provenance] + [config] one read alike.
-    prov = try
-        read_provenance(unit.poses)
-    catch
-        return false
-    end
-    rec_limit = get(prov, "frame_limit", nothing)
-    rec_limit !== nothing && Int(rec_limit) != Int(limit) && return false
-    tpf = joinpath(unit.poses, TARGET_POSES_FILE)
-    n_out = isfile(tpf) ? length(VgtkIO.load(TargetPoses, tpf)) : 0
-    rec_n = get(prov, "n_frames", nothing)
-    complete = if rec_n !== nothing
-        n_out > 0 && n_out == Int(rec_n)
-    else
-        n_img = count(_is_image, readdir(unit.images))
-        n_img > 0 && n_out == n_img
-    end
-    complete || return false
-    # CODE is not keyed — it is RESTORABLE (tag! records commit + dirty
-    # patch). A skip under different code
-    # is legitimate but worth surfacing: BB_FORCE=1 regenerates.
-    warn_commit_drift(prov, unit.label; gitpath = _REPO_ROOT)
-    return true
-end
+# A unit is complete when Eval's `run_complete` says so: its target poses AND
+# its `_provenance.toml` exist. The provenance is the FINISH marker — written
+# after the unit's frame loop (2026-08-11), so its presence genuinely means the
+# run finished. The frame cap is not checked here: it is the config's
+# `[experiment] limit`, a stated value in the run key, so a capped run is
+# another directory, never mistaken for the full one. `run_complete` WARNS on a
+# commit mismatch with the record rather than invalidating: code is not keyed,
+# it is restorable (`tag!` records the commit and dirty patch).
+_complete(unit::SweepUnit) = run_complete(unit.poses; sidecar = TARGET_POSES_FILE)
 
 function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_provenance, force, telemetry)
     isempty(units) && return nothing
-    all(u -> !force && _is_complete(u, limit), units) && return nothing
+    all(u -> !force && _complete(u), units) && return nothing
     _warmup(ctx, first(units))
 
     for unit in units
@@ -383,7 +347,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
         # The unit path is keyed on the config, so a changed config is a NEW
         # directory and there is nothing to clear; an existing complete
         # directory is a cache hit, exactly like `produce_or_load`.
-        if !force && _is_complete(unit, limit)
+        if !force && _complete(unit)
             println("=== '$(unit.label)' already produced -> $(unit.poses)  (skipping; force = true to redo)")
             continue
         end
@@ -440,8 +404,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
 
         # The FINISH marker — written after the unit's frame loop (2026-08-11;
         # it used to be written up-front, so a run killed mid-unit looked
-        # finished). `n_frames` is what _is_complete checks the target-poses
-        # frame count against.
+        # finished: `run_complete`'s marker).
         payload = Dict{String, Any}(
             "config_source" => ctx.config_path,
             "descriptor_network" => ctx.network_path,
