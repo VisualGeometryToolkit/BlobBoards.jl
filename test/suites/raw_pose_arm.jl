@@ -91,7 +91,7 @@ end
     if est.converged      # a failed search has no estimate to read
         @test rad2deg(rotation_angle(RotMatrix{3}(est.estimate.R' * _POSE.R))) < 0.05
         @test norm(est.estimate.t - _POSE.t) < 1.0
-        @test count(est.inlier_mask .& (radius .> 1100)) == count(radius .> 1100)   # the rim is kept
+        @test count(VisualGeometryToolkitCore.inlier_mask(est) .& (radius .> 1100)) == count(radius .> 1100)   # the rim is kept
     end
 end
 

@@ -1274,9 +1274,9 @@ function _resolve_pose_ambiguity(
         rA = zeros(n); rB = zeros(n)
         mahalanobis_distances!(rA, prob, inc.estimate)
         mahalanobis_distances!(rB, prob, alt.estimate)
-        inl = inc.inlier_mask
+        inl = VgtkCore.inlier_mask(inc)      # the scorer's MAP set (posterior weights)
         gap = sqrt(sum(i -> inl[i] ? abs2(rA[i] - rB[i]) : 0.0, 1:n))
-        d = gap / max(inc.scale, 0.3)
+        d = gap / max(VgtkCore.noise_scale(inc), 0.3)   # the scorer's ŝ (was `inc.scale`, not a field: the branch log threw)
         RA = inc.estimate.R; RB = alt.estimate.R
         _append_jsonl(
             blog, (

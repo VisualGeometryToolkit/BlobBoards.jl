@@ -113,7 +113,7 @@ Each item names the contract step it waits for.
 
 - [x] `[sources]` of every workspace member (root, test, docs, gpu, examples, authoring, bmvc2026) → the integration branch
   robust-core, through a PINNED snapshot worktree `vgtk-pin-<sha>` (never the integrator's live worktree, which merges
-  move under running suites); now `vgtk-pin-abe62599`, with LocalOptimizationDoneRight at `lodr-pin-eafb4b6` (temporary, like the hoists pointer it replaces)
+  move under running suites); now `vgtk-pin-ee5de64f`, with LocalOptimizationDoneRight at `lodr-pin-2fc594d` (temporary, like the hoists pointer it replaces)
 - [x] `decision_boundary` (Core 648cd520): BlobBoards binds none of the three retired names (Core's RETIRED_NAMES); the one left was
   prose, configs/default.toml's note on the Student-t boundary → Core's `decision_boundary` (this commit)
 - [x] R12 (the Student-t scorer has no threshold): test/suites/config_toml.jl's two refusal tests named the refused word beside the
@@ -136,7 +136,10 @@ Each item names the contract step it waits for.
 - [x] the strategy rename (owner, 0.9): the geometry's strategy key/keyword/field `local_optimization_strategy`, the public
   reader `geometry_local_optimization_strategy`, Estimation's `optimization_strategy_from_toml`; the two refine calls take
   `optimization_strategy`; the old key is refused naming the new one (`_RENAMED_RUN_KEYS`, fail-first test) (this commit)
-- [ ] Q3 weights (44 sites, robust-contract-weights-sites.txt): waits for B4
+- [x] B4 (robust-core ee5de64f): the find_* result's mask is Core's `inlier_mask(r)` (src/pipeline.jl's branch telemetry,
+  test/suites/raw_pose_arm.jl, bmvc2026/_research/fit_homography.jl), its scale `noise_scale(r)`: the branch telemetry
+  read `inc.scale`, a field RansacMetadata never had, so a run with a branch log threw there (fixed, this commit). The
+  other weights consumers already read `weights` with `is_map_inlier`, and the persisted `n_inliers` keys are unchanged
 - [ ] refine_homography's `RefineMetadata` (src/pipeline.jl's refine sites read `.inlier_mask`): waits for B1
 - [ ] §14 termination fields on BlobBoards' find/refine reads (`res.converged` as "a model exists" → `found_model`): waits for the
   s14-core stubs

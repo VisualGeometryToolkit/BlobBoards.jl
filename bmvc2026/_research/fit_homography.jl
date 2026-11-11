@@ -18,6 +18,7 @@ using StructArrays: StructArray
 using GLMakie; GLMakie.activate!()
 using GeometryBasics: Point2f
 using CoordinateTransformations: PerspectiveMap
+import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: HomographyMap, matches!
 using VisualGeometryToolkitEstimation: fit_homography
 using Statistics: mean
@@ -60,14 +61,14 @@ if isnothing(result) || !result.converged
 end
 
 H = result.value
-inlier_mask = result.inlier_mask
-n_inliers = count(inlier_mask)
+mask = VisualGeometryToolkitCore.inlier_mask(result)
+n_inliers = count(mask)
 
 println("Converged in $(result.iterations) trials")
 println("  inliers     = $n_inliers / $n")
 println("  scale       = $(round(result.scale; digits=3)) px")
 println("  quality     = $(round(result.quality; digits=2))")
-inlier_rmse = sqrt(mean(abs2, result.residuals[inlier_mask]))
+inlier_rmse = sqrt(mean(abs2, result.residuals[mask]))
 println("  inlier RMSE = $(round(inlier_rmse; digits=3)) px")
 
 # =============================================================================
