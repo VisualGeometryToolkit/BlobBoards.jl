@@ -6,6 +6,13 @@ On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1
 the 0.9 branch states them), with the 0.9 port of LocalOptimizationDoneRight.
 Breaking (the next release is a minor bump, 0.6.0):
 
+- **`adapt` flags every blob whose IRLS did not converge.** `BlobDetection`'s
+  metadata is `(; id, converged)`: `converged` is false for a blob capped at
+  `max_irls_iter` or stopped by the shape gate (it keeps its previous iterate),
+  and `count_unconverged(frames)` (public) counts them. The frames themselves,
+  and which blobs are returned, are unchanged. Code that builds a
+  `BlobDetection` itself supplies `converged`.
+
 - **`image_origin` is `pixel_frame`**, the stack's name for the pixel convention
   (`:colmap`, `:opencv`, `:julia`), everywhere: `AffineMap(…; pixel_frame)`, the
   `*_python` functions and the Python package's keywords (`pixel_frame="opencv"`).

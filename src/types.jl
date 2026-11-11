@@ -21,10 +21,13 @@ using VisualGeometryToolkitFeatures: Detection
 
 Type alias for a `Detection` with an `EllipticFrame` and metadata containing:
 - `id::Int` — index into the original detection vector
+- `converged::Bool` — whether the blob's adaptation IRLS met `rtol`. A blob
+  that reached `max_irls_iter` (capped), or whose step the shape gate refused,
+  is returned with `converged = false`; [`count_unconverged`](@ref) counts them.
 
-Access fields via property forwarding: `det.center`, `det.id`.
+Access fields via property forwarding: `det.center`, `det.id`, `det.converged`.
 """
-const BlobDetection{T} = Detection{EllipticFrame{T}, @NamedTuple{id::Int}}
+const BlobDetection{T} = Detection{EllipticFrame{T}, @NamedTuple{id::Int, converged::Bool}}
 
 # =============================================================================
 # Ruler Types

@@ -79,6 +79,7 @@ the chain.
 BlobBoards.detect_blobs
 DetectConfig
 BlobBoards.adapt
+BlobBoards.count_unconverged
 BlobBoards.AdaptConfig
 BlobBoards.canonicalize
 BlobBoards.describe

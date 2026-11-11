@@ -105,6 +105,34 @@ The package's keys, keywords and constructions already take a half-width (`[find
 - [x] src/pipeline.jl `find_board`'s guided final fit and `guided_search`: the Student-t's `outlier_halfwidth` was handed to `guided_search` as `max_px`, a nearest-centre association radius (a gate). By the owner's ruling (2026-11-11) ellipse IoU (≥ `min_iou`, at the blob's rendered boundary) is the ONLY acceptance criterion, as an overlap query: a projected blob's candidates are the detections whose ellipses' bounding boxes intersect the projected ellipse's box (`detection_rtree(det_ells)`, per board cutoff, per round against the claim state), and it takes the candidate of highest IoU; one-to-one, best overlap first, RANSAC's `keep` first. `max_px`, the half-width hand-off, the nearest-centre step (`_rtree_nearest`) and `find_board`'s `guided_detc` are deleted, no key replaces them. The read dependencies are every candidate of the query, recorded before the gate (was: the one nearest centre within the radius). Results move: measured in studentt-keyword-overload.md (this commit)
 
 
+### The robust-estimation contract (robust-contract.md; port-bb-contract.md)
+
+The stack's one contract for robust stages (verbs, the scale hand-off, weights, termination) lands in BlobBoards as follows.
+Each item names the contract step it waits for.
+
+- [x] `[sources]` of every workspace member (root, test, docs, gpu, examples, authoring, bmvc2026) → the integration worktree
+  `vgtk-robust-core` (temporary, like the hoists pointer it replaces) (this commit)
+- [x] `decision_boundary` (Core 648cd520): BlobBoards binds none of the three retired names (Core's RETIRED_NAMES); the one left was
+  prose, configs/default.toml's note on the Student-t boundary → Core's `decision_boundary` (this commit)
+- [x] R12 (the Student-t scorer has no threshold): test/suites/config_toml.jl's two refusal tests named the refused word beside the
+  scorer → the same refusals, the word spelt apart from the scorer's name and tag (this commit)
+- [x] §14, the owner's ruling for BlobBoards: the adaptation IRLS keeps a per-blob state (live, converged at `rtol`, stopped by the
+  shape gate) and returns it as `converged::Bool` in `BlobDetection`'s metadata; a blob capped at `max_irls_iter` or stopped by the
+  shape gate is `converged = false`, counted by `count_unconverged(frames)` and by a `@debug` line per call (capped and
+  shape-stopped apart). Validity and frames are unchanged (bit for bit on the fixture field). Fail-first test
+  `test/suites/adapt_converged.jl`; the parity item checks the flag CPU ≡ GPU (this commit)
+- [x] refine_* with `robust =`: none in BlobBoards (scanned); `refine_homography`/`refine_radial_homography` (src/pipeline.jl
+  `_refine`) take their strategy as `local_optimization` already
+- [ ] the same two `_refine` calls supply `scoring` (the Student-t at `outlier_halfwidth`): B1 refuses a scorer on refine_* and
+  needs exactly one of `scale`/`width` (the scale of the board's `find_*` result, `noise_scale(res)`); the pose arm's
+  `locally_optimize` keeps its scorer (not a refine_*). Waits for B1
+- [ ] A4 `scale_multiple` → `efficiency_constant`, `ScaleMultiple` → `EfficiencyConstant`: four files, Welsch only (no
+  Geman–McClure or BarronHQ value in BlobBoards, so no number moves). Prepared, waits for Core A3/A4 and LODR's rename
+- [ ] Q3 weights (44 sites, robust-contract-weights-sites.txt): waits for B4
+- [ ] refine_homography's `RefineMetadata` (src/pipeline.jl's refine sites read `.inlier_mask`): waits for B1
+- [ ] §14 termination fields on BlobBoards' find/refine reads (`res.converged` as "a model exists" → `found_model`): waits for the
+  s14-core stubs
+
 ## Public names an upstream package owns: an API decision
 
 - [x] `load`/`save`, names VisualGeometryToolkitIO owns → IO's functions (owner decision, Option A): BlobBoards owns

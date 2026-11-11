@@ -122,7 +122,7 @@ function replay end
 # 4. ADVANCED / SUPPORTED-UNEXPORTED — use as `BlobBoards.name`
 # -----------------------------------------------------------------------------
 # Pipeline stages (find_boards composes these; useful standalone for research)
-public detect_blobs, adapt, filter_blobs, canonicalize, describe
+public detect_blobs, adapt, count_unconverged, filter_blobs, canonicalize, describe
 public AdaptConfig, TrackConfig
 public Telemetry, with_tag           # experiment instrumentation sinks for find_boards (pipeline.jl)
 public prepare_image_features       # detect-once seam (sweeps, annotate, track)

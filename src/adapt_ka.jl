@@ -602,6 +602,17 @@ end
     end
 end
 
+# A blob's IRLS state in `d_converged` (Int32): 0 live, `_ADAPT_CONVERGED`
+# when the relative step fell below `rtol`, `_ADAPT_SHAPE_STOP` when the shape
+# gate refused the step and the blob kept its previous iterate. Every kernel
+# reads "live" as `== 0`, so both stops end the blob's iterations; only the
+# first is convergence. A blob still live after `max_irls_iter` was capped.
+# The returned frames carry `converged = (state == _ADAPT_CONVERGED)`: a
+# capped or shape-stopped blob is flagged and counted, never silently valid
+# (the owner's §14 ruling for BlobBoards, 2026-11-11).
+const _ADAPT_CONVERGED = Int32(1)
+const _ADAPT_SHAPE_STOP = Int32(2)
+
 # Apply solution + convergence/validity check — one thread per blob.
 # Mirrors legacy: LU failure invalidates; !is_peak or aspect violation
 # reverts to θ_old and stops; otherwise apply + rtol convergence check.
@@ -620,7 +631,8 @@ end
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
                 end
-                converged[blob] = Int32(1)
+                # Stopped, NOT converged: the shape gate refused the step.
+                converged[blob] = _ADAPT_SHAPE_STOP
             else
                 for j in 1:Int(m)
                     theta[j, blob] = AtWz[j, 1, blob]
@@ -633,7 +645,7 @@ end
                     norm_sq += theta[j, blob] * theta[j, blob]
                 end
                 if sqrt(diff_sq) / (sqrt(norm_sq) + Ta(1.0e-300)) < rtol
-                    converged[blob] = Int32(1)
+                    converged[blob] = _ADAPT_CONVERGED
                 end
             end
         end
@@ -968,12 +980,17 @@ function _adapt_ka(
         valid[i] = valid[i] && valid_live[i]
     end
     theta_out = Array(d_theta)
-    frames = _finalize_frames(sites, valid, theta_out, σ_vec, cfg)
+    state = Array(d_converged)
+    converged = [state[i] == _ADAPT_CONVERGED for i in 1:N]
+    frames = _finalize_frames(sites, valid, converged, theta_out, σ_vec, cfg)
+    n_capped = count(i -> valid[i] && state[i] == Int32(0), 1:N)
+    n_shape = count(i -> valid[i] && state[i] == _ADAPT_SHAPE_STOP, 1:N)
+    @debug "adapt: blob IRLS stops" n_blobs = N n_frames = length(frames) n_capped n_shape_stopped = n_shape max_irls_iter
     return frames
 end
 
 # Shared finalize: θ → Paraboloid3D → EllipticFrame with the legacy gates.
-function _finalize_frames(sites, valid, theta_out::AbstractMatrix, σ_vec, cfg::AdaptConfig)
+function _finalize_frames(sites, valid, converged, theta_out::AbstractMatrix, σ_vec, cfg::AdaptConfig)
     frames = BlobDetection{Float64}[]
     for i in eachindex(sites)
         valid[i] || continue
@@ -988,7 +1005,7 @@ function _finalize_frames(sites, valid, theta_out::AbstractMatrix, σ_vec, cfg::
         frame = EllipticFrame(Point2(cx, cy), p)
         sr = characteristic_scale(frame) / σ
         (sr > cfg.max_scale_ratio || sr < 1 / cfg.max_scale_ratio) && continue
-        push!(frames, Detection(frame, (; id = i)))
+        push!(frames, Detection(frame, (; id = i, converged = converged[i])))
     end
     return frames
 end

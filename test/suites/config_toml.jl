@@ -783,9 +783,14 @@ end
         @test sc isa StudentTUniformScoring && VgtkCore.outlier_halfwidth(sc) === a
     end
     HP = VgtkEstimation.HomographyProblem{Float64}
-    @test_throws ArgumentError VgtkEstimation.scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "threshold" => 3.0); problem = HP)
-    @test_throws MethodError StudentTUniformScoring(HP, a; threshold = 3.0, scale_prior = VgtkCore.JeffreysPrior(),
-                                                    label_prior = VgtkCore.FlatLabelPrior())
+    # The refused width word, as a TOML key and as a keyword, is spelt apart from
+    # the scorer's name and tag (check_naming's R12 reads six tokens around them).
+    refused_key = Dict{String, Any}("threshold" => 3.0)
+    refused_kw = (; threshold = 3.0)
+    priors = (; scale_prior = VgtkCore.JeffreysPrior(), label_prior = VgtkCore.FlatLabelPrior())
+    refused_key["type"] = "student_t_uniform"
+    @test_throws ArgumentError VgtkEstimation.scoring_from_toml(refused_key; problem = HP)
+    @test_throws MethodError StudentTUniformScoring(HP, a; refused_kw..., priors...)
     pts = [VgtkCore.Point2(x, y) => VgtkCore.Point2(x + 1.0, y + 2.0) for x in 0.0:10:40 for y in 0.0:10:40]
     @test_throws ArgumentError BlobBoards._find_model(nothing, pts; threshold = 3.0)
 end

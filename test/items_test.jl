@@ -195,6 +195,10 @@ end
     include("suites/design_resolver.jl")
 end
 
+@testitem "adapt: per-blob convergence flag" begin
+    include("suites/adapt_converged.jl")
+end
+
 @testitem "adapt CPU ≡ GPU" tags=[:gpu] begin
     using VisualGeometryToolkitCore: px
     include("suites/adapt_parity.jl")

@@ -89,7 +89,10 @@ Accepts `Vector{Detection}` (from `detect_blobs`) or `Vector{Disc}` (ground trut
 
 # Returns
 `Vector{BlobDetection{Float64}}` — fitted elliptical frames with `.id` indexing
-into the original detection vector.
+into the original detection vector, and `.converged`: whether the blob's IRLS
+met `rtol`. A blob that reached `max_irls_iter`, or whose step the shape gate
+refused (it keeps its previous iterate), is returned with `converged = false`
+— flagged, never silently valid; [`count_unconverged`](@ref) counts them.
 """
 function adapt(detections::AbstractVector, img::AbstractMatrix; config::AdaptConfig = AdaptConfig(), device = default_device())
     # When the detection geometry is already an EllipticFrame (e.g. the
@@ -114,6 +117,14 @@ end
 # Backend-generic KernelAbstractions adaptation (src/adapt_ka.jl): the same
 # KA kernels on KA.CPU() and on any GPU backend, with no backend hook (one
 # lgamma, one 6×6 solve).
+"""
+    count_unconverged(frames) -> Int
+
+The number of adapted frames whose IRLS did not converge (`converged = false`):
+capped at `max_irls_iter`, or stopped by the shape gate. See [`adapt`](@ref).
+"""
+count_unconverged(frames::AbstractVector) = count(f -> !f.converged, frames)
+
 _adapt(
     img, sites::AbstractVector{<:Union{Disc, EllipticFrame}},
     cfg::AdaptConfig, device::KA.Backend = default_device()
