@@ -117,11 +117,14 @@ Each item names the contract step it waits for.
   prose, configs/default.toml's note on the Student-t boundary → Core's `decision_boundary` (this commit)
 - [x] R12 (the Student-t scorer has no threshold): test/suites/config_toml.jl's two refusal tests named the refused word beside the
   scorer → the same refusals, the word spelt apart from the scorer's name and tag (this commit)
-- [x] §14, the owner's ruling for BlobBoards: the adaptation IRLS keeps a per-blob state (live, converged at `rtol`, stopped by the
-  shape gate) and returns it as `converged::Bool` in `BlobDetection`'s metadata; a blob capped at `max_irls_iter` or stopped by the
-  shape gate is `converged = false`, counted by `count_unconverged(frames)` and by a `@debug` line per call (capped and
-  shape-stopped apart). Validity and frames are unchanged (bit for bit on the fixture field). Fail-first test
-  `test/suites/adapt_converged.jl`; the parity item checks the flag CPU ≡ GPU (this commit)
+- [x] §14, the owner's rulings for BlobBoards: the adaptation IRLS keeps a per-blob state (live, converged at `rtol`, refused by
+  the shape gate as not a peak / beyond `max_aspect_ratio`) and returns each blob's outcome in `BlobDetection`'s metadata —
+  `converged`, `retcode` (`:Success`, `:MaxIters`, `:Failure`, `:InitialFailure`), `stop_rule` (`:ParameterChange`,
+  `:IterationCap`, `:ShapeGate`), `rejection` (`:not_peak`, `:aspect_ratio`, `:none`) — BB-local Symbols one-to-one with
+  Core's `ReturnCode`/`StopRule` until s14-core lands them. Capped blobs are unconverged (`count_unconverged`), refused ones
+  rejected (`count_rejected[, reason]`); a `@debug` line per call counts each. Validity and frames unchanged. Fail-first test
+  `test/suites/adapt_converged.jl`; the parity item checks the flag CPU ≡ GPU (408de3d, this commit)
+- [ ] switch the outcome Symbols to Core's `ReturnCode`/`StopRule` (`ShapeGate` added by s14-core): waits for the s14-core stubs
 - [x] refine_* with `robust =`: none in BlobBoards (scanned); `refine_homography`/`refine_radial_homography` (src/pipeline.jl
   `_refine`) take their strategy as `local_optimization` already
 - [ ] the same two `_refine` calls supply `scoring` (the Student-t at `outlier_halfwidth`): B1 refuses a scorer on refine_* and

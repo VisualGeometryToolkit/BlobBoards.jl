@@ -26,7 +26,7 @@ Configuration for blob adaptation (paraboloid fitting).
 # IRLS
 - `spatial_weighting::Bool = true` — adaptive spatial weights from current shape
 - `cutoff::Float64 = 2.0` — pixel window in units of σ
-- `max_irls_iter::Int = 100` — maximum IRLS iterations (a blob still moving after it is returned with `converged = false`)
+- `max_irls_iter::Int = 100` — maximum IRLS iterations (a blob still moving after it is returned flagged `retcode = :MaxIters`)
 - `rtol::Float64 = 1e-6` — relative parameter convergence threshold
 
 # Filtering
@@ -89,10 +89,13 @@ Accepts `Vector{Detection}` (from `detect_blobs`) or `Vector{Disc}` (ground trut
 
 # Returns
 `Vector{BlobDetection{Float64}}` — fitted elliptical frames with `.id` indexing
-into the original detection vector, and `.converged`: whether the blob's IRLS
-met `rtol`. A blob that reached `max_irls_iter`, or whose step the shape gate
-refused (it keeps its previous iterate), is returned with `converged = false`
-— flagged, never silently valid; [`count_unconverged`](@ref) counts them.
+into the original detection vector, and the blob's outcome (see
+[`BlobDetection`](@ref)): converged at `rtol` (`retcode = :Success`), capped
+at `max_irls_iter` (`:MaxIters`, unconverged), or rejected by the shape gate
+(`:Failure`, or `:InitialFailure` at the first step; `rejection` says why:
+`:not_peak` or `:aspect_ratio`; the blob keeps its previous iterate). Capped
+and rejected blobs are returned, flagged, never silently valid;
+[`count_unconverged`](@ref) and [`count_rejected`](@ref) count them.
 """
 function adapt(detections::AbstractVector, img::AbstractMatrix; config::AdaptConfig = AdaptConfig(), device = default_device())
     # When the detection geometry is already an EllipticFrame (e.g. the
@@ -120,10 +123,26 @@ end
 """
     count_unconverged(frames) -> Int
 
-The number of adapted frames whose IRLS did not converge (`converged = false`):
-capped at `max_irls_iter`, or stopped by the shape gate. See [`adapt`](@ref).
+The number of adapted frames whose IRLS was capped at `max_irls_iter` before
+meeting `rtol` (`retcode = :MaxIters`). Rejected blobs are not counted here
+(see [`count_rejected`](@ref)). See [`adapt`](@ref).
 """
-count_unconverged(frames::AbstractVector) = count(f -> !f.converged, frames)
+count_unconverged(frames::AbstractVector) = count(f -> f.retcode === :MaxIters, frames)
+
+"""
+    count_rejected(frames) -> Int
+    count_rejected(frames, rejection::Symbol) -> Int
+
+The number of adapted frames whose IRLS step the shape gate refused
+(`retcode = :Failure` or `:InitialFailure`); with `rejection`, only those
+refused for that reason, `:not_peak` or `:aspect_ratio`. See [`adapt`](@ref).
+"""
+count_rejected(frames::AbstractVector) = count(f -> f.stop_rule === :ShapeGate, frames)
+function count_rejected(frames::AbstractVector, rejection::Symbol)
+    rejection in (:not_peak, :aspect_ratio) ||
+        throw(ArgumentError("rejection $(repr(rejection)): the shape gate refuses for :not_peak or :aspect_ratio"))
+    return count(f -> f.rejection === rejection, frames)
+end
 
 _adapt(
     img, sites::AbstractVector{<:Union{Disc, EllipticFrame}},

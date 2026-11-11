@@ -80,6 +80,7 @@ BlobBoards.detect_blobs
 DetectConfig
 BlobBoards.adapt
 BlobBoards.count_unconverged
+BlobBoards.count_rejected
 BlobBoards.AdaptConfig
 BlobBoards.canonicalize
 BlobBoards.describe

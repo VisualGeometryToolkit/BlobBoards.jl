@@ -381,13 +381,21 @@ end
 end
 
 # The apply-time shape gate on (θ₄, θ₅, θ₆), the quadratic form
-# C = [θ₄ θ₅; θ₅ θ₆]: a peak (`is_peak(C)`, a concave paraboloid) whose shape
-# `-C` is within the aspect cap (`is_valid_shape`). True when the update is
-# ACCEPTABLE.
-@inline function _shape_ok(θ4::Ta, θ5::Ta, θ6::Ta, max_aspect_ratio) where {Ta}
+# C = [θ₄ θ₅; θ₅ θ₆]: the update is acceptable when C is a peak (`is_peak(C)`,
+# a concave paraboloid) whose shape `-C` is within the aspect cap
+# (`is_valid_shape`). Returns the blob state the refusal records (device
+# side), or 0 when the update is acceptable.
+@inline function _shape_gate_state(θ4::Ta, θ5::Ta, θ6::Ta, max_aspect_ratio) where {Ta}
     C = SMatrix{2, 2, Ta, 4}(θ4, θ5, θ5, θ6)
-    return is_peak(C) && is_valid_shape(-C; max_aspect_ratio)
+    is_peak(C) || return _ADAPT_NOT_PEAK
+    is_valid_shape(-C; max_aspect_ratio) || return _ADAPT_ASPECT_RATIO
+    return Int32(0)
 end
+
+# The gate's verdict by name (host side, and the tests): `:none` (acceptable),
+# `:not_peak` or `:aspect_ratio`.
+_shape_refusal(θ4, θ5, θ6, max_aspect_ratio) =
+    _REJECTION[_shape_gate_state(promote(float(θ4), float(θ5), float(θ6))..., max_aspect_ratio)]
 
 # The (row, column) of the normal matrix's upper triangle entry `kk` (1–21,
 # row-major: (1,1), (1,2), …, (1,6), (2,2), …, (6,6)).
@@ -603,15 +611,29 @@ end
 end
 
 # A blob's IRLS state in `d_converged` (Int32): 0 live, `_ADAPT_CONVERGED`
-# when the relative step fell below `rtol`, `_ADAPT_SHAPE_STOP` when the shape
-# gate refused the step and the blob kept its previous iterate. Every kernel
-# reads "live" as `== 0`, so both stops end the blob's iterations; only the
-# first is convergence. A blob still live after `max_irls_iter` was capped.
-# The returned frames carry `converged = (state == _ADAPT_CONVERGED)`: a
-# capped or shape-stopped blob is flagged and counted, never silently valid
-# (the owner's §14 ruling for BlobBoards, 2026-11-11).
+# when the relative step fell below `rtol`, `_ADAPT_NOT_PEAK` /
+# `_ADAPT_ASPECT_RATIO` when the shape gate refused the step (the blob keeps
+# its previous iterate). Every kernel reads "live" as `== 0`, so each stop ends
+# the blob's iterations. A blob still live after `max_irls_iter` was capped.
+# The owner's §14 rulings for BlobBoards (2026-11-11): every returned frame
+# records its outcome (`_blob_outcome`); a capped blob is UNCONVERGED, a
+# refused one REJECTED, and neither is silently valid.
 const _ADAPT_CONVERGED = Int32(1)
-const _ADAPT_SHAPE_STOP = Int32(2)
+const _ADAPT_NOT_PEAK = Int32(2)
+const _ADAPT_ASPECT_RATIO = Int32(3)
+const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_ASPECT_RATIO => :aspect_ratio)
+
+# The outcome record of one blob, in BB-local Symbols named one-to-one after
+# VisualGeometryToolkitCore's ReturnCode and StopRule (switched to the Core
+# enums once they land): converged → Success / ParameterChange (rtol on the
+# relative parameter step); capped → MaxIters / IterationCap; refused by the
+# shape gate → Failure / ShapeGate, or InitialFailure when the very first step
+# from the seed was refused; `rejection` names the gate that refused.
+function _blob_outcome(state::Int32, initial::Bool)
+    state == _ADAPT_CONVERGED && return (; converged = true, retcode = :Success, stop_rule = :ParameterChange, rejection = :none)
+    state == Int32(0) && return (; converged = false, retcode = :MaxIters, stop_rule = :IterationCap, rejection = :none)
+    return (; converged = false, retcode = initial ? :InitialFailure : :Failure, stop_rule = :ShapeGate, rejection = _REJECTION[state])
+end
 
 # Apply solution + convergence/validity check — one thread per blob.
 # Mirrors legacy: LU failure invalidates; !is_peak or aspect violation
@@ -627,12 +649,13 @@ const _ADAPT_SHAPE_STOP = Int32(2)
             valid[blob] = false
         else
             m = np[blob]
-            if !_shape_ok(AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob], max_aspect_ratio)
+            refused = _shape_gate_state(AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob], max_aspect_ratio)
+            if refused != Int32(0)
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
                 end
-                # Stopped, NOT converged: the shape gate refused the step.
-                converged[blob] = _ADAPT_SHAPE_STOP
+                # Stopped, NOT converged: the shape gate refused the step (why).
+                converged[blob] = refused
             else
                 for j in 1:Int(m)
                     theta[j, blob] = AtWz[j, 1, blob]
@@ -938,7 +961,8 @@ function _adapt_ka(
     KA.synchronize(device)
 
     # --- IRLS loop ---
-    for _ in 1:max_irls_iter
+    initial = falses(N)    # refused at the first step from the seed (InitialFailure)
+    for iter in 1:max_irls_iter
         copyto!(d_theta_old, d_theta)
 
         d_AtWA .= zero(Ta)
@@ -968,6 +992,9 @@ function _adapt_ka(
             ndrange = gs * N
         )
 
+        # A refusal of the very first step is told apart (one N-Int32 download).
+        iter == 1 && (initial .= Array(d_converged) .>= _ADAPT_NOT_PEAK)
+
         # All-converged early exit (two tiny device reductions).
         n_active = Int(sum(d_valid_live .& (d_converged .== Int32(0))))
         n_active <= 0 && break
@@ -981,16 +1008,18 @@ function _adapt_ka(
     end
     theta_out = Array(d_theta)
     state = Array(d_converged)
-    converged = [state[i] == _ADAPT_CONVERGED for i in 1:N]
-    frames = _finalize_frames(sites, valid, converged, theta_out, σ_vec, cfg)
+    outcomes = [_blob_outcome(state[i], initial[i]) for i in 1:N]
+    frames = _finalize_frames(sites, valid, outcomes, theta_out, σ_vec, cfg)
     n_capped = count(i -> valid[i] && state[i] == Int32(0), 1:N)
-    n_shape = count(i -> valid[i] && state[i] == _ADAPT_SHAPE_STOP, 1:N)
-    @debug "adapt: blob IRLS stops" n_blobs = N n_frames = length(frames) n_capped n_shape_stopped = n_shape max_irls_iter
+    n_not_peak = count(i -> valid[i] && state[i] == _ADAPT_NOT_PEAK, 1:N)
+    n_aspect_ratio = count(i -> valid[i] && state[i] == _ADAPT_ASPECT_RATIO, 1:N)
+    n_initial = count(i -> valid[i] && initial[i], 1:N)
+    @debug "adapt: blob IRLS outcomes (before the frame gates)" n_blobs = N n_frames = length(frames) n_capped n_not_peak n_aspect_ratio n_initial max_irls_iter
     return frames
 end
 
 # Shared finalize: θ → Paraboloid3D → EllipticFrame with the legacy gates.
-function _finalize_frames(sites, valid, converged, theta_out::AbstractMatrix, σ_vec, cfg::AdaptConfig)
+function _finalize_frames(sites, valid, outcomes, theta_out::AbstractMatrix, σ_vec, cfg::AdaptConfig)
     frames = BlobDetection{Float64}[]
     for i in eachindex(sites)
         valid[i] || continue
@@ -1005,7 +1034,7 @@ function _finalize_frames(sites, valid, converged, theta_out::AbstractMatrix, σ
         frame = EllipticFrame(Point2(cx, cy), p)
         sr = characteristic_scale(frame) / σ
         (sr > cfg.max_scale_ratio || sr < 1 / cfg.max_scale_ratio) && continue
-        push!(frames, Detection(frame, (; id = i, converged = converged[i])))
+        push!(frames, Detection(frame, (; id = i, outcomes[i]...)))
     end
     return frames
 end

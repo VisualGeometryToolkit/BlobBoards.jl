@@ -21,13 +21,26 @@ using VisualGeometryToolkitFeatures: Detection
 
 Type alias for a `Detection` with an `EllipticFrame` and metadata containing:
 - `id::Int` — index into the original detection vector
-- `converged::Bool` — whether the blob's adaptation IRLS met `rtol`. A blob
-  that reached `max_irls_iter` (capped), or whose step the shape gate refused,
-  is returned with `converged = false`; [`count_unconverged`](@ref) counts them.
+- the blob's adaptation outcome (BB-local names, one-to-one with
+  VisualGeometryToolkitCore's `ReturnCode` and `StopRule`):
+  - `converged::Bool` — the IRLS met `rtol`;
+  - `retcode::Symbol` — `:Success` (converged), `:MaxIters` (capped at
+    `max_irls_iter`: unconverged), `:Failure` (the shape gate refused a step:
+    rejected), `:InitialFailure` (it refused the first step from the seed);
+  - `stop_rule::Symbol` — `:ParameterChange`, `:IterationCap` or `:ShapeGate`;
+  - `rejection::Symbol` — why the shape gate refused: `:not_peak` (the fitted
+    paraboloid is not concave) or `:aspect_ratio` (beyond `max_aspect_ratio`);
+    `:none` otherwise.
 
-Access fields via property forwarding: `det.center`, `det.id`, `det.converged`.
+Capped and rejected blobs are returned, flagged; [`count_unconverged`](@ref)
+and [`count_rejected`](@ref) count them.
+
+Access fields via property forwarding: `det.center`, `det.id`, `det.retcode`.
 """
-const BlobDetection{T} = Detection{EllipticFrame{T}, @NamedTuple{id::Int, converged::Bool}}
+const BlobDetection{T} = Detection{
+    EllipticFrame{T},
+    @NamedTuple{id::Int, converged::Bool, retcode::Symbol, stop_rule::Symbol, rejection::Symbol},
+}
 
 # =============================================================================
 # Ruler Types

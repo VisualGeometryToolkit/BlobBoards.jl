@@ -1,9 +1,14 @@
-# The adaptation IRLS records, per blob, whether it CONVERGED (the owner's §14
-# ruling for BlobBoards, 2026-11-11). A blob that reaches `max_irls_iter`
-# without meeting `rtol` is still returned (validity is not changed), but it is
-# flagged `converged = false` and counted, never silently valid. A blob whose
-# next step the shape gate refused (reverted to the previous iterate) stopped,
-# but it did not converge either, so it is flagged the same way.
+# The adaptation IRLS records, per blob, how it ended (the owner's §14 rulings
+# for BlobBoards, 2026-11-11), in BB-local Symbols mapped one-to-one onto Core's
+# ReturnCode / StopRule until those land:
+#   converged at rtol             retcode :Success        stop_rule :ParameterChange
+#   capped at max_irls_iter       retcode :MaxIters       stop_rule :IterationCap
+#   step refused by the shape gate retcode :Failure        stop_rule :ShapeGate
+#     (refused at the first step from the seed: :InitialFailure)
+# with the refusal's reason in `rejection` (:not_peak or :aspect_ratio; :none
+# otherwise). Capped blobs are UNCONVERGED (`count_unconverged`); refused ones
+# are REJECTED (`count_rejected`), a separate terminal outcome. Neither changes
+# validity: both are returned, flagged and counted, never silently valid.
 using Test
 using BlobBoards
 using BlobBoards.KernelAbstractions: CPU
@@ -27,37 +32,61 @@ function _converged_blob_field(rng; H = 240, W = 320, n = 30)
     return Gray.(clamp!(img, 0.0f0, 1.0f0))
 end
 
-@testset "adapt: per-blob convergence flag" begin
+@testset "adapt: per-blob outcome (converged, capped, rejected)" begin
     img = _converged_blob_field(MersenneTwister(7))
     dets = BlobBoards.detect_blobs(img; device = CPU())
     @test length(dets) >= 15
+    retcodes = (:Success, :MaxIters, :Failure, :InitialFailure)
+    rules = Dict(:Success => :ParameterChange, :MaxIters => :IterationCap, :Failure => :ShapeGate, :InitialFailure => :ShapeGate)
 
-    full = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(), device = CPU())
-    @test !isempty(full)
-    @test all(f -> f.converged isa Bool, full)
+    function consistent(frames)
+        all(frames) do f
+            f.retcode in retcodes && f.stop_rule === rules[f.retcode] &&
+                f.converged == (f.retcode === :Success) &&
+                (f.rejection === :none) == !(f.retcode in (:Failure, :InitialFailure)) &&
+                f.rejection in (:none, :not_peak, :aspect_ratio)
+        end
+    end
+    total(frames) = count(f -> f.converged, frames) + BlobBoards.count_unconverged(frames) + BlobBoards.count_rejected(frames)
+
     # The default budget is 100 (the owner's ruling, 2026-11-11): at the old
     # 20, 21 of this field's 30 blobs were still moving at the cap (rtol 1e-6)
-    # and one was stopped by the shape gate; at 100 none is capped, so only a
-    # shape-stopped blob may stay unconverged.
+    # and one step was refused by the shape gate; at 100 none is capped.
     @test BlobBoards.AdaptConfig().max_irls_iter == 100
-    @test count(f -> f.converged, full) >= length(full) - 2
+    full = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(), device = CPU())
+    @test !isempty(full) && consistent(full) && total(full) == length(full)
+    @test BlobBoards.count_unconverged(full) == 0
+    @test BlobBoards.count_rejected(full) >= 1                       # the field's shape-gate refusal
+    @test BlobBoards.count_rejected(full) ==
+        BlobBoards.count_rejected(full, :not_peak) + BlobBoards.count_rejected(full, :aspect_ratio)
+
     old = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(max_irls_iter = 20), device = CPU())
     @test [f.id for f in old] == [f.id for f in full]
-    @test BlobBoards.count_unconverged(full) < BlobBoards.count_unconverged(old)
+    @test consistent(old) && total(old) == length(old)
+    @test BlobBoards.count_unconverged(old) > 0                      # capped at 20, not rejected
+    @test BlobBoards.count_rejected(old) == BlobBoards.count_rejected(full)
 
-    # One iteration cannot meet rtol = 1e-6 from the seed: every blob still
-    # live at the cap is flagged and counted, not reported as converged.
-    capped = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(max_irls_iter = 1), device = CPU())
-    @test !isempty(capped)
-    @test BlobBoards.count_unconverged(capped) > 0
-    @test BlobBoards.count_unconverged(capped) > BlobBoards.count_unconverged(full)
-    @test BlobBoards.count_unconverged(capped) == count(f -> !f.converged, capped)
+    # One iteration cannot meet rtol = 1e-6 from the seed: every live blob is
+    # capped (unconverged); a step refused there is an InitialFailure.
+    one_ = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(max_irls_iter = 1), device = CPU())
+    @test consistent(one_)
+    @test BlobBoards.count_unconverged(one_) > BlobBoards.count_unconverged(old)
+    @test all(f -> f.retcode !== :Failure, one_)                    # no refusal after the first step exists
 
-    # The flag changes no validity and no geometry: the frames of a run are
-    # the frames of the same run without the flag (ids and centroids).
+    # The record changes no validity and no geometry: the same run twice.
     again = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(), device = CPU())
-    @test [f.id for f in again] == [f.id for f in full]
-    @test [f.converged for f in again] == [f.converged for f in full]
+    @test [(f.id, f.frame, f.retcode, f.rejection) for f in again] == [(f.id, f.frame, f.retcode, f.rejection) for f in full]
 
     @test BlobBoards.count_unconverged(BlobBoards.BlobDetection{Float64}[]) == 0
+    @test BlobBoards.count_rejected(BlobBoards.BlobDetection{Float64}[]) == 0
+    @test_throws ArgumentError BlobBoards.count_rejected(full, :aspect)
+end
+
+@testset "adapt: the shape gate's reason" begin
+    # C = [θ₄ θ₅; θ₅ θ₆], the paraboloid's quadratic part; max_aspect_ratio 10.
+    @test BlobBoards._shape_refusal(-1.0, 0.0, -1.0, 10.0) == :none          # a round peak
+    @test BlobBoards._shape_refusal(-1.0, 0.0, 1.0, 10.0) == :not_peak       # a saddle
+    @test BlobBoards._shape_refusal(1.0, 0.0, 1.0, 10.0) == :not_peak        # a valley
+    @test BlobBoards._shape_refusal(-1.0, 0.0, -0.001, 10.0) == :aspect_ratio  # axis ratio √1000 ≈ 31.6 > 10
+    @test BlobBoards._shape_refusal(-1.0, 0.0, -0.02, 10.0) == :none           # axis ratio √50 ≈ 7.1
 end

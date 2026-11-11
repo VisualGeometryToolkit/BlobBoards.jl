@@ -11,12 +11,16 @@ Breaking (the next release is a minor bump, 0.6.0):
   on the suite's synthetic field) and were returned as if converged; at 100
   they converge. Adapted frames move accordingly; the bmvc2026 sets of record
   take 100 too.
-- **`adapt` flags every blob whose IRLS did not converge.** `BlobDetection`'s
-  metadata is `(; id, converged)`: `converged` is false for a blob capped at
-  `max_irls_iter` or stopped by the shape gate (it keeps its previous iterate),
-  and `count_unconverged(frames)` (public) counts them. The frames themselves,
-  and which blobs are returned, are unchanged. Code that builds a
-  `BlobDetection` itself supplies `converged`.
+- **`adapt` records every blob's outcome.** `BlobDetection`'s metadata is
+  `(; id, converged, retcode, stop_rule, rejection)`, named after
+  VisualGeometryToolkitCore's `ReturnCode`/`StopRule`: converged at `rtol`
+  (`:Success`), capped at `max_irls_iter` (`:MaxIters`: unconverged), or
+  rejected by the shape gate (`:Failure`, `:InitialFailure` at the first step
+  from the seed; `rejection` is `:not_peak` or `:aspect_ratio`). Capped and
+  rejected blobs are still returned, flagged; `count_unconverged(frames)` and
+  `count_rejected(frames[, rejection])` (public) count them. The frames
+  themselves, and which blobs are returned, are unchanged. Code that builds a
+  `BlobDetection` itself supplies the outcome fields.
 
 - **`image_origin` is `pixel_frame`**, the stack's name for the pixel convention
   (`:colmap`, `:opencv`, `:julia`), everywhere: `AffineMap(…; pixel_frame)`, the
