@@ -67,7 +67,7 @@ results_dir(src::Sources) = derived_dir(src, "pose_results", CELL_SOURCES)
     write_pose_results(src; occlusion_level = nothing, force = false)
 
 Compute one cell per marker system (optionally for one occlusion level) and
-persist each through `cached` — so every artifact is `tag!`ed with the commit
+persist each through Eval's `cached_result` — so every artifact is `tag!`ed with the commit
 and dirty patch that produced it, and re-running is a no-op unless `force`.
 
 Returns the written file paths.
@@ -82,7 +82,7 @@ function write_pose_results(
     files = String[]
     for (system, r) in results
         cfg = Dict{String, Any}("dataset" => src.dataset, "system" => system, "level" => level)
-        _, file = cached(
+        _, file = cached_result(
             _ -> merge(
                 copy(cfg),
                 Dict{String, Any}(String(c) => r.table[!, c] for c in names(r.table)),
@@ -95,7 +95,7 @@ function write_pose_results(
                     "script" => isempty(PROGRAM_FILE) ? "src/results.jl" : basename(PROGRAM_FILE),
                 ),
             ),
-            "pose", cfg, relpath(results_dir(src), results_root()); force
+            "pose", cfg, results_dir(src); force
         )
         push!(files, file)
         println("cell $(system)@$(level): $(nrow(r.table)) observations -> $file")

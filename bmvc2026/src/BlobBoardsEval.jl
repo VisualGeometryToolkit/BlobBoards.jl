@@ -38,7 +38,7 @@ include("recovery.jl")
 # result cache.
 using VisualGeometryToolkitEval.Experiments: write_provenance, read_provenance
 include("cache.jl")
-# After cache.jl (uses `cached`) and error_table.jl (uses `evaluate_dataset`).
+# After cache.jl (`cached_result`) and error_table.jl (uses `evaluate_dataset`).
 include("results.jl")
 # after cache.jl and pose_error.jl: the one hand-eye authority
 include("calibration.jl")
@@ -56,12 +56,12 @@ export RigFrame, rig_sequence, load_detected_poses, marker_sizes, detected_marke
     # Exporting it is how this project ended up with four independent fits.
     pose_error_table, evaluate_dataset,
     static_camera_recovery, static_recovery_accepted,
-    data_root, results_root, paper_images_dir, paper_figures_dir, figure_config, write_figure_records, EVAL_TIERS,
+    data_root, results_root, paper_images_dir, paper_figures_dir, figure_config, write_figure_records, figure_numbers, EVAL_TIERS,
     camera_of_record,
     config_path, load_config, run_dir, records_key, records_dir, mocap_dir, network_path, gallery_path,
     sweep_key, sweep_dir, baselines_key, baselines_dir, PoseRun, Sources, eval_sources, poses_dir, val_dir, derived_dir, hand_eye_dir,
     write_provenance, read_provenance,
-    cached, hand_eye, save_hand_eye, load_hand_eye, uncertain_hand_eye, inv_pose_covariance,
+    hand_eye, save_hand_eye, load_hand_eye, uncertain_hand_eye, inv_pose_covariance,
     write_pose_results, pose_results,
     export_target_poses, upstream_camera
 

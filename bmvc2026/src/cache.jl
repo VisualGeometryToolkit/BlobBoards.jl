@@ -35,18 +35,6 @@ three marker systems.
 
 using VisualGeometryToolkitEval.Experiments: cached_result
 
-"""
-    cached(f, prefix, cfg, subdir; force = false) -> (data, file)
-
-The keyed result cache (VisualGeometryToolkitEval.Experiments `cached_result`) with
-this project's conventions: artifacts under `results_root()/<subdir>` (the
-add-only outputs tree, never `data/exp_raw`), named `<prefix>_<hash(cfg)>.jld2`
-(the LEGACY Base.hash key, `legacy_hash_key`, until the next full
-regeneration), and `tag`ged so gitcommit and the patch of a dirty tree ride
-along. `force` keeps the outgoing version as DrWatson `safesave`'s `_#<n>`
-(older backups carry this project's former `#<n>` suffix).
-
-`f(cfg)` must return a string-keyed `Dict` — JLD2 is the store.
-"""
-cached(f, prefix::AbstractString, cfg::AbstractDict, subdir::AbstractString; force::Bool = false) =
-    cached_result(f, prefix, cfg, joinpath(results_root(), subdir); force)
+# The cache is called directly (`cached_result(f, prefix, cfg, dir; force)`,
+# `dir` under `results_root()`): a project wrapper around it was a second copy
+# of the same one line in each paper project, and is deleted.
