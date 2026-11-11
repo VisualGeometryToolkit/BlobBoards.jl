@@ -19,10 +19,10 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 ## Further BlobBoards items of the audit and of `test_duplication`
 
 - [x] `test/suites/docs_gates.jl` (audit 1; a whole-file copy of LODR's) → Core's `test_docs` (48a592f)
-- [x] `_ka_upload` (audit 17), and canonicalize's two hand-written `allocate` + `copyto!` uploads → Core's `ka_upload` (0e14141, 48a592f)
+- [x] the private upload helper (audit 17), and canonicalize's two hand-written `allocate` + `copyto!` uploads → Core's `ka_upload` (0e14141, 48a592f)
 - [x] `config_dict`, owned by both BlobBoards and VisualGeometryToolkitEstimation → Estimation's generic (one of its
   CONTRACT_GENERICS); BlobBoards adds its methods (48a592f)
-- [x] the retired `_bounded` (Estimation's `_with_extent`, restated) → deleted, `BoundedProblem` at its one call (48a592f)
+- [x] the private extent wrapper (Estimation's `_with_extent`, restated; retired in 0.9) → deleted, `BoundedProblem` at its one call (48a592f)
 - [x] homonyms of an upstream name for a different concept, renamed to what they are: `_reads_back` (IO's is the
   pure-bending rule) → `_holds_exactly`; `_plain` (the identity lowering, not IO's Dict conversion) →
   `_identity_lowering`; `_RETIRED_KEYS`/`_check_keys` (BlobBoards' own retired run keys) → `_RETIRED_RUN_KEYS`/
