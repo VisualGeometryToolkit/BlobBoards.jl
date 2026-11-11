@@ -71,9 +71,11 @@ _cell_config(src::Sources, system, level) =
 """
     write_pose_results(src; occlusion_level = nothing, force = false)
 
-Compute one cell per marker system (optionally for one occlusion level) and
-persist each through Eval's `cached_result` — so every artifact is `tag!`ed with the commit
-and dirty patch that produced it, and re-running is a no-op unless `force`.
+One cell per marker system (optionally for one occlusion level), each through
+Eval's `cached_result` keyed by `run_key` — so every artifact is `tag!`ed with
+the commit and dirty patch that produced it. The cache is asked FIRST: the
+evaluation runs once, only when a cell is missing (or `force`), so a rerun with
+every cell present evaluates nothing.
 
 Returns the written file paths.
 """
@@ -82,28 +84,30 @@ function write_pose_results(
         occlusion_level::Union{Nothing, AbstractString} = nothing,
         force::Bool = false
     )
-    results = evaluate_dataset(src; occlusion_level)
     level = something(occlusion_level, "none")
+    evaluated = Ref{Any}(nothing)
+    evaluation() = (evaluated[] === nothing && (evaluated[] = evaluate_dataset(src; occlusion_level)); evaluated[])
     files = String[]
-    for (system, r) in results
-        cfg = _cell_config(src, system, level)
+    for bt in BOARD_TYPES
+        cfg = _cell_config(src, bt.system, level)
         _, file = cached_result(
-            _ -> merge(
-                copy(cfg),
-                Dict{String, Any}(String(c) => r.table[!, c] for c in names(r.table)),
-                # `script` is NOT set by `tag = true`: `produce_or_load` calls
-                # `tag!`, which records gitcommit and gitpatch but leaves the
-                # source alone. Record the entry point explicitly.
-                Dict{String, Any}(
-                    "meta" => r.meta,
-                    "sources" => copy(src.keys),
-                    "script" => isempty(PROGRAM_FILE) ? "src/results.jl" : basename(PROGRAM_FILE),
-                ),
-            ),
+            c -> let r = evaluation()[bt.system]
+                merge(
+                    copy(c),
+                    Dict{String, Any}(String(n) => r.table[!, n] for n in names(r.table)),
+                    # `script` is NOT set by `tag!`, which records gitcommit and
+                    # gitpatch only. Record the entry point explicitly.
+                    Dict{String, Any}(
+                        "meta" => r.meta,
+                        "sources" => copy(src.keys),
+                        "script" => isempty(PROGRAM_FILE) ? "src/results.jl" : basename(PROGRAM_FILE),
+                    ),
+                )
+            end,
             "pose", cfg, results_dir(src); key = run_key, force
         )
         push!(files, file)
-        println("cell $(system)@$(level): $(nrow(r.table)) observations -> $file")
+        println("cell $(bt.system)@$(level) -> $file")
     end
     return files
 end
