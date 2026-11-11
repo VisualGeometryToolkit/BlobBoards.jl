@@ -33,6 +33,9 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   plots/error_distributions) → Eval's `PaperNumbers`/`add_number!`/`write_numbers`, through one `figure_numbers`
   (f172702). Not run here (the paper's inputs); a regeneration reviews them (REPRODUCE.md).
 
+- [x] bmvc2026's Slurm annotation drivers (`test_duplication`: `_init_worker!`, `_process_source` restated between
+  driver.jl and driver_scm.jl) → one file both include, annotate_worker.jl (d84baf3)
+
 ## Hoists into the stack (the coordinator implements; BlobBoards then switches)
 
 - [ ] hoist `_sweep_score` → RANSACScoringDoneRight (audit 7; `test_duplication`: a name RSDR owns). RSDR's
