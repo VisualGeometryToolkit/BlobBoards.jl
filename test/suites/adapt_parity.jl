@@ -1,9 +1,9 @@
-# CPU ↔ GPU adaptation parity — the gate on the two realizations of the
-# Student-t/uniform mixture (the cpu = false workgroup kernels vs the threaded
-# host path). They share the scalar core (adapt_ka.jl "Shared scalar core");
-# this testset pins the two ORCHESTRATIONS together at the level the
-# architecture note licenses: frame-level with tolerances, never bitwise —
-# CUDA's atomic pixel-slot assignment jitters even GPU-vs-GPU runs.
+# CPU ↔ GPU adaptation parity — the gate on the one KA implementation of the
+# Student-t/uniform mixture run on its two kinds of backend: a 256-item
+# workgroup per blob on the GPU, one work item per blob on the CPU
+# (adapt_ka.jl "The per-blob kernels"). This testset pins the two together at
+# the level the architecture note licenses: frame-level with tolerances, never
+# bitwise — CUDA's atomic pixel-slot assignment jitters even GPU-vs-GPU runs.
 #
 # `adapt` returns VALID frames only, id-indexed (`_finalize_frames` drops
 # failed fits) — so parity is judged by MATCHING IDS: a frame present on one

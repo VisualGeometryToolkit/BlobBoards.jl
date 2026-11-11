@@ -7,11 +7,12 @@
 #
 # Design (each point audited against the legacy kernels, 2026-08-10):
 #
-# - GPU kernels are `cpu=false`: they use group-shared memory + barriers,
-#   which KA's CPU transform cannot compile. KA.CPU() instead runs
-#   `_adapt_cpu` — a per-blob threaded host implementation of the SAME math
-#   (same T-storage quantization, same sweep, same LU, same gates), the
-#   split ext/segmented_reduce.jl pioneered.
+# - ONE implementation on every backend: the per-blob kernels below run on
+#   the CPU too (`KA.CPU()`), a blob one workgroup of `_adapt_groupsize`
+#   work items — 256 on a GPU, one on the CPU, where the work item walks its
+#   blob's pixels in scan order (see "The per-blob kernels"). The threaded
+#   host twin of the same math (`_adapt_cpu`) that the CPU used to run is
+#   deleted (2026-11, the 0.9 duplication audit).
 #
 # - Accumulation precision `Ta` dispatches on `KA.supports_float64(device)`:
 #   Float64 on CUDA/CPU (arithmetic identical to the legacy kernels),
@@ -21,13 +22,13 @@
 #
 # - `lgamma` is supplied TO the kernels as an argument: the CUDA extension
 #   supplies the `__nv_lgamma` libdevice ccall (bit-identical to legacy);
-#   every other backend gets the pure-Julia Lanczos below
-#   (SpecialFunctions.loggamma does not GPU-compile).
+#   the CPU gets SpecialFunctions.loggamma, every other backend the
+#   pure-Julia Lanczos below (SpecialFunctions.loggamma does not GPU-compile).
 #
 # - The 6×6 normal-equation solve is the `_solve_6x6_batched!` hook: cuBLAS
 #   getrf/getrs on CUDA (bit-identical, including which near-degenerate
 #   blobs its `info` invalidates), a per-blob register LU with partial
-#   pivoting everywhere else.
+#   pivoting everywhere else (the CPU included).
 #
 # - The legacy fused kernel's thread-1 `break` past a barrier (formally UB
 #   on CUDA, a deadlock elsewhere) is replaced by a shared-memory stop flag
@@ -38,13 +39,14 @@
 #   reads r², which is kept.
 #
 # - Pixel slots are assigned by an atomic counter, so the flat-buffer pixel
-#   ORDER is scheduler-dependent — exactly as on legacy CUDA, whose output
-#   already differs in final ulps between identical runs. Parity testing is
-#   therefore frame-level with tolerances, never bitwise.
+#   ORDER is scheduler-dependent on a GPU — exactly as on legacy CUDA, whose
+#   output already differs in final ulps between identical runs. Parity
+#   testing is therefore frame-level with tolerances, never bitwise. On the
+#   CPU (one work item per blob) the order is the scan order, run to run.
 # =============================================================================
 
-using KernelAbstractions: @kernel, @Const, @context, @index, @groupsize,
-    @localmem, @synchronize, @uniform
+using KernelAbstractions: @kernel, @Const, @index, @groupsize,
+    @localmem, @private, @synchronize, @uniform
 using SpecialFunctions: loggamma
 
 # The per-blob scan samples a canonical (2·31 + 1)² = 3969-point grid, which
@@ -85,11 +87,14 @@ samples effectively independent — which the sweep's Jeffreys score assumes.
     return (hwc, Float64(R) / hwc)
 end
 
-# The clamped bilinear sample, the device-safe lgamma/digamma/trigamma series,
-# the in-register 6×6 LU and the workgroup tree reduction are VisualGeometryToolkitCore's
-# since 0.21.1 (hoisted verbatim from here — same op sequences).
+# The clamped bilinear sample, the device-safe lgamma/digamma/trigamma series
+# and the in-register 6×6 LU are VisualGeometryToolkitCore's since 0.21.1
+# (hoisted verbatim from here — same op sequences), and so is the one upload
+# to a device (`ka_upload`). Core's workgroup `tree_sum!` is not called: a
+# barrier inside a helper does not run on KA's CPU backend, so the kernels
+# spell their reductions inline (see "The per-blob kernels").
 using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
-    trigamma_stirling, lu_solve!, tree_sum!
+    trigamma_stirling, lu_solve!, ka_upload
 # The E-step is Core's Student-t + uniform mixture, built in the kernel's float
 # type with the backend's lgamma (one per blob per iteration: ν and ŝ² change per
 # blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
@@ -105,12 +110,14 @@ using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_we
 
 The lgamma the adaptation kernels use on `backend`. The CUDA extension
 overrides this with the `__nv_lgamma` libdevice ccall so CUDA results stay
-bit-identical to the legacy kernels; the default is the device-safe Lanczos
-approximation below. Every call site has argument ≥ 1, so no reflection.
+bit-identical to the legacy kernels; the CPU uses SpecialFunctions'
+`loggamma`; the default is the device-safe Lanczos approximation below. Every
+call site has argument ≥ 1, so no reflection.
 """
 _device_lgamma(::KA.Backend) = lgamma_lanczos
+_device_lgamma(::KA.CPU) = loggamma
 
-@kernel inbounds = true cpu = false unsafe_indices = true function _lu6_kernel!(
+@kernel inbounds = true unsafe_indices = true function _lu6_kernel!(
         AtWA, AtWz, info, @Const(valid), @Const(converged)
     )
     blob = @index(Global, Linear)
@@ -151,154 +158,184 @@ function _solve_6x6_batched!(backend::KA.Backend, AtWA, AtWz, pivot, info, valid
 end
 
 # =============================================================================
-# Device kernels (cpu=false: group-shared memory + barriers)
+# The per-blob kernels — one workgroup per blob, on every backend
 # =============================================================================
 #
-# All per-workgroup branches below (`valid[blob]`, `converged[blob]`) are
-# GROUP-UNIFORM — every thread in the group reads the same flag — so the
-# barriers inside them are convergent.
+# ONE implementation: the same kernels run on the CPU (`KA.CPU()`) and on any
+# GPU backend. A blob is one workgroup of `_adapt_groupsize(backend)` work
+# items: 256 on a GPU (the pixel loops strided over the group, group-shared
+# reductions and a bitonic sort), ONE on the CPU, where the workgroup is a
+# single work item that walks its blob's pixels in scan order and the
+# reductions are the identity (KA's CPU backend spreads the blobs over the
+# threads). The group size 1 makes the CPU path's pixel order, sums and sort
+# sequential, as the threaded host loops it replaced had them.
+#
+# What KA's CPU transform requires of a kernel with barriers, and every kernel
+# below keeps:
+# - every `@synchronize` at the kernel body's top level or inside a loop whose
+#   bounds are `@uniform` (the reduction strides, the sort's stages, the
+#   ν-Newton steps) — never inside a branch on a work item's own value. A blob
+#   that is invalid (or converged) runs the barriers with no work, and each
+#   segment between barriers re-reads what it needs (`_blob_span`);
+# - a `@uniform` loop counter is updated at the START of its loop body (the
+#   CPU transform drops a `@uniform` statement left after the body's last
+#   barrier);
+# - a value a work item carries across a barrier is `@private` (the 27
+#   normal-equation accumulators) or re-read from memory.
+#
+# The reductions guard `tid + s ≤ nt`, so a group smaller than the 256-slot
+# shared buffers reads no slot nobody wrote.
 
+"""
+    _adapt_groupsize(backend) -> Int
+
+Work items per blob of the adaptation kernels: 256 on a GPU backend, one on
+the CPU (see "The per-blob kernels" in src/adapt_ka.jl).
+"""
+_adapt_groupsize(::KA.Backend) = 256
+_adapt_groupsize(::KA.CPU) = 1
+
+# A blob's pixel count and flat-buffer base; no pixels for a blob that is
+# not live (invalid, or — where `converged` is given — converged).
+@inline _blob_span(cnt, valid, offsets, blob) =
+    (valid[blob] ? cnt[blob] : Int32(0), offsets[blob])
+@inline _blob_span(cnt, valid, converged, offsets, blob) =
+    (valid[blob] && converged[blob] == Int32(0) ? cnt[blob] : Int32(0), offsets[blob])
+
+# The canonical scan grid of a blob: its anchor (the integer pixel the pixel
+# scan used, so `st == 1` lands exactly on those pixels), its sample spacing,
+# halfwidth and side, and the image position of grid point `i`.
+@inline function _scan_layout(::Type{Ta}, cx, cy, hw, spacing, blob) where {Ta}
+    bhw = hw[blob]
+    side = Int32(2) * bhw + Int32(1)
+    return floor(cx[blob]), floor(cy[blob]), Ta(spacing[blob]), bhw, side
+end
+@inline function _grid_point(::Type{Ta}, i, ax, ay, st, bhw, side) where {Ta}
+    gx = (i - Int32(1)) % side
+    gy = (i - Int32(1)) ÷ side
+    return ax + Ta(gx - bhw) * st, ay + Ta(gy - bhw) * st
+end
 
 # Stage 1: per-blob background (max unsaturated intensity, shared-memory max
 # reduction). Stage 2: collect valid pixels into the flat buffers, slots
-# assigned by an atomic counter (order scheduler-dependent, as on legacy).
-@kernel inbounds = true cpu = false unsafe_indices = true function _scan_ka!(
+# assigned by an atomic counter (order scheduler-dependent on a GPU, as on
+# legacy; the scan order on the CPU).
+@kernel inbounds = true unsafe_indices = true function _scan_ka!(
         A, f_obs, v, cnt, bg,
         @Const(img), @Const(cx), @Const(cy), @Const(hw), @Const(spacing), @Const(valid),
         @Const(offsets), H::Int32, W::Int32, sat_lo, sat_hi, min_int
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(bg)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(bg)
+    tid = @index(Local, Linear)
     smem = @localmem eltype(bg) (256,)
-    if valid[blob]
-        bx = cx[blob]
-        by = cy[blob]
-        bhw = hw[blob]
-        # Canonical grid anchored on the same integer pixel the pixel scan
-        # used, so `st == 1` lands exactly on those pixels.
-        st = Ta(spacing[blob])
-        ax = floor(bx)
-        ay = floor(by)
-        side = Int32(2) * bhw + Int32(1)
-        npix = side * side
-        base = offsets[blob]
 
-        local_max = typemin(Ta)
-        i = tid
-        while i <= npix
-            gx = (i - Int32(1)) % side
-            gy = (i - Int32(1)) ÷ side
-            xf = ax + Ta(gx - bhw) * st
-            yf = ay + Ta(gy - bhw) * st
+    local_max = typemin(Ta)
+    if valid[blob]
+        ax, ay, st, bhw, side = _scan_layout(Ta, cx, cy, hw, spacing, blob)
+        i = Int32(tid)
+        while i <= side * side
+            xf, yf = _grid_point(Ta, i, ax, ay, st, bhw, side)
             ok, val = bilinear_sample_clamped(Ta, img, yf, xf, H, W)
             if ok && val >= sat_lo && val <= sat_hi && val > local_max
                 local_max = val
             end
             i += nt
         end
-        smem[tid] = local_max
-        @synchronize()
-        s = Int32(128)
-        while s >= Int32(1)
-            if tid <= s && tid + s <= nt
-                smem[tid] = max(smem[tid], smem[tid + s])
-            end
-            @synchronize()
-            s >>= Int32(1)
-        end
-        background = smem[1]
-        if tid == Int32(1)
-            bg[blob] = background
-            cnt[blob] = Int32(0)
+    end
+    smem[tid] = local_max
+    @synchronize()
+    @uniform s = Int32(256)
+    while s > Int32(1)
+        @uniform s = s >> Int32(1)
+        if tid <= s && tid + s <= nt
+            smem[tid] = max(smem[tid], smem[tid + s])
         end
         @synchronize()
+    end
+    if tid == 1 && valid[blob]
+        bg[blob] = smem[1]
+        cnt[blob] = Int32(0)
+    end
+    @synchronize()
 
-        if background > zero(Ta)
-            i = tid
-            while i <= npix
-                gx = (i - Int32(1)) % side
-                gy = (i - Int32(1)) ÷ side
-                xf = ax + Ta(gx - bhw) * st
-                yf = ay + Ta(gy - bhw) * st
-                ok, val = bilinear_sample_clamped(Ta, img, yf, xf, H, W)
-                if ok && val >= sat_lo && val <= sat_hi
-                    f = background - val
-                    if f > min_int
-                        slot = KA.@atomic cnt[blob] += Int32(1)
-                        flat = base + slot
-                        # Offsets stay in IMAGE pixels regardless of `st`, so
-                        # θ, r² and outlier_halfwidth need no rescale downstream.
-                        dx = xf - Ta(0.5) - bx
-                        dy = yf - Ta(0.5) - by
-                        f_obs[flat] = f
-                        v[flat] = val
-                        A[flat, 1] = one(Ta)
-                        A[flat, 2] = dx
-                        A[flat, 3] = dy
-                        A[flat, 4] = dx * dx
-                        A[flat, 5] = Ta(2.0) * dx * dy
-                        A[flat, 6] = dy * dy
-                    end
+    background = smem[1]
+    if valid[blob] && background > zero(Ta)
+        ax, ay, st, bhw, side = _scan_layout(Ta, cx, cy, hw, spacing, blob)
+        base = offsets[blob]
+        bx = cx[blob]
+        by = cy[blob]
+        i = Int32(tid)
+        while i <= side * side
+            xf, yf = _grid_point(Ta, i, ax, ay, st, bhw, side)
+            ok, val = bilinear_sample_clamped(Ta, img, yf, xf, H, W)
+            if ok && val >= sat_lo && val <= sat_hi
+                f = background - val
+                if f > min_int
+                    slot = KA.@atomic cnt[blob] += Int32(1)
+                    flat = base + slot
+                    # Offsets stay in IMAGE pixels regardless of `st`, so
+                    # θ, r² and outlier_halfwidth need no rescale downstream.
+                    dx = xf - Ta(0.5) - bx
+                    dy = yf - Ta(0.5) - by
+                    f_obs[flat] = f
+                    v[flat] = val
+                    A[flat, 1] = one(Ta)
+                    A[flat, 2] = dx
+                    A[flat, 3] = dy
+                    A[flat, 4] = dx * dx
+                    A[flat, 5] = Ta(2.0) * dx * dy
+                    A[flat, 6] = dy * dy
                 end
-                i += nt
             end
+            i += nt
         end
     end
 end
 
 # Per-blob max(f_obs) — strided shared-memory reduction, one group per blob.
-@kernel inbounds = true cpu = false unsafe_indices = true function _segmented_maxf_ka!(
+@kernel inbounds = true unsafe_indices = true function _segmented_maxf_ka!(
         maxf, @Const(f_obs), @Const(cnt), @Const(valid), @Const(offsets)
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(maxf)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(maxf)
+    tid = @index(Local, Linear)
     smem = @localmem eltype(maxf) (256,)
-    if valid[blob]
-        n = cnt[blob]
-        base = offsets[blob]
-        m = typemin(Ta)
-        j = tid
-        while j <= n
-            fv = Ta(f_obs[base + j])
-            fv > m && (m = fv)
-            j += nt
-        end
-        smem[tid] = m
-        @synchronize()
-        s = Int32(128)
-        while s >= Int32(1)
-            if tid <= s
-                smem[tid] = max(smem[tid], smem[tid + s])
-            end
-            @synchronize()
-            s >>= Int32(1)
-        end
-        tid == Int32(1) && (maxf[blob] = smem[1])
-    else
-        tid == Int32(1) && (maxf[blob] = zero(Ta))
+
+    n, base = _blob_span(cnt, valid, offsets, blob)
+    m = typemin(Ta)
+    j = Int32(tid)
+    while j <= n
+        fv = Ta(f_obs[base + j])
+        fv > m && (m = fv)
+        j += nt
     end
+    smem[tid] = m
+    @synchronize()
+    @uniform s = Int32(256)
+    while s > Int32(1)
+        @uniform s = s >> Int32(1)
+        if tid <= s && tid + s <= nt
+            smem[tid] = max(smem[tid], smem[tid + s])
+        end
+        @synchronize()
+    end
+    tid == 1 && (maxf[blob] = valid[blob] ? smem[1] : zero(Ta))
 end
 
-# Log-space whitened residuals r² = ((log(bg−v) − Aθ)·(bg−v))².
 # =============================================================================
 # Shared scalar core — the per-element algebra of the Student-t/uniform mixture
 # =============================================================================
 #
-# Used VERBATIM by both realizations of the adaptation — the `cpu = false`
-# workgroup kernels (shared-memory bitonic sort + barriers) and the threaded
-# host path (`_adapt_cpu_one!`). The two orchestrations are shaped by their
-# hardware and stay separate; the ALGEBRA lives here exactly once.
+# The per-pixel and per-blob algebra the kernels below call, each piece once.
 #
-# EXPRESSION TREES ARE LOAD-BEARING. The host path is bit-compared against a
-# recorded baseline and the device path against the legacy CUDA trajectory —
-# do not re-associate, do not introduce muladd/fma, do not "simplify".
-# `Ta` is the accumulation type (Float64 on CPU/CUDA, Float32 on Metal);
-# `lgamma_f` is the backend's loggamma (libdevice `__nv_lgamma` on CUDA,
-# SpecialFunctions.loggamma on the host).
+# EXPRESSION TREES ARE LOAD-BEARING. The device path is compared against the
+# legacy CUDA trajectory — do not re-associate, do not introduce muladd/fma,
+# do not "simplify". `Ta` is the accumulation type (Float64 on CPU/CUDA,
+# Float32 on Metal); `lgamma_f` is the backend's loggamma (libdevice
+# `__nv_lgamma` on CUDA, SpecialFunctions.loggamma on the CPU).
 
 # Squared log-space residual of one pixel: r = (log f − z_pred)·f, guarded for
 # non-positive inverted intensity.
@@ -310,6 +347,37 @@ end
         return zero(Ta)
     end
 end
+
+# The paraboloid's log-intensity at flat pixel `gid`: z = A[gid, :]·θ[:, blob].
+@inline _z_pred(::Type{Ta}, A, theta, gid, blob) where {Ta} =
+    Ta(A[gid, 1]) * theta[1, blob] + Ta(A[gid, 2]) * theta[2, blob] +
+    Ta(A[gid, 3]) * theta[3, blob] + Ta(A[gid, 4]) * theta[4, blob] +
+    Ta(A[gid, 5]) * theta[5, blob] + Ta(A[gid, 6]) * theta[6, blob]
+
+# The E-step of one pixel: its responsibility `pin[gid]` and IRLS weight
+# `w[gid]` under Core's Student-t + uniform mixture `mix`, the weight times the
+# spatial factor exp(θ₄a₄ + θ₅a₅ + θ₆a₆) when `spatial`.
+@inline function _soft_weight!(w, pin, ::Type{Ta}, mix, r2, A, theta, gid, blob, spatial::Bool) where {Ta}
+    r2i = Ta(r2[gid])
+    p_in = inlier_posterior(mix, r2i)
+    wi = posterior_weight(mix, r2i)
+    pin[gid] = p_in
+    if spatial
+        q = theta[4, blob] * Ta(A[gid, 4]) +
+            theta[5, blob] * Ta(A[gid, 5]) +
+            theta[6, blob] * Ta(A[gid, 6])
+        wi *= exp(q)
+    end
+    w[gid] = wi
+    return nothing
+end
+
+# The E-step is Core's mixture at (ν, ŝ²) for a d_g = 1 residual, π = ½:
+# `StudentTMixture{Ta}(ν, s2, log(2·outlier_halfwidth), 1; lgamma)`, whose
+# `inlier_posterior` and `posterior_weight` are a pixel's responsibility and
+# IRLS weight (the spatial factor is `_soft_weight!`'s — it reads the θ layout).
+@inline _blob_mixture(::Type{Ta}, nu, s_hat_sq, outlier_halfwidth, blob, lgamma_f) where {Ta} =
+    StudentTMixture{Ta}(nu[blob], max(s_hat_sq[blob], Ta(1.0e-30)), log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
 
 # RSDR's Jeffreys sweep score at partition size kk (jdof = kk − m > 0):
 # S = lgamma(j/2) − (j/2)·log(π·RSS) − (n − kk)·log_two_outlier_halfwidth.
@@ -326,10 +394,15 @@ end
     return lg_j - ν_half * log(Ta(3.141592653589793) * RSS_safe) - outlier_term
 end
 
-# The E-step is Core's mixture at (ν, ŝ²) for a d_g = 1 residual, π = ½:
-# `StudentTMixture{Ta}(ν, s2, log(2·outlier_halfwidth), 1; lgamma)`, whose
-# `inlier_posterior` and `posterior_weight` are a pixel's responsibility and
-# IRLS weight (the spatial factor is the caller's — it reads the θ layout).
+# The ν-Newton step's special-function terms at ν.
+@inline function _nu_terms(ν::Ta) where {Ta}
+    ψ_half_νp1 = digamma_stirling((ν + Ta(1.0)) / Ta(2.0))
+    ψ_half_ν = digamma_stirling(ν / Ta(2.0))
+    ψ1_half_νp1 = trigamma_stirling((ν + Ta(1.0)) / Ta(2.0))
+    ψ1_half_ν = trigamma_stirling(ν / Ta(2.0))
+    inv_ν = Ta(1.0) / ν
+    return ψ_half_νp1, ψ_half_ν, ψ1_half_νp1, ψ1_half_ν, inv_ν, inv_ν * inv_ν
+end
 
 # One pixel's contribution to the ν-Newton objective: (dq_i, d2q_data_i).
 @inline function _nu_point_terms(τ_i::Ta, ν::Ta, inv_ν::Ta, inv_ν2::Ta, ψ_half_νp1::Ta, ψ_half_ν::Ta) where {Ta}
@@ -359,235 +432,212 @@ end
     return is_peak(C) && is_valid_shape(-C; max_aspect_ratio)
 end
 
-# PAIRED COPY (2026-09 audit): the residual + soft-weight arithmetic lives in
-# _residuals_ka!/_soft_weights_ka! (pre-loop init) AND re-inlined in
-# _fused_ka! (the per-iteration kernel). Verified not-drifted; any change to
-# the shared atoms' call shape must land in both. Deliberately NOT collapsed:
-# adapt is nondeterministic on CUDA, so a de-inline cannot be certified
-# bitwise — only frame-level — and this is the quality-critical path.
-@kernel inbounds = true cpu = false unsafe_indices = true function _residuals_ka!(
+# The (row, column) of the normal matrix's upper triangle entry `kk` (1–21,
+# row-major: (1,1), (1,2), …, (1,6), (2,2), …, (6,6)).
+@inline function _upper_entry(kk::Integer)
+    k = 0
+    for jj in 1:6, jj2 in jj:6
+        k += 1
+        k == kk && return jj, jj2
+    end
+    return 6, 6
+end
+
+# Log-space whitened residuals r² = ((log(bg−v) − Aθ)·(bg−v))².
+@kernel inbounds = true unsafe_indices = true function _residuals_ka!(
         r2, @Const(A), @Const(v), @Const(theta), @Const(bg),
         @Const(cnt), @Const(valid), @Const(offsets)
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(theta)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(theta)
-    if valid[blob]
-        n = cnt[blob]
-        base = offsets[blob]
-        bg_val = bg[blob]
-        i = tid
-        while i <= n
-            gid = base + i
-            z_pred = Ta(A[gid, 1]) * theta[1, blob] + Ta(A[gid, 2]) * theta[2, blob] +
-                Ta(A[gid, 3]) * theta[3, blob] + Ta(A[gid, 4]) * theta[4, blob] +
-                Ta(A[gid, 5]) * theta[5, blob] + Ta(A[gid, 6]) * theta[6, blob]
-            r2[gid] = eltype(r2)(_adapt_r2(bg_val - Ta(v[gid]), z_pred))
-            i += nt
-        end
+    tid = @index(Local, Linear)
+    n, base = _blob_span(cnt, valid, offsets, blob)
+    i = Int32(tid)
+    while i <= n
+        gid = base + i
+        r2[gid] = eltype(r2)(_adapt_r2(bg[blob] - Ta(v[gid]), _z_pred(Ta, A, theta, gid, blob)))
+        i += nt
     end
 end
 
 # Per-blob bitonic sort of r² in shared memory → outlier_halfwidth = √median(r²) →
 # marginal posterior sweep (RSDR's Jeffreys `_sweep_score` algebra) → ν, ŝ².
-@kernel inbounds = true cpu = false unsafe_indices = true function _sort_sweep_ka!(
+@kernel inbounds = true unsafe_indices = true function _sort_sweep_ka!(
         nu, s_hat_sq, outlier_halfwidth, @Const(r2), @Const(np),
         @Const(cnt), @Const(valid), @Const(offsets), lgamma_f
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(nu)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(nu)
+    tid = @index(Local, Linear)
     smem = @localmem eltype(nu) (4096,)
-    if valid[blob]
-        base = offsets[blob]
+
+    n, base = _blob_span(cnt, valid, offsets, blob)
+    i = Int32(tid)
+    while i <= _SORT_PADDED
+        smem[i] = (i <= n) ? Ta(r2[base + i]) : typemax(Ta)
+        i += nt
+    end
+    @synchronize()
+
+    @uniform k = Int32(1)
+    while k < _SORT_PADDED
+        @uniform k = k << Int32(1)
+        @uniform j = k
+        while j > Int32(1)
+            @uniform j = j >> Int32(1)
+            idx = Int32(tid) - Int32(1)
+            while idx < _SORT_PADDED
+                ixj = idx ⊻ j
+                if ixj > idx
+                    asc = (idx & k) == Int32(0)
+                    a = smem[idx + Int32(1)]
+                    b = smem[ixj + Int32(1)]
+                    if asc ? a > b : a < b
+                        smem[idx + Int32(1)] = b
+                        smem[ixj + Int32(1)] = a
+                    end
+                end
+                idx += nt
+            end
+            @synchronize()
+        end
+    end
+
+    if tid == 1 && valid[blob]
         n = cnt[blob]
+        mid = cld(n, Int32(2))
+        blob_outlier_halfwidth = max(sqrt(smem[mid]), Ta(1.0e-30))
+        outlier_halfwidth[blob] = blob_outlier_halfwidth
 
-        i = tid
-        while i <= _SORT_PADDED
-            smem[i] = (i <= n) ? Ta(r2[base + i]) : typemax(Ta)
-            i += nt
-        end
-        @synchronize()
+        m = Int32(np[blob]) + Int32(1)
+        log_two_outlier_halfwidth = log(Ta(2.0) * blob_outlier_halfwidth)
 
-        k = Int32(2)
-        while k <= _SORT_PADDED
-            j = k >> Int32(1)
-            while j > Int32(0)
-                idx = tid - Int32(1)
-                while idx < _SORT_PADDED
-                    ixj = idx ⊻ j
-                    if ixj > idx
-                        asc = (idx & k) == Int32(0)
-                        a = smem[idx + Int32(1)]
-                        b = smem[ixj + Int32(1)]
-                        if asc ? a > b : a < b
-                            smem[idx + Int32(1)] = b
-                            smem[ixj + Int32(1)] = a
-                        end
-                    end
-                    idx += nt
+        RSS = zero(Ta)
+        best_S = Ta(-1.0e30)
+        best_k = m + Int32(1)
+
+        kk = Int32(1)
+        while kk <= n
+            RSS += smem[kk]
+            if kk > m
+                S = _sweep_score(kk - m, RSS, Ta(n - kk) * log_two_outlier_halfwidth, lgamma_f)
+                if S > best_S
+                    best_S = S
+                    best_k = kk
                 end
-                @synchronize()
-                j >>= Int32(1)
             end
-            k <<= Int32(1)
+            kk += Int32(1)
         end
 
-        if tid == Int32(1)
-            mid = cld(n, Int32(2))
-            blob_outlier_halfwidth = max(sqrt(smem[mid]), Ta(1.0e-30))
-            outlier_halfwidth[blob] = blob_outlier_halfwidth
-
-            m = Int32(np[blob]) + Int32(1)
-            log_two_outlier_halfwidth = log(Ta(2.0) * blob_outlier_halfwidth)
-
-            RSS = zero(Ta)
-            best_S = Ta(-1.0e30)
-            best_k = m + Int32(1)
-
-            kk = Int32(1)
-            while kk <= n
-                RSS += smem[kk]
-                if kk > m
-                    S = _sweep_score(kk - m, RSS, Ta(n - kk) * log_two_outlier_halfwidth, lgamma_f)
-                    if S > best_S
-                        best_S = S
-                        best_k = kk
-                    end
-                end
-                kk += Int32(1)
-            end
-
-            ν = max(Ta(best_k - m), Ta(2.0))
-            RSS_k = zero(Ta)
-            kk = Int32(1)
-            while kk <= best_k
-                RSS_k += smem[kk]
-                kk += Int32(1)
-            end
-            nu[blob] = ν
-            s_hat_sq[blob] = max(RSS_k / ν, Ta(1.0e-30))
+        ν = max(Ta(best_k - m), Ta(2.0))
+        RSS_k = zero(Ta)
+        kk = Int32(1)
+        while kk <= best_k
+            RSS_k += smem[kk]
+            kk += Int32(1)
         end
+        nu[blob] = ν
+        s_hat_sq[blob] = max(RSS_k / ν, Ta(1.0e-30))
     end
 end
 
-# Soft posterior weights + optional spatial factor (initial weights; the
-# per-iteration update is fused into `_fused_ka!`).
-# PAIRED COPY (2026-09 audit): the residual + soft-weight arithmetic lives in
-# _residuals_ka!/_soft_weights_ka! (pre-loop init) AND re-inlined in
-# _fused_ka! (the per-iteration kernel). Verified not-drifted; any change to
-# the shared atoms' call shape must land in both. Deliberately NOT collapsed:
-# adapt is nondeterministic on CUDA, so a de-inline cannot be certified
-# bitwise — only frame-level — and this is the quality-critical path.
-@kernel inbounds = true cpu = false unsafe_indices = true function _soft_weights_ka!(
+# Soft posterior weights + optional spatial factor (the initial weights; the
+# per-iteration update is phase 4 of `_fused_ka!`, the same `_soft_weight!`).
+@kernel inbounds = true unsafe_indices = true function _soft_weights_ka!(
         w, pin, @Const(r2), @Const(A), @Const(theta), @Const(nu),
         @Const(s_hat_sq), @Const(outlier_halfwidth),
         @Const(cnt), @Const(valid), @Const(offsets), spatial::Bool, lgamma_f
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(theta)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(theta)
-    if valid[blob]
-        n = cnt[blob]
-        base = offsets[blob]
-        ν = nu[blob]
-        s2 = max(s_hat_sq[blob], Ta(1.0e-30))
-        mix = StudentTMixture{Ta}(ν, s2, log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
-        i = tid
+    tid = @index(Local, Linear)
+    n, base = _blob_span(cnt, valid, offsets, blob)
+    if n > Int32(0)
+        mix = _blob_mixture(Ta, nu, s_hat_sq, outlier_halfwidth, blob, lgamma_f)
+        i = Int32(tid)
         while i <= n
-            gid = base + i
-            r2i = Ta(r2[gid])
-            p_in = inlier_posterior(mix, r2i)
-            wi = posterior_weight(mix, r2i)
-            pin[gid] = p_in
-            if spatial
-                q = theta[4, blob] * Ta(A[gid, 4]) +
-                    theta[5, blob] * Ta(A[gid, 5]) +
-                    theta[6, blob] * Ta(A[gid, 6])
-                wi *= exp(q)
-            end
-            w[gid] = wi
+            _soft_weight!(w, pin, Ta, mix, r2, A, theta, base + i, blob, spatial)
             i += nt
         end
     end
 end
 
-# 6×6 A'WA / A'Wz accumulate with W = w·f² — 27 thread-local Float-Ta
-# accumulators + the shared-memory tree reduction, np-masked write with
-# identity padding on inactive params. Arithmetic mirrors legacy exactly.
-@kernel inbounds = true cpu = false unsafe_indices = true function _accumulate_ka!(
+# 6×6 A'WA / A'Wz accumulate with W = w·f² — 27 work-item accumulators + the
+# shared-memory tree reduction, np-masked write with identity padding on
+# inactive params. Arithmetic mirrors legacy exactly.
+@kernel inbounds = true unsafe_indices = true function _accumulate_ka!(
         AtWA, AtWz, @Const(A), @Const(v), @Const(w), @Const(bg),
         @Const(cnt), @Const(valid), @Const(offsets), @Const(np),
         @Const(converged)
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(AtWA)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(AtWA)
+    tid = @index(Local, Linear)
     smem = @localmem eltype(AtWA) (256,)
-    if valid[blob] && converged[blob] == Int32(0)
-        n = cnt[blob]
-        base = offsets[blob]
-        bg_val = bg[blob]
+    acc = @private eltype(AtWA) (27,)
 
-        acc = StaticArrays.MVector{27, Ta}(undef)
-        for kk in 1:27
-            acc[kk] = zero(Ta)
+    for kk in 1:27
+        acc[kk] = zero(Ta)
+    end
+    n, base = _blob_span(cnt, valid, converged, offsets, blob)
+    i = Int32(tid)
+    while i <= n
+        gid = base + i
+        fi = bg[blob] - Ta(v[gid])
+        if fi >= Ta(1.0e-10)
+            zi = log(fi)
+            wi = Ta(w[gid]) * fi * fi
+            a1 = Ta(A[gid, 1]); a2 = Ta(A[gid, 2]); a3 = Ta(A[gid, 3])
+            a4 = Ta(A[gid, 4]); a5 = Ta(A[gid, 5]); a6 = Ta(A[gid, 6])
+            acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
+            acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
+            acc[7] += wi * a2 * a2; acc[8] += wi * a2 * a3; acc[9] += wi * a2 * a4
+            acc[10] += wi * a2 * a5; acc[11] += wi * a2 * a6; acc[12] += wi * a3 * a3
+            acc[13] += wi * a3 * a4; acc[14] += wi * a3 * a5; acc[15] += wi * a3 * a6
+            acc[16] += wi * a4 * a4; acc[17] += wi * a4 * a5; acc[18] += wi * a4 * a6
+            acc[19] += wi * a5 * a5; acc[20] += wi * a5 * a6; acc[21] += wi * a6 * a6
+            wz = wi * zi
+            acc[22] += wz * a1; acc[23] += wz * a2; acc[24] += wz * a3
+            acc[25] += wz * a4; acc[26] += wz * a5; acc[27] += wz * a6
         end
+        i += nt
+    end
 
-        i = tid
-        while i <= n
-            gid = base + i
-            fi = bg_val - Ta(v[gid])
-            if fi >= Ta(1.0e-10)
-                zi = log(fi)
-                wi = Ta(w[gid]) * fi * fi
-                a1 = Ta(A[gid, 1]); a2 = Ta(A[gid, 2]); a3 = Ta(A[gid, 3])
-                a4 = Ta(A[gid, 4]); a5 = Ta(A[gid, 5]); a6 = Ta(A[gid, 6])
-                acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
-                acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
-                acc[7] += wi * a2 * a2; acc[8] += wi * a2 * a3; acc[9] += wi * a2 * a4
-                acc[10] += wi * a2 * a5; acc[11] += wi * a2 * a6; acc[12] += wi * a3 * a3
-                acc[13] += wi * a3 * a4; acc[14] += wi * a3 * a5; acc[15] += wi * a3 * a6
-                acc[16] += wi * a4 * a4; acc[17] += wi * a4 * a5; acc[18] += wi * a4 * a6
-                acc[19] += wi * a5 * a5; acc[20] += wi * a5 * a6; acc[21] += wi * a6 * a6
-                wz = wi * zi
-                acc[22] += wz * a1; acc[23] += wz * a2; acc[24] += wz * a3
-                acc[25] += wz * a4; acc[26] += wz * a5; acc[27] += wz * a6
+    # Each entry reduced over the group, then written by the first work item:
+    # the upper triangle mirrored (rows and columns ≤ np only), then A'Wz.
+    for kk in 1:27
+        smem[tid] = acc[kk]
+        @synchronize()
+        @uniform s = Int32(256)
+        while s > Int32(1)
+            @uniform s = s >> Int32(1)
+            if tid <= s && tid + s <= nt
+                smem[tid] += smem[tid + s]
             end
-            i += nt
-        end
-
-        red = StaticArrays.MVector{27, Ta}(undef)
-        for kk in 1:27
-            smem[tid] = acc[kk]
-            @synchronize()
-            tree_sum!(@context, smem, tid, nt)
-            red[kk] = smem[1]
             @synchronize()
         end
-
-        if tid == Int32(1)
-            m = Int32(np[blob])
-            kidx = 0
-            for jj in 1:6
-                for jj2 in jj:6
-                    kidx += 1
-                    if jj <= m && jj2 <= m
-                        AtWA[jj, jj2, blob] = red[kidx]
-                        AtWA[jj2, jj, blob] = red[kidx]
-                    end
+        if tid == 1 && valid[blob] && converged[blob] == Int32(0)
+            m = Int(np[blob])
+            if kk <= 21
+                jj, jj2 = _upper_entry(kk)
+                if jj <= m && jj2 <= m
+                    AtWA[jj, jj2, blob] = smem[1]
+                    AtWA[jj2, jj, blob] = smem[1]
                 end
+            elseif kk - 21 <= m
+                AtWz[kk - 21, 1, blob] = smem[1]
             end
-            for jj in 1:6
-                jj <= m && (AtWz[jj, 1, blob] = red[21 + jj])
-            end
-            for jj in (Int(m) + 1):6
-                AtWA[jj, jj, blob] = one(Ta)
-            end
+        end
+        @synchronize()
+    end
+
+    if tid == 1 && valid[blob] && converged[blob] == Int32(0)
+        for jj in (Int(np[blob]) + 1):6
+            AtWA[jj, jj, blob] = one(Ta)
         end
     end
 end
@@ -595,7 +645,7 @@ end
 # Apply solution + convergence/validity check — one thread per blob.
 # Mirrors legacy: LU failure invalidates; !is_peak or aspect violation
 # reverts to θ_old and stops; otherwise apply + rtol convergence check.
-@kernel inbounds = true cpu = false unsafe_indices = true function _apply_check_ka!(
+@kernel inbounds = true unsafe_indices = true function _apply_check_ka!(
         theta, @Const(theta_old), @Const(AtWz), @Const(info), valid, converged,
         @Const(np), rtol, max_aspect_ratio
     )
@@ -631,179 +681,137 @@ end
 end
 
 # Fused per-iteration update: residuals → weighted scale ŝ² → Newton ν
-# (5 steps, E-step weights from pin) → soft weights. The legacy thread-1
-# `break` past the barrier is replaced by the `sflag` broadcast — identical
-# stop conditions, identical ν, well-defined barriers on every backend.
-# PAIRED COPY (2026-09 audit): the residual + soft-weight arithmetic lives in
-# _residuals_ka!/_soft_weights_ka! (pre-loop init) AND re-inlined in
-# _fused_ka! (the per-iteration kernel). Verified not-drifted; any change to
-# the shared atoms' call shape must land in both. Deliberately NOT collapsed:
-# adapt is nondeterministic on CUDA, so a de-inline cannot be certified
-# bitwise — only frame-level — and this is the quality-critical path.
-@kernel inbounds = true cpu = false unsafe_indices = true function _fused_ka!(
+# (at most 5 steps, E-step weights from pin) → soft weights. The legacy
+# thread-1 `break` past the barrier is the `sflag` broadcast the ν loop's
+# condition reads — identical stop conditions, identical ν, well-defined
+# barriers on every backend. A blob that is not live sets the flag at once.
+@kernel inbounds = true unsafe_indices = true function _fused_ka!(
         r2, w, pin, s_hat_sq, nu,
         @Const(A), @Const(v), @Const(theta), @Const(bg), @Const(outlier_halfwidth),
         @Const(cnt), @Const(valid), @Const(offsets), spatial::Bool,
         @Const(converged), lgamma_f
     )
     @uniform nt = Int32(@groupsize()[1])
+    @uniform Ta = eltype(theta)
     blob = @index(Group, Linear)
-    tid = Int32(@index(Local, Linear))
-    Ta = eltype(theta)
+    tid = @index(Local, Linear)
     smem_a = @localmem eltype(theta) (256,)
     smem_b = @localmem eltype(theta) (256,)
     smem_c = @localmem eltype(theta) (256,)
     sflag = @localmem Int32 (1,)
-    if valid[blob] && converged[blob] == Int32(0)
-        n = cnt[blob]
-        base = offsets[blob]
-        bg_val = bg[blob]
 
-        # --- Phase 1: residuals ---
-        i = tid
-        while i <= n
-            gid = base + i
-            z_pred = Ta(A[gid, 1]) * theta[1, blob] + Ta(A[gid, 2]) * theta[2, blob] +
-                Ta(A[gid, 3]) * theta[3, blob] + Ta(A[gid, 4]) * theta[4, blob] +
-                Ta(A[gid, 5]) * theta[5, blob] + Ta(A[gid, 6]) * theta[6, blob]
-            r2[gid] = eltype(r2)(_adapt_r2(bg_val - Ta(v[gid]), z_pred))
-            i += nt
+    # --- Phase 1: residuals ---
+    n, base = _blob_span(cnt, valid, converged, offsets, blob)
+    i = Int32(tid)
+    while i <= n
+        gid = base + i
+        r2[gid] = eltype(r2)(_adapt_r2(bg[blob] - Ta(v[gid]), _z_pred(Ta, A, theta, gid, blob)))
+        i += nt
+    end
+    @synchronize()
+
+    # --- Phase 2: weighted scale ŝ² ---
+    n, base = _blob_span(cnt, valid, converged, offsets, blob)
+    local_wr2 = zero(Ta)
+    local_w = zero(Ta)
+    i = Int32(tid)
+    while i <= n
+        gid = base + i
+        # Product in STORAGE precision, then widen — legacy parity: the
+        # CUDA kernel multiplied w*r2 as stored (Float32 by default)
+        # before accumulating in Ta. Widening the factors first changes
+        # the rounding and drifts ŝ² off the legacy trajectory.
+        local_wr2 += Ta(w[gid] * r2[gid])
+        local_w += Ta(w[gid])
+        i += nt
+    end
+    smem_a[tid] = local_wr2
+    smem_b[tid] = local_w
+    @synchronize()
+    @uniform s = Int32(256)
+    while s > Int32(1)
+        @uniform s = s >> Int32(1)
+        if tid <= s && tid + s <= nt
+            smem_a[tid] += smem_a[tid + s]
+            smem_b[tid] += smem_b[tid + s]
         end
         @synchronize()
+    end
+    if tid == 1
+        live = valid[blob] && converged[blob] == Int32(0)
+        live && (s_hat_sq[blob] = max(smem_a[1] / max(smem_b[1], Ta(1.0e-30)), Ta(1.0e-30)))
+        sflag[1] = live ? Int32(0) : Int32(1)
+    end
+    @synchronize()
 
-        # --- Phase 2: weighted scale ŝ² ---
-        local_wr2 = zero(Ta)
+    # --- Phase 3: Newton ν (≤ 5 steps, fixed E-step weights from pin) ---
+    @uniform iter = Int32(0)
+    while iter < Int32(5) && sflag[1] == Int32(0)
+        @uniform iter = iter + Int32(1)
+        n, base = _blob_span(cnt, valid, converged, offsets, blob)
+        ν = nu[blob]
+        s2 = max(s_hat_sq[blob], Ta(1.0e-30))
+        ψ_half_νp1, ψ_half_ν, _, _, inv_ν, inv_ν2 = _nu_terms(ν)
+        local_dQ = zero(Ta)
+        local_d2Q = zero(Ta)
         local_w = zero(Ta)
-        i = tid
+        i = Int32(tid)
         while i <= n
             gid = base + i
-            # Product in STORAGE precision, then widen — legacy parity: the
-            # CUDA kernel multiplied w*r2 as stored (Float32 by default)
-            # before accumulating in Ta. Widening the factors first changes
-            # the rounding and drifts ŝ² off the legacy trajectory.
-            local_wr2 += Ta(w[gid] * r2[gid])
-            local_w += Ta(w[gid])
+            wi = Ta(pin[gid])
+            if wi >= Ta(1.0e-15)
+                dq_i, d2q_data_i = _nu_point_terms(
+                    Ta(r2[gid]) / (ν * s2), ν, inv_ν, inv_ν2, ψ_half_νp1, ψ_half_ν
+                )
+                local_dQ += wi * dq_i
+                local_w += wi
+                local_d2Q += wi * d2q_data_i
+            end
             i += nt
         end
-        smem_a[tid] = local_wr2
-        smem_b[tid] = local_w
+        smem_a[tid] = local_dQ
+        smem_b[tid] = local_d2Q
+        smem_c[tid] = local_w
         @synchronize()
-        s = Int32(128)
-        while s >= Int32(1)
+        @uniform s = Int32(256)
+        while s > Int32(1)
+            @uniform s = s >> Int32(1)
             if tid <= s && tid + s <= nt
                 smem_a[tid] += smem_a[tid + s]
                 smem_b[tid] += smem_b[tid + s]
+                smem_c[tid] += smem_c[tid + s]
             end
             @synchronize()
-            s >>= Int32(1)
         end
-        if tid == Int32(1)
-            s_hat_sq[blob] = max(smem_a[1] / max(smem_b[1], Ta(1.0e-30)), Ta(1.0e-30))
+        if tid == 1
+            ν = nu[blob]
+            _, _, ψ1_half_νp1, ψ1_half_ν, _, inv_ν2 = _nu_terms(ν)
+            ν_new, stop_b = _next_nu(
+                ν, smem_a[1], smem_b[1], smem_c[1], ψ1_half_νp1, ψ1_half_ν, inv_ν2
+            )
+            ν_new != ν && (nu[blob] = ν_new)
+            sflag[1] = stop_b ? Int32(1) : Int32(0)
         end
         @synchronize()
+    end
 
-        # --- Phase 3: Newton ν (5 steps, fixed E-step weights from pin) ---
-        ν = nu[blob]
-        s2 = max(s_hat_sq[blob], Ta(1.0e-30))
-
-        iter = 1
-        while iter <= 5
-            ψ_half_νp1 = digamma_stirling((ν + Ta(1.0)) / Ta(2.0))
-            ψ_half_ν = digamma_stirling(ν / Ta(2.0))
-            ψ1_half_νp1 = trigamma_stirling((ν + Ta(1.0)) / Ta(2.0))
-            ψ1_half_ν = trigamma_stirling(ν / Ta(2.0))
-            inv_ν = Ta(1.0) / ν
-            inv_ν2 = inv_ν * inv_ν
-
-            local_dQ = zero(Ta)
-            local_d2Q = zero(Ta)
-            local_w = zero(Ta)
-            i = tid
-            while i <= n
-                gid = base + i
-                wi = Ta(pin[gid])
-                if wi >= Ta(1.0e-15)
-                    dq_i, d2q_data_i = _nu_point_terms(
-                        Ta(r2[gid]) / (ν * s2), ν, inv_ν, inv_ν2, ψ_half_νp1, ψ_half_ν
-                    )
-                    local_dQ += wi * dq_i
-                    local_w += wi
-                    local_d2Q += wi * d2q_data_i
-                end
-                i += nt
-            end
-            smem_a[tid] = local_dQ
-            smem_b[tid] = local_d2Q
-            smem_c[tid] = local_w
-            @synchronize()
-            s = Int32(128)
-            while s >= Int32(1)
-                if tid <= s && tid + s <= nt
-                    smem_a[tid] += smem_a[tid + s]
-                    smem_b[tid] += smem_b[tid + s]
-                    smem_c[tid] += smem_c[tid + s]
-                end
-                @synchronize()
-                s >>= Int32(1)
-            end
-            if tid == Int32(1)
-                ν_new, stop_b = _next_nu(
-                    ν, smem_a[1], smem_b[1], smem_c[1], ψ1_half_νp1, ψ1_half_ν, inv_ν2
-                )
-                if ν_new != ν
-                    ν = ν_new
-                    nu[blob] = ν
-                end
-                sflag[1] = stop_b ? Int32(1) : Int32(0)
-            end
-            @synchronize()
-            ν = nu[blob]
-            sflag[1] == Int32(1) && break
-            iter += 1
-        end
-
-        # --- Phase 4: soft weights + spatial (stores pin for next ν M-step) ---
-        s2 = max(s_hat_sq[blob], Ta(1.0e-30))
-        mix = StudentTMixture{Ta}(ν, s2, log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
-
-        i = tid
+    # --- Phase 4: soft weights + spatial (stores pin for next ν M-step) ---
+    n, base = _blob_span(cnt, valid, converged, offsets, blob)
+    if n > Int32(0)
+        mix = _blob_mixture(Ta, nu, s_hat_sq, outlier_halfwidth, blob, lgamma_f)
+        i = Int32(tid)
         while i <= n
-            gid = base + i
-            r2i = Ta(r2[gid])
-            p_in = inlier_posterior(mix, r2i)
-            wi = posterior_weight(mix, r2i)
-            pin[gid] = p_in
-            if spatial
-                q = theta[4, blob] * Ta(A[gid, 4]) +
-                    theta[5, blob] * Ta(A[gid, 5]) +
-                    theta[6, blob] * Ta(A[gid, 6])
-                wi *= exp(q)
-            end
-            w[gid] = wi
+            _soft_weight!(w, pin, Ta, mix, r2, A, theta, base + i, blob, spatial)
             i += nt
         end
     end
 end
 
 # =============================================================================
-# Driver — any GPU backend
+# Driver — every backend
 # =============================================================================
 
-_ka_upload(device, x::AbstractArray{T}) where {T} = begin
-    d = KA.allocate(device, T, size(x)...)
-    copyto!(d, x)
-    d
-end
-
 function _adapt_ka(
-        img, sites::AbstractVector{S}, cfg::AdaptConfig,
-        device::KA.Backend
-    ) where {S <: Union{Disc, EllipticFrame}}
-    device isa KA.CPU && return _adapt_cpu(img, sites, cfg)
-    return _adapt_ka_gpu(img, sites, cfg, device)
-end
-
-function _adapt_ka_gpu(
         img, sites::AbstractVector{S}, cfg::AdaptConfig,
         device::KA.Backend
     ) where {S <: Union{Disc, EllipticFrame}}
@@ -814,6 +822,7 @@ function _adapt_ka_gpu(
     # CUDA/CPU (identical to the legacy kernels), Float32 on Metal.
     Ta = KA.supports_float64(device) ? Float64 : Float32
     lgamma_f = _device_lgamma(device)
+    gs = _adapt_groupsize(device)
 
     cutoff = cfg.cutoff
     max_irls_iter = cfg.max_irls_iter
@@ -823,15 +832,17 @@ function _adapt_ka_gpu(
     # native storage: a device-resident array is used AS IS (the pipeline
     # hands over Float32 — reading it directly is bit-identical to the
     # legacy Float64 staging, which only widened exact Float32 values); a
-    # host image uploads once at Float32 (or Ta when it is already Float64
-    # and the backend can hold it — the legacy precision).
-    d_img = if KA.get_backend(img) == device
+    # host image is read at Float32 (or Ta when it is already Float64 and a
+    # GPU backend can hold it — the legacy precision), uploaded once.
+    d_img = if device isa KA.CPU
+        gray_f32(img)
+    elseif KA.get_backend(img) == device
         img
     else
         hostf = gray_f32(img)
         Tp = eltype(hostf) <: Gray ? eltype(eltype(hostf)) : eltype(hostf)
         Tu = Tp == Float64 ? Ta : Float32
-        _ka_upload(device, Tu.(Gray{Tu}.(hostf)))
+        ka_upload(Tu, device, Tu.(Gray{Tu}.(hostf)))
     end
     H, W = size(d_img)
     sat = saturation_bounds(Float64)   # float regime — same (1e-6, 1-1e-6) as legacy
@@ -877,12 +888,12 @@ function _adapt_ka_gpu(
     total_pixels == 0 && return BlobDetection{Float64}[]
 
 
-    d_cx = _ka_upload(device, Ta.(cx_vec))
-    d_cy = _ka_upload(device, Ta.(cy_vec))
-    d_hw = _ka_upload(device, hw_vec)
-    d_spacing = _ka_upload(device, Ta.(spacing_vec))
-    d_valid = _ka_upload(device, collect(valid))
-    d_offsets = _ka_upload(device, offsets)
+    d_cx = ka_upload(Ta, device, cx_vec)
+    d_cy = ka_upload(Ta, device, cy_vec)
+    d_hw = ka_upload(Int32, device, hw_vec)
+    d_spacing = ka_upload(Ta, device, spacing_vec)
+    d_valid = ka_upload(Bool, device, collect(valid))
+    d_offsets = ka_upload(Int32, device, offsets)
 
     # Per-pixel staging at Float32 — the only value AdaptConfig.store ever
     # took before its 2026-09 deletion; kernels promote to Ta on every read.
@@ -893,11 +904,11 @@ function _adapt_ka_gpu(
     d_bg = KA.zeros(device, Ta, N)
     KA.synchronize(device)
 
-    _scan_ka!(device, 256)(
+    _scan_ka!(device, gs)(
         d_A, d_f_obs, d_v, d_cnt, d_bg,
         d_img, d_cx, d_cy, d_hw, d_spacing, d_valid, d_offsets,
         Int32(H), Int32(W), Ta(sat[1]), Ta(sat[2]), Ta(cfg.min_intensity);
-        ndrange = 256 * N
+        ndrange = gs * N
     )
     KA.synchronize(device)
 
@@ -913,13 +924,13 @@ function _adapt_ka_gpu(
                 n < _MIN_POINTS_ANISOTROPIC ? 4 : 6
         )
     end
-    d_np = _ka_upload(device, np_vec)
-    d_valid_gpu = _ka_upload(device, collect(valid))
+    d_np = ka_upload(Int32, device, np_vec)
+    d_valid_live = ka_upload(Bool, device, collect(valid))
 
     # --- θ₀ seed (host, cheap); per-blob max(f_obs) reduced on device ---
     d_maxf = KA.zeros(device, Ta, N)
-    _segmented_maxf_ka!(device, 256)(
-        d_maxf, d_f_obs, d_cnt, d_valid_gpu, d_offsets; ndrange = 256 * N
+    _segmented_maxf_ka!(device, gs)(
+        d_maxf, d_f_obs, d_cnt, d_valid_live, d_offsets; ndrange = gs * N
     )
     KA.synchronize(device)
     maxf_h = Array(d_maxf)
@@ -933,7 +944,7 @@ function _adapt_ka_gpu(
             theta_h[j, i] = Ta(c[j])
         end
     end
-    d_theta = _ka_upload(device, theta_h)
+    d_theta = ka_upload(Ta, device, theta_h)
     KA.synchronize(device)
 
     # --- IRLS buffers (NB no f_hat/r — write-only in the legacy kernels) ---
@@ -954,64 +965,62 @@ function _adapt_ka_gpu(
     KA.synchronize(device)
 
     # --- Initial residuals + fused sort/median/sweep + initial weights ---
-    _residuals_ka!(device, 256)(
-        d_r2, d_A, d_v, d_theta, d_bg, d_cnt, d_valid_gpu, d_offsets;
-        ndrange = 256 * N
+    _residuals_ka!(device, gs)(
+        d_r2, d_A, d_v, d_theta, d_bg, d_cnt, d_valid_live, d_offsets;
+        ndrange = gs * N
     )
-    _sort_sweep_ka!(device, 256)(
-        d_nu, d_s_hat_sq, d_ohw, d_r2, d_np, d_cnt, d_valid_gpu, d_offsets,
-        lgamma_f; ndrange = 256 * N
+    _sort_sweep_ka!(device, gs)(
+        d_nu, d_s_hat_sq, d_ohw, d_r2, d_np, d_cnt, d_valid_live, d_offsets,
+        lgamma_f; ndrange = gs * N
     )
-    _soft_weights_ka!(device, 256)(
+    _soft_weights_ka!(device, gs)(
         d_w, d_pin, d_r2, d_A, d_theta, d_nu, d_s_hat_sq, d_ohw,
-        d_cnt, d_valid_gpu, d_offsets, spatial_weighting, lgamma_f;
-        ndrange = 256 * N
+        d_cnt, d_valid_live, d_offsets, spatial_weighting, lgamma_f;
+        ndrange = gs * N
     )
     KA.synchronize(device)
 
     # --- IRLS loop ---
-    iters_done = 0
-    for iter in 1:max_irls_iter
-        iters_done = iter
+    for _ in 1:max_irls_iter
         copyto!(d_theta_old, d_theta)
 
         d_AtWA .= zero(Ta)
         d_AtWz .= zero(Ta)
-        _accumulate_ka!(device, 256)(
+        _accumulate_ka!(device, gs)(
             d_AtWA, d_AtWz, d_A, d_v, d_w, d_bg,
-            d_cnt, d_valid_gpu, d_offsets, d_np, d_converged;
-            ndrange = 256 * N
+            d_cnt, d_valid_live, d_offsets, d_np, d_converged;
+            ndrange = gs * N
         )
 
         _solve_6x6_batched!(
             device, d_AtWA, d_AtWz, d_pivot, d_info,
-            d_valid_gpu, d_converged
+            d_valid_live, d_converged
         )
 
         _apply_check_ka!(device, 256)(
-            d_theta, d_theta_old, d_AtWz, d_info, d_valid_gpu, d_converged,
+            d_theta, d_theta_old, d_AtWz, d_info, d_valid_live, d_converged,
             d_np, Ta(cfg.rtol), Ta(cfg.max_aspect_ratio);
             ndrange = 256 * cld(N, 256)
         )
 
-        _fused_ka!(device, 256)(
+        _fused_ka!(device, gs)(
             d_r2, d_w, d_pin, d_s_hat_sq, d_nu,
             d_A, d_v, d_theta, d_bg, d_ohw,
-            d_cnt, d_valid_gpu, d_offsets, spatial_weighting,
+            d_cnt, d_valid_live, d_offsets, spatial_weighting,
             d_converged, lgamma_f;
-            ndrange = 256 * N
+            ndrange = gs * N
         )
 
         # All-converged early exit (two tiny device reductions).
-        n_active = Int(sum(d_valid_gpu .& (d_converged .== Int32(0))))
+        n_active = Int(sum(d_valid_live .& (d_converged .== Int32(0))))
         n_active <= 0 && break
     end
     KA.synchronize(device)
 
     # --- Download + convert ---
-    valid_gpu = Array(d_valid_gpu)
+    valid_live = Array(d_valid_live)
     for i in 1:N
-        valid[i] = valid[i] && valid_gpu[i]
+        valid[i] = valid[i] && valid_live[i]
     end
     theta_out = Array(d_theta)
     frames = _finalize_frames(sites, valid, theta_out, σ_vec, cfg)
@@ -1037,256 +1046,4 @@ function _finalize_frames(sites, valid, theta_out::AbstractMatrix, σ_vec, cfg::
         push!(frames, Detection(frame, (; id = i)))
     end
     return frames
-end
-
-# =============================================================================
-# CPU implementation — same math, per-blob threaded host loops
-# =============================================================================
-#
-# Deterministic (pixel order is the box scan order; the sweep sorts, so it
-# is order-canonical anyway). Uses SpecialFunctions.loggamma. Per-pixel
-# quantities round through Float32 (the deleted `AdaptConfig.store`'s only value) the GPU
-# buffers use, so CPU and GPU agree to summation-order ulps.
-
-function _adapt_cpu(
-        img, sites::AbstractVector{S},
-        cfg::AdaptConfig
-    ) where {S <: Union{Disc, EllipticFrame}}
-    N = length(sites)
-    N == 0 && return BlobDetection{Float64}[]
-    imgf = gray_f32(img)
-    H, W = size(imgf)
-    sat_lo, sat_hi = saturation_bounds(Float64)
-    max_scale_px = _max_scale_px(cfg, W, H)
-
-    thetas = zeros(Float64, 6, N)
-    valid = fill(false, N)   # Vector{Bool}, NOT BitVector: parallel writes below
-    σ_vec = zeros(Float64, N)
-    Threads.@threads for i in 1:N
-        ok = _adapt_cpu_one!(
-            view(thetas, :, i), imgf, sites[i], cfg,
-            H, W, sat_lo, sat_hi, max_scale_px
-        )
-        valid[i] = ok
-        σ_vec[i] = characteristic_scale(sites[i])
-    end
-    return _finalize_frames(sites, valid, thetas, σ_vec, cfg)
-end
-
-# One blob: scan → seed → sweep → IRLS. Writes the fitted θ into `θ_out`,
-# returns whether the blob survived the validity gates.
-function _adapt_cpu_one!(
-        θ_out, imgf, site, cfg::AdaptConfig,
-        H, W, sat_lo, sat_hi, max_scale_px
-    )
-    cutoff = cfg.cutoff
-    cx, cy = Float64.(centroid(site))
-    σ = characteristic_scale(site)
-    hw, spacing = _scan_grid(cutoff * cfg.scan_padding * σ)
-
-    σ > max_scale_px && return false
-    mr = cutoff * σ
-    clip_x = max(0.0, mr - cx + 1.0, cx + mr - W)
-    clip_y = max(0.0, mr - cy + 1.0, cy + mr - H)
-    (clip_x + clip_y) * mr / (π * mr^2) > cfg.max_clip_ratio && return false
-
-    # Canonical grid, anchored on the same integer pixel the pixel scan used
-    # (`spacing == 1` ⇒ integer positions ⇒ `bilinear_sample_clamped` returns them exactly).
-    ax = Float64(unsafe_trunc(Int32, floor(cx)))
-    ay = Float64(unsafe_trunc(Int32, floor(cy)))
-    Hi = Int32(H); Wi = Int32(W)
-    _gx(g) = ax + (g - hw) * spacing
-    _gy(g) = ay + (g - hw) * spacing
-
-    # Stage 1: background = max unsaturated intensity.
-    background = -Inf
-    for gx in 0:(2hw), gy in 0:(2hw)
-        ok, val = bilinear_sample_clamped(Float64, imgf, _gy(gy), _gx(gx), Hi, Wi)
-        (ok && val >= sat_lo && val <= sat_hi && val > background) && (background = val)
-    end
-    background <= 0.0 && return false
-
-    # Stage 2: collect valid pixels (design entries + intensities stored at
-    # T like the GPU buffers, promoted on every read).
-    min_int = cfg.min_intensity
-    a2v = Float32[]; a3v = Float32[]; a4v = Float32[]; a5v = Float32[]; a6v = Float32[]
-    vv = Float32[]; fv = Float32[]
-    for gy in 0:(2hw), gx in 0:(2hw)
-        xf = _gx(gx); yf = _gy(gy)
-        ok, val = bilinear_sample_clamped(Float64, imgf, yf, xf, Hi, Wi)
-        ok || continue
-        (val < sat_lo || val > sat_hi) && continue
-        f = background - val
-        f <= min_int && continue
-        # Image-pixel offsets regardless of `spacing` — no rescale downstream.
-        dx = xf - 0.5 - cx
-        dy = yf - 0.5 - cy
-        push!(a2v, Float32(dx)); push!(a3v, Float32(dy))
-        push!(a4v, Float32(dx * dx)); push!(a5v, Float32(2.0 * dx * dy)); push!(a6v, Float32(dy * dy))
-        push!(vv, Float32(val)); push!(fv, Float32(f))
-    end
-    n = length(fv)
-    n < _MIN_POINTS_FIXED_CENTER && return false
-    np = n < _MIN_POINTS_ISOTROPIC ? 2 : n < _MIN_POINTS_ANISOTROPIC ? 4 : 6
-
-    # θ₀ seed from the max inverted intensity.
-    max_f = Float64(maximum(fv))
-    z_max = max_f > 0 ? log(max_f) : 0.0
-    θ = StaticArrays.MVector{6, Float64}(coeffs(_site_seed6(site, z_max))...)
-
-    r2 = zeros(Float32, n)
-    _cpu_residuals!(r2, θ, a2v, a3v, a4v, a5v, a6v, vv, background)
-
-    # Sort + outlier_halfwidth median + marginal sweep (RSDR Jeffreys algebra).
-    sorted = sort(Float64.(r2))
-    outlier_halfwidth = max(sqrt(sorted[cld(n, 2)]), 1.0e-30)
-    m = np + 1
-    log_two_outlier_halfwidth = log(2.0 * outlier_halfwidth)
-    RSS = 0.0
-    best_S = -1.0e30
-    best_k = m + 1
-    for kk in 1:n
-        RSS += sorted[kk]
-        kk <= m && continue
-        S = _sweep_score(kk - m, RSS, Float64(n - kk) * log_two_outlier_halfwidth, loggamma)
-        if S > best_S
-            best_S = S
-            best_k = kk
-        end
-    end
-    ν = max(Float64(best_k - m), 2.0)
-    s2 = max(sum(@view(sorted[1:best_k])) / ν, 1.0e-30)
-
-    w = ones(Float32, n)
-    pin = ones(Float32, n)
-    _cpu_weights!(w, pin, r2, θ, a4v, a5v, a6v, ν, s2, outlier_halfwidth, cfg.spatial_weighting)
-
-    # IRLS loop.
-    A6 = StaticArrays.MMatrix{6, 6, Float64}(undef)
-    b6 = StaticArrays.MVector{6, Float64}(undef)
-    θ_old = StaticArrays.MVector{6, Float64}(undef)
-    for _ in 1:cfg.max_irls_iter
-        θ_old .= θ
-
-        # Accumulate A'WA / A'Wz with W = w·f² (Float64, pixel order).
-        acc = zeros(Float64, 27)
-        for i in 1:n
-            fi = background - Float64(vv[i])
-            fi < 1.0e-10 && continue
-            zi = log(fi)
-            wi = Float64(w[i]) * fi * fi
-            a1 = 1.0; a2 = Float64(a2v[i]); a3 = Float64(a3v[i])
-            a4 = Float64(a4v[i]); a5 = Float64(a5v[i]); a6 = Float64(a6v[i])
-            acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
-            acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
-            acc[7] += wi * a2 * a2; acc[8] += wi * a2 * a3; acc[9] += wi * a2 * a4
-            acc[10] += wi * a2 * a5; acc[11] += wi * a2 * a6; acc[12] += wi * a3 * a3
-            acc[13] += wi * a3 * a4; acc[14] += wi * a3 * a5; acc[15] += wi * a3 * a6
-            acc[16] += wi * a4 * a4; acc[17] += wi * a4 * a5; acc[18] += wi * a4 * a6
-            acc[19] += wi * a5 * a5; acc[20] += wi * a5 * a6; acc[21] += wi * a6 * a6
-            wz = wi * zi
-            acc[22] += wz * a1; acc[23] += wz * a2; acc[24] += wz * a3
-            acc[25] += wz * a4; acc[26] += wz * a5; acc[27] += wz * a6
-        end
-        fill!(A6, 0.0)
-        fill!(b6, 0.0)
-        kidx = 0
-        for j in 1:6, j2 in j:6
-            kidx += 1
-            if j <= np && j2 <= np
-                A6[j, j2] = acc[kidx]
-                A6[j2, j] = acc[kidx]
-            end
-        end
-        for j in 1:np
-            b6[j] = acc[21 + j]
-        end
-        for j in (np + 1):6
-            A6[j, j] = 1.0
-        end
-
-        info = lu_solve!(A6, b6)
-        info != Int32(0) && return false
-
-        # Apply + check (mirrors _apply_check_ka!).
-        if !_shape_ok(b6[4], b6[5], b6[6], cfg.max_aspect_ratio)
-            θ .= θ_old
-            break
-        end
-        for j in 1:np
-            θ[j] = b6[j]
-        end
-        diff_sq = 0.0
-        norm_sq = 0.0
-        for j in 1:np
-            d = θ[j] - θ_old[j]
-            diff_sq += d * d
-            norm_sq += θ[j] * θ[j]
-        end
-        # rtol convergence stops HERE, like the GPU path: the fused update is
-        # skipped for converged blobs there, and nothing after this point
-        # affects θ.
-        sqrt(diff_sq) / (sqrt(norm_sq) + 1.0e-300) < cfg.rtol && break
-
-        # Fused update: residuals → ŝ² → Newton ν → weights.
-        _cpu_residuals!(r2, θ, a2v, a3v, a4v, a5v, a6v, vv, background)
-        swr2 = 0.0
-        sw = 0.0
-        for i in 1:n
-            swr2 += Float64(w[i]) * Float64(r2[i])
-            sw += Float64(w[i])
-        end
-        s2 = max(swr2 / max(sw, 1.0e-30), 1.0e-30)
-        for _ in 1:5
-            ψp = digamma_stirling((ν + 1.0) / 2.0)
-            ψ = digamma_stirling(ν / 2.0)
-            ψ1p = trigamma_stirling((ν + 1.0) / 2.0)
-            ψ1 = trigamma_stirling(ν / 2.0)
-            inv_ν = 1.0 / ν
-            inv_ν2 = inv_ν * inv_ν
-            dQ = 0.0; d2Q_data = 0.0; sum_w = 0.0
-            for i in 1:n
-                wi = Float64(pin[i])
-                wi < 1.0e-15 && continue
-                dq_i, d2q_data_i = _nu_point_terms(Float64(r2[i]) / (ν * s2), ν, inv_ν, inv_ν2, ψp, ψ)
-                dQ += wi * dq_i
-                sum_w += wi
-                d2Q_data += wi * d2q_data_i
-            end
-            ν_new, stop = _next_nu(ν, dQ, d2Q_data, sum_w, ψ1p, ψ1, inv_ν2)
-            ν = ν_new
-            stop && break
-        end
-        _cpu_weights!(w, pin, r2, θ, a4v, a5v, a6v, ν, s2, outlier_halfwidth, cfg.spatial_weighting)
-    end
-
-    θ_out .= θ
-    return true
-end
-
-function _cpu_residuals!(r2, θ, a2v, a3v, a4v, a5v, a6v, vv, background)
-    @inbounds for i in eachindex(r2)
-        z_pred = θ[1] + Float64(a2v[i]) * θ[2] + Float64(a3v[i]) * θ[3] +
-            Float64(a4v[i]) * θ[4] + Float64(a5v[i]) * θ[5] + Float64(a6v[i]) * θ[6]
-        r2[i] = eltype(r2)(_adapt_r2(background - Float64(vv[i]), z_pred))
-    end
-    return r2
-end
-
-function _cpu_weights!(w, pin, r2, θ, a4v, a5v, a6v, ν, s2, outlier_halfwidth, spatial)
-    T = eltype(w)
-    s2 = max(s2, 1.0e-30)                      # kernel parity: the device path clamps on entry too
-    mix = StudentTMixture{Float64}(ν, s2, log(2.0 * outlier_halfwidth), 1; lgamma = loggamma)
-    @inbounds for i in eachindex(w)
-        r2i = Float64(r2[i])
-        p_in = inlier_posterior(mix, r2i)
-        wi = posterior_weight(mix, r2i)
-        pin[i] = T(p_in)
-        if spatial
-            q = θ[4] * Float64(a4v[i]) + θ[5] * Float64(a5v[i]) + θ[6] * Float64(a6v[i])
-            wi *= exp(q)
-        end
-        w[i] = T(wi)
-    end
-    return w
 end
