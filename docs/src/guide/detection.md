@@ -200,7 +200,7 @@ for example `HomographyGeometry(; local_optimization_strategy = …)`.
 
 ## Blob outcomes
 
-[`adapt`](@ref) fits each detected blob's elliptical frame with an IRLS, and
+[`adapt`](@ref BlobBoards.adapt) fits each detected blob's elliptical frame with an IRLS, and
 records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)):
 
 | `retcode` | `stop_rule` | The blob |
@@ -213,7 +213,8 @@ records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)):
 A rejected blob's `rejection` says why: `:not_peak` (the fitted paraboloid is
 not concave) or `:aspect_ratio` (beyond `max_aspect_ratio`). Capped and
 rejected blobs are still returned, flagged, never silently valid. Count them
-with [`count_unconverged`](@ref) and [`count_rejected`](@ref):
+with [`count_unconverged`](@ref BlobBoards.count_unconverged) and
+[`count_rejected`](@ref BlobBoards.count_rejected):
 
 ```julia
 detections = BlobBoards.detect_blobs(img)
@@ -224,7 +225,7 @@ BlobBoards.count_rejected(frames, :aspect_ratio)  # refused for one reason
 ```
 
 The iteration cap and `rtol` are the `[find_boards.adapt]` keys of
-`configs/default.toml` ([`AdaptConfig`](@ref)'s `max_irls_iter` and `rtol`).
+`configs/default.toml` ([`AdaptConfig`](@ref BlobBoards.AdaptConfig)'s `max_irls_iter` and `rtol`).
 
 ## Video: `track_boards`
 
