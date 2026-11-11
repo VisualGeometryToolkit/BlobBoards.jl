@@ -3,9 +3,13 @@
 
 [experiment]
 generator = "occlusion_picks"
-dataset = "260527"
-level = "70"
-tiers = ["bb_absolute_pose_occlusion_70_260527"]
+
+
+# The input of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
+[inputs.images]
+tier = "bb_absolute_pose_occlusion_70_260527"
+path = "absolute_pose_experiments/260527/occlusion/70/images"
+provenance = "synthetic occlusion level 70: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
 
 [output]
 dir = "occ_setup/70"                     # under papers/images

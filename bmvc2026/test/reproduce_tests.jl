@@ -72,7 +72,7 @@ end
 
 # Every figure generator that runs detection takes its detector, adaptation,
 # matching and verification settings from the evaluation's run config of
-# record (`[inputs] run_config`, read by reference, no detector values
+# record (`[runs] bb`, read by reference, no detector values
 # restated) unless its config declares a reasoned `[find_boards]
 # detector_exception` — so a figure and the evaluation cannot silently diverge.
 @testitem "bmvc2026 figures use the run config of record" begin
@@ -90,7 +90,7 @@ end
         occursin(r"\b(find_boards|trace_pipeline|detect_blobs)\(", src) || continue
         exception = get(get(cfg, "find_boards", Dict()), "detector_exception", "")
         if isempty(exception)
-            run = get(get(cfg, "inputs", Dict()), "run_config", "")
+            run = get(get(cfg, "runs", Dict()), "bb", "")
             @test !isempty(run) && isfile(projectdir("configs", run))
             @test occursin("FindBoardsConfig(CONFIG_PATH", src)
             @test !any(k -> has_key(cfg, k), detector_keys)      # no restated detector values

@@ -19,7 +19,7 @@ transcribed:
 
 Values are formatted the way the tables print them (`5` px, `$10^{-6}$`), so
 a macro and the literal it replaces render identically. Both files go to
-plotsdir(); regenerate_paper.jl copies plots/*.tex into papers/figures/floorplan/.
+plotsdir(); the copy_tex stage (scripts/copy_tex.jl) copies plots/*.tex into papers/figures/floorplan/.
 Every input and output name is in the config of record,
 configs/figures/supp_tables.toml (`--config=<path>` overrides); each run writes
 its record (effective config, provenance, outputs) under plotsdir("records").
@@ -49,14 +49,14 @@ import VisualGeometryToolkitFeatures
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, figure_config, write_figure_records, figure_numbers, sweep_dir, camera_of_record
+using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
 
 const CFG, CFG_PATH = figure_config("supp_tables"; default = projectdir("configs", "figures", "supp_tables.toml"))
-const DATASET = joinpath(data_root(; tiers = String.(CFG["experiment"]["tiers"])), "absolute_pose_experiments", CFG["experiment"]["dataset"])
-const INPUTS = CFG["inputs"]
-const RUN_CONFIG = joinpath(sweep_dir(INPUTS["run"]), "poses", "bb", "_config.toml")
+const BOARDS_DIR = input_path(CFG, "boards")
+const CAMERA_JSON = input_path(CFG, "camera")
+const RUN_CONFIG = joinpath(sweep_dir(CFG["runs"]["bb"]), "poses", "bb", "_config.toml")
 # A board JSON's `{value, unit}` field as a quantity, its unit read through
 # VisualGeometryToolkitCore's one guarded parse; lengths come out with `ustrip(mm, …)`.
 _quantity(x) = Float64(x.value) * parse_unit(String(x.unit))
@@ -84,7 +84,7 @@ end
 _num(x) = isinteger(x) ? string(Int(x)) : string(x)
 
 # The evaluation gallery's boards, as `_pattern` reads them.
-_gallery() = [_pattern(f) for f in readdir(joinpath(DATASET, INPUTS["boards_dir"]); join = true) if endswith(f, ".json")]
+_gallery() = [_pattern(f) for f in readdir(BOARDS_DIR; join = true) if endswith(f, ".json")]
 
 function write_board_params(nums)
     size_words = CFG["board_params"]["size_classes"]
@@ -124,7 +124,7 @@ _run_find_boards() = TOML.parsefile(RUN_CONFIG)["find_boards"]
 
 function _camera()
     # the session's camera of record (calibration/<camera>.json, vgio/cameras/v3)
-    return VgtkIO.load(BoundedCamera, camera_of_record(DATASET))
+    return VgtkIO.load(BoundedCamera, CAMERA_JSON)
 end
 
 # 1e-6 → "10^{-6}", as the table prints a tolerance.
@@ -187,7 +187,7 @@ function main()
         println("$(basename(out)) -> $out")
     end
     write_figure_records(CFG, CFG_PATH; driver = "bmvc2026/scripts/make_supp_tables.jl", outputs,
-        inputs = [joinpath(DATASET, INPUTS["boards_dir"]), RUN_CONFIG, camera_of_record(DATASET)])
+        inputs = [BOARDS_DIR, RUN_CONFIG, CAMERA_JSON])
     return nothing
 end
 

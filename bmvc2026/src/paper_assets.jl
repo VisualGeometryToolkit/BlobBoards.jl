@@ -52,7 +52,7 @@ The config of record of a paper-figure generator: `default`
 (`configs/figures/<generator>.toml`; scripts spell it out, so the config each
 reads is visible in its source),
 or the `--config=<path>` among `args` whose `[experiment] generator` names this
-generator (several `--config=` may be given — regenerate_paper.jl forwards its
+generator (several `--config=` may be given — a caller forwards its
 arguments to every generator, and each takes only its own). The `[experiment]`
 table must name the generator, so a config cannot be read by the wrong script.
 """

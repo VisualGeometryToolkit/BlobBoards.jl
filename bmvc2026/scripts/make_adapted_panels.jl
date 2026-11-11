@@ -81,30 +81,26 @@ using VisualGeometryToolkitCore: is_map_inlier, imshow, ellipses!, HomographyMap
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, results_root, paper_images_dir, figure_config, write_figure_records, network_path, load_config
+using Main.BlobBoardsEval: input_path, network_path, gallery_path, paper_images_dir, figure_config, write_figure_records
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
 
 const BB = BlobBoards
 const DEVICE = CUDABackend()
 const CFG, CFG_PATH = figure_config("adapted_panels"; default = projectdir("configs", "figures", "adapted_panels.toml"))
-const INP, FB, RND, OUT = CFG["inputs"], CFG["find_boards"], CFG["render"], CFG["output"]
-const ROOT = data_root(; tiers = String.(CFG["experiment"]["tiers"]))
-const IMG_PATH = joinpath(ROOT, INP["image"])
+const FB, RND, OUT = CFG["find_boards"], CFG["render"], CFG["output"]
+const IMG_PATH = input_path(CFG, "image")
 const PHOTO_PX = RND["photo_px"]
 # papers/images (not plotsdir()) because the PAPER reads it here, through
-# paper_images_dir (src/paper_assets.jl), whose BB_PAPER_IMAGES override is how
-# a regeneration is reviewed before it replaces the submitted panels.
+# paper_images_dir (src/paper_assets.jl); a regeneration is reviewed as the
+# working tree's diff against the submitted panels.
 const OUT_DIR = paper_images_dir(OUT["dir"])
 # The boards Fig. occexamples shows, in its column order; empty = every board.
 const PANEL_UIDS = isempty(OUT["uids"]) ? nothing : String.(OUT["uids"])
 const WRITE_VECTOR = RND["write_vector"]
 const PX_PER_UNIT = RND["px_per_unit"]
 _cutoff(v) = v == "default" ? Float32(BB.DEFAULT_CUTOFF) : Float32(v)
-# "package" = the package's default network (configs/default.toml), else a run
-# config under configs/ naming it.
-_network_path(v) = v == "package" ? descriptor_network_path() : network_path(load_config(v))
-const GALLERY = joinpath(results_root(), "galleries", INP["gallery"])   # a cache, never in the input tree
+const GALLERY = gallery_path(CFG)   # a cache, never in the input tree
 
 function main()
     # Detect on gray (find_boards expects it), DRAW on color -- the same split
@@ -112,10 +108,10 @@ function main()
     # panels look washed out next to Fig. 1.
     img_color = load_image(IMG_PATH)
     img = Gray.(img_color)
-    net = DescriptorNetwork(_network_path(INP["network"]))
+    net = DescriptorNetwork(network_path(CFG))
     mkpath(dirname(GALLERY))
     gallery = BoardGallery(GALLERY, net)
-    board_paths = filter(endswith(".json"), readdir(joinpath(ROOT, INP["boards_dir"]); join = true))
+    board_paths = filter(endswith(".json"), readdir(input_path(CFG, "boards"); join = true))
     bfd = Dict(uid => f for (uid, f) in insert!(gallery, board_paths, net; device = DEVICE))
     bundles = Dict(
         let (b, _, ch) = BB.load_bundle(bp)
@@ -217,7 +213,7 @@ function main()
         @info "panel" uid n_inliers = count(keep) path = out
     end
     write_figure_records(CFG, CFG_PATH; driver = "bmvc2026/scripts/make_adapted_panels.jl", outputs,
-        inputs = [IMG_PATH, GALLERY, joinpath(ROOT, INP["boards_dir"])])
+        inputs = [IMG_PATH, GALLERY, input_path(CFG, "boards"), network_path(CFG)])
     return nothing
 end
 

@@ -2,7 +2,7 @@
 # the paper's tables, macros and pgfplots panels: make_hand_eye.jl,
 # make_pose_results.jl, scripts/plots/error_distributions.jl, flip_table.jl,
 # make_detection_stats.jl, make_hand_eye_table.jl, make_supp_tables.jl
-# (regenerate_paper.jl runs them in this order).
+# (the stages of configs/reproduce.toml run them in this order).
 
 [experiment]
 generator = "evaluation"

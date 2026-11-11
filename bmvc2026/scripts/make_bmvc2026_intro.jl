@@ -48,14 +48,13 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using DrWatson: projectdir
-using Main.BlobBoardsEval: data_root, results_root, paper_images_dir, figure_config, write_figure_records, network_path, load_config
+using Main.BlobBoardsEval: input_path, network_path, gallery_path, paper_images_dir, figure_config, write_figure_records, load_config
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 # ---- config of record --------------------------------------------------------
 const CFG, CFG_PATH = figure_config("intro"; default = projectdir("configs", "figures", "intro.toml"))
-const INP, FB, RND = CFG["inputs"], CFG["find_boards"], CFG["render"]
-const ROOT = data_root(; tiers = String.(CFG["experiment"]["tiers"]))
-IMG_PATH = joinpath(ROOT, INP["image"])
+const FB, RND = CFG["find_boards"], CFG["render"]
+IMG_PATH = input_path(CFG, "image")
 # RASTER, not vector. The same figure as a PDF is ~48 MB and Ghostscript
 # cannot reduce it -- the size is the overlay geometry (25 boards' outlines plus
 # every pattern blob), not a recompressible image stream, so /prepress,
@@ -67,8 +66,8 @@ OUT_PNG = paper_images_dir(CFG["output"]["name"])
 # project site (blobboards.github.io) renders the same figure with a
 # transparent background so the boards that overhang the photo float on the page.
 BG = Symbol(RND["background"])
-const BOARDS_DIR = joinpath(ROOT, INP["boards_dir"])
-const GALLERY = joinpath(results_root(), "galleries", INP["gallery"])   # a cache, never in the input tree
+const BOARDS_DIR = input_path(CFG, "boards")
+const GALLERY = gallery_path(CFG)   # a cache, never in the input tree
 CUTOFF = FB["nms_cutoff"] == "default" ? BlobBoards.DEFAULT_CUTOFF : FB["nms_cutoff"]
 # CUDABackend from CUDA — VGF's CudaBackend is from the retired
 # ComputeBackend hierarchy and no longer resolves.
@@ -83,9 +82,7 @@ function main()
     # ---- gallery + boards + descriptor model (ONNX) -----------------------------
     # Same network as the main sweep — this figure used to resolve a package
     # default that pointed at the OLD SupCon model, so the paper mixed networks.
-    descriptor_network = DescriptorNetwork(
-        INP["network"] == "package" ? descriptor_network_path() : network_path(load_config(INP["network"]))
-    )
+    descriptor_network = DescriptorNetwork(network_path(load_config(CFG["runs"]["bb"])))
     mkpath(dirname(GALLERY))
     gallery = BoardGallery(GALLERY, descriptor_network)
     board_paths = filter(endswith(".json"), readdir(BOARDS_DIR; join = true))

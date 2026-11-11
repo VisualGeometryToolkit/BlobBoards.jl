@@ -84,41 +84,21 @@ using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, paper_images_dir, figure_config, write_figure_records, camera_of_record, gallery_path
+using Main.BlobBoardsEval: input_path, network_path, paper_images_dir, figure_config, write_figure_records, gallery_path
 const BlobBoardsEval = Main.BlobBoardsEval
 
 const CFG, CFG_PATH = figure_config("pipeline_panels"; default = projectdir("configs", "figures", "pipeline_panels.toml"))
-const INP, RND = CFG["inputs"], CFG["render"]
-const CONFIG_PATH = projectdir("configs", INP["run_config"])
+const RND = CFG["render"]
+const CONFIG_PATH = projectdir("configs", CFG["runs"]["bb"])
 const RUN = read_run_config(CONFIG_PATH)
-# Two sources: "data_root" — a still anywhere under data_root() (the
-# descriptor-training stills live there) — or "dataset", a frame of
-# <dataset>/images/bb. The descriptor network is the run config of record's.
-const SOURCE = INP["source"]
-if SOURCE == "data_root"
-    # a still anywhere under data_root(): image, camera and boards are
-    # data_root()-relative (the descriptor-training stills live here)
-    const ROOT = data_root(; tiers = String.(CFG["experiment"]["tiers"]))
-    const IMAGE = joinpath(ROOT, INP["image"])
-    const CAMERA_JSON = joinpath(ROOT, INP["camera"])
-    const BOARDS_DIR = joinpath(ROOT, INP["boards_dir"])
-    const NETWORK = joinpath(ROOT, RUN.descriptor["model"])
-    const GALLERY = isempty(INP["gallery"]) ? joinpath(tempdir(), "blobboards_pipeline_gallery.jld2") : INP["gallery"]
-elseif SOURCE == "dataset"
-    const ROOT = data_root(; tiers = String.(CFG["experiment"]["tiers"]))
-    const DATASET = joinpath(ROOT, "absolute_pose_experiments", RUN.experiment["dataset"])
-    # the config names the network data-root-relative (the frozen form)
-    const NETWORK = joinpath(ROOT, RUN.descriptor["model"])
-    # the session's camera of record (src/data.jl), never an images-tier file
-    const CAMERA_JSON = camera_of_record(DATASET)
-    basename(CAMERA_JSON) == INP["camera"] || error("the session camera of record is $(basename(CAMERA_JSON)), the config names $(INP["camera"])")
-    const BOARDS_DIR = joinpath(DATASET, INP["boards_dir"])
-    const GALLERY = isempty(INP["gallery"]) ? gallery_path(RUN.config_toml) : INP["gallery"]
-    const IMAGE = joinpath(DATASET, "images", "bb", INP["image"])
-else
-    error("pipeline_panels: unknown inputs.source $(repr(SOURCE))")
-end
-const BOARD = INP["board"]
+# The inputs of record: a descriptor-training still, its session's camera and
+# the gallery boards; the descriptor network is the run config of record's.
+const IMAGE = input_path(CFG, "image")
+const CAMERA_JSON = input_path(CFG, "camera")
+const BOARDS_DIR = input_path(CFG, "boards")
+const NETWORK = network_path(RUN.config_toml)
+const GALLERY = isempty(CFG["gallery"]["path"]) ? joinpath(tempdir(), "blobboards_pipeline_gallery.jld2") : gallery_path(CFG)
+const BOARD = CFG["panel"]["board"]
 
 const PANEL_SIZE = Tuple(RND["panel_size"])   # pt; the paper sets each at 0.245\textwidth
 const CROP_PAD = RND["crop_pad"]               # crop = outline bbox grown by this per side

@@ -18,7 +18,7 @@ from an RVG fit object the current `hand_eye` deliberately does not retain
 (src/calibration.jl, "scalars only"), so the table now reports exactly the
 scalars the pipeline computes rather than numbers no run can reproduce.
 
-Run AFTER make_hand_eye.jl (regenerate_paper.jl orders them).
+Run AFTER make_hand_eye.jl (configs/reproduce.toml orders them).
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/make_hand_eye_table.jl
 Config of record: configs/figures/evaluation.toml.
 =#

@@ -4,15 +4,25 @@
 [experiment]
 generator = "supp_tables"
 dataset = "260527"                       # absolute_pose_experiments/<dataset>
-tiers = ["bb_absolute_pose_inputs"]
 
-[inputs]
-boards_dir = "boards/blobboards"         # dataset-relative: the evaluation gallery's board JSONs
-run = "bmvc2026_260527.toml"             # configs/-relative: the BlobBoards run config of record; the table
+[runs]
+bb = "bmvc2026_260527.toml"              # configs/-relative: the BlobBoards run config of record; the table
                                          # reads the EFFECTIVE configuration its run wrote (sweep_dir(run)/poses/bb/_config.toml)
 
+# The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
+[inputs.boards]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/boards/blobboards"
+provenance = "the evaluation gallery's board definitions (blobboards/board/v5)"
+
+[inputs.camera]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/calibration/sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
+provenance = "the camera of record (scripts/import_cameras.jl's port of calibrate_pinhole)"
+sha256 = "788adf4e3a8158d3c06f0f3412e35e671503fa4b0cdc6035bc8908d0ca155ec9"
+
 [board_params]
-output = "board_params.tex"              # under plotsdir(); regenerate_paper.jl copies it into papers/figures/floorplan
+output = "board_params.tex"              # under plotsdir(); the copy_tex stage copies it into papers/figures/floorplan
 # Size classes in increasing pattern extent; each name becomes the suffix of its macros.
 size_classes = ["Small", "Medium", "Large"]
 
