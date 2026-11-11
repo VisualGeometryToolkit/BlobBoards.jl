@@ -80,6 +80,12 @@ Source: cpu-gpu-twin-audit.md ("BlobBoards"), hoists-09.md ("the one-kernel gate
 - [x] B1: the cuBLAS batched-LU override `_solve_6x6_batched!(::CUDABackend)` vs `_lu6_kernel!` → `_lu6_kernel!` on every backend, the override and the hook deleted (owner ruling, 2026-11-11: unify) (closed by 508508c; the new CUDA baseline 8ad05ba)
 - [x] B2: `_device_lgamma`'s three implementations (SpecialFunctions on the CPU, `lgamma_lanczos`, CUDA's `__nv_lgamma`) → Core's `lgamma_lanczos` on every backend, `_device_lgamma` and the SpecialFunctions dependency deleted (owner ruling, 2026-11-11: unify). CPU frames bit for bit unchanged; CUDA frames vs the old CUDA code max 2.2e-12 px, inside the old code's run-to-run spread; the adapt parity item now holds CPU ≡ CUDA under 1e-6 px with no validity disagreement (measured 8.3e-9 px) (closed by 508508c; the new CUDA baseline 8ad05ba)
 
+## Robust schema
+
+- [x] the adapt GPU kernel's robust IRLS (`adapt_ka.jl:469-503`, `adapt.jl:84-86`: the private half-width √median(r²), ν ≥ 2 and
+  its floors) → DEFERRED by the owner (ruling 3, 2026-11-11): the kernel and its parameters stay as they are for 0.9; not a blocker
+  of this leg (robust-schema audit, borderline 5)
+
 ## Public names an upstream package owns: an API decision
 
 - [x] `load`/`save`, names VisualGeometryToolkitIO owns → IO's functions (owner decision, Option A): BlobBoards owns
