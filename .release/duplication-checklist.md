@@ -64,7 +64,20 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   (bmvc2026/scripts/plots/error_distributions.jl `_cells`) and `load_hand_eye` (bmvc2026/src/pose_error.jl). The
   paper tree leaves the package repository in 0.5.1 (owner decision 11).
 
-- [ ] the ONNX descriptor's own session handling (src/descriptor.jl: `ONNXRunTime.load_inference` with its CUDA arena cap and CPU fallback) → VisualGeometryToolkitFeatures' ONNX runtime (src/onnx_runtime.jl: the execution-provider resolution, the sm_100-capable CUDA provider, the capped arena). OPEN: Features' session builder is private (`_onnx_session`, a fixed 8 GiB cap); the hoist makes it public with the arena cap as a keyword, then DescriptorNetwork calls it (the GPU smoke and the four annotate-smoke B200 errors to be checked on the GPU).
+- [x] the ONNX descriptor's own session handling (src/descriptor.jl: `ONNXRunTime.load_inference` with its CUDA arena cap and CPU fallback) → VisualGeometryToolkitFeatures' ONNX runtime (src/onnx_runtime.jl: the execution-provider resolution, the sm_100-capable CUDA provider, the capped arena). — CLOSED: Features' `onnx_session(path; execution_provider, gpu_mem_limit)` is public (monorepo f0342189); DescriptorNetwork calls it with `gpu_mem_limit = _arena_cap(max_batch)`, BlobBoards' `load_inference` handling deleted, its `allow_cpu_fallback` kept around an explicit `:cuda`. On a B200 the CUDA session runs (Features' sm_100 build): annotate smoke 57/57 in a session, its four `cudaErrorNoKernelImageForDevice` errors gone; the device handoff's descriptors equal the host handoff's on the CUDA EP exactly (closed by 9536308)
+
+## CPU/GPU twins (the owner's one-kernel rule: a GPU branch's CPU branch is the same KernelAbstractions kernel on the CPU backend)
+
+Source: cpu-gpu-twin-audit.md ("BlobBoards"), hoists-09.md ("the one-kernel gate"); Core's `check_duplication`
+`:backend_branch` / `:twin_name` rules (vgtk-hoists d3a02dbf, 9b14e0cb).
+
+- [x] B3: BlobBoardsCUDAExt's `_canon_describe(::CUDABackend)` and `_canonicalize_cuda_device` (the inline warp builder and their own driver) → the generic warp builder (`_region_bm`) in `_patch_cube` (Core's one batched KA warp, one Float32 cube on every backend: `_canonicalize`'s `device isa KA.CPU` branch gone with it) and the generic chunked `_canon_describe`; the extension keeps only the ONNX device-tensor handoff (`_describe_patches` of a CUDA cube). Patches (logpolar/cartesian, supersample 1/2, CPU and CUDA) and descriptors (CPU EP, CPU and CUDA devices) bit-identical to the old code; the device handoff equals the host handoff on the CUDA EP exactly (closed by f037213)
+- [x] the duplicate uploaders `_upload_f32` / `_gpu_upload_f32` (and the `_undistort_adapt` methods they served; its one call passed `nothing`) → Core's `on_device`/`ka_upload` (`_device_image`) (closed by f037213)
+- [x] B4: `_nu_point_terms` / `_next_nu` (drifted: no concave/ascent safeguard) → Core's `nu_point_terms` / `next_nu_from_sums` from the kernel. Results CHANGE (numbers in the port report): on three synthetic fields 12/63, 0/25, 42/150 frames move by more than 1e-3 px; the median centroid error against the rendered truth falls 4–7× (e.g. 1.1e-4 → 2.8e-5 px), CPU ≡ GPU tightens from 0.23–0.29 px to ≤ 6e-8 px (closed by 6706f1d)
+- [x] gate hit `_execution_provider` (training.jl): a provider choice, no second computation → DUPLICATION.toml `[[backend]]` with the reason (closed by 71151ab)
+- [x] gate hit `detect_cpu`/`detect_gpu` (bmvc2026/_research): two different detectors (BlobBoards' and the VKS C library), not one on two backends → named for what they are, `detect_blobboards`/`detect_vks` (closed by 71151ab)
+- [ ] B1: the cuBLAS batched-LU override `_solve_6x6_batched!(::CUDABackend)` vs `_lu6_kernel!`. AWAITING THE OWNER'S RULING (deleting it changes CUDA results).
+- [ ] B2: `_device_lgamma`'s three implementations (SpecialFunctions on the CPU, `lgamma_lanczos`, CUDA's `__nv_lgamma`). AWAITING THE OWNER'S RULING (it changes CUDA results); the suite's duplication item lists it as its one open finding.
 
 ## Public names an upstream package owns: an API decision
 
