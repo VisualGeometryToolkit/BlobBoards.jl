@@ -6,6 +6,11 @@ On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1
 the 0.9 branch states them), with the 0.9 port of LocalOptimizationDoneRight.
 Breaking (the next release is a minor bump, 0.6.0):
 
+- **`AdaptConfig`'s `max_irls_iter` default is 100** (was 20; `rtol` stays
+  1e-6). At 20 most blobs were still moving when the budget ran out (21 of 30
+  on the suite's synthetic field) and were returned as if converged; at 100
+  they converge. Adapted frames move accordingly; the bmvc2026 sets of record
+  take 100 too.
 - **`adapt` flags every blob whose IRLS did not converge.** `BlobDetection`'s
   metadata is `(; id, converged)`: `converged` is false for a blob capped at
   `max_irls_iter` or stopped by the shape gate (it keeps its previous iterate),

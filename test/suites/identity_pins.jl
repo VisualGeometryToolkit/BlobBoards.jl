@@ -426,8 +426,8 @@ const PINNED_PATTERN_V3_JSON = """
     @testset "annotation and run-config hashes" begin
         @test BlobBoards.config_hash(;
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
-        ) == "148d5baf77e7d5e18fbbe26735207cc6367a7da2c137eb28b4558c221ed197ce"
+        ) == "6a7042b4465849fa8a65fbec19c8e370fdd904b81ff8032d432cb0ef99558ef7"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "5efb5950c750dce114bc501ea6a761fd2e4eeb0e0ac6a6485d4a364a039be0dd"
+            "c0d89bbf84580b69df6d4d1d18ca6e4a21b2ac0d0d79d05c8c144f3db2a0b502"
     end
 end

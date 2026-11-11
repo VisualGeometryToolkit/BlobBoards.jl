@@ -120,7 +120,7 @@ nms = { type = "ellipse", cutoff = 2.0, band_octaves = 1.0, band_reach = 1 }
 # undersize the window.
 min_intensity = 1.0e-6
 scan_padding = 1.0
-max_irls_iter = 20                     # quality knob, not just a convergence cap
+max_irls_iter = 100                    # quality knob, not just a convergence cap
 spatial_weighting = true
 rtol = 1.0e-6
 # sigma cap as a FRACTION of the image's sqrt(area): sigma > f*sqrt(W*H) is

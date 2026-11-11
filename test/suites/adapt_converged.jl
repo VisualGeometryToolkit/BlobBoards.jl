@@ -35,14 +35,15 @@ end
     full = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(), device = CPU())
     @test !isempty(full)
     @test all(f -> f.converged isa Bool, full)
-    # At the default budget (20) some blobs converge; most of this field's do
-    # not meet rtol = 1e-6 yet (21 of 30 capped on 2026-11-11, one stopped by
-    # the shape gate). With a budget of 100 none is capped.
-    @test BlobBoards.count_unconverged(full) < length(full)
-    long = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(max_irls_iter = 100), device = CPU())
-    @test [f.id for f in long] == [f.id for f in full]
-    @test BlobBoards.count_unconverged(long) < BlobBoards.count_unconverged(full)
-    @test count(f -> f.converged, long) >= length(long) - 2
+    # The default budget is 100 (the owner's ruling, 2026-11-11): at the old
+    # 20, 21 of this field's 30 blobs were still moving at the cap (rtol 1e-6)
+    # and one was stopped by the shape gate; at 100 none is capped, so only a
+    # shape-stopped blob may stay unconverged.
+    @test BlobBoards.AdaptConfig().max_irls_iter == 100
+    @test count(f -> f.converged, full) >= length(full) - 2
+    old = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(max_irls_iter = 20), device = CPU())
+    @test [f.id for f in old] == [f.id for f in full]
+    @test BlobBoards.count_unconverged(full) < BlobBoards.count_unconverged(old)
 
     # One iteration cannot meet rtol = 1e-6 from the seed: every blob still
     # live at the cap is flagged and counted, not reported as converged.

@@ -26,7 +26,7 @@ Configuration for blob adaptation (paraboloid fitting).
 # IRLS
 - `spatial_weighting::Bool = true` — adaptive spatial weights from current shape
 - `cutoff::Float64 = 2.0` — pixel window in units of σ
-- `max_irls_iter::Int = 20` — maximum IRLS iterations
+- `max_irls_iter::Int = 100` — maximum IRLS iterations (a blob still moving after it is returned with `converged = false`)
 - `rtol::Float64 = 1e-6` — relative parameter convergence threshold
 
 # Filtering
