@@ -300,7 +300,7 @@
         cp(run, bent; force = true)
         rigfile = joinpath(bent, "targets_1.json")
         rec_bent = JSON.parse(read(rigfile, String))
-        @test rec_bent["schema"] == "vgio/rig/v8" && rec_bent["targets"][1]["target"]["calibration"]["type"] == "rigid"
+        @test rec_bent["schema"] == "vgio/rig/v9" && rec_bent["targets"][1]["target"]["calibration"]["type"] == "rigid"
         rec_bent["targets"][1]["target"]["calibration"] = Dict("type" => "aspect", "parameters" => [0.01])
         write(rigfile, JSON.json(rec_bent))
         err = try

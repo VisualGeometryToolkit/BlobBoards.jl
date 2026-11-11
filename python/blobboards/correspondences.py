@@ -3,7 +3,7 @@
 A run directory carries ``observations.json`` (vgio/target_points2d/v1 or v2: per frame,
 the image, the sensor and each measured point's pixel and reference into a target's
 point list, in the pixel frame the file declares — the canonical COLMAP frame,
-top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v6 to v8: each
+top-left pixel centre at (0.5, 0.5)) and ``targets_<k>.json`` (vgio/rig/v6 to v9: each
 member target's points in its own frame — a ``points`` target's ``points``, a
 ``planar`` target's ``nominal`` points — in the file's declared ``length_unit``; a
 planar target named only by its reference carries no points here). A planar
@@ -38,7 +38,7 @@ MM_PER_UNIT = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "um": 1.0e-3, "inch": 25.4}
 # covariance storage (target_points2d v2, rig v8), or added a planar target stated by its
 # layout (rig v7), which it refuses by name where an observation names it.
 TARGET_POINTS2D_SCHEMAS = ("vgio/target_points2d/v1", "vgio/target_points2d/v2")
-RIG_SCHEMAS = ("vgio/rig/v6", "vgio/rig/v7", "vgio/rig/v8")
+RIG_SCHEMAS = ("vgio/rig/v6", "vgio/rig/v7", "vgio/rig/v8", "vgio/rig/v9")
 
 
 def _points_mm(path, unit, tgt):
@@ -144,8 +144,8 @@ def load_correspondences(run_dir, convention="opencv"):
 
 def image_size(run_dir):
     d = json.load(open(os.path.join(run_dir, "camera_mocap.json")))
-    if d.get("schema") != "vgio/cameras/v4":
-        raise ValueError(f"{run_dir}: camera_mocap.json is {d.get('schema')!r}, not vgio/cameras/v4 (a v3 store: "
+    if d.get("schema") not in ("vgio/cameras/v4", "vgio/cameras/v5"):
+        raise ValueError(f"{run_dir}: camera_mocap.json is {d.get('schema')!r}, not vgio/cameras/v4 or v5 (a v3 store: "
                          "migrate it with VisualGeometryToolkitIO.vgio_migrate)")
     c = d["cameras"][0]
     return int(c["width"]), int(c["height"])
