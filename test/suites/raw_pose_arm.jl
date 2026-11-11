@@ -85,7 +85,7 @@ end
     est = BlobBoards.VisualGeometryToolkitEstimation.find_absolute_pose(
         _CAM, src .=> dst; rng = MersenneTwister(1),
         scoring = scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => 5.0); problem = AbsolutePoseProblem),
-        local_optimization = HQ{WelschShape}(; scale_multiple = tuning_constant(:absolute_pose, "welsch").scale_multiple)
+        local_optimization_strategy = HQ{WelschShape}(; efficiency_constant = tuning_constant(:absolute_pose, "welsch").efficiency_constant)
     )
     @test est.converged   # a failed search is a :no_model result, not `nothing` (Estimation 0.5)
     if est.converged      # a failed search has no estimate to read

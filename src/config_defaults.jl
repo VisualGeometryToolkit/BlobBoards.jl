@@ -105,26 +105,26 @@ _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
 # VisualGeometryToolkitEstimation's loader over its strategies and LocalOptimizationDoneRight's
 # (`student_t_uniform`, `hq`, … are LocalOptimizationDoneRight's):
 # `{ type = "student_t_uniform" }`, or e.g.
-# `{ type = "hq", loss = "welsch", scale_multiple = "cross_validated" }`, where
-# `scale_multiple` resolves per `class` and loss through LocalOptimizationDoneRight's
+# `{ type = "hq", loss = "welsch", efficiency_constant = "cross_validated" }`, where
+# `efficiency_constant` resolves per `class` and loss through LocalOptimizationDoneRight's
 # `tuning_constant` registry. ONE converter
 # for the geometry structs' defaults AND config_toml.jl's loader. `class` is
 # the RVG pipeline class of the arm (:homography, :absolute_pose,
 # :radial_homography); `section` only names the table in error messages.
-using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, local_optimization_from_toml
+using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, optimization_strategy_from_toml
 import LocalOptimizationDoneRight
 const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.STRATEGY_TAGS)
 """
-    geometry_local_optimization(d, class::Symbol) -> AbstractLocalOptimization
+    geometry_local_optimization_strategy(d, class::Symbol) -> AbstractOptimizationStrategy
 
 The RANSAC local-optimization strategy a `[find_boards.geometry]`
-`local_optimization` table `d` names, read by VisualGeometryToolkitEstimation's
+`local_optimization_strategy` table `d` names, read by VisualGeometryToolkitEstimation's
 loader over its strategies and LocalOptimizationDoneRight's (`class` is the
 arm's pipeline class: `:homography`, `:absolute_pose`, `:radial_homography`, …).
 The one reader for every geometry arm's TOML, downstream arms' included.
 """
-geometry_local_optimization(d, class::Symbol) = local_optimization_from_toml(
-    d; class, section = "find_boards.geometry.local_optimization", tags = _LO_TAGS
+geometry_local_optimization_strategy(d, class::Symbol) = optimization_strategy_from_toml(
+    d; class, section = "find_boards.geometry.local_optimization_strategy", tags = _LO_TAGS
 )
-_dflt_local_optimization(class::Symbol) =
-    geometry_local_optimization(_dflt("geometry", "local_optimization"), class)
+_dflt_local_optimization_strategy(class::Symbol) =
+    geometry_local_optimization_strategy(_dflt("geometry", "local_optimization_strategy"), class)

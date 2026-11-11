@@ -150,7 +150,7 @@ type = "pose"            # calibrated P3P; "homography" is the uncalibrated path
 # and verifies through the FULL camera, so the residual is in the pixels the
 # detector produced.
 undistortion = "global"
-local_optimization = { type = "student_t_uniform" }   # posterior-weight IRLS LO on every arm
+local_optimization_strategy = { type = "student_t_uniform" }   # posterior-weight IRLS LO on every arm
 # 9, not 8: the count gate became INCLUSIVE (>= min_inliers, 2026-08-11), so
 # the authored value moves up one to keep the tuned effective threshold. This
 # changes config_dict and therefore the run key — a fresh run directory.

@@ -9,7 +9,8 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 ## BlobBoards ↔ CaliBlobs (cascade list)
 
 - [x] the shared helpers → one owner: BlobBoards (audit 6). BlobBoards' side: `board_fit_keywords`, `board_endpoints`,
-  `distortion_center`, `load_descriptor_network` and `geometry_local_optimization` are public (48a592f);
+  `distortion_center`, `load_descriptor_network` and `geometry_local_optimization` are public (48a592f; renamed
+  `geometry_local_optimization_strategy` in the 0.9 strategy rename);
   CaliBlobs deleted its copies in its own leg (cb-09 `caliblobs-09`, 639abd1).
 - [x] BlobBoards' CPU twin of its GPU kernels → one KernelAbstractions implementation (audit 7): `_adapt_cpu`,
   `_adapt_cpu_one!`, `_cpu_residuals!`, `_cpu_weights!` deleted; the per-blob kernels run on `KA.CPU()` with one
@@ -126,12 +127,15 @@ Each item names the contract step it waits for.
   `test/suites/adapt_converged.jl`; the parity item checks the flag CPU ≡ GPU (408de3d, this commit)
 - [ ] switch the outcome Symbols to Core's `ReturnCode`/`StopRule` (`ShapeGate` added by s14-core): waits for the s14-core stubs
 - [x] refine_* with `robust =`: none in BlobBoards (scanned); `refine_homography`/`refine_radial_homography` (src/pipeline.jl
-  `_refine`) take their strategy as `local_optimization` already
+  `_refine`) take their strategy as a keyword already; after the 0.9 rename it is `optimization_strategy` (this commit)
 - [ ] the same two `_refine` calls supply `scoring` (the Student-t at `outlier_halfwidth`): B1 refuses a scorer on refine_* and
   needs exactly one of `scale`/`width` (the scale of the board's `find_*` result, `noise_scale(res)`); the pose arm's
   `locally_optimize` keeps its scorer (not a refine_*). Waits for B1
-- [ ] A4 `scale_multiple` → `efficiency_constant`, `ScaleMultiple` → `EfficiencyConstant`: four files, Welsch only (no
-  Geman–McClure or BarronHQ value in BlobBoards, so no number moves). Prepared, waits for Core A3/A4 and LODR's rename
+- [x] A3, the width multiple is `efficiency_constant` (the width mode `EfficiencyConstant`; old names in Core's RETIRED_NAMES): four files, Welsch only (no
+  Geman–McClure or BarronHQ value in BlobBoards, so no number moves) (this commit)
+- [x] the strategy rename (owner, 0.9): the geometry's strategy key/keyword/field `local_optimization_strategy`, the public
+  reader `geometry_local_optimization_strategy`, Estimation's `optimization_strategy_from_toml`; the two refine calls take
+  `optimization_strategy`; the old key is refused naming the new one (`_RENAMED_RUN_KEYS`, fail-first test) (this commit)
 - [ ] Q3 weights (44 sites, robust-contract-weights-sites.txt): waits for B4
 - [ ] refine_homography's `RefineMetadata` (src/pipeline.jl's refine sites read `.inlier_mask`): waits for B1
 - [ ] §14 termination fields on BlobBoards' find/refine reads (`res.converged` as "a model exists" → `found_model`): waits for the

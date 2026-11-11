@@ -133,7 +133,7 @@ public fit_rng                             # one board's RANSAC stream (config.r
 public board_fit_keywords, board_endpoints # one board's fit keywords; a scored set as a 2D fit's endpoints (board side exact)
 public distortion_center                   # a radial arm's distortion centre (the sensor's middle)
 public load_descriptor_network             # a descriptor network as given, or read from a path (.jld2 → Lux, else ONNX)
-public geometry_local_optimization         # a [find_boards.geometry] local_optimization table → its strategy
+public geometry_local_optimization_strategy         # a [find_boards.geometry] local_optimization_strategy table → its strategy
 public BoardDetection                      # one board in one frame: track_boards' record
 public GalleryIndex                        # the staged board gallery; the type of every `gpu_index` keyword
 public board_palette                       # one stable color per board id (sorted) — every overlay uses it

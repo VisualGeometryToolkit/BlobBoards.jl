@@ -6,6 +6,16 @@ On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1
 the 0.9 branch states them), with the 0.9 port of LocalOptimizationDoneRight.
 Breaking (the next release is a minor bump, 0.6.0):
 
+- **The geometry's strategy is `local_optimization_strategy`** (the stack's 0.9
+  rename: a `find_*` takes `local_optimization_strategy`, a `refine_*` and a
+  `fit_*` take `optimization_strategy`). The `[find_boards.geometry]` key, the
+  `HomographyGeometry`/`PoseGeometry`/`RadialHomographyGeometry` keyword and
+  field, and the public reader (`geometry_local_optimization_strategy`, was
+  `geometry_local_optimization`) are renamed. The old key is refused with an
+  `ArgumentError` naming the new one; there is no alias. The bmvc2026 configs of
+  record use the new key, so their run keys move. A Welsch-HQ table's width is
+  `efficiency_constant` (was `scale_multiple`; Welsch's value is unchanged).
+
 - **`AdaptConfig`'s `max_irls_iter` default is 100** (was 20; `rtol` stays
   1e-6). At 20 most blobs were still moving when the budget ran out (21 of 30
   on the suite's synthetic field) and were returned as if converged; at 100
@@ -44,7 +54,7 @@ Breaking (the next release is a minor bump, 0.6.0):
   `BlobBoards.CONTRACT_GENERICS` no longer lists it.
 - **New public helpers for a downstream geometry arm** (CaliBlobs'):
   `board_fit_keywords`, `board_endpoints`, `distortion_center`,
-  `load_descriptor_network`, `geometry_local_optimization`.
+  `load_descriptor_network`, `geometry_local_optimization_strategy`.
 - **One adaptation implementation on every backend**: the per-blob
   KernelAbstractions kernels run on `KA.CPU()` (one work item per blob); the
   threaded host twin is deleted. CPU frames move by at most ~2e-7 px.

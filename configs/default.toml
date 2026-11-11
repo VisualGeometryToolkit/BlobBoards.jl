@@ -196,11 +196,11 @@ outlier_halfwidth = 5.0
 # VisualGeometryToolkitEstimation's loader over LocalOptimizationDoneRight's `LO_TAGS`. BB
 # pins the posterior-weight Student-t/uniform IRLS on every arm (switched back
 # from the Welsch-HQ arm, 2026-07-28); the Welsch-HQ arm would be
-# `{ type = "hq", loss = "welsch", scale_multiple = "cross_validated" }` here.
+# `{ type = "hq", loss = "welsch", efficiency_constant = "cross_validated" }` here.
 # The fits score with the Student-t + uniform marginal at `outlier_halfwidth`
 # (VisualGeometryToolkitCore's `StudentTUniformScoring`), stated in the code, not
 # VisualGeometryToolkitEstimation's MSAC default.
-local_optimization = { type = "student_t_uniform" }
+local_optimization_strategy = { type = "student_t_uniform" }
 # NB no `resolve_pose_ambiguity` here: it is pose-only, and the loader
 # refuses it under `type = "homography"`. The plane-induced H is a unique
 # 8-DOF map; the two-fold ambiguity belongs to its DECOMPOSITION into

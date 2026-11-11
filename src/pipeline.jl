@@ -420,12 +420,12 @@ _describe_patches(model, cube) = describe(model, _host_patches(cube))
 # context type: the geometry ITSELF rides the camera slot — it already
 # carries the one datum the estimator needs (`image_size`) — so its
 # `_find_model`/`_refine` methods live below the GeometryConfig definitions.
-# The LO strategy is the geometry config's `local_optimization`
+# The LO strategy is the geometry config's `local_optimization_strategy`
 # (`[find_boards.geometry]`, `{ type = "student_t_uniform" }` by default;
 # RVG's own find_* defaults are Welsch-HQ). find_boards threads it through
 # `fit_kw`; the keyword default re-reads the file for a bare `find_board`.
-_default_lo(::Nothing) = _dflt_local_optimization(:homography)
-_default_lo(::CameraModel) = _dflt_local_optimization(:absolute_pose)
+_default_lo(::Nothing) = _dflt_local_optimization_strategy(:homography)
+_default_lo(::CameraModel) = _dflt_local_optimization_strategy(:absolute_pose)
 # The scorer of every fit and refine: the Student-t + uniform marginal at the
 # arm's outlier half-width (`P` the arm's problem type). Its table states the
 # half-width and nothing else: the scale and label priors are the stack's
@@ -446,16 +446,16 @@ _scoring(::Type{P}, outlier_halfwidth) where {P} = scoring_from_toml(
 # (not cross-validated).
 const _FIT_HALFWIDTH_FALLBACK = (homography = 5.0, absolute_pose = 5.0, radial_homography = 20.0)
 _find_model(
-    cam::Nothing, pt_csponds; local_optimization = _default_lo(cam),
+    cam::Nothing, pt_csponds; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.homography, kw...
 ) = find_homography(
-    pt_csponds; scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization, kw...
+    pt_csponds; scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
 )
 _find_model(
-    cam::CameraModel, pt_csponds; local_optimization = _default_lo(cam),
+    cam::CameraModel, pt_csponds; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.absolute_pose, kw...
 ) = find_absolute_pose(
-    cam, pt_csponds; scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization, kw...
+    cam, pt_csponds; scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
 # Seeded warm local-optimization refine (no second RANSAC) for the guided final
@@ -472,19 +472,19 @@ _find_model(
 # `Extrinsics3` (a `Vec`), and a track holds one model type — the guided refit's
 # result would not convert into it.
 _refine(
-    cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization = _default_lo(cam),
+    cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = refine_homography(
-    θ₀, pt_csponds; extent, workspace, local_optimization,
+    θ₀, pt_csponds; extent, workspace, optimization_strategy = local_optimization_strategy,   # a refine_*'s keyword
     scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth)
 )
 _refine(
-    cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization = _default_lo(cam),
+    cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
     # the board's world extent bounds the problem as the `find_*` pipelines' `extent` keyword does
     extent === nothing ? AbsolutePoseProblem(cam, pt_csponds) : BoundedProblem(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
-    scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization
+    scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
@@ -1192,7 +1192,7 @@ end
 # (possibly the alternative branch) — the caller's downstream is unchanged.
 function _resolve_pose_ambiguity(
         camera, scored, pt_csponds, res;
-        outlier_halfwidth, local_optimization, extent, workspace, telemetry = nothing
+        outlier_halfwidth, local_optimization_strategy, extent, workspace, telemetry = nothing
     )
     bs = sources(scored)
     # Bare strip (audited): `sources` are board-frame blobs, unitless mm by the
@@ -1218,7 +1218,7 @@ function _resolve_pose_ambiguity(
     # different scoring objects — measured to flip healthy boards.)
     inc = _refine(
         camera, pt_csponds, res.estimate;
-        outlier_halfwidth, local_optimization, extent, workspace
+        outlier_halfwidth, local_optimization_strategy, extent, workspace
     )
     if isnothing(inc) || !inc.converged
         # Returns the UNREFINED incumbent and never refines the mirror at all.
@@ -1232,7 +1232,7 @@ function _resolve_pose_ambiguity(
         )
         return res
     end
-    alt = _refine(camera, pt_csponds, θm; outlier_halfwidth, local_optimization, extent, workspace)
+    alt = _refine(camera, pt_csponds, θm; outlier_halfwidth, local_optimization_strategy, extent, workspace)
     if isnothing(alt) || !alt.converged
         _log_branch_bail(
             telemetry, :alt_not_converged; sep_deg = sep, inc_conv = true,
@@ -1356,7 +1356,7 @@ function find_board(
     res = _find_model(camera, pt_csponds; fit_kw...)
     (!isnothing(res) && res.converged) || return nothing
     # The refines below use the SAME strategy the fit used.
-    local_optimization = get(fit_kw, :local_optimization, _default_lo(camera))
+    local_optimization_strategy = get(fit_kw, :local_optimization_strategy, _default_lo(camera))
 
     # Planar pose ambiguity (P3P arm; see _resolve_pose_ambiguity): reflect the
     # RANSAC winner, refine the reflection with the same seeded LO, select by
@@ -1365,7 +1365,7 @@ function find_board(
     if resolve_pose_ambiguity && camera isa CameraModel
         res = _resolve_pose_ambiguity(
             camera, scored, pt_csponds, res;
-            outlier_halfwidth = get(fit_kw, :outlier_halfwidth, 5.0), local_optimization,
+            outlier_halfwidth = get(fit_kw, :outlier_halfwidth, 5.0), local_optimization_strategy,
             extent = get(fit_kw, :extent, nothing),
             workspace = refine_workspace, telemetry
         )
@@ -1404,7 +1404,7 @@ function find_board(
             # Warm LM-guarded local optimization from res.estimate — no second RANSAC.
             res2 = _refine(
                 camera, g_pt, res.estimate;
-                outlier_halfwidth, local_optimization, extent = get(fit_kw, :extent, nothing),
+                outlier_halfwidth, local_optimization_strategy, extent = get(fit_kw, :extent, nothing),
                 workspace = refine_workspace
             )
             if !isnothing(res2) && res2.converged
@@ -1614,7 +1614,7 @@ homography-vs-P3P path inside `find_boards`.
 abstract type GeometryConfig end
 
 """
-    HomographyGeometry(; outlier_halfwidth=5.0, min_inliers=7, local_optimization=StudentTUniform())
+    HomographyGeometry(; outlier_halfwidth=5.0, min_inliers=7, local_optimization_strategy=StudentTUniform())
 
 Homography (no-camera) estimator config. 4 is the geometric minimum for
 `find_homography`; the default 7 leaves three outlier-tolerated points above
@@ -1637,14 +1637,14 @@ knob on the same failure mode.
 Base.@kwdef struct HomographyGeometry{L} <: GeometryConfig
     outlier_halfwidth::Float64 = _dflt("geometry", "outlier_halfwidth")
     min_inliers::Int = _dflt("geometry", "min_inliers")
-    # The RANSAC local-optimization strategy (an RVG `AbstractLocalOptimization`),
-    # selected by tag in the file: `local_optimization = { type = "student_t_uniform" }`.
+    # The RANSAC local-optimization strategy (an RVG `AbstractOptimizationStrategy`),
+    # selected by tag in the file: `local_optimization_strategy = { type = "student_t_uniform" }`.
     # A type parameter, not an abstract field: the per-board fit loop reads it.
-    local_optimization::L = _dflt_local_optimization(:homography)
+    local_optimization_strategy::L = _dflt_local_optimization_strategy(:homography)
 end
 
 """
-    PoseGeometry(camera; outlier_halfwidth=5.0, min_inliers=6, local_optimization=StudentTUniform())
+    PoseGeometry(camera; outlier_halfwidth=5.0, min_inliers=6, local_optimization_strategy=StudentTUniform())
 
 Calibrated P3P estimator config. Holds the `camera` (a `CameraModel` carrying
 the lens/distortion model used to undistort the image). The camera lives here
@@ -1683,7 +1683,7 @@ struct PoseGeometry{C, L} <: GeometryConfig
     # target (Schweighofer & Pinz 2006). See _resolve_pose_ambiguity.
     resolve_pose_ambiguity::Bool
     # The RANSAC local-optimization strategy; see HomographyGeometry.
-    local_optimization::L
+    local_optimization_strategy::L
     # Where the pose is measured: :none (raw detection, the full camera in the
     # estimator) or :global (undistort the image, pinhole twin). See the docstring.
     undistortion::Symbol
@@ -1700,17 +1700,17 @@ const _UNDISTORTION_POLICIES = (:none, :global)
 function PoseGeometry(
         camera; outlier_halfwidth::Float64 = 5.0, min_inliers::Int = 6,
         resolve_pose_ambiguity::Bool = false,
-        local_optimization = _dflt_local_optimization(:absolute_pose),
+        local_optimization_strategy = _dflt_local_optimization_strategy(:absolute_pose),
         undistortion::Symbol = :none,
     )
     undistortion in _UNDISTORTION_POLICIES || throw(
         ArgumentError("PoseGeometry: undistortion must be one of $(_UNDISTORTION_POLICIES), got :$undistortion")
     )
-    return PoseGeometry(camera, outlier_halfwidth, min_inliers, resolve_pose_ambiguity, local_optimization, undistortion)
+    return PoseGeometry(camera, outlier_halfwidth, min_inliers, resolve_pose_ambiguity, local_optimization_strategy, undistortion)
 end
 
 """
-    RadialHomographyGeometry(image_size; outlier_halfwidth=5.0, min_inliers=7, local_optimization=StudentTUniform())
+    RadialHomographyGeometry(image_size; outlier_halfwidth=5.0, min_inliers=7, local_optimization_strategy=StudentTUniform())
 
 Uncalibrated radially distorted homography config — the one-sided
 division-model `(H, k)` path (RVG `find_radial_homography`; Wadenbäck et
@@ -1736,16 +1736,16 @@ struct RadialHomographyGeometry{L} <: GeometryConfig
     outlier_halfwidth::Float64
     min_inliers::Int
     # The RANSAC local-optimization strategy; see HomographyGeometry.
-    local_optimization::L
+    local_optimization_strategy::L
 end
 RadialHomographyGeometry(
     image_size;
     outlier_halfwidth::Float64 = _dflt("geometry", "outlier_halfwidth"),
     min_inliers::Int = _dflt("geometry", "min_inliers"),
-    local_optimization = _dflt_local_optimization(:radial_homography)
+    local_optimization_strategy = _dflt_local_optimization_strategy(:radial_homography)
 ) =
     RadialHomographyGeometry(
-    (Int(image_size[1]), Int(image_size[2])), outlier_halfwidth, min_inliers, local_optimization
+    (Int(image_size[1]), Int(image_size[2])), outlier_halfwidth, min_inliers, local_optimization_strategy
 )
 
 """
@@ -1798,7 +1798,7 @@ _estimation_camera(g::RadialHomographyGeometry) = g
 #
 # The arm estimates its own model, the one-sided division homography (H, k), k
 # free per fit; the guided final fit transfers through its plain homography.
-_default_lo(g::RadialHomographyGeometry) = g.local_optimization
+_default_lo(g::RadialHomographyGeometry) = g.local_optimization_strategy
 _fit_endpoints(::RadialHomographyGeometry, scored) = board_endpoints(scored)   # the board exact, as for H
 _guided_enabled(::RadialHomographyGeometry) = true
 # Detection runs on the RAW image unless an arm says otherwise — the
@@ -1818,11 +1818,11 @@ board_quad(::RadialHomographyGeometry, m::VgtkCore.RadialHomography, bundle::Boa
 # `pt_csponds` arrives from `_fit_endpoints` already in point form, so it is
 # not re-converted.
 _find_model(
-    g::RadialHomographyGeometry, pt_csponds; local_optimization = g.local_optimization,
+    g::RadialHomographyGeometry, pt_csponds; local_optimization_strategy = g.local_optimization_strategy,
     outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.radial_homography, kw...
 ) = find_radial_homography(
     pt_csponds; center = distortion_center(g),
-    scoring = _scoring(_RadialProblem5, outlier_halfwidth), local_optimization, kw...
+    scoring = _scoring(_RadialProblem5, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
 # The arm's problem type: the radial 5-point kernel's (`find_radial_homography`'s
@@ -1840,17 +1840,17 @@ an `image_size`).
 """
 distortion_center(g) = VgtkCore.Point2{Float64}(g.image_size[1] / 2, g.image_size[2] / 2)
 
-_refine(g::RadialHomographyGeometry, pt_csponds, θ₀::HomographyMat; local_optimization = g.local_optimization, kw...) =
-    _refine(nothing, pt_csponds, θ₀; local_optimization, kw...)
+_refine(g::RadialHomographyGeometry, pt_csponds, θ₀::HomographyMat; local_optimization_strategy = g.local_optimization_strategy, kw...) =
+    _refine(nothing, pt_csponds, θ₀; local_optimization_strategy, kw...)
 # The radial homography is its own manifold (sl(3) ⊕ k) — polish it there, not
 # through a plain homography. The problem's distortion centre is the model's
 # own, which `_find_model` set to `distortion_center(g)`.
 _refine(
     g::RadialHomographyGeometry, pt_csponds, θ₀::VgtkCore.RadialHomography;
-    outlier_halfwidth, local_optimization = g.local_optimization,
+    outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy,
     extent = nothing, workspace = nothing,
 ) = refine_radial_homography(
-    θ₀, pt_csponds; extent, workspace, local_optimization,
+    θ₀, pt_csponds; extent, workspace, optimization_strategy = local_optimization_strategy,   # a refine_*'s keyword
     scoring = _scoring(_RadialProblem5, outlier_halfwidth)
 )
 
@@ -1885,7 +1885,7 @@ fit_rng(seed::Integer, uid::AbstractString) =
     board_fit_keywords(config::FindBoardsConfig, uid, bundle) -> NamedTuple
 
 One board's fit keywords, as `find_boards`' engine builds them (less its
-per-thread workspace): the arm's `outlier_halfwidth` and `local_optimization`,
+per-thread workspace): the arm's `outlier_halfwidth` and `local_optimization_strategy`,
 the RANSAC `config`, the board's world `extent` and its own seeded stream
 (`rng = fit_rng(config.ransac_seed, uid)`). The serial oracle builds them here,
 and so does a downstream arm (CaliBlobs'), so their fits stay comparable with
@@ -1893,7 +1893,7 @@ the engine's by construction.
 """
 board_fit_keywords(config, uid, bundle) = (;
     outlier_halfwidth = config.geometry.outlier_halfwidth,
-    local_optimization = config.geometry.local_optimization,
+    local_optimization_strategy = config.geometry.local_optimization_strategy,
     config = config.ransac_config,
     extent = Rect(bundle, :world),
     rng = fit_rng(config.ransac_seed, uid),
@@ -2624,7 +2624,7 @@ end
 # the GLOBAL id, so a call from the interactive pool can return an id
 # above `nthreads(:default)`. `maxthreadid()` is the safe upper bound.
 # A workspace is built for the scorer and the local optimizer it serves
-# (`outlier_halfwidth`, `local_optimization`: the geometry's).
+# (`outlier_halfwidth`, `local_optimization_strategy`: the geometry's).
 _fit_workspace_builder(::Nothing, a, lo) =
     n -> VgtkEstimation.RansacWorkspace(HomographyProblem{Float64}, n, _scoring(HomographyProblem{Float64}, a), lo)
 _fit_workspace_builder(::CameraModel, a, lo) =
@@ -2633,9 +2633,9 @@ _fit_workspace_builder(::CameraModel, a, lo) =
 # RadialHomography-shaped buffers) — RVG sizes fresh ones per fit.
 _fit_workspace_builder(::RadialHomographyGeometry, _a, _lo) = nothing
 
-_pool_kw(g) = (; outlier_halfwidth = g.outlier_halfwidth, local_optimization = g.local_optimization)
-function _workspace_pools(cam, max_match::Int, max_blobs::Int; outlier_halfwidth, local_optimization)
-    builder = _fit_workspace_builder(cam, outlier_halfwidth, local_optimization)
+_pool_kw(g) = (; outlier_halfwidth = g.outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy)
+function _workspace_pools(cam, max_match::Int, max_blobs::Int; outlier_halfwidth, local_optimization_strategy)
+    builder = _fit_workspace_builder(cam, outlier_halfwidth, local_optimization_strategy)
     builder === nothing && return nothing, nothing
     fit = max_match >= 4 ?
         [builder(max_match) for _ in 1:Threads.maxthreadid()] : nothing
@@ -3163,7 +3163,7 @@ function _claim_boards(
             # keeps fit_kw type-stable across the ws/no-ws cases.
             fit_kw = (;
                 outlier_halfwidth, workspace = ws,
-                local_optimization = cfg.geometry.local_optimization,
+                local_optimization_strategy = cfg.geometry.local_optimization_strategy,
                 config = cfg.ransac_config, extent = extent_i,
                 rng = fit_rng(cfg.ransac_seed, e.uid),
             )

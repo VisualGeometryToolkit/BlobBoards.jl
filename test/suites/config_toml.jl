@@ -99,40 +99,53 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
         end
     end
 
-    @testset "local_optimization: the file's tag on every arm, overridable, round-trips" begin
+    @testset "local_optimization_strategy: the file's tag on every arm, overridable, round-trips" begin
         # The four Student-t + uniform IRLS literals that pipeline.jl carried
-        # until 2026-09-04 are now `[find_boards.geometry] local_optimization`,
+        # until 2026-09-04 are now `[find_boards.geometry] local_optimization_strategy`,
         # read through RVG's tagged loader over LocalOptimizationDoneRight's tags
         # (its `StudentTUniform`). The default names ONE thing.
         toml = TOML.parsefile(joinpath(pkgdir(BlobBoards), "configs", "default.toml"))["find_boards"]
-        @test toml["geometry"]["local_optimization"] == Dict("type" => "student_t_uniform")
-        @test HomographyGeometry().local_optimization isa StudentTUniform
-        @test PoseGeometry(_CAM).local_optimization isa StudentTUniform
-        @test BlobBoards.RadialHomographyGeometry((4240, 2832)).local_optimization isa StudentTUniform
+        @test toml["geometry"]["local_optimization_strategy"] == Dict("type" => "student_t_uniform")
+        @test HomographyGeometry().local_optimization_strategy isa StudentTUniform
+        @test PoseGeometry(_CAM).local_optimization_strategy isa StudentTUniform
+        @test BlobBoards.RadialHomographyGeometry((4240, 2832)).local_optimization_strategy isa StudentTUniform
         @test isconcretetype(typeof(HomographyGeometry())) && isconcretetype(typeof(PoseGeometry(_CAM)))
         mktempdir() do dir
-            # A different strategy by tag; `scale_multiple = "cross_validated"` resolves per ARM.
+            # A different strategy by tag; `efficiency_constant = "cross_validated"` resolves per ARM.
             p = _write(
                 dir, "hq.toml",
-                "[find_boards.geometry]\ntype = \"pose\"\nlocal_optimization = { type = \"hq\", loss = \"welsch\", scale_multiple = \"cross_validated\", max_iter = 7 }\n"
+                "[find_boards.geometry]\ntype = \"pose\"\nlocal_optimization_strategy = { type = \"hq\", loss = \"welsch\", efficiency_constant = \"cross_validated\", max_iter = 7 }\n"
             )
             g = FindBoardsConfig(p; camera = _CAM).geometry
-            @test g.local_optimization isa HQ{WelschShape}
-            @test g.local_optimization.width.value == tuning_constant(:absolute_pose, "welsch").scale_multiple   # a ScaleMultiple width
-            @test g.local_optimization.max_iter == 7
+            @test g.local_optimization_strategy isa HQ{WelschShape}
+            @test g.local_optimization_strategy.width.value == tuning_constant(:absolute_pose, "welsch").efficiency_constant   # an EfficiencyConstant width
+            @test g.local_optimization_strategy.max_iter == 7
             @test g.min_inliers == PoseGeometry(_CAM).min_inliers          # siblings inherit
             # It is part of the run record and reloads to the same strategy.
-            d = config_dict(FindBoardsConfig(p; camera = _CAM))["geometry"]["local_optimization"]
+            d = config_dict(FindBoardsConfig(p; camera = _CAM))["geometry"]["local_optimization_strategy"]
             @test d["type"] == "hq" && d["loss"] == "welsch" && d["max_iter"] == 7
             q = write_config(joinpath(dir, "back.toml"), FindBoardsConfig(p; camera = _CAM))
-            @test FindBoardsConfig(q; camera = _CAM).geometry.local_optimization == g.local_optimization
+            @test FindBoardsConfig(q; camera = _CAM).geometry.local_optimization_strategy == g.local_optimization_strategy
             # Unknown tags and knobs are refused, never defaulted.
             @test_throws ArgumentError FindBoardsConfig(
-                _write(dir, "bad.toml", "[find_boards.geometry]\ntype = \"homography\"\nlocal_optimization = { type = \"student_t\" }\n")
+                _write(dir, "bad.toml", "[find_boards.geometry]\ntype = \"homography\"\nlocal_optimization_strategy = { type = \"student_t\" }\n")
             )
             @test_throws ArgumentError FindBoardsConfig(
-                _write(dir, "bad2.toml", "[find_boards.geometry]\ntype = \"homography\"\nlocal_optimization = { type = \"student_t_uniform\", max_itr = 3 }\n")
+                _write(dir, "bad2.toml", "[find_boards.geometry]\ntype = \"homography\"\nlocal_optimization_strategy = { type = \"student_t_uniform\", max_itr = 3 }\n")
             )
+            # The renamed key (the owner's ruling, 0.9: find_* strategies are
+            # `local_optimization_strategy`) is refused on every arm, naming the
+            # new key; there is no alias.
+            for (arm, kw) in (("homography", (;)), ("pose", (; camera = _CAM)), ("radial_homography", (; image_size = (640, 480))))
+                old_key = _write(dir, "old_$arm.toml", "[find_boards.geometry]\ntype = \"$arm\"\nlocal_optimization = { type = \"student_t_uniform\" }\n")
+                err = try
+                    FindBoardsConfig(old_key; kw...); nothing
+                catch e
+                    e
+                end
+                msg = err === nothing ? "" : sprint(showerror, err)
+                @test err isa ArgumentError && occursin("`local_optimization` was renamed `local_optimization_strategy`", msg)
+            end
         end
     end
 

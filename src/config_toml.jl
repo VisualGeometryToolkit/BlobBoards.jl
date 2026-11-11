@@ -118,7 +118,20 @@ const _RETIRED_RUN_KEYS = Set(
     ]
 )
 
-_check_run_keys(d, allowed, section) = check_keys(d, allowed, section; retired = _RETIRED_RUN_KEYS)
+# RENAMED keys: refused with the new name (no alias; the owner's rulings).
+#   ("find_boards.geometry", "local_optimization") — the find_* strategy keyword
+#                  is `local_optimization_strategy` (the 0.9 strategy rename).
+const _RENAMED_RUN_KEYS = Dict(
+    ("find_boards.geometry", "local_optimization") => "local_optimization_strategy",
+)
+
+function _check_run_keys(d, allowed, section)
+    for k in keys(d)
+        new = get(_RENAMED_RUN_KEYS, (section, k), nothing)
+        new === nothing || throw(ArgumentError("[$section] `$k` was renamed `$new` (no alias)"))
+    end
+    return check_keys(d, allowed, section; retired = _RETIRED_RUN_KEYS)
+end
 
 # -----------------------------------------------------------------------------
 # Section readers
@@ -214,7 +227,7 @@ function _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size)
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
-            "local_optimization" => t -> geometry_local_optimization(t, :radial_homography)
+            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, :radial_homography)
         )...
     )
 end
@@ -240,7 +253,7 @@ function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
-            "local_optimization" => t -> geometry_local_optimization(t, :homography)
+            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, :homography)
         )...
     )
 end
@@ -259,7 +272,7 @@ function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
             "resolve_pose_ambiguity" => Bool,
-            "local_optimization" => t -> geometry_local_optimization(t, :absolute_pose),
+            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, :absolute_pose),
             "undistortion" => Symbol
         )...
     )
@@ -489,8 +502,8 @@ toml_field(c::DetectConfig, ::Val{:nms}) = _nms_toml(c.nms)
 toml_field(c::DetectConfig, ::Val{:tilts}) = [[t[1], t[2]] for t in c.tilts]
 # The LO strategy writes as RVG's tagged table (`{ type = ..., ... }`), the
 # same shape its loader reads — RVG owns that round trip.
-toml_field(g::GeometryConfig, ::Val{:local_optimization}) =
-    VgtkEstimation.config_dict(g.local_optimization)
+toml_field(g::GeometryConfig, ::Val{:local_optimization_strategy}) =
+    VgtkEstimation.config_dict(g.local_optimization_strategy)
 
 # Tagged unions: the discriminator plus the type's own fields, so a new field
 # on either NMS strategy or either geometry is picked up automatically.

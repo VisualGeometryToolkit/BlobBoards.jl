@@ -463,7 +463,7 @@ function _warm_track_frame(
     # prior is always the column: the correspondence standard).
     res = _find_model(
         camera, withattrs(pt; score = scores); outlier_halfwidth = oh,
-        local_optimization = config.geometry.local_optimization,
+        local_optimization_strategy = config.geometry.local_optimization_strategy,
         config = config.ransac_config,
         extent = Rect(bundle, :world),
         rng = fit_rng(config.ransac_seed, tr.uid)
