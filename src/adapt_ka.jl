@@ -94,7 +94,7 @@ end
 # barrier inside a helper does not run on KA's CPU backend, so the kernels
 # spell their reductions inline (see "The per-blob kernels").
 using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
-    trigamma_stirling, lu_solve!, ka_upload
+    trigamma_stirling, lu_solve!, ka_upload, on_device
 # The E-step is Core's Student-t + uniform mixture, built in the kernel's float
 # type with the backend's lgamma (one per blob per iteration: ν and ŝ² change per
 # blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
@@ -811,22 +811,12 @@ function _adapt_ka(
     max_irls_iter = cfg.max_irls_iter
     spatial_weighting = cfg.spatial_weighting
 
-    # The kernels promote per-pixel loads to Ta, so the image stays at its
-    # native storage: a device-resident array is used AS IS (the pipeline
-    # hands over Float32 — reading it directly is bit-identical to the
-    # legacy Float64 staging, which only widened exact Float32 values); a
-    # host image is read at Float32 (or Ta when it is already Float64 and a
-    # GPU backend can hold it — the legacy precision), uploaded once.
-    d_img = if device isa KA.CPU
-        gray_f32(img)
-    elseif KA.get_backend(img) == device
-        img
-    else
-        hostf = gray_f32(img)
-        Tp = eltype(hostf) <: Gray ? eltype(eltype(hostf)) : eltype(hostf)
-        Tu = Tp == Float64 ? Ta : Float32
-        ka_upload(Tu, device, Tu.(Gray{Tu}.(hostf)))
-    end
+    # The kernels promote per-pixel loads to Ta. The image is on `device`
+    # through Core's one upload, on every backend: an array already there in
+    # Float32 (the pipeline's) is used as it is; a Gray{Float64} image is read
+    # at Ta (the legacy precision), anything else at Float32, an 8-bit or
+    # 16-bit one converted on the device (`_device_image`).
+    d_img = eltype(img) <: Gray{Float64} ? on_device(Ta, device, img) : _device_image(device, img)
     H, W = size(d_img)
     sat = saturation_bounds(Float64)   # float regime — same (1e-6, 1-1e-6) as legacy
 

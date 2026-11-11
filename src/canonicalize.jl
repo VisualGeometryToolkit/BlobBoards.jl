@@ -114,8 +114,17 @@ end
 # =============================================================================
 
 # The image as a Float32 matrix on `device`, uploaded once (an image already
-# there in Float32 is used as it is) — Core's one upload.
-_device_image(device, img) = on_device(Float32, device, gray_f32(img))
+# there in Float32 is used as it is) — Core's one upload. An 8-bit or 16-bit
+# grey image crosses as its fixed-point plane and Core converts it on the
+# device (one kernel on every backend, bit for bit the host's Float32.(img)).
+_device_image(device, img) = on_device(Float32, device, _raw_gray(img))
+
+# A fixed-point grey image as its fixed-point plane (Gray{N0f8} → N0f8: the same
+# bytes, no copy), which Core's upload converts on the device; anything else as
+# float grey (`gray_f32`).
+_raw_gray(img::AbstractMatrix{Gray{T}}) where {T <: Normed} = reinterpret(T, img)
+_raw_gray(img::AbstractMatrix{<:Normed}) = img
+_raw_gray(img) = gray_f32(img)
 
 # The (P·s, P·s, N) Float32 patch cube of `frames` on `device`, sampled by VGC's
 # one batched bilinear KA kernel (`image_warp_batch_to!`) at `supersample` = s

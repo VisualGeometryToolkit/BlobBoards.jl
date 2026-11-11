@@ -2174,7 +2174,7 @@ _detect_config_for_boards(config, polarity::Symbol) =
 # convert, not a second kernel).
 function _undistorted_pair(img, geometry, device::KA.Backend)
     detect_img = gray_u8(_undistort_detect(device, img, geometry))
-    adapt_img = _device_image(device, detect_img isa AbstractMatrix{UInt8} ? reinterpret(Gray{N0f8}, detect_img) : detect_img)
+    adapt_img = _device_image(device, detect_img isa AbstractMatrix{UInt8} ? reinterpret(N0f8, detect_img) : detect_img)
     return detect_img, adapt_img
 end
 
