@@ -22,11 +22,10 @@ make_pose_results.jl) and renders:
 Usage:
   julia --project=bmvc2026 bmvc2026/scripts/plots/error_distributions.jl
 
-Env knobs: BB_FIG (output dir, default: DrWatson's
-plotsdir() = bmvc2026/plots — never inside the dataset, which is the immutable
-input tree; see the comment at `fig_dir`), BB_OCC_LEVELS (occlusion levels to
-render floor plans for, default "10,50,70"), BB_TEX_PREFIX (path prefix baked into
-the emitted TikZ).
+Writes into DrWatson's plotsdir() = bmvc2026/plots (never inside the dataset,
+the immutable input tree). The per-level floor plans and the \\input prefix
+baked into the TikZ are the config's [drivers] occlusion_levels and tex_prefix;
+no environment variable configures it.
 
 BB_CSV is gone: there is no CSV root any more. A condition is selected with
 `with_level`, because `level` is a column of the frame rather than a directory.

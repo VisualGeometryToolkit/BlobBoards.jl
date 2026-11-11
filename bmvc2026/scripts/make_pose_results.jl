@@ -13,11 +13,10 @@ DataFrame — one row per observation, with `system` and `level` as ordinary
 columns.
 
 Usage:
-  julia --project=bmvc2026 bmvc2026/scripts/make_pose_results.jl [--config=<evaluation toml>]
+  julia --project=bmvc2026 bmvc2026/scripts/make_pose_results.jl [--config=<evaluation toml>] [--force]
 
-Env knob:
-  BB_FORCE   recompute cells that already exist (config-keyed caching cannot
-             see a CODE change — same reason the sweeps need it)
+--force recomputes cells that already exist (config-keyed caching cannot see
+a CODE change — same reason the sweeps take it).
 =#
 # reproduce: reads configs/figures/evaluation.toml
 

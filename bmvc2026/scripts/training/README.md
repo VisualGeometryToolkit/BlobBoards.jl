@@ -1,19 +1,31 @@
 # Training scripts — environment contract
 
-These scripts run under the `bmvc2026` project (`@quickactivate` /
-`--project=bmvc2026`), which declares everything the ANNOTATION half needs:
-CUDA + cuDNN, Distributed/ClusterManagers (SLURM), FileIO/Images, and Lux.
+Two experiments, each ONE config of record and ONE driver (no environment
+variable configures either; both write only into their keyed run directory
+under results_root(), Eval's `keyed_cell_dir`):
+
+| experiment | config of record | driver | output |
+|---|---|---|---|
+| the training corpus (annotate + split) | `configs/training/annotations.toml` | `build_annotations.jl` | `…/bmvc2026/annotations-<key>/{truth_images,splits}` |
+| a descriptor trained on it | `configs/training/train_descriptor.toml` | `train_descriptor.jl` | `…/bmvc2026/descriptor-<key>/` |
+
+Both are stages of `configs/reproduce.toml` (`annotations`, `train_descriptor`;
+`default = false`: the paper's network of record is an INPUT, the bb_assets
+tier, trained by the bootstrap chain the descriptor_training tiers publish).
+Run them with `bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh
+--only=annotations` (or `train_descriptor`), or call a driver directly.
+
+The drivers run under the `bmvc2026` project, which declares everything the
+ANNOTATION half needs (CUDA + cuDNN, FileIO/Images, Lux).
 
 **The training LOOP's extension stack is deliberately NOT declared here.**
 `BlobBoardsTrainingExt` triggers on Reactant + Enzyme + Optimisers + Zygote +
 TensorBoardLogger, and Reactant cannot coexist with cuDNN in one environment
 (it bundles its own — the reason inference and training are separate
-extensions). Training runs therefore load the trigger stack from the HOST
-environment (the cluster's shared env; see `slurm/README.md`), not from this
-project. A script that errors with "TrainingExt not loaded" is running in an
-environment without those triggers — that is the contract, not a bug.
+extensions). `train_descriptor.jl` therefore needs those triggers on the load
+path (the cluster's shared environment); without them it stops with
+"BlobBoardsTrainingExt is not loaded" — that is the contract, not a bug.
 
-SLURM entry points live in `slurm/`; `build_annotations.jl` is the
-annotation driver (see `build_annotations_pitfalls` notes for its failure
-modes). Camera files are canonical `vgio/cameras/v3` — convert any RAID
-copies of the dataset before pointing these scripts at them.
+`dataset_viewer.jl` (`--splits-dir=<run>/splits`) and `test_annotate_blobs.jl`
+are interactive viewers (GLMakie, a display), not stages. Camera files are
+canonical `vgio/cameras/v3`.

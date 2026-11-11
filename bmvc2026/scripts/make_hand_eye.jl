@@ -8,8 +8,8 @@ camera-untracked calibration frames carry the evidence-gated static-camera
 substitution (flagged `recovered` in the camera-rig trajectory) — and write
 the result, every pose with the fit's covariance:
 
-  results_root()/hand_eye-<key>/hand_eye_<name>.json   (src/runs.jl `derived_dir`:
-                                       keyed on the run keys of its sources)
+  …/bmvc2026/hand_eye-<key>/hand_eye_<name>.json   (src/runs.jl `hand_eye_dir`:
+                                       Eval's keyed_cell_dir, keyed on the run keys of its sources)
     vgio/transforms/v3   X: body:camera_rig → camera_optical (+ diagnostics in provenance)
   …/hand_eye_<name>_board_rig.json
     vgio/rig/v6          Y_m: target:<uid> → body:board_rig, one per marker

@@ -1,0 +1,36 @@
+# Config of record of scripts/training/train_descriptor.jl: a descriptor
+# trained on the corpus of configs/training/annotations.toml (its run key is
+# folded into this run's), BlobBoardsTrainingExt `train_descriptor`. The
+# checkpoints land in the keyed directory (VisualGeometryToolkitEval
+# keyed_cell_dir: …/bmvc2026/descriptor-<run_key>/). Every TrainingConfig field is
+# stated: a defaulted field would silently move with the package.
+
+[experiment]
+generator = "train_descriptor"
+dataset = "blobboard_training"
+# The results tree's layout (keyed_cell_dir: <dataset>/<matcher>/<problem>).
+matcher = "blobboards"
+problem = "descriptor_training"
+
+[runs]
+annotations = "training/annotations.toml"   # configs/-relative: the corpus (its splits/)
+
+[train]
+# B200-tuned batch (180 GB HBM3e): blobs * views + confusers = 384 * 10 + 2048 =
+# 5888 patches per step (~30 GB). On an A100 (40 GB) drop to 96 / 10 / 512 and
+# halve the AdamW learning rate (sqrt rule).
+blobs_per_batch = 384
+views_per_blob = 10
+confusers_per_batch = 2048
+batches_per_epoch = 0     # 0 = ceil(n_labels / blobs_per_batch)
+patch_size = 64
+# TrainingConfig's defaults when this was codified (ext/training/data.jl), stated:
+min_track_length = 2
+temperature = 0.07
+optimizer = "adamw"
+lr = 1.0e-3
+weight_decay = 1.0e-4
+epochs = 50
+eval_interval = 50
+descriptor_dim = 128
+dropout = 0.1

@@ -1,73 +1,65 @@
+#=
+train_descriptor.jl — train a blob descriptor on the corpus of
+configs/training/annotations.toml (BlobBoardsTrainingExt `train_descriptor`,
+single GPU, single process).
+
+    julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/training/train_descriptor.jl [--config=<toml>]
+
+Its ONE config of record is configs/training/train_descriptor.toml (or
+--config): the corpus (`[runs] annotations`, whose run key is folded into this
+run's) and every TrainingConfig field (`[train]`). The checkpoints (best_model.jld2
+whenever val FPR@95 improves, the TensorBoard events) land in the run's keyed
+directory (VisualGeometryToolkitEval `keyed_cell_dir`: …/bmvc2026/descriptor-<run_key>/).
+
+ENVIRONMENT: BlobBoardsTrainingExt triggers on Lux + Optimisers + Enzyme +
+Reactant + NNlib + TensorBoardLogger + Zygote, which the paper project does not
+declare (README.md beside this file); they must be on the load path. CUDA is
+NOT loaded here: Reactant brings its own cuDNN.
+=#
+# reproduce: reads configs/training/train_descriptor.toml
+
+using DrWatson
+@quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
+
 using BlobBoards
-using Logging, Dates
-
-# Training pipeline lives in the BlobBoardsTrainingExt extension; loading
-# any of these trigger packages activates it, then we grab the extension
-# module to access TrainingConfig + train_descriptor.
 using Lux, Optimisers, Enzyme, Reactant, NNlib, TensorBoardLogger, Zygote
+using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, write_run_records, run_complete
+
+if !isdefined(Main, :BlobBoardsEval)
+    include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
+end
+using Main.BlobBoardsEval: figure_config, load_config, EXPERIMENT
+
 const Training = Base.get_extension(BlobBoards, :BlobBoardsTrainingExt)
-@assert Training !== nothing "BlobBoardsTrainingExt failed to load — check that all triggers (Lux/Optimisers/Enzyme/Reactant/NNlib/TensorBoardLogger/Zygote) are in the active project."
-const TrainingConfig = Training.TrainingConfig
-const train_descriptor = Training.train_descriptor
+Training === nothing && error("BlobBoardsTrainingExt is not loaded: its triggers (Lux, Optimisers, Enzyme, Reactant, NNlib, " *
+    "TensorBoardLogger, Zygote) must be on the load path (scripts/training/README.md)")
 
+const CFG, CFG_PATH = figure_config("train_descriptor"; default = projectdir("configs", "training", "train_descriptor.toml"))
+const ANNOTATIONS = load_config(CFG["runs"]["annotations"])
+# What the run is keyed on: this config with the corpus' run key folded in.
+const KEYED = merge(CFG, Dict{String, Any}("sources" => Dict{String, Any}("annotations" => run_key(ANNOTATIONS))))
+const KEY = run_key(KEYED)
+const RUN_DIR = keyed_cell_dir(KEYED, EXPERIMENT, "descriptor")
+const SPLITS = joinpath(keyed_cell_dir(ANNOTATIONS, EXPERIMENT, "annotations"), "splits")
 
-# Direct all @info/@warn/@error to a log file (tail -f to monitor)
-# _build_log_io = open(joinpath(@__DIR__, "train_descriptor.log"), "w")
-# global_logger(SimpleLogger(_build_log_io, Logging.Info))
+function main()
+    T = CFG["train"]
+    cfg = Training.TrainingConfig(;
+        blobs_per_batch = T["blobs_per_batch"], views_per_blob = T["views_per_blob"],
+        confusers_per_batch = T["confusers_per_batch"], min_track_length = T["min_track_length"],
+        temperature = Float32(T["temperature"]), optimizer = Symbol(T["optimizer"]), lr = T["lr"],
+        weight_decay = T["weight_decay"], epochs = T["epochs"], batches_per_epoch = T["batches_per_epoch"],
+        eval_interval = T["eval_interval"], patch_size = T["patch_size"], descriptor_dim = T["descriptor_dim"],
+        dropout = Float32(T["dropout"]),
+    )
+    train, val = joinpath(SPLITS, "train.jld2"), joinpath(SPLITS, "val.jld2")
+    isfile(train) || error("no corpus at $(SPLITS): run scripts/training/build_annotations.jl on $(CFG["runs"]["annotations"]) first")
+    @info "training" run = KEY train val RUN_DIR
+    result = Training.train_descriptor(train, val; cfg, output_dir = RUN_DIR)
+    @info "training done" epochs = result.epoch best_fpr = result.best_fpr
+    write_run_records(RUN_DIR, KEYED; driver = "bmvc2026/scripts/training/train_descriptor.jl", config_source = CFG_PATH,
+        key = KEY, inputs = [train, val])
+    return RUN_DIR
+end
 
-# @info "=== train descriptor started ==="
-# flush(_build_log_io)
-
-root = data_dir()
-
-# =============================
-# Parameters
-# =============================
-train_path = joinpath(root, "blobboard_training/training/splits/train.jld2")
-val_path = joinpath(root, "blobboard_training/training/splits/val.jld2")
-out_path = joinpath(root, "checkpoints")
-latest_model = joinpath(".", "checkpoints", "best_model.jld2")
-
-train_cfg = TrainingConfig()
-
-# ---- Batch size (tuned for NVIDIA B200, 180 GB HBM3e) ----
-# Total batch = blobs_per_batch * views_per_blob + confusers_per_batch
-#             = 384 * 10 + 2048 = 5888 patches per step (≈30 GB GPU memory).
-#
-# B200 has ~6× the memory headroom of A100; the previous A100-tuned config
-# (96 / 10 / 512 = 1472 patches, ~10 GB) was leaving most of the GPU idle.
-# SupCon literature shows monotonic gains up to ~4–8K batch size; 5888 is
-# well within the sweet spot.
-#
-# If you change these, also rescale:
-#   * Learning rate: linear-scaling rule for SGD, sqrt rule for AdamW.
-#     Going from old 1472 → new 5888 = 4× larger; multiply AdamW LR by 2.
-#   * Warmup: bigger batches benefit from longer LR warmup (5–10% of training).
-#
-# Monitor `nvidia-smi -l 5` during the first run; if HBM usage stays well
-# below 60 GB, push blobs_per_batch / confusers_per_batch up. Above ~80 GB
-# back off to leave room for activation-memory peaks.
-train_cfg.blobs_per_batch = 384    # was 96 (A100 default 64)
-train_cfg.views_per_blob = 10     # mean of training dataset is ~10
-train_cfg.confusers_per_batch = 2048   # was 512
-train_cfg.batches_per_epoch = 0      # auto: ceil(n_labels / blobs_per_batch)
-
-train_cfg.patch_size = 64
-
-
-# =============================
-# Train
-# =============================
-@info "Start training..."
-
-result = train_descriptor(
-    train_path,
-    val_path;
-    cfg = train_cfg,
-    output_dir = out_path
-)
-
-@info "\n\nTraining done."
-@info "Results:"
-@info "  Epochs: $(result.epoch)"
-@info "  Best FPR@95: $(result.best_fpr)"
+run_complete(RUN_DIR; sidecar = "best_model.jld2") ? println("train_descriptor: run $(KEY) complete at $(RUN_DIR)") : main()

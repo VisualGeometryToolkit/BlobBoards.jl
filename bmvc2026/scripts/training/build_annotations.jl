@@ -1,247 +1,139 @@
 #=
-import VisualGeometryToolkitEval as VgtkEval
-import VisualGeometryToolkitIO as VgtkIO
-Build Annotation Database — annotate all data sources into a per-frame
-JLD2 directory. See summarize_annotations(output_dir) for after-run stats.
+build_annotations.jl — the descriptor training corpus: annotate every source of
+the training footage with its boards (per-frame canonical patches), then split
+by board identity into train/val/test.
 
-Processes videos and images from the NFS data directory, detecting boards
-and extracting canonical patches. Calibrated sources use camera intrinsics;
-uncalibrated sources use homography-only matching.
+    julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/training/build_annotations.jl [--config=<toml>]
 
-Usage:
-  QUICK_TEST=true  include("examples/training/build_annotations.jl")  # 2 videos, 3 images per source
-  include("examples/training/build_annotations.jl")                    # full dataset
+Its ONE config of record is configs/training/annotations.toml (or --config):
+the inputs (`[inputs.<id>]`: the boards, the photo and video sets, the network
+that finds the boards), the detector (`[annotate]`) and the split (`[split]`).
+Everything lands in the run's keyed directory (VisualGeometryToolkitEval
+`keyed_cell_dir`, under results_root(); NOTHING is written into the input tree):
+
+  <run>/truth_images/   per-frame annotations (+ refs/, _log.jsonl)
+  <run>/splits/         train.jld2, val.jld2, test.jld2
+  <run>/build.log       the timestamped log of every launch on this run
+
+The same config is the same directory: an interrupted run resumes there (each
+source's _log.jsonl marker skips what is done); a changed value is a new run.
+A source directory is calibrated when a sibling `<dir>.json` camera exists
+(PoseGeometry), else homography-only. CUDA is required (the adaptation of
+elliptic frames).
 =#
+# reproduce: reads configs/training/annotations.toml
+
+using DrWatson
+@quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 
 using BlobBoards
 using BlobBoards: build_annotations   # advanced API (unexported)
 using CUDA, cuDNN
-
-import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
+import VisualGeometryToolkitIO as VgtkIO
+using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load (pixel operations take a BoundedCamera)
+using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, write_run_records, run_complete
 using Logging, Dates
-import VisualGeometryToolkitEval
-using Infiltrator
 
+if !isdefined(Main, :BlobBoardsEval)
+    include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
+end
+using Main.BlobBoardsEval: figure_config, input_path, network_path, gallery_path, EXPERIMENT
 
-root = joinpath(data_dir(), "blobboard_training")
+const CFG, CFG_PATH = figure_config("annotations"; default = projectdir("configs", "training", "annotations.toml"))
+const KEY = run_key(CFG)
+const RUN_DIR = keyed_cell_dir(CFG, EXPERIMENT, "annotations")
+const ANN, SPLIT = CFG["annotate"], CFG["split"]
 
-# Custom logger: timestamped lines, tee'd to stdout + a per-run log file.
+# Timestamped lines, tee'd to stdout and the run's build.log.
 struct TimestampLogger <: Logging.AbstractLogger
     streams::Vector{IO}
     min_level::Logging.LogLevel
 end
-
 Logging.shouldlog(::TimestampLogger, _, _, _, _) = true
 Logging.min_enabled_level(logger::TimestampLogger) = logger.min_level
 Logging.catch_exceptions(::TimestampLogger) = false
-
 function Logging.handle_message(logger::TimestampLogger, level, message, _module, group, id, filepath, line; kwargs...)
     timestamp = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")   # a log line's time, not an output path
-    msg = "[$timestamp] [$level] $message"
     for io in logger.streams
-        println(io, msg)
+        println(io, "[$timestamp] [$level] $message")
         flush(io)
     end
     return
 end
 
-
-QUICK_TEST = get(ENV, "QUICK_TEST", "false") == "true" || @isdefined(QUICK_TEST) && QUICK_TEST == true
-if QUICK_TEST
-    @info "QUICK_TEST mode — small subset only"
-end
-_take(v, n) = v[1:min(n, length(v))]
-
-# The run directory is KEYED by the annotation settings (VisualGeometryToolkitEval
-# Experiments `run_key`: SHA-256 of their sorted TOML), not by the wall clock:
-# the same settings land in the same directory, which `_is_source_processed`
-# then resumes; changed settings are a new directory. RESUME_DIR still points
-# at an explicit directory.
-const ANNOTATION_SETTINGS = Dict{String, Any}(
-    "experiment" => Dict{String, Any}(
-        "driver" => "build_annotations", "root" => basename(root), "quick_test" => QUICK_TEST,
-        "network" => basename(descriptor_network_path()),
-    ),
-)
-run_dir = let env_dir = get(ENV, "RESUME_DIR", "")
-    isempty(env_dir) ?
-        joinpath(root, "training", "annotations-" * VgtkEval.Experiments.run_key(ANNOTATION_SETTINGS)) :
-        env_dir
-end
-mkpath(run_dir)
-_build_log_io = open(joinpath(run_dir, "build.log"), "a")
-global_logger(TimestampLogger(IO[stdout, _build_log_io], Logging.Info))
-
-@info "=== build_annotations started ==="
-@info "run_dir = $run_dir"
-
-# =============================================================================
-# Paths
-# =============================================================================
-
-boards_dir = joinpath(root, "boards")
-# Network from configs/default.toml — the one place a default entry point
-# learns which descriptor to load. Same log-polar _cuda net as the paper.
-model_path = descriptor_network_path()
-gallery_path = joinpath(root, "models/board_gallery.jld2")
-output_dir = joinpath(run_dir, "truth_images")
-output_splits_path = joinpath(run_dir, "splits")
-nfs_dir = nothing # joinpath(root, "training")
-
-# =============================================================================
-# Setup — boards, descriptor model, gallery
-# =============================================================================
-
-@info "Building gallery $gallery_path ..."
-descriptor_network = DescriptorNetwork(model_path)
-gallery = BoardGallery(gallery_path, descriptor_network)
-board_paths = filter(endswith(".json"), readdir(boards_dir; join = true))
-board_feature_dict = Dict(
-    uid => features for (uid, features) in
-        [insert!(gallery, bp, descriptor_network) for bp in board_paths]
-)
-board_bundles = Dict(
-    let (b, _, ch) = BlobBoards.load_bundle(bp)
-            uid_from_hash(ch) => b
-    end
-        for bp in board_paths
-)
-@info "$(length(board_paths)) boards loaded"
-
-# =============================================================================
-# Data sources — auto-discover from <root>/{images,videos}/<subdir>/
-#
-# For each immediate subdir D of images/ (or videos/):
-#   • calibration = sibling D.json if it exists, else nothing
-#   • files       = matching extensions inside D (non-recursive)
-# =============================================================================
-
-@isdefined(_IMG_EXTS) || (const _IMG_EXTS = (".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp"))
-@isdefined(_VID_EXTS) || (const _VID_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv"))
-
+const _IMG_EXTS = (".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp")
+const _VID_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv")
 _has_ext(p, exts) = lowercase(splitext(p)[2]) in exts
 
-function _discover(kind_dir::AbstractString, exts)
+# Every immediate subdirectory D of `kind_dir`: its files of `exts` (sorted,
+# the first `max_sources` when that is positive) and its camera, the sibling
+# D.json when it exists.
+function _discover(kind_dir::AbstractString, exts, max_sources::Integer)
     out = Tuple{Vector{String}, Union{String, Nothing}}[]
     isdir(kind_dir) || return out
     for entry in sort(readdir(kind_dir; join = true))
         isdir(entry) || continue
-        cal_path = entry * ".json"
-        calib = isfile(cal_path) ? cal_path : nothing
         files = sort!(filter(f -> _has_ext(f, exts), readdir(entry; join = true)))
+        max_sources > 0 && (files = first(files, max_sources))
         isempty(files) && continue
-        push!(out, (files, calib))
+        push!(out, (files, isfile(entry * ".json") ? entry * ".json" : nothing))
     end
     return out
 end
 
-videos_calibrated = _discover(joinpath(root, "videos"), _VID_EXTS)
-images_calibrated = _discover(joinpath(root, "images"), _IMG_EXTS)
-
-@info "Discovered $(sum(length(f) for (f, _) in videos_calibrated; init = 0)) videos across $(length(videos_calibrated)) dirs"
-@info "Discovered $(sum(length(f) for (f, _) in images_calibrated; init = 0)) images across $(length(images_calibrated)) dirs"
-
-# --- Quick test: subset everything ---
-if QUICK_TEST
-    videos_calibrated = [(images[1:min(2, end)], calib) for (images, calib) in videos_calibrated]
-    images_calibrated = [(images[1:min(3, end)], calib) for (images, calib) in images_calibrated]
-    output_dir = joinpath(run_dir, "truth_quicktest")
-end
-
-# =============================================================================
-# Common kwargs
-# =============================================================================
-
-# Detector settings matched to examples/pipeline/find_boards.jl —
-# unified detection across the find_boards pipeline and annotation pipeline.
-CUTOFF = BlobBoards.DEFAULT_CUTOFF
-DETECT_CONFIG = DetectConfig(
-    polarity = :dark,
-    peak_threshold = 0.02,
-    edge_threshold = 5.0,
-    nms = EllipseNms(cutoff = Float32(CUTOFF))
-)
-
-# Per-source camera lives in config.geometry: PoseGeometry(cam) for calibrated
-# sources, HomographyGeometry() otherwise. min_inliers=10 either way.
-_config_for(cam) = FindBoardsConfig(
-    geometry = isnothing(cam) ? HomographyGeometry(min_inliers = 10) :
-        PoseGeometry(cam; min_inliers = 10),
-    detect = DETECT_CONFIG
-)
-
-common_kw = (;
-    board_bundles,
-    board_paths,
-    output_dir,
-    device = CUDABackend(),
-)
-
-# =============================================================================
-# Annotate — uncalibrated sources (homography)
-# =============================================================================
-
-n_vid_frames = QUICK_TEST ? 5 : 30
-# TODO: wait until homography patch extraction bug is fixed
-
-# =============================================================================
-# Annotate — calibrated sources
-# =============================================================================
-
-@info "=== Annotation ==="
-@info "Annotate videos..."
-for (videos, calib_file) in videos_calibrated
-    video_camera = isnothing(calib_file) ? nothing : VgtkIO.load(BoundedCamera, calib_file)
-    build_annotations(
-        board_feature_dict, descriptor_network, videos;
-        common_kw..., n_frames = n_vid_frames, config = _config_for(video_camera)
+# The detector of record, per source: PoseGeometry with the source's camera, or
+# the homography path for an uncalibrated one.
+function _config_for(cam)
+    detect = DetectConfig(;
+        polarity = Symbol(ANN["polarity"]), peak_threshold = ANN["peak_threshold"],
+        edge_threshold = ANN["edge_threshold"], nms = EllipseNms(cutoff = Float32(ANN["nms_cutoff"])),
     )
+    n = Int(ANN["min_inliers"])
+    geometry = cam === nothing ? HomographyGeometry(min_inliers = n) : PoseGeometry(cam; min_inliers = n)
+    return FindBoardsConfig(; geometry, detect)
 end
 
-@info "Annotate images..."
-for (images, calib_file) in images_calibrated
-    image_camera = isnothing(calib_file) ? nothing : VgtkIO.load(BoundedCamera, calib_file)
-    build_annotations(
-        board_feature_dict, descriptor_network, images;
-        common_kw..., config = _config_for(image_camera)
-    )
-end
+function main()
+    mkpath(RUN_DIR)
+    log_io = open(joinpath(RUN_DIR, "build.log"), "a")
+    global_logger(TimestampLogger(IO[stdout, log_io], Logging.Info))
+    @info "=== build_annotations: run $(KEY) -> $(RUN_DIR) ==="
 
+    boards_dir = input_path(CFG, "boards")
+    network = DescriptorNetwork(network_path(CFG))
+    gallery = BoardGallery(gallery_path(CFG), network)
+    board_paths = filter(endswith(".json"), readdir(boards_dir; join = true))
+    board_feature_dict = Dict(uid => f for (uid, f) in [insert!(gallery, bp, network) for bp in board_paths])
+    board_bundles = Dict(let (b, _, ch) = BlobBoards.load_bundle(bp); uid_from_hash(ch) => b end for bp in board_paths)
+    @info "$(length(board_paths)) boards loaded"
 
-# =============================================================================
-# Split into train / val / test
-# =============================================================================
+    max_sources = Int(ANN["max_sources"])
+    videos = _discover(input_path(CFG, "videos"), _VID_EXTS, max_sources)
+    images = _discover(input_path(CFG, "images"), _IMG_EXTS, max_sources)
+    @info "$(sum(length(f) for (f, _) in videos; init = 0)) videos in $(length(videos)) dirs, " *
+        "$(sum(length(f) for (f, _) in images; init = 0)) images in $(length(images)) dirs"
 
-@info "=== Splitting ==="
-# By board identity; the corpus split is chosen HERE (no library default).
-result = split_training_data(
-    output_dir;
-    output_dir = output_splits_path,
-    validation_fraction = 0.1,
-    test_fraction = 0.1,
-    seed = 42,
-)
-
-@info "Done!"
-@info "  Train: $(result.stats.train_patches) patches ($(result.stats.train_boards) boards)"
-@info "  Val:   $(result.stats.val_patches) patches ($(result.stats.val_boards_n) boards)"
-@info "  Test:  $(result.stats.test_patches) patches ($(result.stats.test_boards_n) boards)"
-@info "  Files: $(result.train_path), $(result.val_path), $(result.test_path)"
-
-# =============================================================================
-# Copy to NFS for preservation
-# =============================================================================
-
-if !isnothing(nfs_dir)
-    mkpath(nfs_dir)
-    # Output dir (recursive) + per-split JLD2 files
-    for src in [output_dir, result.train_path, result.val_path, result.test_path]
-        ispath(src) || continue
-        dst = joinpath(nfs_dir, basename(src))
-        sz = isfile(src) ? filesize(src) : sum(filesize.(filter(isfile, readdir(src; join = true))); init = 0)
-        @info "Copying $(basename(src)) → $nfs_dir ($(round(sz / 1.0e9; digits = 2)) GB)"
-        cp(src, dst; force = true)
+    output_dir = joinpath(RUN_DIR, "truth_images")
+    common = (; board_bundles, board_paths, output_dir, device = CUDABackend(),
+        cutoff = ANN["cutoff"], outer_extent = Float64(ANN["outer_extent"]), min_iou = Float64(ANN["min_iou"]))
+    for (files, cam) in videos
+        build_annotations(board_feature_dict, network, files; common...,
+            n_frames = Int(ANN["video_frames"]), config = _config_for(cam === nothing ? nothing : VgtkIO.load(BoundedCamera, cam)))
     end
-    @info "All files copied to NFS: $nfs_dir"
+    for (files, cam) in images
+        build_annotations(board_feature_dict, network, files; common...,
+            config = _config_for(cam === nothing ? nothing : VgtkIO.load(BoundedCamera, cam)))
+    end
+
+    result = split_training_data(output_dir; output_dir = joinpath(RUN_DIR, "splits"),
+        validation_fraction = SPLIT["validation_fraction"], test_fraction = SPLIT["test_fraction"], seed = SPLIT["seed"])
+    @info "train $(result.stats.train_patches) patches ($(result.stats.train_boards) boards), " *
+        "val $(result.stats.val_patches) ($(result.stats.val_boards_n)), test $(result.stats.test_patches) ($(result.stats.test_boards_n))"
+    write_run_records(RUN_DIR, CFG; driver = "bmvc2026/scripts/training/build_annotations.jl", config_source = CFG_PATH, key = KEY,
+        inputs = [boards_dir, input_path(CFG, "images"), input_path(CFG, "videos"), network_path(CFG)])
+    close(log_io)
+    return RUN_DIR
 end
+
+run_complete(RUN_DIR; sidecar = joinpath("splits", "train.jld2")) ?
+    println("build_annotations: run $(KEY) complete at $(RUN_DIR)") : main()

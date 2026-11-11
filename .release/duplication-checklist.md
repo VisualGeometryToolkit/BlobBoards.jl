@@ -35,7 +35,9 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   (f172702). Not run here (the paper's inputs); a regeneration reviews them (REPRODUCE.md).
 
 - [x] bmvc2026's Slurm annotation drivers (`test_duplication`: `_init_worker!`, `_process_source` restated between
-  driver.jl and driver_scm.jl) → one file both include, annotate_worker.jl (d84baf3)
+  driver.jl and driver_scm.jl) → one file both include, annotate_worker.jl (d84baf3); then (paper-09-bb) the three
+  annotation drivers and three training drivers → ONE each, `scripts/training/build_annotations.jl` and
+  `scripts/training/train_descriptor.jl` on their configs of record, the Slurm launchers → `configs/reproduce.toml` stages
 
 ## Hoists into the stack (the coordinator implements; BlobBoards then switches)
 

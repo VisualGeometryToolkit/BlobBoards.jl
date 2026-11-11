@@ -9,8 +9,8 @@ Usage:
   julia --project=bmvc2026 bmvc2026/scripts/plots/absolute_pose.jl
 
 Reads the collected results frame (`pose_results` of the evaluation's
-sources). Env knob: BB_FIG (output dir, default: plotsdir("results");
-the paper includes neither figure).
+sources); writes into plotsdir("results") (the paper includes neither
+figure).
 BB_CSV is gone — a condition is a `level` filter, not a directory.
 =#
 

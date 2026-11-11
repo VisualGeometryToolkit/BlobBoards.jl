@@ -49,7 +49,7 @@ end
         # an inputs-only data root: the network a run config names (the sweep
         # keys hash its content) and the session
         rc = load_config("bmvc2026_260527.toml")
-        net = joinpath(data, rc["descriptor"]["model"])
+        net = joinpath(data, rc["inputs"]["network"]["path"])
         mkpath(dirname(net)); write(net, "not a network")
         mkpath(joinpath(data, "absolute_pose_experiments", "260527"))
         withenv("VGTK_DATA_ROOT" => data, "VGTK_RESULTS_ROOT" => results) do

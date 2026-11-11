@@ -82,21 +82,19 @@ Nearest DrWatson neighbours, deliberately NOT used (checked against
 The two big custom pieces are the same DrWatson idea scaled past its
 primitives:
 
-- **`bb-<key>/` is `produce_or_load` for a directory.** A sweep's output
-  is a pose file and an overlay PER IMAGE — `produce_or_load` caches one
-  file, not a tree, so every stage implements the identical contract by hand:
-  key = `run_key(config of record ⊕ what decides the result and is not in
-  it)`, add-only paths, skip-if-complete, and a consumer derives the same
-  directory from the same config (`src/runs.jl`). CODE is deliberately NOT keyed — it is RESTORABLE:
-  `tag!` records the commit and the dirty-tree patch in every sidecar, so
-  any run regenerates under its exact code state, and `_is_complete` warns
-  when skipping work recorded under a different commit (`BB_FORCE=1`
-  redoes it). Commit-keying would orphan 45-minute sweeps on every
-  unrelated commit; a manual version constant would never be bumped; a
-  source-content hash was judged too heavyweight. `filename = hash` (never
-  `savename`) for the same reason `src/cache.jl` documents: `savename`
-  silently drops nested tables, and these configs are almost entirely
-  nested.
+- **`bb-<key>/` is `produce_or_load` for a directory**, through
+  VisualGeometryToolkitEval: the directory is `keyed_cell_dir` (the config's
+  [experiment] layout, `run_key` of the config of record — its
+  `[inputs.<id>]` sha256s included — and, for a derived stage, the upstream
+  run keys), add-only, skipped when Eval's `run_complete` holds, and a
+  consumer derives the same directory from the same config (`src/runs.jl`).
+  CODE is deliberately NOT keyed — it is RESTORABLE: `tag!` records the
+  commit and the dirty-tree patch in every sidecar, so any run regenerates
+  under its exact code state, and `run_complete` warns when skipping work
+  recorded under a different commit (`--force` redoes it). Commit-keying
+  would orphan 45-minute sweeps on every unrelated commit. Caches go through
+  Eval's `cached_result(…; key = run_key)` (never `savename`, which silently
+  drops nested tables, nor `hash`, which moves between Julia versions).
 - **Selection is a config, not a promote.** Which run the paper reads is
   named by the evaluation's config of record (`configs/figures/evaluation.toml`
   `[runs]`): the config IS the selection, versioned in git, and its key IS
