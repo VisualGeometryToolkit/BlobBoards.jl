@@ -135,3 +135,43 @@ end
     @test !any(m -> :max_px in Base.kwarg_decl(m), methods(BlobBoards.guided_search))
     @test !any(m -> :guided_detc in Base.kwarg_decl(m), methods(BlobBoards.find_board))
 end
+
+# The guided search's IoU prune (`_iou_below`) only skips pairs whose IoU is PROVEN below min_iou: on random
+# ellipse pairs (any size, aspect, angle and offset, five thresholds) and on concentric similar ellipses whose IoU
+# sits at the threshold to 1e-9 (their IoU is the area ratio, so the bound is tight there), it never rejects a pair
+# whose exact IoU reaches the threshold. And the claim mask is the rebuilt index: candidates through one index with
+# `skip` are those of an index built without the skipped detections, with the same reads.
+@testset "guided association: the IoU prune is sound, the claim mask is the rebuilt index" begin
+    rng = MersenneTwister(20261111)
+    function pair(rng)
+        a1 = 0.5 + 15rand(rng); a2 = 0.5 + 15rand(rng)
+        e1 = Ellipse(Point2(0.0, 0.0), a1, a1 * (0.1 + 0.9rand(rng)), pi * rand(rng))
+        e2 = Ellipse(Point2(30 * (rand(rng) - 0.5) * rand(rng), 30 * (rand(rng) - 0.5) * rand(rng)), a2, a2 * (0.1 + 0.9rand(rng)), pi * rand(rng))
+        return e1, e2
+    end
+    n_reach = n_pruned = n_wrong = 0
+    for _ in 1:20_000, t in (0.1, 0.3, 0.5, 0.7, 0.9)
+        e1, e2 = pair(rng)
+        v = VisualGeometryToolkitCore.iou(e1, e2); p = BlobBoards._iou_below(e1, e2, t)
+        n_reach += v >= t; n_pruned += p; n_wrong += p && v >= t
+    end
+    @test n_wrong == 0
+    @test n_pruned > 0 && n_reach > 0          # both sides of the bound are exercised
+    for _ in 1:5_000
+        a = 1 + 10rand(rng); b = a * (0.2 + 0.8rand(rng)); t = 0.2 + 0.7rand(rng); th = pi * rand(rng)
+        s = sqrt(t) * (1 + 1.0e-9 * randn(rng))
+        e1 = Ellipse(Point2(5.0, 5.0), a, b, th); e2 = Ellipse(Point2(5.0, 5.0), s * a, s * b, th)
+        VisualGeometryToolkitCore.iou(e1, e2) >= t && @test !BlobBoards._iou_below(e1, e2, t)
+    end
+    # one index + the claim mask ≡ an index rebuilt without the claimed detections
+    H = HomographyMap(VisualGeometryToolkitCore.HomographyMat(SMatrix{3, 3, Float64}(1, 0, 0, 0, 1, 0, 0, 0, 1)))
+    wregions = [Circle(Point2(20.0 * i, 20.0 * j), 4.0 + rand(rng)) for i in 1:12 for j in 1:12]
+    det_ells = [Ellipse(Point2(20.0 * i + 3randn(rng), 20.0 * j + 3randn(rng)), 3.0 + 2rand(rng), 2.5 + rand(rng), pi * rand(rng))
+                for i in 1:12 for j in 1:12 for _ in 1:2]
+    claimed = BitVector(rand(rng, Bool, length(det_ells)))
+    r1 = Int32[]; r2 = Int32[]
+    c1 = BlobBoards._guided_candidates(BlobBoards.detection_rtree(det_ells; skip = claimed), H, wregions, det_ells, 0.5, j -> push!(r1, j))
+    c2 = BlobBoards._guided_candidates(BlobBoards.detection_rtree(det_ells), H, wregions, det_ells, 0.5, j -> push!(r2, j), claimed)
+    @test c1 == c2 && !isempty(c1)
+    @test sort(r1) == sort(r2) && !any(j -> claimed[j], r2)
+end

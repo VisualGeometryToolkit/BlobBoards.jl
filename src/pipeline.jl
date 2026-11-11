@@ -573,9 +573,10 @@ rendered boundary: each ellipse's bounding box). The ellipse form is the
 are the detections whose boxes intersect its own.
 
 `skip` (a `BitVector` over the detections) leaves the detections already
-claimed out of the index, so they can never be re-associated. The codebase's
-standard spatial index (`pattern.jl` collision detection, `annotate.jl` IoU
-matching), built once per phase (per round, against the claim state).
+claimed out of the index, so they can never be re-associated; the engine
+instead builds one index per phase and hands [`guided_search`](@ref) the claim
+mask as its `skip`, which gives the same candidates. The codebase's standard
+spatial index (`pattern.jl` collision detection, `annotate.jl` IoU matching).
 """
 function detection_rtree(detc::AbstractVector; skip::Union{Nothing, BitVector} = nothing)
     rt = _new_rtree()
@@ -807,6 +808,10 @@ function guided_search(
         min_iou::Real,
         keep::AbstractVector{Pair{Int, Int}} = Pair{Int, Int}[],
         rtree::Union{Nothing, SpatialIndexing.RTree} = nothing,
+        # Claim mask over the detections: a set entry is never a candidate (the
+        # same set as an `rtree` built with `detection_rtree(det_ells; skip)`, so
+        # one index can serve every claim state of a phase).
+        skip::Union{Nothing, BitVector} = nothing,
         det_ells::Union{Nothing, Vector} = nothing,
         wdiscs::Union{Nothing, Vector} = nothing,
         wregions::Union{Nothing, Vector} = nothing,
@@ -836,7 +841,7 @@ function guided_search(
     # World blobs at the same rendered boundary — constant per board.
     wregions = wregions === nothing ?
         [region(d, board_cutoff) for d in wdiscs] : wregions
-    cands = _guided_candidates(rtree, H, wregions, det_ells, Float64(min_iou), on_read)
+    cands = _guided_candidates(rtree, H, wregions, det_ells, Float64(min_iou), on_read, skip)
     # The RANSAC inliers (`keep`) were certified by descriptors AND spatial
     # consensus — guided search may only ADD to them, never drop them. They
     # claim their csponds first, unconditionally (no IoU gate); the IoU
@@ -896,13 +901,25 @@ _scored_with_ids(sources, image_features, matches) = withattrs(
 # (Under the retired nearest-centre rule the outcome depended on the one nearest
 # detection within the radius, and that one index was pushed; the set is now
 # the query's candidates, a superset of it whenever the nearest overlaps.)
-@inline function _guided_accept!(cands, on_read, rt, ep, es, det_ells, min_iou, wi, t)
+#
+# CLAIMED DETECTIONS ARE NOT CANDIDATES. The index holds every detection of the
+# phase (built once per cutoff); `skip` (the claim mask of the round, constant
+# while the round's fits run) drops a claimed one before it is read, which is
+# exactly the candidate set of an index rebuilt without it.
+#
+# THE EXACT IoU IS PRUNED, NEVER THE CANDIDATE SET: a candidate whose IoU
+# provably cannot reach `min_iou` (`_iou_below`) skips the exact computation.
+# It is still read (its dependency recorded) and it could never have been the
+# blob's association, so the outcome and the read set are what the exact IoU
+# of every candidate gives.
+@inline function _guided_accept!(cands, on_read, rt, ep, es, det_ells, min_iou, wi, t, skip = nothing)
     bestv = -Inf; bestj = 0
     foreach_intersecting(rt, _float_rect(bbox(es))) do elem
         j = SpatialIndexing.id(elem)
+        skip === nothing || !skip[j] || return false
         on_read === nothing || on_read(Int32(j))
         de = _guided_detell(t, det_ells, j)
-        if de !== nothing
+        if de !== nothing && !_iou_below(ep, de, min_iou)
             v = iou(ep, de)
             (v > bestv || (v == bestv && j < bestj)) && (bestv = v; bestj = j)
         end
@@ -912,20 +929,58 @@ _scored_with_ids(sources, image_features, matches) = withattrs(
     return nothing
 end
 
+# `true` only when IoU(e1, e2) < t is PROVEN by a bound that needs no exact
+# intersection, so a pair whose IoU could reach `t` is never rejected. Three
+# upper bounds on IoU = |A∩B| / |A∪B|, each from |A∪B| ≥ max(|A|, |B|):
+#   1. area ratio: |A∩B| ≤ min(|A|, |B|), so IoU ≤ min/max of the areas (πab);
+#   2. disjoint circumscribed discs: each ellipse lies in the disc of radius its
+#      semi-major axis `a` about its centre, so a centre distance ≥ a₁ + a₂
+#      leaves the ellipses disjoint, IoU = 0;
+#   3. the discs' lens: A∩B lies in the intersection of those two discs, so
+#      |A∩B| ≤ lens(a₁, a₂, d) and IoU ≤ lens / max(|A|, |B|).
+# (2 is the lens's zero case, kept for its cost.) Each bound is compared with a
+# relative slack of 1e-6, far above the exact IoU's own rounding (Core's
+# analytic overlap area), so rounding cannot turn a reachable pair into a
+# pruned one.
+const _IOU_PRUNE_SLACK = 1.0e-6
+@inline function _iou_below(e1::Ellipse, e2::Ellipse, t::Float64)
+    t > 0 || return false
+    A1 = Float64(e1.a) * Float64(e1.b); A2 = Float64(e2.a) * Float64(e2.b)     # areas over π
+    Amax = max(A1, A2)
+    Amax > 0 || return false
+    tt = t * (1 - _IOU_PRUNE_SLACK)
+    min(A1, A2) < tt * Amax && return true                                        # 1
+    r1 = Float64(e1.a); r2 = Float64(e2.a)
+    d = hypot(Float64(e1.center[1]) - Float64(e2.center[1]), Float64(e1.center[2]) - Float64(e2.center[2]))
+    d >= (r1 + r2) * (1 + _IOU_PRUNE_SLACK) && return true                        # 2
+    return _disc_lens(r1, r2, d) < tt * pi * Amax                                 # 3
+end
+
+# The area of the intersection of two discs of radii r1, r2 whose centres are
+# d apart (the circular lens; the smaller disc when one contains the other).
+@inline function _disc_lens(r1::Float64, r2::Float64, d::Float64)
+    d >= r1 + r2 && return 0.0
+    d <= abs(r1 - r2) && return pi * min(r1, r2)^2
+    c1 = clamp((d^2 + r1^2 - r2^2) / (2 * d * r1), -1.0, 1.0)
+    c2 = clamp((d^2 + r2^2 - r1^2) / (2 * d * r2), -1.0, 1.0)
+    k = (-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2)
+    return r1^2 * acos(c1) + r2^2 * acos(c2) - sqrt(max(k, 0.0)) / 2
+end
+
 # Function barrier for guided_search: `H` arrives concrete here, so the
 # transfer + overlap-query loop compiles without union splits. Keep this a
 # separate function — inlining it back into guided_search reintroduces the
 # union-split boxing.
 function _guided_candidates(
         rt::SpatialIndexing.RTree, H, wregions, det_ells::AbstractVector,
-        min_iou::Float64, on_read = nothing
+        min_iou::Float64, on_read = nothing, skip::Union{Nothing, BitVector} = nothing
     )
     cands = Tuple{Float64, Int, Int}[]
     for (wi, wreg) in enumerate(wregions)
         tr = _guided_transfer(H, wreg)
         tr === nothing && continue
         ep, es = tr
-        _guided_accept!(cands, on_read, rt, ep, es, det_ells, min_iou, wi, H)
+        _guided_accept!(cands, on_read, rt, ep, es, det_ells, min_iou, wi, H, skip)
     end
     return cands
 end
@@ -1270,6 +1325,7 @@ function find_board(
         matches = nothing,
         bundle = nothing,
         guided_rtree = nothing,
+        guided_skip = nothing,
         guided_det_ells = nothing,
         guided_wdiscs = nothing,
         guided_wregions = nothing,
@@ -1339,7 +1395,7 @@ function find_board(
         g_matches = NNMatch[]
         g_scored = guided_search(
             _model_to_homography(res.estimate, camera), bundle, image_features;
-            min_iou, keep, rtree = guided_rtree,
+            min_iou, keep, rtree = guided_rtree, skip = guided_skip,
             det_ells = guided_det_ells, wdiscs = wd,
             wregions = guided_wregions, on_read = on_guided_read, matches_out = g_matches
         )
@@ -2743,11 +2799,14 @@ function _find_boards_serial(
         claimed = falses(length(feat_pool))
         # The detections' ellipses at each board cutoff, and per round the
         # guided search's overlap index over them (claimed detections skipped).
+        # The detections' ellipses at each board cutoff and the guided search's
+        # overlap index over them, built once per phase; the round's claims are
+        # its `skip` mask (claimed detections are never candidates).
         det_ells_at = Dict{Float64, Vector}()
         ells_at(c) = get!(() -> [Ellipse(region(feature_frame(f), c)) for f in feat_pool], det_ells_at, c)
+        rts = Dict{Float64, Any}()
+        rt_at(c) = get!(() -> detection_rtree(ells_at(c)), rts, c)
         while !isempty(gallery)
-            rts = Dict{Float64, Any}()
-            rt_at(c) = get!(() -> detection_rtree(ells_at(c); skip = claimed), rts, c)
             cands = Tuple[]
             for uid in sort!(collect(keys(gallery)))
                 # Per-round one-to-one resolution on the claim-filtered RAW
@@ -2769,7 +2828,7 @@ function _find_boards_serial(
                         cam, gallery[uid], feat_pool;
                         min_similarity = config.min_similarity,
                         matches = resolved, bundle = bdl,
-                        guided_rtree = rt_at(Float64(cutoff(bdl))),
+                        guided_rtree = rt_at(Float64(cutoff(bdl))), guided_skip = claimed,
                         guided_det_ells = ells_at(Float64(cutoff(bdl))),
                         resolve_pose_ambiguity = _pose_ambiguity_enabled(config.geometry),
                         fit_kw = board_fit_keywords(config, uid, bdl),
@@ -3055,16 +3114,15 @@ function _claim_boards(
     # or breaks, so the loop runs at most |agenda| rounds. Wall time is
     # bounded by the measured serial arm (1.2–2.4 s/frame) and in practice
     # sits below it — rounds still fit in parallel.
+    # The guided search's overlap index: one per board cutoff, over the
+    # detections' ellipses at it, built ONCE per phase (its contents are the
+    # phase's fixed detections). The claim state is its `guided_skip` mask,
+    # `in_claimed` — pre-claims and this phase's earlier commits, constant while
+    # a round's fits run — so guided association never reads a claimed
+    # detection, exactly as an index rebuilt without them each round.
+    guided_rtrees = det_ells_by_cutoff === nothing ? nothing :
+        Dict(c => detection_rtree(ells) for (c, ells) in det_ells_by_cutoff)
     while !isempty(agenda)
-        # Detection R-tree for guided_search, rebuilt per round against the
-        # current claim state: `skip = in_claimed` covers pre-claims AND this
-        # phase's earlier commits, so guided association can never re-associate
-        # a claimed detection (documented invariant at detection_rtree).
-        # O(D log D) bulk load, a few ms.
-        # One index per board cutoff, over the detections' ellipses at it (the
-        # guided overlap query's candidates are the boxes it intersects).
-        guided_rtrees = det_ells_by_cutoff === nothing ? nothing :
-            Dict(c => detection_rtree(ells; skip = in_claimed) for (c, ells) in det_ells_by_cutoff)
         # Per-round one-to-one resolution on the claim-filtered RAW match
         # lists. Filtering the RESOLVED list instead (the pre-2026-08-17
         # within-phase behavior) cannot promote a blob's next-best candidate
@@ -3131,6 +3189,7 @@ function _claim_boards(
                     on_guided_read = track_deps ? (j -> push!(e.deps, j)) : nothing,
                     telemetry,
                     guided_rtree = guided_rtrees === nothing ? nothing : guided_rtrees[Float64(cutoff(bdl))],
+                    guided_skip = in_claimed,
                     guided_det_ells = det_ells_by_cutoff === nothing ? nothing :
                         det_ells_by_cutoff[Float64(cutoff(bdl))],
                     guided_wdiscs = geom === nothing ? nothing : geom.wdiscs,
