@@ -37,9 +37,7 @@ VgtkCore.test_quality_gates(
     @test BlobBoards.load === VisualGeometryToolkitIO.load && BlobBoards.save === VisualGeometryToolkitIO.save
     @test hasmethod(BlobBoards.load, Tuple{Type{BlobBoards.BoardBundle}, String})
     @test hasmethod(BlobBoards.save, Tuple{Matrix{Float64}, BlobBoards.PatternBundle})
-    # OPEN (.release/duplication-checklist.md): IO does not yet list `load`/`save` among its
-    # CONTRACT_GENERICS, so those two methods are the gate's only findings until the hoist lands
+    # IO lists `load`/`save` among its CONTRACT_GENERICS: BlobBoards' methods land on declared extension points
     cv = VgtkCore.contract_generic_violations(BlobBoards)
-    @test all(v -> occursin(r"\b(load|save)\b", string(v)), cv)
-    @test_broken isempty(cv)
+    @test isempty(cv)
 end

@@ -20,6 +20,7 @@
 # shading's linear reflectance; they are sRGB-encoded for display.
 
 using BlobBoards
+using VisualGeometryToolkitFeatures: linear_to_srgb   # the stack's one sRGB encoder
 
 const SIDE = 150mm                     # square canvas
 const SEED = 0x0000000b10bb0a2d        # fixed: placement is a function of it
@@ -39,7 +40,6 @@ svg = mktempdir() do dir
     read(`$(BlobBoards.pdftocairo()) -svg $pdf -`, String)
 end
 
-srgb(v) = v <= 0.0031308 ? 12.92v : 1.055v^(1 / 2.4) - 0.055
 
 # The profile: the opaque stops of the first gradient (every gradient's are the
 # same), as (offset, linear reflectance) — then resampled at STOPS offsets.
@@ -54,7 +54,7 @@ function sample(t)
     (t0, v0), (t1, v1) = profile[k - 1], profile[k]
     return t1 == t0 ? v1 : v0 + (v1 - v0) * (t - t0) / (t1 - t0)
 end
-pct(v) = string(round(100 * srgb(clamp(v, 0, 1)); digits = 3), "%")
+pct(v) = string(round(100 * linear_to_srgb(clamp(v, 0, 1)); digits = 3), "%")
 stops = join(("<stop offset=\"$(round(t; digits = 5))\" stop-color=\"rgb($(pct(sample(t))), $(pct(sample(t))), $(pct(sample(t))))\"/>"
               for t in range(0, 1; length = STOPS)), "\n")
 # beyond the disc the blob is absent, as the PDF's unextended shading

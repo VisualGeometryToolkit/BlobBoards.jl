@@ -6,7 +6,7 @@
 # =============================================================================
 
 using DrWatson: projectdir
-using VisualGeometryToolkitEval.Experiments: set_project_root!, ArtifactView, data_root, results_root
+using VisualGeometryToolkitEval.Experiments: set_project_root!, ArtifactView, data_root, results_root, assert_active_project
 import TOML
 
 # projectdir(), not joinpath(@__DIR__, ".."): @__DIR__ is relative to THIS
@@ -18,17 +18,7 @@ import TOML
 # trade against @__DIR__, which is right relative to the FILE. Assert it, so
 # running a driver under the parent package's project fails here with a clear
 # message instead of silently resolving paths into the wrong tree.
-function _assert_project()
-    isfile(projectdir("src", "BlobBoardsEval.jl")) && return nothing
-    error(
-        """
-        DrWatson's projectdir() resolves to $(projectdir()), which is not the
-        bmvc2026 subproject (no src/BlobBoardsEval.jl there). Run drivers with
-        `--project=bmvc2026`; the active project is $(Base.active_project()).
-        """
-    )
-end
-_assert_project()
+assert_active_project(joinpath("src", "BlobBoardsEval.jl"))   # VisualGeometryToolkitEval's check: projectdir() is this paper project
 
 const _ARTIFACTS_TOML = projectdir("Artifacts.toml")
 # DEFERRED: the shared convention puts the view AT datadir("exp_raw"); this

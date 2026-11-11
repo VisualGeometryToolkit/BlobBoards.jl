@@ -22,6 +22,8 @@
 # =============================================================================
 
 import VisualGeometryToolkitIO as VgtkIO
+import VisualGeometryToolkitEval.Experiments: save_hand_eye   # the hand-eye records' writer, a fit's method added below
+using VisualGeometryToolkitEval.Experiments: load_hand_eye, hand_eye_mount_file
 using Rotations: RotMatrix, rotation_angle
 using BlobBoards: load_bundle, uid_from_hash, Rect
 using VisualGeometryToolkitCore: ustrip, mm, parse_unit
@@ -213,55 +215,16 @@ end
 
 using VisualGeometryToolkitCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame
 
-# The marker-mount file beside a hand-eye file.
-_mount_file(file::AbstractString) = string(splitext(file)[1], "_board_rig", splitext(file)[2])
-
-# The marker mount as a rig: each printed board a pose-only planar target —
-# its design named by its id, its points its design owner's (BlobBoards'
-# `board_points`) — mounted on the board rig.
-_mount_rig(Y::AbstractDict) = Rig{BoardRigFrame}(Dict(Symbol(id) => PosedTarget(PlanarTarget(Symbol(id)), with_unit(T, mm)) for (id, T) in Y))
-
 """
     save_hand_eye(file, he; provenance = (;)) -> (file, mount)
-    save_hand_eye(file, X, Y; provenance = (;)) -> (file, mount)
 
-Write a hand-eye calibration as its two records: `file`, a `vgio/transforms/v3`
-file holding `X` (`body:camera_rig → camera_optical`), and
-`<file stem>_board_rig.json`, a `vgio/rig/v6` file of the marker mount
-`Y` (target id → its pose `target:<id> → body:board_rig`, frame
-`body:board_rig`; each board a pose-only `PlanarTarget` named by its id). Each pose is written as given — with its covariance iff
-`Uncertain`; a FIT (`hand_eye_calibrate`'s `(; X, Y, fit)`) is written with
-the fit's covariances ([`uncertain_hand_eye`](@ref)), never without. The
-provenance goes on the transforms file.
+A hand-eye FIT (`hand_eye_calibrate`'s `(; X, Y, fit)`) as VisualGeometryToolkitEval's
+two hand-eye records (`save_hand_eye(file, X, Y)`, read back by its
+`load_hand_eye`), with the fit's covariances ([`uncertain_hand_eye`](@ref)),
+never without.
 """
 save_hand_eye(file::AbstractString, he::NamedTuple; provenance::NamedTuple = (;)) =
-    save_hand_eye(file, uncertain_hand_eye(he)...; provenance)
-
-function save_hand_eye(file::AbstractString, X, Y::AbstractDict; provenance::NamedTuple = (;))
-    mount = _mount_file(file)
-    VgtkIO.save(file, [with_unit(relabel(CameraRigFrame, CameraFrame, unlabel(X)), mm)]; provenance)   # computed in plain mm; a file takes quantities
-    VgtkIO.save(mount, _mount_rig(Y); provenance = (hand_eye = basename(file),))
-    return file, mount
-end
-
-"""
-    load_hand_eye(file) -> (X, targets)
-
-A hand-eye record pair as [`save_hand_eye`](@ref) writes it: `X`, the
-camera-mount pose labeled `CameraRigFrame → ViewFrame{:optical}`, and
-`targets`, the marker mount as a `Rig{BoardRigFrame}` (`TargetFrame{id} →
-BoardRigFrame`, minted on access) — each pose `Uncertain` where the record
-states its covariance.
-"""
-function load_hand_eye(file::AbstractString)
-    poses = VgtkIO.load(Vector{EuclideanMap}, file)
-    ix = findfirst(X -> geom(X) isa EuclideanMap{3, <:Any, <:Any, <:Any, CameraRigFrame, CameraFrame}, poses)
-    ix === nothing && error("no body:camera_rig -> camera_optical record in $file")
-    X = relabel(CameraRigFrame, ViewFrame{:optical}, ustrip(mm, poses[ix]))   # back to the evaluation's plain millimetres
-    targets = ustrip(mm, VgtkIO.load(Rig, _mount_file(file)))
-    targets isa Rig{BoardRigFrame} || error("$(_mount_file(file)): the marker mount is posed in body:board_rig, got $(typeof(targets))")
-    return X, targets
-end
+    save_hand_eye(file, uncertain_hand_eye(he)...; provenance)   # VisualGeometryToolkitEval's two records
 
 # The geometric target rig of an uncertain one (the chain is composed on values).
 _plain_targets(r::Rig) = Rig{BoardRigFrame}(Dict(id => PosedTarget(model(r[id]), geom(pose(r[id]))) for id in ids(r)))

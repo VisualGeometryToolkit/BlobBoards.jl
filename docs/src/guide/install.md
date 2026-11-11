@@ -257,8 +257,8 @@ member is the environment for one kind of work; instantiate the one you need:
 # Install row: work in a clone
 git clone https://github.com/VisualGeometryToolkit/BlobBoards.jl
 cd BlobBoards.jl
-git config core.hooksPath .githooks     # re-resolve the Manifest after a pull moves a Project.toml
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using VisualGeometryToolkitCore; VisualGeometryToolkitCore.install_githooks()'   # re-resolve the Manifest after a pull moves a Project.toml
 julia --project=. -e 'using BlobBoards; blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), dir = mktempdir())'
 ```
 

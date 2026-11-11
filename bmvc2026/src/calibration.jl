@@ -131,7 +131,7 @@ function hand_eye(
         kept = _backup!(file)
         kept === nothing || println("  preserved previous version -> $(basename(kept))")
     end
-    mount = _mount_file(file)
+    mount = hand_eye_mount_file(file)
     if !(isfile(file) && isfile(mount))
         he = hand_eye_calibrate(frames, detected; min_rel_angle)
         save_hand_eye(
@@ -141,8 +141,8 @@ function hand_eye(
                 n_frames = length(usable),
                 n_markers = length(markers),
                 # Scalars only — see the header on not embedding RVG's fit object.
-                sigma_rot_rad = _diag(he.fit, :sigma_rot, :σ_rot),
-                sigma_trans_mm = _diag(he.fit, :sigma_trans, :σ_trans),
+                sigma_rot_rad = he.fit.metadata.σ_rot,      # the fit's per-block noise scales (its metadata)
+                sigma_trans_mm = he.fit.metadata.σ_trans,
                 gitcommit = gitdescribe(projectdir()),
             ),
         )
@@ -160,13 +160,3 @@ function hand_eye(
     return (; X = geom(X), targets = _plain_targets(targets), uncertain = (; X, targets), diagnostics, file)
 end
 
-# RVG has renamed these fields before; probe rather than assume, and record
-# `nothing` rather than failing the whole calibration over a diagnostic.
-function _diag(fit, names::Symbol...)
-    for n in names
-        hasproperty(fit, n) && return Float64(getproperty(fit, n))
-        hasproperty(fit, :metadata) && hasproperty(fit.metadata, n) &&
-            return Float64(getproperty(fit.metadata, n))
-    end
-    return nothing
-end

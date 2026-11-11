@@ -27,7 +27,7 @@ ext_install(ext) = getproperty(BlobBoards.EXTENSION_INSTALL, ext).install
 @test occursin("`$(ext_install(:BlobBoardsMakieExt))`", readme_table["plot or visualize"])
 @test occursin("`$(ext_install(:BlobBoardsTrainingExt))`", readme_table["train the descriptor network"])
 gpu = readme_table["find boards on the GPU"]
-@test issubset(split(chopprefix(ext_install(:BlobBoardsCUDAExt), "pkg> add ")), install_packages(gpu))
+@test issubset(split(chopprefix(ext_install(:BlobBoardsCUDAExt), "pkg> add ")), VgtkCore.install_packages(gpu))
 @test occursin("`$(BlobBoards.CUDA_RUNTIME_PIN)`", gpu)
 
 # The table covers every extension of the Project.toml, and each install line
@@ -57,10 +57,10 @@ counts = Dict(row => count(e -> e.row == row, all_examples) for row in row_key.(
 
 # Each row's line names exactly what its examples load.
 for task in INSTALL_ROWS
-    packages = install_packages(readme_table[task])
+    packages = VgtkCore.install_packages(readme_table[task])
     isempty(packages) && continue
     julia = [e.code for e in all_examples if e.lang == "julia" && e.row == row_key(task)]
-    @test Set(packages) == union(loaded_packages.(julia)...)
+    @test Set(packages) == union(VgtkCore.loaded_packages.(julia)...)
 end
 # The Python script imports only the pixi environment's packages.
 python = only(e.code for e in all_examples if e.lang == "python")
@@ -76,10 +76,10 @@ readme_example = only(page_julia("README.md"))
 # The README's and the landing page's install line is the example's row; the
 # Getting started line is the authoring row's, which its examples use.
 install_lines(page) = [m[1] for m in eachmatch(r"^pkg> add (.+)$"m, read(joinpath(README_ROOT, page), String))]
-@test install_lines("README.md") == [join(install_packages(readme_table["find boards on the CPU"]), " ")]
+@test install_lines("README.md") == [join(VgtkCore.install_packages(readme_table["find boards on the CPU"]), " ")]
 @test install_lines(joinpath("docs", "src", "index.md")) == install_lines("README.md")
 @test install_lines(joinpath("docs", "src", "guide", "getting-started.md")) ==
-    [join(install_packages(readme_table["author boards (pattern, PDF, PNG)"]), " ")]
+    [join(VgtkCore.install_packages(readme_table["author boards (pattern, PDF, PNG)"]), " ")]
 
 # The clone row's members are the workspace's.
 clone = only(e for e in all_examples if e.row == "work in a clone")

@@ -54,7 +54,7 @@ function _legacy_scalar(x)
     x isa AbstractDict || return x
     u = parse_unit(String(x.unit); compound = true)
     v = x.value
-    return (dimension(u) == dimension(mm) ? Float64(v) : _snap_integer(v)) * u
+    return (dimension(u) == dimension(mm) ? Float64(v) : VgtkIO.snap_integer(v)) * u
 end
 _legacy_size2(x) = Size2(width = _legacy_scalar(x.width), height = _legacy_scalar(x.height))
 
@@ -242,7 +242,7 @@ function _migrated_render_value(k, v, unit)
         stated == own || return _file_number(q; unit)        # a unit the file does not declare: converted
         v = v.value
     end
-    return kind === :length ? Float64(v) : _snap_integer(v)
+    return kind === :length ? Float64(v) : VgtkIO.snap_integer(v)
 end
 
 # The migrated block against the old one, each read under the units its own file

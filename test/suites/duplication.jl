@@ -13,11 +13,6 @@ using Test
 import VisualGeometryToolkitCore as VgtkCore
 
 const OPEN = Set([
-    "name _Record",               # hoist: IO's public Record
-    "name _snap_integer",         # hoist: IO's public snap_integer
-    "pattern docs/make_hero.jl",  # hoist: Features' linear_to_srgb (plane-maps)
-    "file .githooks/sync-manifest.jl",              # hoist: one sync-manifest (cau-tooling)
-    "similar test/suites/readme_rows.jl",           # hoist: Core's README row runner
 ])
 
 _key(v) = v.check === :name ? "name $(v.text)" :
@@ -28,4 +23,4 @@ keys_found = Set(_key(v) for v in found)
 foreach(v -> _key(v) in OPEN || println(stderr, v), found)
 @test keys_found ⊆ OPEN
 @test isempty(setdiff(OPEN, keys_found)) || isempty(get(ENV, "VGTK_STACK_PATHS", ""))   # file/similar need the stack paths
-@test_broken isempty(found)
+@test isempty(found)

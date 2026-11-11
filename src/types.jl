@@ -59,7 +59,7 @@ end
 # style's method is more specific than JSON.jl's AbstractVector one)
 JSON.lower(s::_Style, rt::RulerTick) = (spacing = _jv(s, rt.spacing), width = _jv(s, rt.width))
 
-JSON.lift(::VgtkIO.VgioStyle, ::Type{<:RulerTick}, x::_Record) =
+JSON.lift(::VgtkIO.VgioStyle, ::Type{<:RulerTick}, x::VgtkIO.Record) =
     RulerTick(_file_quantity(x.spacing, :length), _file_quantity(x.width, :length))
 
 # Preserve RulerTick type under broadcasting operations
@@ -95,7 +95,7 @@ end
 
 JSON.lower(s::_Style, rs::RulerSpec) = (major_tick = JSON.lower(s, rs.major_tick), minor_tick = JSON.lower(s, rs.minor_tick))
 
-function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:RulerSpec}, x::_Record)
+function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:RulerSpec}, x::VgtkIO.Record)
     major_tick = JSON.lift(s, RulerTick, x.major_tick)
     minor_tick = JSON.lift(s, RulerTick, x.minor_tick)
     # Promote major_tick and minor_tick to have consistent types
@@ -270,7 +270,7 @@ function _parse_pixel_type(s::AbstractString)
     return pt
 end
 
-function JSON.lift(::VgtkIO.VgioStyle, ::Type{<:PatternConfig}, x::_Record)
+function JSON.lift(::VgtkIO.VgioStyle, ::Type{<:PatternConfig}, x::VgtkIO.Record)
     pixel_type = _pixel_type_from_name(String(x.pixel_type))
     pattern_resolution = _file_size2(x.pattern_resolution, :pixel)
 
@@ -387,7 +387,7 @@ end
 JSON.lower(s::VgtkIO.VgioStyle, pb::PatternBundle) =
     (units = _bundle_units(s, pb), pattern_config = JSON.lower(s, pb.pattern_config), blobs = _file_blobs(pb.blobs))
 
-function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:PatternBundle}, x::_Record)
+function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:PatternBundle}, x::VgtkIO.Record)
     @with _FILE_UNITS => _declared_units(x) begin
         pc = JSON.lift(s, PatternConfig, x.pattern_config)::PatternConfig   # (a parsed field is `Any`: asserted)
         blobs_vec = _construct_blobs(x.blobs)
@@ -960,7 +960,7 @@ _tick_kwargs(rs) = (;
     major_tick_width = rs.major_tick.width, minor_tick_width = rs.minor_tick.width,
 )
 
-function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardConfig}, x::_Record)
+function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardConfig}, x::VgtkIO.Record)
     canvas_size = _file_size2(x.canvas_size, :length)
     layout_grid = _construct_grid(x)
     # a point-grid board's margin (its board derived from it); a pixel-grid board's board, as recorded
@@ -1027,7 +1027,7 @@ function _pattern_from_points(x, bc::BoardConfig)
     return d
 end
 
-function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardPreamble}, x::_Record)
+function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardPreamble}, x::VgtkIO.Record)
     # (a parsed field is `Any`, so each lift is asserted)
     bc = JSON.lift(s, BoardConfig, x.board_config)::BoardConfig
     raw = x.pattern_config
@@ -1075,7 +1075,7 @@ _blob_unit(::PointGrid) = "pt"
 JSON.lower(s::VgtkIO.VgioStyle, bb::BoardBundle) =
     (units = _bundle_units(s, bb), preamble = JSON.lower(s, bb.preamble), blobs = _file_blobs(bb.blobs))
 
-function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardBundle}, x::_Record)
+function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardBundle}, x::VgtkIO.Record)
     units = _declared_units(x)
     @with _FILE_UNITS => units begin
         preamble = JSON.lift(s, BoardPreamble, x.preamble)::BoardPreamble   # (a parsed field is `Any`: asserted)

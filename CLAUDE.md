@@ -14,8 +14,9 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 # Once per clone: let git regenerate the Manifest whenever a pull, checkout or
 # rebase moves Project.toml (compat bumps from a release cut elsewhere).
-# Without this every such pull leaves the Manifest illegal. See .githooks/.
-git config core.hooksPath .githooks
+# Without this every such pull leaves the Manifest illegal. The hooks are
+# VisualGeometryToolkitCore's (its githooks/, one copy for every stack repository).
+julia --project=. -e 'using VisualGeometryToolkitCore; VisualGeometryToolkitCore.install_githooks()'
 
 # Development mode with auto-reload
 julia --project=. dev.jl
@@ -51,7 +52,7 @@ resolve together into the ONE `Manifest.toml` at the root, which is not
 committed (no member has a Manifest; `.gitignore` ignores them all). The test
 deps live in `test/Project.toml` (no `[extras]`/`[targets]`), and `Pkg.test()`
 runs that member without a sandbox, against the shared Manifest. After a pull
-that moves any member's `Project.toml`, the `.githooks` re-resolve the root.
+that moves any member's `Project.toml`, the git hooks (VisualGeometryToolkitCore's, `install_githooks`) re-resolve the root.
 
 ### `--project=.` has no CUDA — use `--project=gpu`
 

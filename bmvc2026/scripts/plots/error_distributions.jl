@@ -40,6 +40,7 @@ include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval: pose_results, figure_config, write_figure_records, figure_numbers, eval_sources, poses_dir
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
+using VisualGeometryToolkitEval.Render: station_cells   # the floorplan fan's cells
 using DrWatson: projectdir
 using CairoMakie
 using DrWatson: plotsdir
@@ -216,50 +217,8 @@ end
 # fidelity for protocol fidelity. Frames are identified by their exact
 # rig_angles value (constant across a frame's marker rows, distinct
 # between frames).
-function _cells(df)
-    station = Dict{Tuple{Float64, Int}, Int}()
-    for spot in unique(df.rig_distances_bin)
-        angs = sort(unique(df.rig_angles[df.rig_distances_bin .== spot]))
-        anchor = round(Int, rad2deg(first(angs)) / 10) * 10
-        for (k, a) in enumerate(angs)
-            station[(a, spot)] = anchor + 10 * (k - 1)
-        end
-    end
-    d = transform(
-        df,
-        [:rig_angles, :rig_distances_bin] => ByRow((a, s) -> station[(a, s)]) => :station
-    )
-    _med(e) = (v = collect(skipmissing(e)); isempty(v) ? NaN : median(v))
-    g = combine(
-        groupby(d, [:station, :rig_distances_bin]),
-        :error_distances => (e -> count(!ismissing, e)) => :n,
-        :error_distances => length => :ntot,
-        :error_distances => _med => :med,
-        :abs_error_angles_deg => (e -> _med(abs.(e))) => :medr
-    )
-    cells = [
-        (
-                angle = Float64(r.station), dist = Float64(r.rig_distances_bin),
-                n = r.n, rate = r.n / r.ntot, med = r.med, medr = r.medr,
-            )
-            for r in eachrow(g)
-    ]
-    # The ±90° stations are edge-on — a plane presenting zero area, where no
-    # system can detect anything — so they carry no information and are
-    # DROPPED from the chart (this also absorbs bb's one uncaptured +90°@3 m
-    # frame). Any remaining interior slot without a frame is filled as n = 0
-    # so a hole in the fan always means zero detections, never missing data.
-    filter!(c -> abs(c.angle) < 90, cells)
-    have = Set((c.angle, c.dist) for c in cells)
-    sa = ED["station_angles"]
-    for spot in unique(df.rig_distances_bin), a in Float64(sa["start"]):Float64(sa["spacing"]):Float64(sa["stop"])
-        (a, Float64(spot)) in have || push!(
-            cells,
-            (angle = a, dist = Float64(spot), n = 0, rate = 0.0, med = NaN, medr = NaN)
-        )
-    end
-    return cells
-end
+# The fan's cells: VisualGeometryToolkitEval's `station_cells`, at the station angles of record.
+_cells(df) = (sa = ED["station_angles"]; station_cells(df; stations = Float64(sa["start"]):Float64(sa["spacing"]):Float64(sa["stop"])))
 
 function plot_error_floorplan(src; out_dir)
     crange = (log10(2), log10(120))          # translation, mm

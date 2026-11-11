@@ -121,7 +121,7 @@ end
     clone = only(e.code for e in examples() if e.row == "work in a clone")
     code = match(r"^julia --project=\. -e '(using BlobBoards;.*)'$"m, clone)[1]
     if isfile(joinpath(README_ROOT, "Manifest.toml"))
-        @test run_child(README_ROOT, "-e", code) == 0
+        @test VgtkCore.run_readme_child(README_ROOT, "-e", code) == 0
     else
         @test_skip "work in a clone: no instantiated workspace at $(README_ROOT)"
     end

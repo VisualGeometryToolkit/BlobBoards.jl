@@ -114,11 +114,6 @@ end
 # what every file this package writes declares.
 const _FILE_UNITS = ScopedValue((mm, dpi))
 
-_snap_integer(v::Integer) = Int(v)
-_snap_integer(v::AbstractFloat) = isinteger(v) ? Int(v) : v
-# an exact quantity's magnitude (`300px` is a Rational): an integer, else its Float64
-_snap_integer(v::Rational) = isinteger(v) ? Int(v) : Float64(v)
-_snap_integer(v) = v
 
 # A quantity as the number a file holds. `role = :world` (the default): by
 # dimension, a length in the file's world unit `unit`, a density in dpi, a pixel
@@ -129,8 +124,8 @@ function _file_number(q::Quantity; role::Symbol = :world, unit = mm)
     role === :pattern && return Float64(ustrip(px, q))
     d = dimension(q)
     d == dimension(mm) && return Float64(ustrip(unit, q))
-    d == dimension(dpi) && return _snap_integer(ustrip(dpi, q))
-    d == dimension(px) && return _snap_integer(ustrip(px, q))
+    d == dimension(dpi) && return VgtkIO.snap_integer(ustrip(dpi, q))
+    d == dimension(px) && return VgtkIO.snap_integer(ustrip(px, q))
     throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
 end
 
@@ -148,7 +143,7 @@ function _identity_form(q::Quantity; role::Symbol = :world)
     u = d == dimension(mm) ? mm : d == dimension(dpi) ? dpi : d == dimension(px) ? px :
         throw(ArgumentError("no board-file unit for a quantity of dimension $(d)"))
     v = ustrip(u, q)
-    return (value = u === mm ? Float64(v) : _snap_integer(v), unit = unit_string(u))
+    return (value = u === mm ? Float64(v) : VgtkIO.snap_integer(v), unit = unit_string(u))
 end
 
 # The one function every lowering calls for a quantity: the file's number (in the
@@ -186,8 +181,8 @@ function _file_quantity(x, kind::Symbol)
     )
     world, density = _FILE_UNITS[]
     kind === :length && return Float64(x) * world
-    kind === :density && return _snap_integer(x) * density
-    (kind === :pixel || kind === :pattern) && return _snap_integer(x) * px
+    kind === :density && return VgtkIO.snap_integer(x) * density
+    (kind === :pixel || kind === :pattern) && return VgtkIO.snap_integer(x) * px
     kind === :blob && return Float64(x) * px
     throw(ArgumentError("a quantity's kind is :length, :pixel, :density, :pattern or :blob, got $(repr(kind))"))
 end
@@ -219,9 +214,6 @@ end
 # The type a parsed JSON object is (`VgtkIO.read_record`, `JSON.parse`): read
 # by property access, its keys in order.
 const _ParsedObject = JSON.Object{String, Any}
-# What a lift reads (its type keeps the lift off JSON.jl's own methods for its
-# lazy values): a parsed object, or a NamedTuple built in memory.
-const _Record = Union{JSON.Object, NamedTuple}
 
 # A JSON object built in code, in the form a lift reads: the pairs given, or a
 # dictionary or NamedTuple with every nested one converted (a version step's
