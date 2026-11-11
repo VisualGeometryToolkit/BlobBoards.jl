@@ -83,6 +83,16 @@ end
 # =============================================================================
 
 const MOCAP = CFG["mocap"]
+
+# A pose computed in plain mm with its translation in metres the way a file's
+# millimetre number is read (VisualGeometryToolkitIO's decimal-exact
+# `read_length`; VisualGeometryToolkitCore conventions/units.md, "A float length
+# built in code has already rounded"): a trajectory built so reads back to
+# itself, bit for bit (its file holds the vendor's number, or for a few percent of
+# 17-digit ones the shorter decimal of the same metre value). `with_unit(·, mm)`
+# rounds the float's binary value instead, a metre value no millimetre file
+# number need read back to (frame 46 of 260527/apr, board rig).
+_in_mm(X::EuclideanMap) = EuclideanMap(X.R, VgtkIO.read_length.(X.t, mm); check = false)
 const BODIES = [(id = Symbol(b["id"]), pose = b["pose"], markers = b["markers"][1]:b["markers"][2]) for b in MOCAP["bodies"]]
 
 _colmajor(v) = SMatrix{3, 3, Float64}(reshape(Float64.(collect(v)), 3, 3))
@@ -249,13 +259,13 @@ function convert_mocap(session)
                 end
             end
             tr = Trajectory(
-                BodyFrame{b.id}, WorldFrame, poses;
+                BodyFrame{b.id}, WorldFrame, Dict(t => _in_mm(X) for (t, X) in poses);
                 images = Dict(t => images[t] for t in keys(poses)), times = Dict(t => times[t] for t in keys(poses)),
                 time_origin = origin, recovered = rec,
             )
             file = joinpath(odir, "$(b.id).json")
             VgtkIO.save(
-                file, with_unit(tr, mm);
+                file, tr;
                 provenance = merge(
                     (
                         body = String(b.id), run_key = KEY,
@@ -274,7 +284,7 @@ function convert_mocap(session)
             back = VgtkIO.load(Trajectory, file)
             for (t, X) in poses
                 Y = geom(back[t])
-                (Y.R isa QuatRotation && SVector{4, Float64}(params(Y.R)) == _written_quaternion(X) && ustrip.(mm, Y.t) == X.t) ||
+                (Y.R isa QuatRotation && SVector{4, Float64}(params(Y.R)) == _written_quaternion(X) && Y.t == _in_mm(X).t) ||
                     error("$file: frame $t does not read back")
             end
 
@@ -286,7 +296,7 @@ function convert_mocap(session)
             end
             kfile = joinpath(odir, "$(b.id).kabsch.json")
             VgtkIO.save(
-                kfile, with_unit(Trajectory(BodyFrame{b.id}, WorldFrame, kab; images = Dict(t => images[t] for t in keys(kab)), times = Dict(t => times[t] for t in keys(kab)), time_origin = origin), mm);
+                kfile, Trajectory(BodyFrame{b.id}, WorldFrame, Dict(t => _in_mm(X) for (t, X) in kab); images = Dict(t => images[t] for t in keys(kab)), times = Dict(t => times[t] for t in keys(kab)), time_origin = origin);
                 provenance = (
                     body = String(b.id), run_key = KEY,
                     source = (markers = "markers.json", markers_sha256 = mhash, constellation = "../" * basename(cons_files[b.id]), constellation_sha256 = _sha(cons_files[b.id])),
