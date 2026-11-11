@@ -428,6 +428,6 @@ const PINNED_PATTERN_V3_JSON = """
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
         ) == "6a7042b4465849fa8a65fbec19c8e370fdd904b81ff8032d432cb0ef99558ef7"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "c0d89bbf84580b69df6d4d1d18ca6e4a21b2ac0d0d79d05c8c144f3db2a0b502"
+            "d9661b5bd67cbab9246d376f8b0160bccfa01269d7e77072c70b462db97cdb65"
     end
 end
