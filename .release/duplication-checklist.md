@@ -38,12 +38,10 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 
 ## Hoists into the stack (the coordinator implements; BlobBoards then switches)
 
-- [ ] hoist `_sweep_score` → RANSACScoringDoneRight (audit 7; `test_duplication`: a name RSDR owns). RSDR's
-  `_sweep_score(::IGPrior, lg_k, ν_half, RSS, outlier_term)` (src/sweep.jl:423) made public as
-  `sweep_score(prior, lg_k, ν_half, RSS, outlier_term)`, device-callable (it is plain arithmetic generic in `T`).
-  Callers: BlobBoards `_sort_sweep_ka!` (src/adapt_ka.jl, the kernel's sweep, IG prior α₀ = β₀ = 0, `lg_k` the
-  backend's lgamma with the j = 1, 2 closed forms). The switch is one function body; numerically the RSDR form
-  (`log(2π)`, `log(RSS/2)`) differs from BlobBoards' (`log(π·RSS)`) in the last bits only.
+- [x] `_sweep_score` → RANSACScoringDoneRight's `partition_score` (audit 7; `test_duplication`: a name RSDR owned):
+  RSDR made its per-partition score public and device-callable (rsdr-09 6ddd808); the sweep kernel calls it at the
+  Jeffreys prior (COMMIT_LOADSAVE). CPU frames unchanged against the earlier port (max 2.2e-7 px vs the old twin, as
+  before).
 - [x] the package defaults reader (`test_duplication`: `_dflt` and `default_config_path` owned by Estimation,
   `_TOML_DEFAULTS` by LODR; audit 20): not the same concept but each package's own data, read through Core's one
   `parse_defaults` (BlobBoards now parses its two files with it) and `toml_default` — the idiom `parse_defaults`'
@@ -68,10 +66,11 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 
 ## Public names an upstream package owns: an API decision
 
-- [ ] `load(path)` (BlobBoards' bundle + image reader) and `save(pattern, bundle; dir)`, names VisualGeometryToolkitIO
-  owns (`load(::Type{T}, path)`, `save(path, x)`). They become IO methods only if IO declares `load`/`save` among its
-  CONTRACT_GENERICS (a hoist) and BlobBoards' reader takes IO's form, `load(AbstractBundle, path)`: a breaking change
-  of BlobBoards' documented API (README, docs), the owner's call.
+- [x] `load`/`save`, names VisualGeometryToolkitIO owns → IO's functions (owner decision, Option A): BlobBoards owns
+  no `load`/`save` binding; its reader is the method `load(T::Type{<:AbstractBundle}, path)` (was `load(path)`) and
+  its writer the method `save(pattern, bundle::PatternBundle; dir)` (COMMIT_LOADSAVE). Until the hoist below lands,
+  the two methods are the contract_generics gate's only findings (report mode; the suite pins exactly them).
+- [ ] hoist: IO lists load/save in CONTRACT_GENERICS.
 - [x] `board`/`board!` (BlobBoards' Makie recipe), a name Core's Cameras owns (`board(t::PlanarTarget)`): not the
   same concept (a recipe that draws a board vs the accessor of a target's physical board); a DUPLICATION.toml entry
   with the proof, per the owner's ruling (eef3144).

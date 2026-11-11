@@ -26,7 +26,7 @@ pattern, discs, config = blob_pattern(800, 600; blob_sizes = (12px, nothing), se
 
 # Extract blobs from the saved board, in mm in the pattern frame
 board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
-loaded, _ = BlobBoards.load(board_json)
+loaded, _ = BlobBoards.load(BlobBoards.BoardBundle, board_json)
 b = blobs(loaded, :pattern; units = mm)
 length(b) == length(blobs(bundle, :pattern; units = mm))    # true
 ```

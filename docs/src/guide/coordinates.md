@@ -62,7 +62,7 @@ lies inside its `:board` one.
 ### Converting Between Reference Frames
 
 ```julia
-bundle, _ = BlobBoards.load("blob_board.json")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # Get Translation between frames (in the board's stored unit: points on a v4
 # board, pixels on a stored v3 board)
@@ -98,7 +98,7 @@ For transforms between pixel and physical units, use `:pixel`, `:physical`, and 
 ### Pixel to Physical Transform
 
 ```julia
-bundle, _ = BlobBoards.load("blob_board.json")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # Get affine transform from pixels (of a 300 dpi image of the board) to mm
 H = BlobBoards.AffineMap(bundle, :pixel, :physical; pixel_frame=:julia, density=300dpi)
@@ -122,7 +122,7 @@ world_pt = H(Point2(100.0, 200.0))
 The `blobs` function takes a reference frame (positional) and optional units:
 
 ```julia
-bundle, _ = BlobBoards.load("blob_board.json")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # Pixel units (default) in pattern frame, at the density of the image they are
 # in (a stored v3 board's own by default; required for a v4 board)
@@ -158,7 +158,7 @@ Get rectangles for different regions:
 ```julia
 using GeometryBasics: Rect
 
-bundle, _ = BlobBoards.load("blob_board.json")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # Pattern bounds (origin at 0,0)
 rect = Rect(bundle, :pattern)
@@ -174,7 +174,7 @@ rect = Rect(bundle, :board)
 
 ```julia
 using BlobBoards: EuclideanMap, PixelFrame, centroid, ustrip     # not exported
-bundle, image = BlobBoards.load("blob_board.json")
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # Ground truth at the image's density, as OpenCV-convention centres (an
 # external detector's convention)
@@ -189,7 +189,7 @@ gt_opencv = [to_opencv(ustrip.(px, centroid(d))) for d in gt]
 
 ```julia
 using BlobBoards: centroid                                     # not exported
-bundle, image = BlobBoards.load("blob_board.json")
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # 3D points (world frame, z = 0)
 b = blobs(bundle, :world)
@@ -208,7 +208,7 @@ using BlobBoards                     # re-exports mm, px, dpi
 using VisualGeometryToolkitCore: uconvert, ustrip
 using GeometryBasics: Point2
 
-bundle, _ = BlobBoards.load("blob_board.json")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 # A board's layout has no density: pixels are those of a conversion at one you name
 density = 300dpi
 

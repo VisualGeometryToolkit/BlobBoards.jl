@@ -183,7 +183,7 @@ bundle = blob_board("A4";
 Extract blobs with specified reference frame and units:
 
 ```julia
-bundle, image = BlobBoards.load("blob_board.json")
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 
 # Pixel units (default) in pattern frame, at the density you name (a v3 board's own by default)
 b = blobs(bundle, :pattern; density = 300dpi)
@@ -210,9 +210,9 @@ b = blobs(bundle, :world)
 ### Loading
 
 ```julia
-bundle, image = BlobBoards.load("blob_board.json")   # From JSON
-bundle, image = BlobBoards.load("blob_board.pdf")    # From PDF
-bundle, image = BlobBoards.load("blob_pattern.png")  # From PNG
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")   # From JSON
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.pdf")    # From PDF
+bundle, image = BlobBoards.load(BlobBoards.PatternBundle, "blob_pattern.png")  # From PNG
 ```
 
 ### Saving

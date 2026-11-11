@@ -29,7 +29,7 @@ public render_board                       # re-render a stored board (its record
 public rebuild_board                      # rebuild a stored board from its JSON, as printed
 public save_canvas_texture                # a board's printed page as a canvas texture (a PNG, its SHA-256, the rectangle it covers)
 export PatternConfig, BoardConfig          # Seeded configs (bit-exact reproduction)
-public save                                # Write a pattern bundle's JSON + PNG (`BlobBoards.save`: Makie exports a `save` too)
+public save                                # VisualGeometryToolkitIO's `save`; BlobBoards' method writes a pattern bundle's JSON + PNG (Makie exports a `save` too)
 export Size2                               # Pattern/board dimensions
 export blobs                               # Bundle accessor: blobs(bundle, frame; units=px)
 export cutoff, pattern_config, board_config
@@ -148,12 +148,12 @@ public plot_tracks, replay       # TrackTrace viewers (BlobBoardsMakieExt)
 public annotate_blobs, build_annotations, split_training_data
 public load_annotations, load_cspond_sets, plot_annotations, summarize_annotations
 # Bundle I/O internals
-public load                                # BlobBoards.load — avoids FileIO.load clash
+public load                                # VisualGeometryToolkitIO's `load`; BlobBoards' method reads a bundle + image: `load(BoardBundle, path)`
 public load_bundle
 public rasterize_pdf                       # a PDF page as pixels (pdftocairo): how every raster of a board is made
 public write_tiff                          # the TIFF writer (libtiff, LZW) behind a `Tiff` output
 public canonical_config_json               # the byte string identities are minted from
-public PatternBundle, BoardBundle, BoardPreamble
+public AbstractBundle, PatternBundle, BoardBundle, BoardPreamble
 public PRINT_SIZES
 # Board authoring internals (consumed by BlobBoards.Authoring)
 public RulerOrientation, hruler, vruler, RulerTick, RulerSpec

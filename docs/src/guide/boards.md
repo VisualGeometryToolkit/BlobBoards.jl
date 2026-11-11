@@ -483,7 +483,7 @@ The JSON sidecar is the board's definition. There are three ways to use it.
 
 ```julia
 # 1. Load the bundle (and its image): the input to detection and coordinates
-bundle, image = BlobBoards.load("./output/blob_board_<uid>.json")
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "./output/blob_board_<uid>.json")
 
 # 2. Re-render the stored board (its recorded blobs, frame, QR and uid);
 #    no placement is re-run, so it matches the printed board exactly.
@@ -502,7 +502,7 @@ Form 3 writes the board as its JSON's `render` block records (`output` and
 ## Reading a board back
 
 ```julia
-bundle, image = BlobBoards.load("./output/blob_board_<uid>.json")
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "./output/blob_board_<uid>.json")
 
 blobs(bundle, :pattern; units = mm)                  # mm, pattern frame
 blobs(bundle, :board; units = mm)                    # mm, board frame (the same as :pattern on a board made today)

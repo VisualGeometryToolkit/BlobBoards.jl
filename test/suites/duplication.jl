@@ -13,11 +13,8 @@ using Test
 import VisualGeometryToolkitCore as VgtkCore
 
 const OPEN = Set([
-    "name _sweep_score",          # hoist: RSDR's public sweep_score
     "name _Record",               # hoist: IO's public Record
     "name _snap_integer",         # hoist: IO's public snap_integer
-    "name load",                  # owner's API decision (IO's load/save contract)
-    "name save",                  # owner's API decision (IO's load/save contract)
     "pattern docs/make_hero.jl",  # hoist: Features' linear_to_srgb (plane-maps)
     "file .githooks/sync-manifest.jl",              # hoist: one sync-manifest (cau-tooling)
     "similar test/suites/readme_rows.jl",           # hoist: Core's README row runner

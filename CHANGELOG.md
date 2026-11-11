@@ -4,7 +4,7 @@
 
 On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1 as
 the 0.9 branch states them), with the 0.9 ports of RANSACScoringDoneRight and
-LocalOptimizationDoneRight. Breaking (the next release is a minor bump):
+LocalOptimizationDoneRight. Breaking (the next release is a minor bump, 0.6.0):
 
 - **`image_origin` is `pixel_frame`**, the stack's name for the pixel convention
   (`:colmap`, `:opencv`, `:julia`), everywhere: `AffineMap(…; pixel_frame)`, the
@@ -14,6 +14,14 @@ LocalOptimizationDoneRight. Breaking (the next release is a minor bump):
   detections spread over the image** (VisualGeometryToolkitFeatures'
   `spread_strongest`, which replaces its `strongest`), ordered by response. The
   default (`"unbounded"`) is unchanged.
+- **`load` and `save` are VisualGeometryToolkitIO's functions** (the stack's one file reader's
+  and writer's names); BlobBoards adds the methods of its own types and owns no
+  `load`/`save` binding. Reading takes the type first, as IO's `load` does:
+  `BlobBoards.load(path)` is now `BlobBoards.load(BlobBoards.BoardBundle, path)`
+  (or `PatternBundle`, or `AbstractBundle` for either; a file holding the other
+  kind is an `ArgumentError`). `BlobBoards.save(pattern, bundle; dir)` is unchanged
+  in form, a method of IO's `save`. `AbstractBundle` is public. No other BlobBoards
+  function was named `load` or `save`, so nothing is renamed.
 - **`config_dict` is VisualGeometryToolkitEstimation's generic** (one of its
   CONTRACT_GENERICS); BlobBoards adds its methods. `BlobBoards.config_dict` is the
   same function, and a downstream configuration adds its method as before;

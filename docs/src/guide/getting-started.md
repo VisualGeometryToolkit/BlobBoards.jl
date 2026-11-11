@@ -72,7 +72,7 @@ using BlobBoards
 dir = mktempdir()
 blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), seed = 0xBEEF, dir)
 board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
-bundle, image = BlobBoards.load(board_json)
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, board_json)
 
 # Physical coordinates (mm) relative to pattern origin
 b = blobs(bundle, :pattern; units = mm)
@@ -98,7 +98,7 @@ using BlobBoards
 pattern_dir = mktempdir()
 blob_pattern(800, 600; blob_sizes = (12px, nothing), seed = 0x1234, dir = pattern_dir)
 pattern_json = only(filter(endswith(".json"), readdir(pattern_dir; join = true)))
-bundle, _ = BlobBoards.load(pattern_json)
+bundle, _ = BlobBoards.load(BlobBoards.PatternBundle, pattern_json)
 
 # Pixel coordinates (COLMAP convention)
 b = blobs(bundle)
@@ -116,8 +116,8 @@ blob_board("A4"; blob_sizes = suggest_blob_sizes(600dpi, "A4"), seed = 0xBEEF, d
 # Load from any paired file (JSON, PNG, or PDF)
 board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
 board_pdf = only(filter(endswith(".pdf"), readdir(dir; join = true)))
-bundle, image = BlobBoards.load(board_json)
-bundle, image = BlobBoards.load(board_pdf)
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, board_json)
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, board_pdf)
 
 # Access configuration
 config = pattern_config(bundle)

@@ -59,7 +59,7 @@ dir = mktempdir()
 blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0xBEEF, dir, output = Png(100dpi))
 board_json = only(filter(endswith(".json"), readdir(dir; join = true)))
 scene = load_board(board_json)                 # the board's uid and bundle
-_, image = BlobBoards.load(board_json)         # the rendered sheet, a grey image
+_, image = BlobBoards.load(BlobBoards.BoardBundle, board_json)         # the rendered sheet, a grey image
 
 network = DescriptorNetwork(descriptor_network_path(); execution_provider = :cpu)
 gallery = BoardGallery(joinpath(dir, "board_features.jld2"), network)

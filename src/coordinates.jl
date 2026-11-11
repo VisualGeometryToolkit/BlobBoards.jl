@@ -215,7 +215,7 @@ For reference-frame translations (`:pattern`/`:board`/`:canvas`), use
 
 # Example
 ```julia
-bundle, image = BlobBoards.load("board.png")
+bundle, image = BlobBoards.load(BlobBoards.BoardBundle, "board.png")
 
 # Pixels of a 300 dpi conversion → world coordinates (COLMAP, the default origin)
 H = AffineMap(bundle, :pixel, :world; density = 300dpi)
@@ -327,7 +327,7 @@ Construct a rectangle for the board in the specified coordinate system.
 
 # Examples
 ```julia
-bundle, _ = BlobBoards.load("board.png")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "board.png")
 
 # Pattern coords
 rect = Rect(bundle, :pattern)  # Rect2(0.0, 0.0, pattern_width, pattern_height)

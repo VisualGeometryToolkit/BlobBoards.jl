@@ -229,11 +229,9 @@ The adaptation's sort-and-sweep posterior seed no longer calls RVG's
 host-side `sweep!`/`ScoringWorkspace` (those imports were removed): each
 blob's sweep runs inside the per-blob device kernel (bitonic sort of r² in
 shared memory → outlier_halfwidth median → marginal sweep, `_sort_sweep_ka!`).
-The device formula is pinned to RANSACScoringDoneRight's Jeffreys
-`_sweep_score` algebra — `S = lgamma(j/2) − (j/2)·log(π·RSS) − (n−k)·log_two_outlier_halfwidth`
-is RSDR's score at `alpha0 = beta0 = 0`. RVG/RSDR ship no generic device
-sweep (RSDR's KA files are eval-harness drivers), so this hand-rolled kernel
-is the sole device implementation and is intentional.
+Each partition is scored by RANSACScoringDoneRight's `partition_score` (public,
+device-callable) at the Jeffreys prior, the one per-partition formula of every
+sweep in the stack; the kernel supplies the backend's lgamma(j/2).
 
 The CPU `posterior_adapt.jl` implementation that extended RVG's `irls!` hooks
 was removed: that driver is now VGC's `block_coordinate_descent!`.

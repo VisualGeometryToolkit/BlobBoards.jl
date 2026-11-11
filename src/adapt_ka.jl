@@ -99,6 +99,10 @@ using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamm
 # type with the backend's lgamma (one per blob per iteration: ν and ŝ² change per
 # blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
 using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_weight, is_peak, is_valid_shape
+# The sweep's per-partition score is RANSACScoringDoneRight's one formula.
+using RANSACScoringDoneRight: partition_score
+using VisualGeometryToolkitCore: IGPrior
+const _JEFFREYS = IGPrior()
 
 
 # =============================================================================
@@ -379,19 +383,15 @@ end
 @inline _blob_mixture(::Type{Ta}, nu, s_hat_sq, outlier_halfwidth, blob, lgamma_f) where {Ta} =
     StudentTMixture{Ta}(nu[blob], max(s_hat_sq[blob], Ta(1.0e-30)), log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
 
-# RSDR's Jeffreys sweep score at partition size kk (jdof = kk − m > 0):
-# S = lgamma(j/2) − (j/2)·log(π·RSS) − (n − kk)·log_two_outlier_halfwidth.
-@inline function _sweep_score(jdof::Integer, RSS::Ta, outlier_term::Ta, lgamma_f::F) where {Ta, F}
-    RSS_safe = max(RSS, Ta(1.0e-30))
-    ν_half = Ta(jdof) / Ta(2.0)
-    lg_j = if jdof == 1
-        Ta(0.5) * log(Ta(3.141592653589793))
-    elseif jdof == 2
-        zero(Ta)
-    else
-        lgamma_f(ν_half)
-    end
-    return lg_j - ν_half * log(Ta(3.141592653589793) * RSS_safe) - outlier_term
+# The sweep's score of a partition is RANSACScoringDoneRight's one per-partition
+# formula, `partition_score` (device-callable), at the Jeffreys prior (IG at
+# α₀ = β₀ = 0): S = lgamma(j/2) − (j/2)·log 2π − (j/2)·log(RSS/2) − outlier_cost.
+# The kernel supplies lgamma(j/2) — the backend's lgamma, its two closed forms at
+# j = 1, 2 — and floors the RSS, as the score's callers do.
+@inline function _half_dof_lgamma(jdof::Integer, ::Type{Ta}, lgamma_f::F) where {Ta, F}
+    jdof == 1 && return Ta(0.5) * log(Ta(3.141592653589793))
+    jdof == 2 && return zero(Ta)
+    return lgamma_f(Ta(jdof) / Ta(2.0))
 end
 
 # The ν-Newton step's special-function terms at ν.
@@ -462,7 +462,7 @@ end
 end
 
 # Per-blob bitonic sort of r² in shared memory → outlier_halfwidth = √median(r²) →
-# marginal posterior sweep (RSDR's Jeffreys `_sweep_score` algebra) → ν, ŝ².
+# marginal posterior sweep (RSDR's `partition_score` at the Jeffreys prior) → ν, ŝ².
 @kernel inbounds = true unsafe_indices = true function _sort_sweep_ka!(
         nu, s_hat_sq, outlier_halfwidth, @Const(r2), @Const(np),
         @Const(cnt), @Const(valid), @Const(offsets), lgamma_f
@@ -522,7 +522,10 @@ end
         while kk <= n
             RSS += smem[kk]
             if kk > m
-                S = _sweep_score(kk - m, RSS, Ta(n - kk) * log_two_outlier_halfwidth, lgamma_f)
+                S = partition_score(
+                    _JEFFREYS, _half_dof_lgamma(kk - m, Ta, lgamma_f), Ta(kk - m) / Ta(2.0),
+                    max(RSS, Ta(1.0e-30)), Ta(n - kk) * log_two_outlier_halfwidth
+                )
                 if S > best_S
                     best_S = S
                     best_k = kk

@@ -153,10 +153,16 @@ function _bundle_length_unit(bundle::AbstractBundle, render)
 end
 
 
+# `load` and `save` are VisualGeometryToolkitIO's, the stack's one file reader's and
+# writer's names: BlobBoards adds the methods of its own types (a bundle type to
+# read, a pattern bundle to write) and owns no `load`/`save` of its own.
+import VisualGeometryToolkitIO: load, save
+
 """
     save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite=false)
 
-Save a grayscale pattern image directly and its JSON sidecar.
+Save a grayscale pattern image directly and its JSON sidecar (a method of
+VisualGeometryToolkitIO's `save`).
 Saves the colorant array directly as a grayscale PNG (single channel, no alpha).
 Returns `(img_path, json_path)`.
 """
@@ -590,11 +596,11 @@ The `config_hash` is the hex-encoded SHA-256 hash stored at write time in the
 use `uid_from_hash(config_hash)` to derive the 3-character UID rather than
 recomputing from the deserialized config (which may differ after format migrations).
 
-See also: [`load`](@ref) for loading bundle + image together.
+See also: `BlobBoards.load(BlobBoards.AbstractBundle, path)` for loading bundle + image together.
 """
 function load_bundle(path::AbstractString)
     if lowercase(splitext(path)[2]) in [".tracks", ".h5", ".hdf5"]
-        error("load_bundle does not support track files; use load() instead")
+        error("load_bundle does not support track files (read them with HDF5.jl or the Python `blobboards.load_tracks`)")
     end
 
     json_path, image_path = _resolve_paths(path)
@@ -670,9 +676,13 @@ function _stored_config_hash(json_obj::_ParsedObject)
 end
 
 """
-    load(path::AbstractString) -> (bundle, image)
+    load(T::Type{<:AbstractBundle}, path::AbstractString) -> (bundle::T, image)
 
-Load a blob board or pattern from disk, including both the JSON metadata and image.
+Load a blob board or pattern from disk, including both the JSON metadata and
+image (a method of VisualGeometryToolkitIO's `load`, which takes the type to read
+first). `T` is [`BoardBundle`](@ref), [`PatternBundle`](@ref) or
+[`AbstractBundle`](@ref) (either, the one the file holds); a file that holds
+another kind than `T` is an `ArgumentError`.
 
 Accepts any of the paired files (image or JSON) and automatically finds the sidecar:
 - `.png` → finds `.json` sidecar
@@ -680,18 +690,14 @@ Accepts any of the paired files (image or JSON) and automatically finds the side
 - `.json` → finds image (`.png` or `.pdf`)
 
 Returns a tuple `(bundle, image)` where:
-- `bundle`: Either `BoardBundle` or `PatternBundle` (automatically detected from JSON)
+- `bundle`: the `BoardBundle` or `PatternBundle` the JSON holds (a `T`)
 - `image`: Loaded image array
 
 See also: [`load_bundle`](@ref) for metadata-only loading (no rasterization).
 """
-function load(path::AbstractString)
-    # NOTE: a `.tracks`/`.h5`/`.hdf5` branch used to dispatch to
-    # `_load_tracks`, which lived in src/training.jl. Commit 197beeb deleted
-    # training.jl but left this call site, so that branch has thrown
-    # UndefVarError ever since. Track I/O is no longer part of this package;
-    # the branch is removed rather than resurrected (found by JET, 2026-07-26).
+function load(::Type{T}, path::AbstractString) where {T <: AbstractBundle}
     bundle, image_path = load_bundle(path)
+    bundle isa T || throw(ArgumentError("$(path) holds a $(nameof(typeof(bundle))), not a $(nameof(T))"))
     image = _load_image(image_path, bundle)
     return bundle, image
 end

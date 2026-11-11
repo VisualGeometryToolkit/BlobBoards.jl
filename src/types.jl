@@ -118,6 +118,12 @@ Base.:/(rs::RulerSpec, scalar::Quantity) = RulerSpec(rs.major_tick / scalar, rs.
 # Configuration Types
 # =============================================================================
 
+"""
+    AbstractBundle
+
+A stored blob pattern or board: [`PatternBundle`](@ref) or [`BoardBundle`](@ref).
+`BlobBoards.load(BlobBoards.AbstractBundle, path)` reads either, the one the file holds.
+"""
 abstract type AbstractBundle end
 
 """

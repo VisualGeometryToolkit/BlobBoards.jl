@@ -15,7 +15,7 @@ bundle = blob_board("A4"; blob_sizes=(4.0mm, 0.2short_side), cutoff=2.0, seed=0x
 pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), cutoff=2.0, seed=0x1234)
 
 # Extract blobs from saved files
-bundle, _ = load("blob_board.json")
+bundle, _ = BlobBoards.load(BlobBoards.BoardBundle, "blob_board.json")
 b = blobs(bundle, :pattern; units=mm)  # Physical units
 b = blobs(bundle, :canvas; density = 300dpi)   # Pixel units, at a density
 ```

@@ -144,9 +144,14 @@ BlobBoards.plot_tracks
 
 ## File I/O
 
+`load` and `save` are VisualGeometryToolkitIO's functions; BlobBoards adds the methods
+of its own types, `BlobBoards.load(BoardBundle | PatternBundle | AbstractBundle, path)`
+and `BlobBoards.save(pattern, bundle::PatternBundle; dir)`.
+
 ```@docs
-BlobBoards.load
-BlobBoards.save
+BlobBoards.load(::Type{T}, ::AbstractString) where {T <: BlobBoards.AbstractBundle}
+BlobBoards.save(::AbstractMatrix, ::BlobBoards.PatternBundle)
+BlobBoards.AbstractBundle
 BlobBoards.canonical_config_json
 ```
 
@@ -183,7 +188,7 @@ The main types used in BlobBoards are:
 - `Disc` - Isotropic blob/feature type (from VisualGeometryToolkitCore)
 - `PatternConfig` - Pattern generation configuration
 - `BoardConfig` - Board layout configuration
-- `PatternBundle` - Pattern with metadata (what `blob_pattern(…; dir)` writes as JSON, and `BlobBoards.load` returns)
+- `PatternBundle` - Pattern with metadata (what `blob_pattern(…; dir)` writes as JSON, and `BlobBoards.load(PatternBundle, path)` returns)
 - `BoardBundle` - Board with metadata (returned by `blob_board`)
 
 ## Media enumeration

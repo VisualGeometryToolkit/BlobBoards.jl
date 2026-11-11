@@ -125,7 +125,7 @@ p2, b2, _ = blob_pattern(800, 600; blob_sizes=(12px, nothing), seed=0x1234)
 # p1 == p2 and b1 == b2
 
 # From saved configuration
-bundle, image = BlobBoards.load("blob_pattern.json")
+bundle, image = BlobBoards.load(BlobBoards.PatternBundle, "blob_pattern.json")
 config = pattern_config(bundle)
 # Regenerate identical pattern from config
 ```
@@ -147,7 +147,7 @@ pattern, blobs, config = blob_pattern(800, 600; blob_sizes=(12px, nothing), pola
 Blobs are stored in COLMAP convention internally (first pixel center at 0.5, 0.5):
 
 ```julia
-bundle, _ = BlobBoards.load("blob_pattern.json")
+bundle, _ = BlobBoards.load(BlobBoards.PatternBundle, "blob_pattern.json")
 
 # Get blobs in COLMAP convention
 b = blobs(bundle)
