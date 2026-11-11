@@ -13,9 +13,6 @@ using Test
 import VisualGeometryToolkitCore as VgtkCore
 
 const OPEN = Set([
-    # B2 of the CPU/GPU twin audit, AWAITING THE OWNER'S RULING (it changes CUDA results): `_device_lgamma`'s three
-    # implementations (SpecialFunctions on the CPU, Core's lgamma_lanczos, CUDA's __nv_lgamma in BlobBoardsCUDAExt)
-    "backend_branch src/adapt_ka.jl",
 ])
 
 _key(v) = v.check === :name ? "name $(v.text)" :
@@ -26,4 +23,4 @@ keys_found = Set(_key(v) for v in found)
 foreach(v -> _key(v) in OPEN || println(stderr, v), found)
 @test keys_found ⊆ OPEN
 @test isempty(setdiff(OPEN, keys_found)) || isempty(get(ENV, "VGTK_STACK_PATHS", ""))   # file/similar need the stack paths
-isempty(OPEN) ? (@test isempty(found)) : (@test_broken isempty(found))   # the release leg refuses while OPEN is not empty
+@test isempty(found)
