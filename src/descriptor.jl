@@ -3,6 +3,8 @@
 # =============================================================================
 
 import ONNXRunTime
+# the one ONNX Runtime session of the stack (provider resolution, the sm_100-capable CUDA build)
+using VisualGeometryToolkitFeatures: onnx_session
 
 # =============================================================================
 # Abstract interface
@@ -255,17 +257,16 @@ the rest of BlobBoards' hot path is GPU-resident (KA detect, CUDA
 adapt + canonicalize).  Saves ~340 ms on the SupCon checkpoint vs CPU
 EP (~2× on this batch-1 model; dynamic-batch models would gain more).
 
-Requires `import CUDA, cuDNN` before the call — BOTH; `import CUDA` alone
-leaves ONNXRunTime's CUDA extension inactive and the :cuda EP unavailable.
+The session is VisualGeometryToolkitFeatures' `onnx_session`: on `:cuda` it
+runs ONNX Runtime's CUDA build that Features installs (device code from sm_70
+to sm_120, the B200's sm_100 among them), which needs a visible CUDA device and
+CUDA 12's runtime and cuDNN (CUDA_Runtime_jll, CUDNN_jll) in the environment;
+its arena is capped at `gpu_mem_limit` (by default derived from `max_batch`).
 
 THROWS if the :cuda EP cannot initialize. It used to warn and continue on the
 CPU EP, which is ~34x slower on this network and reported success while doing
 it. Opt out explicitly: `execution_provider = :cpu` on a CUDA-less host, or
 `allow_cpu_fallback = true` to restore the warn-and-continue behaviour.
-
-The CUDA runtime version must be in the range ONNXRunTime.jl supports
-(currently 12.x).  Pin via `CUDA.set_runtime_version!(v"12.x")` if your
-default is newer; the preference lives in `LocalPreferences.toml`.
 """
 function DescriptorNetwork(
         path::AbstractString;
@@ -275,10 +276,13 @@ function DescriptorNetwork(
         allow_cpu_fallback::Bool = false
     )
     h = open(sha256_hex, path)   # the model file's content hash keys the gallery cache (the Lux checkpoint's likewise)
-    provider_options = execution_provider === :cuda ?
-        (; gpu_mem_limit = Int(gpu_mem_limit)) : (;)
+    # The session is VisualGeometryToolkitFeatures' one ONNX Runtime session
+    # (`onnx_session`): its provider resolution, and on CUDA its ONNX Runtime
+    # build with device code for every device from sm_70 to sm_120 (the B200's
+    # sm_100 among them, which Microsoft's GPU builds lack), the arena capped at
+    # `gpu_mem_limit` and counted in the reserve the ASIFT detector's plans leave.
     session = try
-        ONNXRunTime.load_inference(path; execution_provider, provider_options)
+        onnx_session(path; execution_provider, gpu_mem_limit = Int(gpu_mem_limit))
     catch err
         execution_provider === :cuda || rethrow()
         # THIS THROWS BY DEFAULT, and used to `@warn` and silently continue on
@@ -290,13 +294,10 @@ function DescriptorNetwork(
         # than a failure: it gets measured, believed, and reported as the
         # pipeline's throughput (it was, in this session).
         #
-        # The trigger is mundane and easy to hit: the :cuda EP needs
-        # ONNXRunTime's CUDA extension active in THIS process, which requires
-        # BOTH `import CUDA` and `import cuDNN`. `using CUDA` alone is not
-        # enough, and nothing else in the pipeline needs cuDNN, so the omission
-        # is invisible. A full card at session creation produces the same
-        # exception (ORT reserves a fixed arena up front), so contention and a
-        # missing package are indistinguishable without reading this text.
+        # Features' error names why the CUDA provider is unavailable (no device
+        # visible, a CUDA 12 runtime or cuDNN missing from the environment, …); a
+        # full card at session creation fails here too (the arena is reserved
+        # below, while the card is empty).
         #
         # Opt out deliberately: `execution_provider = :cpu` for a CUDA-less
         # host, or `allow_cpu_fallback = true` to keep the old behaviour.
@@ -307,18 +308,16 @@ function DescriptorNetwork(
                     "The CPU EP is ~34x slower on this network (1.76 ms vs " *
                     "52 us per patch), so falling back silently would " *
                     "misreport pipeline throughput.\n" *
-                    "Fix: install both once with `$(EXTENSION_INSTALL.BlobBoardsCUDAExt.install)`, " *
-                    "pin the CUDA runtime ONNX Runtime takes with `$(CUDA_RUNTIME_PIN)` " *
-                    "(then restart Julia), and `import CUDA, cuDNN` before constructing " *
-                    "DescriptorNetwork (cuDNN is required and easy to omit); " *
-                    "or free the GPU if the arena reservation failed.\n" *
+                    "Fix: the reason below; install BlobBoards' CUDA extension once with " *
+                    "`$(EXTENSION_INSTALL.BlobBoardsCUDAExt.install)` and pin the CUDA 12 runtime with `$(CUDA_RUNTIME_PIN)` " *
+                    "(then restart Julia); or free the GPU if the arena reservation failed.\n" *
                     "Opt out: DescriptorNetwork(path; execution_provider = :cpu) " *
                     "or DescriptorNetwork(path; allow_cpu_fallback = true).\n" *
                     "Underlying error: $(sprint(showerror, err))"
             )
         )
         @warn "ONNX CUDA execution provider unavailable; falling back to CPU EP (~34x slower)" exception = err
-        ONNXRunTime.load_inference(path; execution_provider = :cpu)
+        onnx_session(path; execution_provider = :cpu)
     end
     net = DescriptorNetwork(
         session, String(first(session.input_names)),
