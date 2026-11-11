@@ -64,11 +64,13 @@ if CUDA.functional()
         # tightening it is a ratchet.
         @test oneside == 0
         @test maximum(dc) < 1.0e-6
-        # The per-blob convergence flag (§14): the same IRLS on both backends
-        # stops the same blobs. A blob whose last relative step lands within
+        # The per-blob outcome (§14): the same IRLS on both backends ends the
+        # same blobs the same way. A blob whose last relative step lands within
         # rounding of rtol may flip, so at most one disagreement is allowed.
-        @test count(id -> c[id].converged != g[id].converged, common) <= 1
-        @test BlobBoards.count_unconverged(cpu) == count(f -> !f.converged, cpu)
+        @test count(id -> c[id].retcode !== g[id].retcode, common) <= 1
+        @test count(id -> c[id].rejection !== g[id].rejection, common) <= 1
+        # Not converged = capped (unconverged) + refused by the shape gate (rejected).
+        @test BlobBoards.count_unconverged(cpu) + BlobBoards.count_rejected(cpu) == count(f -> !f.converged, cpu)
     end
 else
     @info "adapt parity: skipped (no functional CUDA device)"
