@@ -230,7 +230,7 @@ The adaptation's sort-and-sweep posterior seed no longer calls RVG's
 host-side `sweep!`/`ScoringWorkspace` (those imports were removed): each
 blob's sweep runs inside the per-blob device kernel (bitonic sort of r² in
 shared memory → outlier_halfwidth median → marginal sweep, `_sort_sweep_ka!`).
-Each partition is scored by RANSACScoringDoneRight's `partition_score` (public,
+Each partition is scored by VisualGeometryToolkitCore's `partition_score` (public,
 device-callable) at the Jeffreys prior, the one per-partition formula of every
 sweep in the stack; the kernel supplies the backend's lgamma(j/2).
 

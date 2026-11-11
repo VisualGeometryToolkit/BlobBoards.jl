@@ -3,8 +3,8 @@
 ## Unreleased (the VisualGeometryToolkit 0.9 stack)
 
 On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1 as
-the 0.9 branch states them), with the 0.9 ports of RANSACScoringDoneRight and
-LocalOptimizationDoneRight. Breaking (the next release is a minor bump, 0.6.0):
+the 0.9 branch states them), with the 0.9 port of LocalOptimizationDoneRight.
+Breaking (the next release is a minor bump, 0.6.0):
 
 - **`image_origin` is `pixel_frame`**, the stack's name for the pixel convention
   (`:colmap`, `:opencv`, `:julia`), everywhere: `AffineMap(…; pixel_frame)`, the
@@ -39,6 +39,11 @@ LocalOptimizationDoneRight. Breaking (the next release is a minor bump, 0.6.0):
   CPU's SpecialFunctions `loggamma`, are gone; SpecialFunctions is no longer a
   dependency). Frames change: blobs whose ν Newton step went downhill move, so the
   CPU and CUDA frames now agree to ~1e-8 px (they differed by up to 0.3 px).
+- **RANSACScoringDoneRight is no longer a dependency.** The Student-t + uniform
+  scorer and its per-partition score `partition_score` are VisualGeometryToolkitCore's;
+  every fit builds the scorer from its table through VisualGeometryToolkitEstimation's
+  `scoring_from_toml` (`outlier_halfwidth` the one number it states, the priors the
+  stack's configuration: Jeffreys and flat, as before). The scores are unchanged.
 - The docstring gates are VisualGeometryToolkitCore's `test_docs`; the suite runs
   Core's `check_duplication` (its open findings listed, each an item of
   `.release/duplication-checklist.md`).

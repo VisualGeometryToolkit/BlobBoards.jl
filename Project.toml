@@ -33,7 +33,6 @@ PNGFiles = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
 Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-RANSACScoringDoneRight = "084d9f33-8b05-4903-a655-8a8c4926d033"
 VisualGeometryToolkitEstimation = "9a478df9-9a37-4dc7-9070-58617efe7573"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 Scratch = "6c6a2e73-6563-6170-7368-637461726353"
@@ -79,8 +78,6 @@ VisualGeometryToolkitEstimation = {path = "/home/jpr/src/vgtk-hoists/VisualGeome
 VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-hoists/VisualGeometryToolkitFeatures"}
 # TEMPORARY: its 0.9 port (on the unregistered 0.9 stack) is not registered yet; replace by its released version from the registry before any push or registration
 LocalOptimizationDoneRight = {path = "/home/jpr/src/lodr-09"}
-# TEMPORARY: its 0.9 port (on the unregistered 0.9 stack) is not registered yet; replace by its released version from the registry before any push or registration
-RANSACScoringDoneRight = {path = "/home/jpr/src/rsdr-09"}
 
 [compat]
 Artifacts = "1"
@@ -120,7 +117,6 @@ Poppler_jll = "25.10.0"
 Preferences = "1.6"
 PythonCall = "0.9.35"
 Random = "1"
-RANSACScoringDoneRight = "0.6"
 Reactant = "0.2.240"
 VisualGeometryToolkitEstimation = "0.8"
 Rotations = "1.7"

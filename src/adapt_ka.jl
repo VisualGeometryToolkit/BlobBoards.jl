@@ -100,9 +100,8 @@ using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_we
 # The ν M-step is Core's: a point's Q-derivative terms and the safeguarded Newton
 # update from the reduced sums (Newton only where Q is concave).
 using VisualGeometryToolkitCore: nu_point_terms, next_nu_from_sums
-# The sweep's per-partition score is RANSACScoringDoneRight's one formula.
-using RANSACScoringDoneRight: partition_score
-using VisualGeometryToolkitCore: IGPrior
+# The sweep's per-partition score is VisualGeometryToolkitCore's one formula.
+using VisualGeometryToolkitCore: IGPrior, partition_score
 const _JEFFREYS = IGPrior()
 
 
@@ -360,7 +359,7 @@ end
 @inline _blob_mixture(::Type{Ta}, nu, s_hat_sq, outlier_halfwidth, blob, lgamma_f) where {Ta} =
     StudentTMixture{Ta}(nu[blob], max(s_hat_sq[blob], Ta(1.0e-30)), log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
 
-# The sweep's score of a partition is RANSACScoringDoneRight's one per-partition
+# The sweep's score of a partition is VisualGeometryToolkitCore's one per-partition
 # formula, `partition_score` (device-callable), at the Jeffreys prior (IG at
 # α₀ = β₀ = 0): S = lgamma(j/2) − (j/2)·log 2π − (j/2)·log(RSS/2) − outlier_cost.
 # The kernel supplies lgamma(j/2) — the backend's lgamma, its two closed forms at
