@@ -13,7 +13,7 @@
 using VisualGeometryToolkitCore:
     centroid, feature_frame,
     Extrinsics3, CameraModel, AbstractIntrinsics, Pinhole, AbstractLensModel,
-    undistort, undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
+    undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
     sources, Attributed, withattrs, planar_lift, lift, exact   # #21 correspondence layer; `exact`: the board side of a 2D fit
 
@@ -376,16 +376,42 @@ function describe_frames(
     return described_features(frames, descriptors)
 end
 
-# Canonicalize + describe as one dispatchable stage. The generic path is the
-# host pipeline (patch download → per-batch host gather → ONNX). The
-# CUDABackend + DescriptorNetwork(:cuda) override in BlobBoardsCUDAExt keeps
-# the patch cube on-device and feeds ONNX Runtime a device tensor directly —
-# at 26k patches the host path moves ~880 MB over PCIe for nothing.
+# Canonicalize + describe as one stage, on every backend: the image goes up
+# once, each chunk of frames is warped into a log-polar patch cube on `device`
+# (`_patch_cube`, the one KA kernel) and handed to the network
+# (`_describe_patches`). The handoff is the only backend-specific step: through
+# the host by default (the cube downloaded, `describe`'s batches); for a CUDA
+# cube and an ONNX session on the CUDA provider, BlobBoardsCUDAExt gives ONNX
+# Runtime a device tensor over the cube itself — at 26k patches the host path
+# moves ~880 MB over PCIe for nothing.
+#
+# THE PATCH CUBE IS CHUNKED. One cube for a whole frame is P·P·N·4 B — 3 GiB at
+# 195 000 detections — held while the network runs, beside the detector's plan
+# and the arena, and it was the allocation that failed first on a 24 GB card
+# (2026-09-15). A chunk of `_DESCRIBE_CHUNK` is 256 MB; the network batches
+# inside it (`max_batch` divides it), so the descriptors are the same bytes.
 #
 # Shapes before the image (`canonicalize(frames, img)`); typed so the retired
-# `(device, model, img, frames)` order is a MethodError, here and on the override.
-_canon_describe(device, model, frames::AbstractVector, img::AbstractMatrix; inner_extent, outer_extent, patch_size = 64) =
-    describe(model, canonicalize(frames, img; patch_size, inner_extent, outer_extent, device))
+# `(device, model, img, frames)` order is a MethodError.
+function _canon_describe(device, model, frames::AbstractVector, img::AbstractMatrix; inner_extent, outer_extent, patch_size = 64)
+    N = length(frames)
+    N == 0 && return Matrix{Float32}(undef, 0, 0)
+    d_img = _device_image(device, img)
+    out = Matrix{Float32}(undef, 0, 0)
+    for start in 1:_DESCRIBE_CHUNK:N
+        stop = min(start + _DESCRIBE_CHUNK - 1, N)
+        cube = _patch_cube(device, d_img, view(frames, start:stop); patch_size, inner_extent, outer_extent)
+        rows = _describe_patches(model, cube)
+        finalize(cube)   # a device cube back to its pool now, not at the next collection
+        isempty(out) && (out = Matrix{Float32}(undef, N, size(rows, 2)))
+        out[start:stop, :] .= rows
+    end
+    return out
+end
+const _DESCRIBE_CHUNK = 16_384
+
+# A patch cube's descriptors (one row per patch): the host handoff.
+_describe_patches(model, cube) = describe(model, _host_patches(cube))
 
 # =============================================================================
 # Dispatch on camera: nothing → homography, CameraModel → P3P,
@@ -522,9 +548,6 @@ function _undistort_detect(
     return Array(d_out)
 end
 
-# Adapt-image undistort: CPU reference is VGC's undistort; the CUDABackend
-# method (BlobBoardsCUDAExt) keeps a device-resident CuArray{Float32}.
-_undistort_adapt(::KA.Backend, img, camera) = undistort(camera, img)
 
 # =============================================================================
 # guided_search — project the verified pattern, re-associate to detections
@@ -2146,16 +2169,12 @@ _detect_config_for_boards(config, polarity::Symbol) =
 # Undistort for the detector: the geometry decides (KA kernel on `device`
 # for the pose arm under :global; identity for Pinhole/no camera, for the
 # raw-detecting arms, and for the pose arm under :none). The detector
-# consumes host UInt8. The second `_undistort_adapt(..., nothing)` is a
-# storage convert, not a second kernel.
+# consumes host UInt8; the adaptation and the descriptor read the same pixels as
+# a Float32 image on `device`, uploaded once (`_device_image`: a storage
+# convert, not a second kernel).
 function _undistorted_pair(img, geometry, device::KA.Backend)
     detect_img = gray_u8(_undistort_detect(device, img, geometry))
-    adapt_img = _undistort_adapt(
-        device,
-        detect_img isa AbstractMatrix{UInt8} ?
-            reinterpret(Gray{N0f8}, detect_img) : detect_img,
-        nothing
-    )
+    adapt_img = _device_image(device, detect_img isa AbstractMatrix{UInt8} ? reinterpret(Gray{N0f8}, detect_img) : detect_img)
     return detect_img, adapt_img
 end
 
@@ -2229,8 +2248,8 @@ none (undistort becomes a no-op).
 
 Detect-once seam for `annotate_blobs`, `track_boards` and the sweeps: the
 SAME stages `find_boards(…, img)` runs — undistort (two-step: a KA undistort
-kernel for the lens, then a storage conversion via an identity-kernel
-`_undistort_adapt`), detect at the polarity the boards imply, cap, printed-
+kernel for the lens, then a storage conversion to the Float32 image the
+adaptation reads, `_device_image`), detect at the polarity the boards imply, cap, printed-
 profile scale correction, adapt, describe at the gallery's shared extent
 (`_shared_image_cutoff` over `uids`) — producing ONE feature set shared by
 every board. There is no `cutoff` keyword: the gallery decides the extent, and
@@ -2241,9 +2260,9 @@ incomparable. The returned `config` carries the derived detection polarity;
 NEVER run two undistort kernels on the same image — the per-stage numerical
 drift between kernels (hardware bilinear vs manual bilinear)
 propagates through adapt → canonicalize → descriptors and shifts RANSAC
-inliers enough to drop borderline boards. The second `_undistort_adapt(…,
-nothing)` call here is a storage convert (Pinhole/nothing path), not a
-second kernel.
+inliers enough to drop borderline boards. The adaptation image here is a
+storage convert of the detection image (`_device_image`), not a second
+kernel.
 """
 function prepare_image_features(
         descriptor_network, img::AbstractMatrix;

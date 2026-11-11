@@ -1,61 +1,28 @@
 module BlobBoardsCUDAExt
 
 using CUDA: CUDA, CuArray
-using Colors: Gray
-using FixedPointNumbers: N0f8
 
 using BlobBoards
-using VisualGeometryToolkitFeatures: gray_f32, batched_rows
-using VisualGeometryToolkitCore: logpolar_map, image_warp, image_warp_batch_to!, region, undistort!,
-    CameraModel, AbstractIntrinsics, AbstractLensModel, Pinhole
+using VisualGeometryToolkitFeatures: batched_rows
 using CUDA: CUDABackend   # the KA device token — BB's sole GPU dispatch tag
-import KernelAbstractions as KA
 using ONNXRunTime: ONNXRunTime
 const _OCAPI = ONNXRunTime.CAPI
-
-import BlobBoards: _undistort_adapt
 
 # The default-device resolver is registered by VisualGeometryToolkitCoreCUDAExt
 # (2026-09-07); this extension no longer needs an `__init__`.
 
 # =============================================================================
-# GPU canonicalize→describe fast path (ORT device tensors)
-# =============================================================================
-#
-# The kernel and bilinear sampler live in `VisualGeometryToolkitCoreCUDAExt`
-# (`image_warp_batch_to!` for `CuArray`). This file keeps only the DEVICE core
-# below — the (P,P,N) patch cube that `_canon_describe` hands to ORT without a
-# download. The host-facing `_canonicalize` is the backend-generic one in
-# src/canonicalize.jl (a CUDA override here was unreachable: `canonicalize`
-# dispatches to BlobBoards' own generic method).
-
-# Device core: returns the (P,P,N) patch cube ON DEVICE (no download).
-function _canonicalize_cuda_device(img, warps, P::Int)
-    N = length(warps)
-    # Skip the CPU conversion + PCIe upload if caller pre-uploaded the image
-    # (≈80 ms saved on a 4240×2832 Float32 image).
-    d_img = if img isa CUDA.CuArray{Float32, 2}
-        img
-    else
-        CuArray(Float32.(Gray{Float32}.(gray_f32(img))))
-    end
-    d_warps = CuArray(warps)
-    d_patches = CUDA.zeros(Float32, P, P, N)
-
-    # Delegate to VGC's batched bilinear warp (per-thread warp math + sample).
-    image_warp_batch_to!(d_patches, d_warps, d_img; fillvalue = 0.5f0)
-    return d_patches
-end
-
-# =============================================================================
 # GPU-resident canonicalize → describe (ORT device tensors)
 # =============================================================================
 #
-# The host path downloads the (P,P,N) patch cube (~440 MB at 26k patches),
-# splits it into 26k Gray matrices, then re-gathers 128-patch host batches
-# that the ORT CUDA EP uploads again. This path keeps the cube on-device:
-# permute to ORT's row-major NCHW byte layout on the GPU and hand ONNX
-# Runtime an OrtValue backed by CUDA memory.
+# The patch cube is BlobBoards' one KA warp (`_patch_cube`, src/canonicalize.jl)
+# and the chunked driver its `_canon_describe` (src/pipeline.jl); this file adds
+# only the HANDOFF of a CUDA cube to an ONNX session on the CUDA provider. The
+# host handoff downloads the cube (~440 MB at 26k patches), splits it into 26k
+# Gray matrices, then re-gathers 128-patch host batches that the ORT CUDA EP
+# uploads again. This one keeps the cube on-device: permute to ORT's row-major
+# NCHW byte layout on the GPU and hand ONNX Runtime an OrtValue backed by CUDA
+# memory.
 #
 # ONNXRunTime 1.3.x wraps only CreateCpuMemoryInfo; the CreateMemoryInfo and
 # CreateTensorWithDataAsOrtValue entries in the api table accept any
@@ -133,67 +100,21 @@ function _describe_device(model, d_patches::CuArray{Float32, 3})
     end
 end
 
-# CUDABackend + ONNX(:cuda) fast path for the fused canonicalize→describe
-# stage. Any other execution provider falls back to the host pipeline.
-function BlobBoards._canon_describe(
-        device::CUDABackend, model::BlobBoards.DescriptorNetwork,
-        frames::AbstractVector, img::AbstractMatrix; inner_extent, outer_extent, patch_size = 64
-    )
-    if model.session.execution_provider !== :cuda || patch_size != 64
-        return BlobBoards.describe(
-            model,
-            BlobBoards.canonicalize(frames, img; patch_size, inner_extent, outer_extent, device)
-        )
-    end
-    P = 64
-    inner_r = inner_extent / outer_extent
-    N = length(frames)
-    N == 0 && return Matrix{Float32}(undef, 0, 0)
-    # The image goes up once; every chunk warps from the resident copy.
-    d_img = _upload_f32(img)
-    # THE PATCH CUBE IS CHUNKED. One cube for a whole frame is P·P·N·4 B —
-    # 3 GiB at 195 000 detections — held while the network runs, beside the
-    # detector's plan and the arena, and it was the allocation that failed
-    # first on a 24 GB card (2026-09-15). A chunk of `_DESCRIBE_CHUNK` is
-    # 256 MB; the network batches inside it as before, so the descriptors are
-    # the same bytes.
-    out = Matrix{Float32}(undef, 0, 0)
-    for start in 1:_DESCRIBE_CHUNK:N
-        stop = min(start + _DESCRIBE_CHUNK - 1, N)
-        # Logpolar-only by construction (this fast path never receives mode or
-        # supersample; the generic BlobBoards.canonicalize handles those). The
-        # inline warp build mirrors _region_bm(:logpolar, …) — kept inline on
-        # purpose: routing through the generic builder changes warp construction
-        # on the production descriptor path (2026-09 audit).
-        warps = [
-            image_warp(logpolar_map(region(ff, outer_extent), P, inner_r), P)
-                for ff in view(frames, start:stop)
-        ]
-        d_patches = _canonicalize_cuda_device(d_img, warps, P)
-        rows = _describe_device(model, d_patches)
-        finalize(d_patches)   # back to the pool now, not at the next collection
-        isempty(out) && (out = Matrix{Float32}(undef, N, size(rows, 2)))
-        out[start:stop, :] .= rows
-    end
-    return out
-end
-const _DESCRIBE_CHUNK = 16_384
-
-# The image on the device as Float32. An 8-bit grey raster (a board: 50 Mpx at
-# 1200 dpi) goes up as its bytes and is converted there — a quarter of the
-# transfer and no host-side Float32 copy (0.34 → 0.20 s per board); the values
-# are the same as the host conversion's (N0f8 → Float32 is exact either way).
-_upload_f32(img::CuArray{Float32, 2}) = img
-_upload_f32(img::AbstractMatrix{Gray{N0f8}}) =
-    Float32.(reinterpret(N0f8, CuArray(collect(reinterpret(UInt8, img)))))
-_upload_f32(img::AbstractMatrix) = CuArray(Float32.(Gray{Float32}.(gray_f32(img))))
+# A CUDA patch cube to an ONNX session on the CUDA provider: the device tensor
+# above. Any other provider takes the host handoff (the same network, read
+# through the host).
+BlobBoards._describe_patches(model::BlobBoards.DescriptorNetwork, cube::CuArray{Float32, 3}) =
+    model.session.execution_provider === :cuda ? _describe_device(model, cube) :
+    BlobBoards.describe(model, BlobBoards._host_patches(cube))
 
 # =============================================================================
 # CUDA hooks for the backend-generic KA adaptation (src/adapt_ka.jl)
 # =============================================================================
 #
 # The adaptation kernels are backend-generic; CUDA keeps the two
-# bit-exactness hooks of the original implementation.
+# bit-exactness hooks of the original implementation. Both are open items of
+# the CPU/GPU twin audit (B1: the cuBLAS batched LU vs `_lu6_kernel!`; B2: a
+# third lgamma), AWAITING THE OWNER'S RULING: removing either changes CUDA results.
 
 # __nv_lgamma keeps the sweep S-score and the weight kernels' log_C
 # bit-identical to the legacy CUDA kernels.
@@ -210,36 +131,6 @@ function BlobBoards._solve_6x6_batched!(
     return nothing
 end
 
-
-# =============================================================================
-# GPU undistort — lens distortion + bilinear sampling on device
-# =============================================================================
-#
-# Returns CuArray{Float32,2} that flows directly into scale space (zero-copy).
-# For each output pixel: K⁻¹ → normalized → lens → K → bilinear sample.
-
-# Upload image to GPU as Float32 — reinterpret + convert on device, no CPU Float32 copy
-function _gpu_upload_f32(img)
-    raw = reinterpret(eltype(eltype(img)), img)  # Gray{N0f8} → N0f8, Gray{Float32} → Float32, etc.
-    d_raw = CuArray(raw)
-    return Float32.(d_raw)
-end
-_gpu_upload_f32(img::AbstractMatrix{Float32}) = CuArray(img)
-_gpu_upload_f32(img::CuArray{Float32, 2}) = img
-
-_undistort_adapt(::CUDABackend, img, ::Nothing) = _gpu_upload_f32(img)
-_undistort_adapt(::CUDABackend, img, cam::CameraModel{<:AbstractIntrinsics, Pinhole}) = _gpu_upload_f32(img)
-
-# Lens undistort (any lens with a distortion map):
-# VGC's fused KA warp (`undistort!`) on the CUDA backend; this method just
-# keeps the CUDABackend contract (device-resident CuArray{Float32} flowing
-# into scale space).
-function _undistort_adapt(::CUDABackend, img, cam::CameraModel{<:AbstractIntrinsics, <:AbstractLensModel})
-    d_img = _gpu_upload_f32(img)
-    d_out = CUDA.zeros(Float32, size(d_img))
-    undistort!(d_out, Float32, cam, d_img)
-    return d_out
-end
 
 # =============================================================================
 # Training-pipeline backend hooks (src/training.jl)

@@ -24,15 +24,16 @@
 # CPU path (Interpolations BSpline + hard-edge extrapolation) differed from the
 # GPU kernel in the half-open boundary ring.
 #
-# On CPU the cube eltype is Gray{Float32}, so the colorant store path is the
-# same one the old per-frame `image_warp!` loop used — byte-identical output.
+# The patch cube is Float32 on every backend (`_patch_cube`): the same kernel,
+# the same store; `canonicalize` hands it back as Gray{Float32} patches, and the
+# descriptor stage (`_canon_describe`, pipeline.jl) hands it to the network.
 #
 # Dispatches on a KA device token — `KA.CPU()` here, `CUDABackend()` when
 # `BlobBoardsCUDAExt` is loaded. NOT VGF's `CpuBackend`/`CudaBackend`: those are
 # `ComputeBackend`s, not `KA.Backend`s, and match no `_canonicalize` method.
 
 using VisualGeometryToolkitCore: logpolar_map, canonical_map, image_warp,
-    image_warp_batch_to!, region, Circle, ka_upload
+    image_warp_batch_to!, region, Circle, ka_upload, on_device, device_zeros
 # the supersampling downfilter: Feat's block mean, in Float32 for a Gray{Float32} patch
 using VisualGeometryToolkitFeatures: box_downsample
 
@@ -112,6 +113,32 @@ end
 # Backend-generic batched warp — VGC's one KA bilinear kernel, any device
 # =============================================================================
 
+# The image as a Float32 matrix on `device`, uploaded once (an image already
+# there in Float32 is used as it is) — Core's one upload.
+_device_image(device, img) = on_device(Float32, device, gray_f32(img))
+
+# The (P·s, P·s, N) Float32 patch cube of `frames` on `device`, sampled by VGC's
+# one batched bilinear KA kernel (`image_warp_batch_to!`) at `supersample` = s
+# times the patch resolution. `img` is uploaded unless it is already there.
+function _patch_cube(
+        device::KA.Backend, img, frames;
+        patch_size = 64, inner_extent = 2.0, outer_extent = DEFAULT_OUTER_EXTENT,
+        mode::Symbol = :logpolar, supersample::Int = 1
+    )
+    P_hi = patch_size * supersample
+    warps = [_region_bm(mode, ff; patch_size = P_hi, inner_extent, outer_extent) for ff in frames]
+    cube = device_zeros(Float32, device, P_hi, P_hi, length(warps))
+    image_warp_batch_to!(cube, ka_upload(eltype(warps), device, warps), _device_image(device, img); fillvalue = 0.5f0)
+    return cube
+end
+
+# The cube's patches on the host, as the Gray{Float32} matrices `canonicalize`
+# returns, box-averaged down by `supersample` (1: a copy).
+function _host_patches(cube, supersample::Int = 1)
+    c = Array(cube)
+    return [box_downsample(Gray{Float32}.(view(c, :, :, k)), supersample) for k in axes(c, 3)]
+end
+
 function _canonicalize(
         device::KA.Backend, img, frames;
         patch_size = 64,
@@ -124,27 +151,8 @@ function _canonicalize(
     isempty(frames) && return Matrix{Gray{Float32}}[]
     # Sample the same patch domain at `supersample`× resolution, then box-average
     # down. supersample == 1 leaves the batched path byte-identical.
-    P = patch_size
-    P_hi = P * supersample
-    warps = [_region_bm(mode, ff; patch_size = P_hi, inner_extent, outer_extent) for ff in frames]
-    N = length(warps)
-    if device isa KA.CPU
-        # Gray{Float32} cube → the identical colorant store path the old
-        # per-frame image_warp! loop ran: byte-identical patches.
-        cube = Array{Gray{Float32}, 3}(undef, P_hi, P_hi, N)
-        image_warp_batch_to!(cube, warps, gray_f32(img); fillvalue = 0.5f0)
-        return [box_downsample(view(cube, :, :, k), supersample) for k in 1:N]
-    end
-    # GPU backends: upload once (skipped when the caller pre-uploaded Float32
-    # on this device), run the same batched kernel, download + reshape into
-    # the legacy Vector{Matrix{Gray}} API.
-    d_img = (KA.get_backend(img) == device && eltype(img) == Float32) ? img :
-        ka_upload(Float32, device, Float32.(Gray{Float32}.(gray_f32(img))))
-    d_warps = ka_upload(eltype(warps), device, warps)
-    d_cube = KA.zeros(device, Float32, P_hi, P_hi, N)
-    image_warp_batch_to!(d_cube, d_warps, d_img; fillvalue = 0.5f0)
-    cube = Array(d_cube)
-    return [box_downsample(Gray{Float32}.(view(cube, :, :, k)), supersample) for k in 1:N]
+    cube = _patch_cube(device, img, frames; patch_size, inner_extent, outer_extent, mode, supersample)
+    return _host_patches(cube, supersample)
 end
 
 function _interpolant(img)
