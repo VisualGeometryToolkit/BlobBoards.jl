@@ -82,12 +82,13 @@ using Pkg.Artifacts
 using SHA
 using TOML
 import VisualGeometryToolkitIO as VgtkIO
+import VisualGeometryToolkitEval
 import BlobBoards   # its board migrations (VgtkIO.migrate_schema methods)
 
-# This driver lives in <subproject>/scripts/, but the Artifacts.toml it binds
-# into is the one src/data.jl reads — <subproject>/Artifacts.toml, one level
-# up. Bind against @__DIR__ and the packager writes a file nothing consumes.
-const PROJECT_ROOT = dirname(@__DIR__)
+# The Artifacts.toml it binds into is the one src/data.jl reads — the paper
+# project's (projectdir(), the project @quickactivate activated), never one
+# derived from this file's location.
+const PROJECT_ROOT = projectdir()
 
 # The SOURCE copy is named explicitly (ENV["VGTK_DATA_ROOT"], rung 1 of the
 # data_root() ladder): the packer builds the artifacts, so it cannot resolve
@@ -233,8 +234,9 @@ if TIER == "inputs"
     isdefined(Main, :BlobBoardsEval) || include(joinpath(PROJECT_ROOT, "src", "BlobBoardsEval.jl"))
     BBE = Main.BlobBoardsEval
     cams = BBE.load_config("import_cameras.toml")
-    cam_run = BBE.run_dir("import_cameras", BBE.config_run_key(cams))
-    isfile(joinpath(cam_run, "_provenance.toml")) || error("$(cam_run): run scripts/import_cameras.jl first")
+    cam_run = VisualGeometryToolkitEval.Experiments.keyed_cell_dir(cams, BBE.EXPERIMENT, "import_cameras")
+    VisualGeometryToolkitEval.Experiments.run_complete(cam_run; sidecar = "_config.toml") ||
+        error("$(cam_run): run scripts/import_cameras.jl first")
     files = Pair{String, String}[]
     for session in PUBLISHED_SESSIONS
         mt = joinpath(DS_ROOT, session, "poses", "motion_tracker")
@@ -249,8 +251,9 @@ if TIER == "inputs"
         for c in cams["cameras"]
             c["session"] == session || continue
             push!(files, joinpath(cam_run, session, "calibration", c["output"]) => joinpath(session, "calibration", c["output"]))
-            src = c["source"]
-            bytes2hex(open(sha256, src)) == c["sha256"] || error("$(src): sha256 differs from the config of record")
+            inp = cams["inputs"][c["input"]]
+            src = joinpath(dirname(DS_ROOT), inp["path"])
+            bytes2hex(open(sha256, src)) == inp["sha256"] || error("$(src): sha256 differs from the config of record")
             push!(files, src => joinpath("provenance", "calibration", session, basename(src)))
         end
     end

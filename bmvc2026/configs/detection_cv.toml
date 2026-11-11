@@ -48,21 +48,45 @@
 
 [experiment]
 generator = "detection_cv"
+dataset = "260521"
+# The results tree's layout of this stage's run (VisualGeometryToolkitEval
+# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
+matcher = "blobboards"
+problem = "detection_cv"
 
-[inputs]
+[runs]
 # configs/-relative: the EVALUATION's run config of record — detection,
 # adaptation, matching, verification, the network and the pose arm's geometry
-# are read from it (FindBoardsConfig); the search overrides only its axes.
-run_config = "bmvc2026_260527.toml"
-# data_root()-relative. The validation session's camera as a vgio/cameras/v3
-# record (converted exactly from the session's OpenCV calibration).
-camera = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
-# The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids
-# and definition hashes); the metadata tier's 260527 definitions are read.
-boards_dir = "absolute_pose_experiments/260527/boards/blobboards"
-gallery = "cache/board_features_260521.jld2"   # results_root()-relative: the gallery cache (keyed by the network inside)
+# are read from it (FindBoardsConfig); the search overrides only its axes. Its
+# run key is folded into this run's.
+bb = "bmvc2026_260527.toml"
+
+[panel]
 n_boards = 30         # boards on the panel: C(30,2) pairs per frame is the criterion's denominator
 min_obs = 3           # frames a board pair needs before it has a leave-one-out reference
+
+[gallery]
+path = "cache/board_features_260521.jld2"   # results_root()-relative: the gallery cache (keyed by the network inside)
+
+# The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
+[inputs.images]
+tier = "unpublished"
+path = "absolute_pose_experiments/260521/images"
+provenance = "the 260521 captures (f/9.0), the validation side of the registered scene split; unpublished"
+
+[inputs.camera]
+# The validation session's camera as a vgio/cameras/v3 record (converted
+# exactly from the session's OpenCV calibration).
+tier = "unpublished"
+path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
+provenance = "the 260521 camera (scripts/import_cameras.jl's port of calibrate_pinhole)"
+
+[inputs.boards]
+# The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids
+# and definition hashes); the inputs tier's 260527 definitions are read.
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/boards/blobboards"
+provenance = "the printed BlobBoards definitions (blobboards/board/v5)"
 
 [tuning.detection]
 type = "joint_coarse_fine"

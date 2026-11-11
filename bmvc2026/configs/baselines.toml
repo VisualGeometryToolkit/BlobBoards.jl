@@ -10,6 +10,10 @@
 [experiment]
 generator = "baselines"
 dataset = "260527"
+# The results tree's layout of this stage's run (VisualGeometryToolkitEval
+# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
+matcher = "apriltag_aruco"
+problem = "absolute_pose"
 port_of = "BlobBoards-Evaluation 88bca9f: evaluation_pipe/pose_extractor.py (extract_pose, packing_poses, validate_image), evaluation_pipe/pose_estimators.py (estimate_apriltag_pose, estimate_aruco_pose_opencv, estimate_pose_from_corners)"
 
 [camera]
@@ -74,3 +78,70 @@ clock = "perf_counter"
 # validate_image: each pose's axes (half the tag side) projected with K onto the
 # undistorted image; X red, Y green, Z blue, 3 px; the id in white.
 axis_fraction = 0.5
+
+# The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
+[inputs.session]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527"
+provenance = "the 260527 session: the AprilTag/ArUco board definitions and the camera of record"
+
+[inputs.images]
+tier = "bb_absolute_pose_images_260527"
+path = "absolute_pose_experiments/260527/images"
+provenance = "the 260527 captures (apr, uco and their calibration subsets)"
+
+[inputs.camera]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/calibration/sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
+provenance = "the camera of record (scripts/import_cameras.jl's port of calibrate_pinhole)"
+sha256 = "788adf4e3a8158d3c06f0f3412e35e671503fa4b0cdc6035bc8908d0ca155ec9"
+
+[inputs.occlusion_00]
+tier = "bb_absolute_pose_occlusion_00_260527"
+path = "absolute_pose_experiments/260527/occlusion/00/images"
+provenance = "synthetic occlusion level 00: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_10]
+tier = "bb_absolute_pose_occlusion_10_260527"
+path = "absolute_pose_experiments/260527/occlusion/10/images"
+provenance = "synthetic occlusion level 10: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_20]
+tier = "bb_absolute_pose_occlusion_20_260527"
+path = "absolute_pose_experiments/260527/occlusion/20/images"
+provenance = "synthetic occlusion level 20: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_30]
+tier = "bb_absolute_pose_occlusion_30_260527"
+path = "absolute_pose_experiments/260527/occlusion/30/images"
+provenance = "synthetic occlusion level 30: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_40]
+tier = "bb_absolute_pose_occlusion_40_260527"
+path = "absolute_pose_experiments/260527/occlusion/40/images"
+provenance = "synthetic occlusion level 40: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_50]
+tier = "bb_absolute_pose_occlusion_50_260527"
+path = "absolute_pose_experiments/260527/occlusion/50/images"
+provenance = "synthetic occlusion level 50: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_60]
+tier = "bb_absolute_pose_occlusion_60_260527"
+path = "absolute_pose_experiments/260527/occlusion/60/images"
+provenance = "synthetic occlusion level 60: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_70]
+tier = "bb_absolute_pose_occlusion_70_260527"
+path = "absolute_pose_experiments/260527/occlusion/70/images"
+provenance = "synthetic occlusion level 70: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_80]
+tier = "bb_absolute_pose_occlusion_80_260527"
+path = "absolute_pose_experiments/260527/occlusion/80/images"
+provenance = "synthetic occlusion level 80: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"
+
+[inputs.occlusion_90]
+tier = "bb_absolute_pose_occlusion_90_260527"
+path = "absolute_pose_experiments/260527/occlusion/90/images"
+provenance = "synthetic occlusion level 90: BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py"

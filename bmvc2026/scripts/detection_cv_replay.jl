@@ -30,6 +30,8 @@ Usage:
 =#
 # reproduce: reads configs/detection_cv.toml
 
+using DrWatson
+@quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 using TOML: TOML
 using SHA: sha256
 using Random: Xoshiro
@@ -47,9 +49,9 @@ module ReplayOperatingPoints
 end
 const OP = ReplayOperatingPoints
 
-const PROJECT = normpath(joinpath(@__DIR__, ".."))            # bmvc2026/
-const REPO = normpath(joinpath(PROJECT, ".."))                # the BlobBoards checkout
-const CFG_PATH = joinpath(PROJECT, "configs", "detection_cv.toml")
+const PROJECT = projectdir()                                  # bmvc2026/, the project @quickactivate activated
+const REPO = dirname(PROJECT)                                 # the BlobBoards checkout
+const CFG_PATH = projectdir("configs", "detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
 const SPEC = tuning_spec(CFG, "detection")
 const SEARCH = joinpath("tuning", "detection_cv-c80d42e9055f8cd5", "detection.jld2")
@@ -80,7 +82,7 @@ function replay()
     t == tuning_table(src.spec) || error("$SEARCH ran another search than [tuning.detection] (less its incumbent)")
     src["frames"] == inc["frames"] && src["pairs"] == inc["pairs"] || error("the two sources differ in frames or board pairs")
     v = SPEC.scheme.incumbent.values
-    rc = TOML.parsefile(joinpath(PROJECT, "configs", CFG["inputs"]["run_config"]))["find_boards"]
+    rc = TOML.parsefile(projectdir("configs", CFG["runs"]["bb"]))["find_boards"]
     (rc["detect"]["peak_threshold"], rc["min_similarity"]) == (v["peak_threshold"], v["min_similarity"]) ||
         error("the incumbent's peak threshold and similarity are not the run config of record's, under which $INCUMBENT ran")
     j = findfirst(==(v["outlier_halfwidth"]), inc["evaluated_x"])
@@ -118,10 +120,10 @@ function replay()
     sel = deployed_setting(OP.detection_cv_artifact(OUTDIR); context = "joint detection CV (replay)")
     open(joinpath(OUTDIR, "_config.toml"), "w") do io
         println(io, "# EFFECTIVE configuration of this run. Source: bmvc2026/configs/detection_cv.toml")
-        TOML.print(io, VgtkEval.Tuning.resolve_tuning!(deepcopy(CFG)); sorted = true)
+        TOML.print(io, VgtkEval.Tuning.resolve_tuning!(deepcopy(OP.detection_cv_config(CFG))); sorted = true)
     end
     write_provenance(OUTDIR, Dict{String,Any}(
-            "run_key" => basename(OUTDIR)[length("detection_cv-")+1:end],
+            "run_key" => VgtkEval.Experiments.run_key(OP.detection_cv_config(CFG)),
             "config" => merge(_repo(REPO), Dict{String,Any}("path" => "bmvc2026/configs/detection_cv.toml")),
             "code" => Dict{String,Any}("BlobBoards" => _repo(REPO),
                                        "VisualGeometryToolkitEval" => _repo(VisualGeometryToolkitEval),

@@ -39,10 +39,11 @@ the failure mode this cache exists to avoid.
 using LinearAlgebra: norm
 
 """
-    hand_eye(frames, detected; dataset, subset, min_rel_angle = deg2rad(5), force = false)
+    hand_eye(src, frames, detected; subset, min_rel_angle = deg2rad(5), force = false)
         -> (X, targets, diagnostics, file)
 
-The hand-eye (robot-world) calibration for one marker system, cached by config.
+The hand-eye (robot-world) calibration for one marker system of the
+evaluation's sources `src`, cached by config.
 
 `X` is the labeled camera-mount transform (`CameraRigFrame →
 ViewFrame{:optical}`); `targets` is the marker mount as a
@@ -57,10 +58,12 @@ Supply `force = true` to refit and overwrite.
 # THE ARTIFACT IS a `vgio/transforms/v3` file (X) and a `vgio/rig/v6` file
 # (the Y_m), written by VisualGeometryToolkitIO's `save` from the labeled poses and
 # read back through `load`, the labels minted from the files' typed frames.
-# Keyed like every `cached` artifact — `<prefix>_<hash(cfg)>.json` under
-# `results_root()/calibration`, `force` preserving the outgoing files as `#<n>`
-# — but not through the JLD2 cache: its JLD2 would embed either a private
-# layout (the 16-float 4×4 this replaced on 2026-09-14) or a package type.
+# Keyed like every run: the file is `handeye_<dataset>_<subset>.json` in the
+# fit's `keyed_cell_dir` (`…/bmvc2026/hand_eye_fit-<run_key>`, the key over the
+# evaluation's [experiment] layout and everything the fit reads, below), `force`
+# preserving the outgoing files as `#<n>` — but not through Eval's JLD2 cache,
+# `cached_result`: its JLD2 would embed either a private layout (the 16-float
+# 4×4 this replaced on 2026-09-14) or a package type.
 using DrWatson: gitdescribe
 
 # DrWatson's `safesave` semantics for the vgio JSON about to be overwritten:
@@ -80,10 +83,10 @@ function _backup!(file::AbstractString)
 end
 
 function hand_eye(
-        frames::Vector{RigFrame}, detected::Dict;
-        dataset::AbstractString, subset::AbstractString,
-        min_rel_angle::Float64 = deg2rad(5), force::Bool = false
+        src::Sources, frames::Vector{RigFrame}, detected::Dict;
+        subset::AbstractString, min_rel_angle::Float64 = deg2rad(5), force::Bool = false
     )
+    dataset = src.dataset
     # Normalise the join key HERE so no caller has to know it. `_stem` was
     # being reimplemented at six call sites; it is the join key of the whole
     # evaluation and it is not exported, so every caller that needed it either
@@ -107,7 +110,7 @@ function hand_eye(
     )
 
     cfg = Dict{String, Any}(
-        "dataset" => String(dataset),
+        "experiment" => copy(src.experiment),
         "subset" => String(subset),
         "min_rel_angle_deg" => round(rad2deg(min_rel_angle); digits = 9),
         "frames" => sort([_stem(fr.image) for fr in usable]),
@@ -116,17 +119,17 @@ function hand_eye(
         # promoted run re-detects the same calibration frames with different
         # poses while every other key component stays identical, which used to
         # be a silent cache hit on the PREVIOUS network's calibration
-        # (2026-08-11 fix; the last mutable-slot staleness path). Content hash
-        # rather than the promoted run key so the same mechanism covers the
-        # fixed oracle systems, which have no run key. Entries are isbits
-        # NamedTuples, so `hash` is content-based and order-independent over
-        # the Dict; its cross-version stability caveat is cache.jl's —
-        # recoverable orphans, never a wrong answer.
-        "poses_content" => string(hash(detected)),
+        # (2026-08-11 fix; the last mutable-slot staleness path). A content
+        # key rather than the upstream run key, so the same mechanism covers a
+        # caller's own detections: Eval's `run_key` (SHA-256 of the sorted
+        # TOML) of every pose, stable across processes and Julia versions.
+        "poses_content" => run_key(Dict{String, Any}("poses" => Dict{String, Any}(
+            stem => [Dict{String, Any}("id" => p.id, "R" => collect(vec(p.R)), "t" => collect(p.t)) for p in ps]
+            for (stem, ps) in detected))),
     )
-    dir = joinpath(results_root(), "calibration")
+    dir = keyed_cell_dir(cfg, EXPERIMENT, "hand_eye_fit")
     mkpath(dir)
-    file = joinpath(dir, string("handeye_", dataset, "_", subset, "_", hash(cfg), ".json"))
+    file = joinpath(dir, string("handeye_", dataset, "_", subset, ".json"))
     if force
         kept = _backup!(file)
         kept === nothing || println("  preserved previous version -> $(basename(kept))")

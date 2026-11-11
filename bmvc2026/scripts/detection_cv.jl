@@ -28,7 +28,7 @@ per (frame, board pair) of the C(n_boards, 2) possible; an undetected pair is
 a failure (Inf). The spec's `mean_average_accuracy` criterion turns them into
 the continuous mAA@10 mm.
 
-Outputs, in the keyed run directory `results_root()/tuning/detection_cv-<run_key>`
+Outputs, in the keyed run directory `detection_cv_dir(cfg)` (Eval's `keyed_cell_dir`: `…/bmvc2026/detection_cv-<run_key>`)
 (src/operating_points.jl): the tuning artifact `detection.jld2`
 (VisualGeometryToolkitEval `save_coarse_fine_artifact`: the spec, the coarse and fine
 grids of every axis, the objective over both product grids, every evaluated
@@ -71,11 +71,12 @@ using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, wr
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, results_root, detection_cv_dir, detection_cv_artifact
+using Main.BlobBoardsEval: data_root, results_root, input_path, network_path, load_config,
+    detection_cv_config, detection_cv_dir, detection_cv_artifact
 
 const CFG_PATH = projectdir("configs", "detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
-const INP = CFG["inputs"]
+const PANEL = CFG["panel"]
 const SPEC = tuning_spec(CFG, "detection")
 SPEC.scheme isa JointCoarseFine || error("[tuning.detection] must be a joint_coarse_fine spec")
 SPEC.scheme.criterion isa MeanAverageAccuracy ||
@@ -97,26 +98,26 @@ const OUTDIR = detection_cv_dir(CFG)
 function validation_frames(cv::CrossValidation)
     scene = only(validation_scenes(cv))
     session, subset = String.(split(scene, '/'))
-    dir = joinpath(data_root(), "absolute_pose_experiments", session, "images", subset)
+    dir = joinpath(input_path(CFG, "images"), subset)
+    basename(dirname(dir)) == session || error("the validation scene $(scene) is not in [inputs.images] $(dir)")
     all_images = sort(filter(f -> lowercase(splitext(f)[2]) in (".jpg", ".jpeg", ".png"), readdir(dir)))
     return dir, only(validation_units(cv, Dict(scene => all_images))).second
 end
 
 function run_cv()
     image_dir, frames = validation_frames(SPEC.scheme.cross_validation)
-    root = data_root()
-    camera = VgtkIO.load(BoundedCamera, joinpath(root, INP["camera"]))
-    run_config = projectdir("configs", INP["run_config"])
+    camera = VgtkIO.load(BoundedCamera, input_path(CFG, "camera"))   # pixel operations take a BoundedCamera
+    run_config = projectdir("configs", CFG["runs"]["bb"])
     base = FindBoardsConfig(run_config; camera)
-    # the run config names the network data_root()-relative (the bb_assets tier mounts models/ at the root)
-    net = DescriptorNetwork(joinpath(root, read_run_config(run_config).descriptor["model"]))
-    gallery_path = joinpath(results_root(), INP["gallery"]); mkpath(dirname(gallery_path))
+    # the network is the run config's [inputs.network]
+    net = DescriptorNetwork(network_path(load_config(CFG["runs"]["bb"])))
+    gallery_path = joinpath(results_root(), CFG["gallery"]["path"]); mkpath(dirname(gallery_path))
     gallery = BoardGallery(gallery_path, net)
-    board_paths = filter(endswith(".json"), readdir(joinpath(root, INP["boards_dir"]); join = true))
+    board_paths = filter(endswith(".json"), readdir(input_path(CFG, "boards"); join = true))
     feats = Dict(uid => f for (uid, f) in [insert!(gallery, bp, net) for bp in board_paths])
     bundles = Dict(let (b, _, ch) = load_bundle(bp); uid_from_hash(ch) => b end for bp in board_paths)
     uids = sort!(collect(keys(bundles)))
-    length(uids) == INP["n_boards"] || error("$(length(uids)) boards in $(INP["boards_dir"]), the config states $(INP["n_boards"])")
+    length(uids) == PANEL["n_boards"] || error("$(length(uids)) boards in [inputs.boards], the config states $(PANEL["n_boards"])")
     stems = [splitext(f)[1] for f in frames]
     device = CUDABackend()
     apply(cfg, p) = foldl((c, n) -> SETTERS[String(n)](c, p[n]), keys(p); init = cfg)
@@ -146,7 +147,7 @@ function run_cv()
         poses = Dict(s => Dict(uid => m for (uid, m, _, _) in find_boards(feats, prepared[s].image_features;
                                                                           config = cfg, device, board_bundles = bundles))
                      for s in stems)
-        r = rigid_invariance_errors(poses; targets = uids, units = stems, min_obs = Int(INP["min_obs"]))
+        r = rigid_invariance_errors(poses; targets = uids, units = stems, min_obs = Int(PANEL["min_obs"]))
         pairs[] = r.pairs
         return r.translation
     end
@@ -181,9 +182,9 @@ function run_cv()
         arm = "pose")
     # the read-side gate, before anything is recorded complete
     @info "selected" deployed_setting(detection_cv_artifact(OUTDIR); context = "joint detection CV") interval
-    write_run_records(OUTDIR, CFG; driver = "bmvc2026/scripts/detection_cv.jl",
-        config_source = CFG_PATH, key = VgtkEval.Experiments.run_key(CFG),
-        inputs = [image_dir, joinpath(root, INP["camera"]), joinpath(root, INP["boards_dir"]), run_config])
+    write_run_records(OUTDIR, detection_cv_config(CFG); driver = "bmvc2026/scripts/detection_cv.jl",
+        config_source = CFG_PATH, key = VgtkEval.Experiments.run_key(detection_cv_config(CFG)),
+        inputs = [image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), run_config])
     return OUTDIR
 end
 

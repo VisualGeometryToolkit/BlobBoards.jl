@@ -26,30 +26,17 @@
 
 [experiment]
 dataset = "260527"
+# The results tree's layout of every run of this config (VisualGeometryToolkitEval
+# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
+matcher = "blobboards"
+problem = "absolute_pose"
+# Frame cap per subset for smoke runs (0 = every frame; `select_frames` in
+# src/sweep.jl STRIDES rather than taking a prefix). Stated, so it is keyed: a
+# capped run is another run directory, never mistaken for the full one.
+limit = 0
 # The flip table's base censuses the evaluation subset only; the hand-eye
 # calibration is the disambiguated run's.
 subsets = ["bb"]
-
-[descriptor]
-# The log-polar s96 tracking network, `_cuda` variant: identical weights to
-# track_logpolar_circ_s96.onnx, with the ten circular/edge Pad nodes rewritten
-# as Slice+Concat so ORT's CUDA EP takes the whole graph. Descriptors are
-# bit-identical (max |Δ| = 0 over 256 real patches) and it is ~14× faster —
-# the CUDA EP has no kernel for Pad in wrap/edge mode, so the original fell
-# back to the CPU for every Pad and shredded the graph with 16 Memcpy nodes.
-# Regenerate with experiments/onnx_depad.py; see
-# bmvc2026/_research/findings/descriptor_inference_speedup.md.
-# RealFourthIteration export (2026-08-10): the network of the promoted
-# snapshot. THIS BASE CONFIG NOW NAMES IT TOO (2026-08-14) — go_bmvc2026.jl
-# defaults to this file, and the base/iter4 network split is exactly how a
-# full-sweep "engine regression" turned out to be a descriptor confound
-# (10 lost 2–3 m detections, all network). `bmvc2026_260527_iter4.toml` was
-# DELETED 2026-08-17: it had become value-identical to this file (comments
-# were the only diff), was read by nothing, and — since run keys hash the
-# EFFECTIVE config — could not even produce a distinct run key. Old runs'
-# `_provenance.toml` sidecars that name it as config_source still restore:
-# they carry the effective `_config.toml` beside the poses.
-model = "models/track_logpolar_circ_s96_iter4.onnx"
 
 [gallery]
 # Cache of (board set × descriptor model). Safe to share and safe to delete:
@@ -190,3 +177,37 @@ resolve_pose_ambiguity = false
 min_trials = 100
 max_trials = 2000
 success_prob = 0.99      # RANSAC confidence level
+
+# =============================================================================
+# The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-
+# relative `path`, the published `tier` that holds it, `provenance`, and the
+# file's `sha256` where it is one file — verified by Eval when it lands, keyed
+# now: the network's content is in this config's run key through it).
+# =============================================================================
+
+[inputs.session]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527"
+provenance = "captured by the authors; the motion-capture exports, boards and camera of record of the 260527 session (configs/data_artifacts.toml)"
+
+[inputs.images]
+tier = "bb_absolute_pose_images_260527"
+path = "absolute_pose_experiments/260527/images"
+provenance = "the 260527 captures (record bb_images, zenodo 23965208)"
+
+[inputs.camera]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/calibration/sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
+provenance = "the camera of record: OpenCV calibrateCamera (BlobBoards-Evaluation calibrate_pinhole), ported by scripts/import_cameras.jl"
+sha256 = "788adf4e3a8158d3c06f0f3412e35e671503fa4b0cdc6035bc8908d0ca155ec9"
+
+[inputs.boards]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/boards/blobboards"
+provenance = "the printed BlobBoards definitions of the session (blobboards/board/v5)"
+
+[inputs.network]
+tier = "bb_assets"
+path = "models/track_logpolar_circ_s96_iter4.onnx"
+provenance = "the log-polar s96 tracking network, RealFourthIteration export (2026-08-10), CUDA-EP depadded (scripts/onnx_depad.py); trained by the authors (descriptor_training tiers)"
+sha256 = "6efc291ab94e812ce043d919ecc72ded7e4b16bd1c0c50b1492b1ce245bae8b9"

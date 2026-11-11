@@ -31,16 +31,17 @@
     @test sort([c["session"] for c in cfg["cameras"]]) == sort(collect(keys(PREVIOUS)))
     for entry in cfg["cameras"]
         prev = PREVIOUS[entry["session"]]
-        @test !isabspath(entry["source"])                                                  # data_root()-relative, never a machine path
+        src_rel = cfg["inputs"][entry["input"]]["path"]
+        @test !isabspath(src_rel)                                                          # data_root()-relative, never a machine path
         # the export is an input under the data root: without a bound one, or
         # without the file, a recorded skip (never an install of the artifact
         # view, which upstream_source would trigger)
-        if !is_primary_copy() || !isfile(upstream_source(entry))
+        if !is_primary_copy() || !isfile(upstream_source(cfg, entry))
             @info "upstream export of $(entry["session"]) not on this machine — conversion check skipped"
             @test_skip false
             continue
         end
-        name, camera, _ = upstream_camera(entry, cfg["upstream"])
+        name, camera, _ = upstream_camera(cfg, entry)
         bc = getfield(camera, :value)
         @test String(name) == entry["name"]
         @test SMatrix{3, 3, Float64}(bc.camera.intrinsics.K) == prev.K                     # bit for bit
@@ -49,7 +50,7 @@
         cal = getfield(camera, :attributes).calibration
         @test !haskey(cal, :reprojection_rms)                                              # the export's error is a mean
         @test occursin("mean reprojection error", cal.note) && occursin("modification date", cal.note)
-        @test cal.date == entry["date"] && startswith(cal.source, basename(entry["source"]))
+        @test cal.date == entry["date"] && startswith(cal.source, basename(src_rel))
         # the native file reads back to the same camera
         mktempdir() do dir
             f = joinpath(dir, "c.json")

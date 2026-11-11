@@ -32,7 +32,7 @@ cd_ = load_detected_poses(poses_dir(SRC, "bb"; calibration = true))
 # The ONE hand-eye authority (src/calibration.jl): cached, keyed on the
 # frames and markers that determine the fit, and tagged with the commit.
 # This was an independent refit — the project had FOUR of them.
-he = hand_eye(cf, cd_; dataset = SRC.dataset, subset = "calibration_bb")
+he = hand_eye(SRC, cf, cd_; subset = "calibration_bb")
 n_tracked = count(f -> f.T_cb !== nothing, frames)
 N_ATTEMPTS = 30 * n_tracked
 

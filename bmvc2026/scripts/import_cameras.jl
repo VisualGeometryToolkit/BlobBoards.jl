@@ -15,7 +15,7 @@ camera is built in VisualGeometryToolkitCore (`CameraModel(K; lens = opencv_lens
 its calibration block is filled from the export, and it is written ONLY through
 VisualGeometryToolkitIO's `save`, read back, and checked equal.
 
-Writes, add-only, under results_root()/import_cameras-<run key>/:
+Writes, add-only, under the keyed run `…/bmvc2026/import_cameras-<run key>/` (Eval's `keyed_cell_dir`):
     <session>/calibration/<output>     vgio/cameras/v3, the camera of record
     _config.toml, _provenance.toml     the run's records (source paths + sha256)
 
@@ -32,18 +32,18 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: run_dir, figure_config, upstream_camera
+using Main.BlobBoardsEval: figure_config, upstream_camera, EXPERIMENT
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: BoundedCamera
-using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
+using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, write_run_records, run_complete
 
 const CFG, CFG_PATH = figure_config("import_cameras"; default = projectdir("configs", "import_cameras.toml"))
 const KEY = run_key(CFG)
-const OUT = run_dir("import_cameras", KEY)
+const OUT = keyed_cell_dir(CFG, EXPERIMENT, "import_cameras")
 function main()
     written, inputs = String[], String[]
     for entry in CFG["cameras"]
-        name, camera, (; src, sha) = upstream_camera(entry, CFG["upstream"])
+        name, camera, (; src, sha) = upstream_camera(CFG, entry)
         out = joinpath(OUT, String(entry["session"]), "calibration", String(entry["output"]))
         mkpath(dirname(out))
         store = Dict(name => camera)
@@ -56,4 +56,4 @@ function main()
     return nothing
 end
 
-isfile(joinpath(OUT, "_provenance.toml")) ? println("import_cameras: run $(KEY) complete at $(OUT)") : main()
+run_complete(OUT; sidecar = "_config.toml") ? println("import_cameras: run $(KEY) complete at $(OUT)") : main()

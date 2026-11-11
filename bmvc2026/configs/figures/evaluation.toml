@@ -7,6 +7,10 @@
 [experiment]
 generator = "evaluation"
 dataset = "260527"
+# The results tree's layout of the derived stages' runs (hand_eye, pose_results:
+# VisualGeometryToolkitEval keyed_cell_dir, <dataset>/<matcher>/<problem>/bmvc2026/<kind>-<key>).
+matcher = "marker_systems"
+problem = "absolute_pose"
 tiers = ["bb_absolute_pose_inputs", "bb_absolute_pose_images_260527"]
 
 [runs]
@@ -20,7 +24,7 @@ baselines = "baselines.toml"               # AprilTag + ArUco (scripts/detect_ba
 
 [drivers]
 tex_prefix = "figures/floorplan/"        # the \input prefix the panels are written with
-occlusion_levels = "10,50,70"            # the per-level floor plans the supplement shows
+occlusion_levels = ["10", "50", "70"]       # the per-level floor plans the supplement shows
 flip_base = "bb_noflip"                  # the no-disambiguation comparison series ([runs] bb_noflip)
 flip_deg = 10                            # a flip is a rotation error above this (deg)
 collapse_pod = 0.01                      # PoD below which a system has "failed catastrophically"

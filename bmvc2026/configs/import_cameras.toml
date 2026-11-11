@@ -16,19 +16,22 @@
 
 [experiment]
 generator = "import_cameras"
+dataset = "absolute_pose_experiments"
+# The results tree's layout of this stage's run (VisualGeometryToolkitEval
+# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
+matcher = "opencv_calibration"
+problem = "cameras"
 
 [[cameras]]
 session = "260527"
-source = "absolute_pose_experiments/260527/images/sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
-sha256 = "0c452de05aafb2df6df831bce4ffbdf065f2ab6230cfdb8bd1b36f299f677602"
+input = "export_260527"                                       # its [inputs.<id>]
 name = "sony-fx3-iso100_tamron-20mm-f2.8-set-to-f22"        # the camera's name in the store
 output = "sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json" # <session>/calibration/<output>
 date = "2026-05-28"                                          # the export file's modification date (calibrate_pinhole records no fit date)
 
 [[cameras]]
 session = "260521"
-source = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json"
-sha256 = "b745b7370fcaca5b5335026c34f48b01ebd0dbcc15b2993d92fdf41a716f4d56"
+input = "export_260521"
 name = "sony-fx3-iso125_tamron-20mm-f2.8-set-to-f9.0"
 output = "260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json"
 date = "2026-05-22"                                          # the export file's modification date
@@ -42,3 +45,18 @@ pixel_frame = "opencv"          # camera_matrix's principal point: OpenCV's (top
 # camera is opencv_lens([k1, k2, p1, p2]). A nonzero one is refused.
 n_fitted = 4
 flags_names = { 16384 = "CALIB_RATIONAL_MODEL", 128 = "CALIB_FIX_K3", 2048 = "CALIB_FIX_K4", 4096 = "CALIB_FIX_K5", 8192 = "CALIB_FIX_K6" }
+
+# The upstream exports ported (VisualGeometryToolkitEval [inputs.<id>]:
+# data_root()-relative, never a machine path; the run refuses a file whose
+# sha256 differs).
+[inputs.export_260527]
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/provenance/calibration/260527/sony-fx3-iso100_tamron-20mm-f2.8-(set-to-f22).json"
+provenance = "BlobBoards-Evaluation calibrate_pinhole's export of the 260527 camera, published beside the code archive"
+sha256 = "0c452de05aafb2df6df831bce4ffbdf065f2ab6230cfdb8bd1b36f299f677602"
+
+[inputs.export_260521]
+tier = "unpublished"
+path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json"
+provenance = "BlobBoards-Evaluation calibrate_pinhole's export of the 260521 camera (the session is unpublished: it fails end-to-end validation)"
+sha256 = "b745b7370fcaca5b5335026c34f48b01ebd0dbcc15b2993d92fdf41a716f4d56"

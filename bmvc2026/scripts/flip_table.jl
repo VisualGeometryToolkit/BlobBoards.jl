@@ -67,7 +67,7 @@ function census(name, abbr; series = name)
     calib_detected = load_detected_poses(poses_dir(SRC, name; calibration = true))
 
     # The ONE hand-eye authority, the same artifact the pose results resolve.
-    he = hand_eye(calib_frames, calib_detected; dataset = SRC.dataset, subset = "calibration_" * abbr)
+    he = hand_eye(SRC, calib_frames, calib_detected; subset = "calibration_" * abbr)
     df = pose_error_table(frames, detected, he.X, he.targets; marker_sizes)
     return map((1000, 2000, 3000)) do spot
         d = df[df.rig_distances_bin .== spot, :]

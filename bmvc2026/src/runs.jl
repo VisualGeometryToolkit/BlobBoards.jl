@@ -13,24 +13,30 @@
 # the same directory the producer wrote, so a changed config is a new
 # directory and a stale result has no name to be read under.
 #
-#   stage                       config of record                 directory
-#   motion-capture records      configs/convert_formats.toml     convert_formats-<key>/
-#   BlobBoards detections       configs/bmvc2026_260527*.toml    bb-<key>/       (+ the run's subsets)
-#   BlobBoards, occlusion       the same config                  occlusion-<key>/<LL>/
-#   AprilTag/ArUco baselines    configs/baselines.toml           baselines-<key>/
-#   hand-eye records            the evaluation's [runs]          hand_eye-<key>/
-#   pose-error cells            the evaluation's [runs]          pose_results-<key>/
+#   stage                       config of record                 directory (keyed_cell_dir)
+#   motion-capture records      configs/convert_formats.toml     …/convert_formats-<key>/
+#   BlobBoards detections       configs/bmvc2026_260527*.toml    …/bb-<key>/       (+ the run's subsets)
+#   BlobBoards, occlusion       the same config                  …/occlusion-<key>/occlusion/<LL>/
+#   AprilTag/ArUco baselines    configs/baselines.toml           …/baselines-<key>/
+#   camera import               configs/import_cameras.toml      …/import_cameras-<key>/
+#   hand-eye records            the evaluation's [runs]          …/hand_eye-<key>/
+#   pose-error cells            the evaluation's [runs]          …/pose_results-<key>/
 #
-# A key is VisualGeometryToolkitEval's SHA-256 `run_key` of the config of record
-# together with what decides the result and is not in it: the descriptor
-# network's content (sha256) for a sweep, the upstream run keys for a
-# consumer. Code is provenance (DrWatson `tag!` in every run's records), not
-# key — see the run records.
+# Every directory is VisualGeometryToolkitEval's `keyed_cell_dir(cfg, EXPERIMENT,
+# kind)`: `results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>`,
+# the three layout names the literals of the config's [experiment]. A key is
+# Eval's `run_key` of the config of record, which states every input it reads
+# as `[inputs.<id>]` (tier, path, provenance, sha256 — the descriptor network's
+# content is in the key that way); a derived stage keys the evaluation's
+# [experiment] together with the run keys of the upstreams it reads. Code is
+# provenance (DrWatson `tag!` in every run's records), not key.
 
 import TOML
-import SHA
 using DrWatson: projectdir
-using VisualGeometryToolkitEval.Experiments: run_key as config_run_key
+using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir
+
+# `EXPERIMENT`, the name every run directory is filed under, is
+# src/operating_points.jl's (a self-contained file; BlobBoardsEval includes it).
 
 """
     config_path(name) -> String
@@ -48,27 +54,29 @@ The parsed config of record `configs/<name>`.
 load_config(name::AbstractString) = TOML.parsefile(config_path(name))
 
 """
-    run_dir(generator, key) -> String
+    input_path(cfg, id) -> String
 
-THE layout of a run: `results_root()/<generator>-<key>`.
+The input `[inputs.<id>]` of a config of record: its `path` under the data
+root, its `tier` installed.
 """
-run_dir(generator::AbstractString, key::AbstractString) = joinpath(results_root(), string(generator, "-", key))
-
-_sha256(path) = bytes2hex(open(SHA.sha256, path))
+function input_path(cfg::AbstractDict, id::AbstractString)
+    t = cfg["inputs"][id]
+    return joinpath(data_root(; tiers = [String(t["tier"])]), String(t["path"]))
+end
 
 # --- motion-capture records ---------------------------------------------------
 
 "The run key of the motion-capture records (scripts/convert_formats.jl)."
-records_key(name::AbstractString = "convert_formats.toml") = config_run_key(load_config(name))
+records_key(name::AbstractString = "convert_formats.toml") = run_key(load_config(name))
 
 """
     records_dir(dataset; config = "convert_formats.toml") -> String
 
 The session directory of the motion-capture records of `dataset`:
-`convert_formats-<key>/absolute_pose_experiments/<dataset>`.
+`<convert_formats run>/absolute_pose_experiments/<dataset>`.
 """
 records_dir(dataset::AbstractString; config::AbstractString = "convert_formats.toml") =
-    joinpath(run_dir("convert_formats", records_key(config)), "absolute_pose_experiments", dataset)
+    joinpath(keyed_cell_dir(load_config(config), EXPERIMENT, "convert_formats"), "absolute_pose_experiments", dataset)
 
 "The motion-tracker directory of a session's records (`poses/motion_tracker`)."
 mocap_dir(dataset::AbstractString; config::AbstractString = "convert_formats.toml") =
@@ -79,10 +87,10 @@ mocap_dir(dataset::AbstractString; config::AbstractString = "convert_formats.tom
 """
     network_path(run_config) -> String
 
-The descriptor network a run config names (`[descriptor] model`,
-data_root()-relative: an input of the assets tier).
+The descriptor network a run config names: its `[inputs.network]` (an input of
+the assets tier).
 """
-network_path(rc::AbstractDict) = joinpath(data_root(; tiers = ["bb_assets"]), String(rc["descriptor"]["model"]))
+network_path(rc::AbstractDict) = input_path(rc, "network")
 
 """
     gallery_path(run_config) -> String
@@ -94,28 +102,32 @@ own cache key carries the network, patch and each board's cutoff).
 gallery_path(rc::AbstractDict) = joinpath(results_root(), "galleries", basename(String(rc["gallery"]["path"])))
 
 """
-    sweep_key(config; kind = "bb") -> String
+    sweep_key(config) -> String
 
-The run key of a BlobBoards sweep: the run config of record, the content of
-the network it names, and the sweep `kind` (`"bb"` — the run's image subsets —
-or `"occlusion"` — the occlusion levels).
+The run key of a BlobBoards sweep: `run_key` of its run config of record (its
+`[inputs]` carry the network's sha256). The main sweep and the occlusion sweep
+of one config share it; their directories differ by kind ([`sweep_dir`](@ref)).
 """
-function sweep_key(config::AbstractString; kind::AbstractString = "bb")
-    kind in ("bb", "occlusion") || error("sweep kind $(repr(kind)): bb or occlusion")
-    rc = load_config(config)
-    return config_run_key(Dict{String, Any}("config" => rc, "network_sha256" => _sha256(network_path(rc)), "kind" => kind))
-end
+sweep_key(config::AbstractString) = run_key(load_config(config))
 
-"The directory of a BlobBoards sweep (`bb-<key>` or `occlusion-<key>`)."
-sweep_dir(config::AbstractString; kind::AbstractString = "bb") = run_dir(kind, sweep_key(config; kind))
+"""
+    sweep_dir(config; kind = "bb") -> String
+
+The directory of a BlobBoards sweep: `bb-<key>` (the run's image subsets) or
+`occlusion-<key>` (the occlusion levels).
+"""
+function sweep_dir(config::AbstractString; kind::AbstractString = "bb")
+    kind in ("bb", "occlusion") || error("sweep kind $(repr(kind)): bb or occlusion")
+    return keyed_cell_dir(load_config(config), EXPERIMENT, kind)
+end
 
 # --- AprilTag/ArUco baselines -------------------------------------------------
 
 "The run key of the AprilTag/ArUco baselines (scripts/detect_baselines.jl)."
-baselines_key(config::AbstractString = "baselines.toml") = config_run_key(load_config(config))
+baselines_key(config::AbstractString = "baselines.toml") = run_key(load_config(config))
 
 "The directory of the AprilTag/ArUco baselines."
-baselines_dir(config::AbstractString = "baselines.toml") = run_dir("baselines", baselines_key(config))
+baselines_dir(config::AbstractString = "baselines.toml") = keyed_cell_dir(load_config(config), EXPERIMENT, "baselines")
 
 # --- the evaluation's sources -------------------------------------------------
 
@@ -137,11 +149,13 @@ end
     Sources
 
 Everything the evaluation of one dataset reads, resolved from its config of
-record: the INPUTS (`inputs`, data_root()'s session directory: images, boards),
-the motion-capture records (`mocap`), the detections of each series
+record: its `[experiment]` layout (`experiment`: dataset, matcher, problem), the
+INPUTS (`inputs`, data_root()'s session directory: images, boards), the
+motion-capture records (`mocap`), the detections of each series
 (`poses[series]`) and the run keys that identify them all (`keys`).
 """
 struct Sources
+    experiment::Dict{String, Any}
     dataset::String
     inputs::String
     mocap::String
@@ -178,9 +192,10 @@ function eval_sources(cfg::AbstractDict; tiers = EVAL_TIERS)
     )
     keys = Dict(
         "records" => records_key(String(r["records"])), "baselines" => baselines_key(bl),
-        "bb" => sweep_key(bb), "occlusion" => sweep_key(bb; kind = "occlusion"), "bb_noflip" => sweep_key(nf),
+        "bb" => sweep_key(bb), "occlusion" => sweep_key(bb), "bb_noflip" => sweep_key(nf),
     )
-    return Sources(ds, joinpath(data_root(; tiers), "absolute_pose_experiments", ds),
+    layout = Dict{String, Any}(k => cfg["experiment"][k] for k in ("dataset", "matcher", "problem"))
+    return Sources(layout, ds, joinpath(data_root(; tiers), "absolute_pose_experiments", ds),
         mocap_dir(ds; config = String(r["records"])), poses, keys)
 end
 
@@ -206,13 +221,14 @@ The detection overlays (`<image>_val.png`) of a series' main run.
 val_dir(src::Sources, series::AbstractString) = joinpath(src.poses[series].main, "val", src.poses[series].name)
 
 """
-    derived_dir(src, generator, series_keys...) -> String
+    derived_config(src, which) -> Dict
 
-The run directory of a stage derived from the evaluation's sources (the
-hand-eye records, the pose-error cells): keyed on the run keys it reads.
+The config a stage derived from the evaluation's sources is keyed on (the
+hand-eye records, the pose-error cells): the evaluation's [experiment] layout
+and the run keys of the upstreams `which` it reads.
 """
-derived_dir(src::Sources, generator::AbstractString, which = sort!(collect(keys(src.keys)))) =
-    run_dir(generator, config_run_key(Dict{String, Any}("dataset" => src.dataset, (k => src.keys[k] for k in which)...)))
+derived_config(src::Sources, which) =
+    Dict{String, Any}("experiment" => copy(src.experiment), "sources" => Dict{String, Any}(k => src.keys[k] for k in which))
 
 """
     hand_eye_dir(src) -> String
@@ -221,4 +237,4 @@ The hand-eye records of the evaluation (scripts/make_hand_eye.jl):
 `hand_eye-<key>/`, keyed on the motion-capture records and the detections of
 the calibration subsets they are fitted on.
 """
-hand_eye_dir(src::Sources) = derived_dir(src, "hand_eye", ["records", "baselines", "bb"])
+hand_eye_dir(src::Sources) = keyed_cell_dir(derived_config(src, ["records", "baselines", "bb"]), EXPERIMENT, "hand_eye")

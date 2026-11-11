@@ -699,7 +699,9 @@ OWNERSHIP AND VALIDATION: unknown TOP-LEVEL tables are refused (a typo'd
 package-owned `[descriptor]` table is key-checked (`model` only; the retired
 `patch_size` warns — the graph declares it). `[experiment]` and `[gallery]`
 are DRIVER-owned free-form tables: the research drivers define their keys,
-and the package deliberately has no opinion on them. A driver that keeps
+and the package deliberately has no opinion on them. So is `[inputs]`, the
+paper projects' `[inputs.<id>]` statement of what a run reads
+(VisualGeometryToolkitEval's convention: tier, path, provenance, sha256). A driver that keeps
 further top-level tables of its own names them in `tables`; they are admitted,
 not checked, and read from `config_toml`. (The board and pattern authoring
 defaults are configs/authoring.toml's, never a run config's: `[blob_board]`
@@ -710,7 +712,7 @@ function read_run_config(path::AbstractString; tables = ())
     root = TOML.parsefile(path)
     _check_run_keys(
         root,
-        vcat(["find_boards", "experiment", "gallery", "descriptor"], String[String(t) for t in tables]),
+        vcat(["find_boards", "experiment", "gallery", "descriptor", "inputs"], String[String(t) for t in tables]),
         "top level"
     )
     descriptor = get(root, "descriptor", Dict{String, Any}())

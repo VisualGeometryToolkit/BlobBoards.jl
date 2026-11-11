@@ -164,7 +164,8 @@ end
     mktempdir() do tmp
         withenv("VGTK_RESULTS_ROOT" => mkpath(joinpath(tmp, "results"))) do
             none = joinpath(tmp, "nothing-here")
-            src = Sources("260527", none, none, Dict(bt.name => PoseRun(none, none, bt.name) for bt in BOARD_TYPES),
+            layout = Dict{String, Any}("dataset" => "260527", "matcher" => "marker_systems", "problem" => "absolute_pose")
+            src = Sources(layout, "260527", none, none, Dict(bt.name => PoseRun(none, none, bt.name) for bt in BOARD_TYPES),
                 Dict("records" => "r", "baselines" => "b", "bb" => "k", "occlusion" => "o", "bb_noflip" => "n"))
             # nothing cached: the cells are evaluated, and the evaluation reads detections that are not there
             @test_throws Exception write_pose_results(src)

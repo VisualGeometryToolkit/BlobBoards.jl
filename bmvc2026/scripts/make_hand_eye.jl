@@ -62,10 +62,7 @@ for bt in BlobBoardsEval.BOARD_TYPES
     # The ONE hand-eye authority (src/calibration.jl): cached, keyed on the
     # frames and markers that determine the fit, and tagged with the commit.
     # This was an independent refit — the project had FOUR of them.
-    he = hand_eye(
-        frames, detected;
-        dataset = SRC.dataset, subset = "calibration_" * bt.abbr
-    )
+    he = hand_eye(SRC, frames, detected; subset = "calibration_" * bt.abbr)
     diag = he.diagnostics
 
     # The published records: the cache's pair (X with its covariance, the

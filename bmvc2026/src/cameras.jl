@@ -10,6 +10,7 @@
 # scripts/import_cameras.jl ports each ONCE into the native vgio/cameras/v3
 # camera of record through `upstream_camera`; nothing else reads the shape.
 
+import SHA
 using VisualGeometryToolkitIO: opencv_lens
 using VisualGeometryToolkitCore: CameraModel, BoundedCamera, Attributed, Size2
 
@@ -19,31 +20,38 @@ _flag_names(flags::Integer, names::AbstractDict) = join(
 )
 
 """
-    upstream_source(entry) -> String
+    upstream_source(cfg, entry) -> String
 
-The upstream export of one `[[cameras]]` entry: its `source`, a
-data_root()-relative path, resolved through `data_root()`. An absolute
-(machine) path is refused.
+The upstream export of one `[[cameras]]` entry of configs/import_cameras.toml
+(`cfg`): its `[inputs.<input>]`, a data_root()-relative path, resolved through
+`input_path`. An absolute (machine) path is refused.
 """
-function upstream_source(entry::AbstractDict)
-    s = String(entry["source"])
-    isabspath(s) && error("import_cameras: source $(repr(s)) is a machine path; give it relative to data_root()")
-    return joinpath(data_root(), s)
+function upstream_source(cfg::AbstractDict, entry::AbstractDict)
+    s = String(cfg["inputs"][entry["input"]]["path"])
+    isabspath(s) && error("import_cameras: input $(entry["input"]) path $(repr(s)) is a machine path; give it relative to data_root()")
+    return input_path(cfg, String(entry["input"]))
 end
 
-"""
-    upstream_camera(entry, upstream) -> (name, camera::Attributed{BoundedCamera}, facts)
+# The sha256 of a file: the export is refused unless it is the one its
+# [inputs.<id>] states. (VisualGeometryToolkitEval verifies a declared input
+# sha256 once its runner does; until then this one check is the conversion's.)
+_sha256(path) = bytes2hex(open(SHA.sha256, path))
 
-The camera of one `[[cameras]]` entry of configs/import_cameras.toml (its
-`[upstream]` table: `upstream`), built from its upstream export: K from
+"""
+    upstream_camera(cfg, entry) -> (name, camera::Attributed{BoundedCamera}, facts)
+
+The camera of one `[[cameras]]` entry of configs/import_cameras.toml (`cfg`,
+whose `[upstream]` table states the export's facts), built from its upstream export: K from
 `camera_matrix` in OpenCV's pixel frame, the lens `opencv_lens` of the fitted
 coefficients (every coefficient past them must be zero), the calibration block
 from the export's own facts.
 """
-function upstream_camera(entry::AbstractDict, UP::AbstractDict)
-    src = upstream_source(entry)
+function upstream_camera(cfg::AbstractDict, entry::AbstractDict)
+    UP = cfg["upstream"]
+    src = upstream_source(cfg, entry)
     sha = _sha256(src)
-    sha == entry["sha256"] || error("$(src): sha256 $(sha), the config of record states $(entry["sha256"])")
+    want = cfg["inputs"][entry["input"]]["sha256"]
+    sha == want || error("$(src): sha256 $(sha), the config of record states $(want)")
     d = JSON.parse(read(src, String))
     d.model == "pinhole_radtan" || error("$(src): model $(d.model), expected pinhole_radtan")
     M = d.camera_matrix

@@ -8,7 +8,7 @@ VisualGeometryToolkitIO's kinds, verified.
 Reads data_root()/absolute_pose_experiments/<session>/poses/motion_tracker
 (the vendor's `marker_*.json`, READ ONLY) and the image listing of each subset
 (the positional frame ↔ image join), and writes the records to
-results_root()/convert_formats-<run key>/absolute_pose_experiments/<session>/
+<keyed run: …/bmvc2026/convert_formats-<run key>>/absolute_pose_experiments/<session>/
 poses/motion_tracker/ (src/runs.jl `records_dir`), the run key that of the
 config of record (configs/convert_formats.toml):
 
@@ -40,14 +40,14 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, figure_config, static_camera_recovery, run_dir, EVAL_TIERS
+using Main.BlobBoardsEval: data_root, figure_config, static_camera_recovery, records_dir, EVAL_TIERS
 include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the subsets' image predicate
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
     PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids, with_unit, mm, ustrip
 using Rotations: QuatRotation, params
-using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
+using VisualGeometryToolkitEval.Experiments: run_key, write_run_records, run_complete
 using DrWatson: gitdescribe
 import VisualGeometryToolkitCore
 using StaticArrays: SMatrix, SVector
@@ -59,8 +59,9 @@ import JSON, SHA, TOML
 const CFG, CFG_PATH = figure_config("convert_formats"; default = projectdir("configs", "convert_formats.toml"))
 const KEY = run_key(CFG)
 const SRC_ROOT = joinpath(data_root(; tiers = EVAL_TIERS), "absolute_pose_experiments")
-const RUN_ROOT = run_dir("convert_formats", KEY)              # src/runs.jl records_dir
-const OUT_ROOT = joinpath(RUN_ROOT, "absolute_pose_experiments")
+const SESSIONS = [String(CFG["experiment"]["dataset"])]
+const OUT_ROOT = dirname(records_dir(only(SESSIONS); config = CFG_PATH))   # <run>/absolute_pose_experiments
+const RUN_ROOT = dirname(OUT_ROOT)                                       # the keyed run (Eval keyed_cell_dir)
 const MANIFEST = joinpath(RUN_ROOT, "_manifest.jsonl")
 const REPORT = Dict{String, Any}()
 
@@ -366,7 +367,7 @@ end
 function main()
     isdir(RUN_ROOT) && error("$(RUN_ROOT) exists without its run records — an interrupted run; move it aside to redo")
     mkpath(OUT_ROOT)
-    for session in CFG["sessions"]["names"]
+    for session in SESSIONS
         convert_mocap(session)
     end
     REPORT["roundtrip"] = roundtrip_all(OUT_ROOT)
@@ -382,12 +383,12 @@ function main()
 
     write_run_records(
         RUN_ROOT, CFG; driver = "bmvc2026/scripts/convert_formats.jl",
-        config_source = CFG_PATH, key = KEY, inputs = [joinpath(SRC_ROOT, s) for s in CFG["sessions"]["names"]],
+        config_source = CFG_PATH, key = KEY, inputs = [joinpath(SRC_ROOT, s) for s in SESSIONS],
     )
     # The code that converted: the commit of every repository whose source ran
     # (the project's own tree, and the packages that own the kinds).
     REPORT["code"] = Dict(
-        "bmvc2026" => something(gitdescribe(realpath(@__DIR__)), "?"),
+        "bmvc2026" => something(gitdescribe(projectdir()), "?"),
         "VisualGeometryToolkitIO" => something(gitdescribe(pkgdir(VgtkIO)), "?"),
         "VisualGeometryToolkitCore" => something(gitdescribe(pkgdir(VisualGeometryToolkitCore)), "?"),
     )
@@ -398,5 +399,5 @@ function main()
     return nothing
 end
 
-isfile(joinpath(RUN_ROOT, "_provenance.toml")) ?
+run_complete(RUN_ROOT; sidecar = basename(MANIFEST)) ?
     println("convert_formats: run $(KEY) complete at $(RUN_ROOT)") : main()

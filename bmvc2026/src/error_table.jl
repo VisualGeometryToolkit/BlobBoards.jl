@@ -193,7 +193,7 @@ function evaluate_dataset(
         # different printed targets, so each needs its own fit, which is why the
         # default stays `nothing`.
         he = hand_eye_fit === nothing ?
-            hand_eye(calib_frames, calib_detected; dataset = src.dataset, subset = "calibration_" * bt.abbr) :
+            hand_eye(src, calib_frames, calib_detected; subset = "calibration_" * bt.abbr) :
             hand_eye_fit
         df = pose_error_table(frames, detected, he.X, he.targets; marker_sizes)
         upstream = joinpath(pdir, "_config.toml")

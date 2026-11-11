@@ -23,8 +23,9 @@ scripts/baselines/detect_markers.py and run in the pinned pixi environment
      `occlusion/<LL>/poses/<system>/`);
   4. writes the run records.
 
-Everything lands in results_root()/baselines-<run key> (src/runs.jl
-`baselines_dir`); a run whose records exist is complete and is skipped.
+Everything lands in the keyed run `…/bmvc2026/baselines-<run key>` (src/runs.jl
+`baselines_dir`, Eval's `keyed_cell_dir`); a complete run (Eval's
+`run_complete`) is skipped.
 =#
 # reproduce: reads configs/baselines.toml
 
@@ -34,19 +35,21 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, figure_config, run_dir, camera_of_record, export_target_poses, EVAL_TIERS
+using Main.BlobBoardsEval: figure_config, baselines_dir, input_path, export_target_poses
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: opencv_coefficients
 using VisualGeometryToolkitCore: BoundedCamera, EuclideanMap, PixelFrame
-using VisualGeometryToolkitEval.Experiments: run_key, write_run_records
+using VisualGeometryToolkitEval.Experiments: run_key, write_run_records, run_complete
 import JSON
 
 const CFG, CFG_PATH = figure_config("baselines"; default = projectdir("configs", "baselines.toml"))
 const KEY = run_key(CFG)
-const RUN_ROOT = run_dir("baselines", KEY)
+const RUN_ROOT = baselines_dir(CFG_PATH)
 const LEVELS = String.(CFG["occlusion"]["levels"])
-const TIERS = vcat(EVAL_TIERS, ["bb_absolute_pose_occlusion_$(l)_260527" for l in LEVELS])
-const SESSION = joinpath(data_root(; tiers = TIERS), "absolute_pose_experiments", CFG["experiment"]["dataset"])
+const SESSION = input_path(CFG, "session")
+const IMAGES = input_path(CFG, "images")
+const CAMERA = input_path(CFG, "camera")
+const OCCLUSION = Dict(l => input_path(CFG, "occlusion_$(l)") for l in LEVELS)
 const EXPORTS = joinpath(RUN_ROOT, "exports")
 const DRIVER = joinpath(@__DIR__, "baselines", "detect_markers.py")
 const PIXI = joinpath(dirname(@__DIR__), "pixi.toml")
@@ -54,7 +57,7 @@ const OPENCV_KEYS = ("k1", "k2", "p1", "p2", "k3", "k4", "k5", "k6", "s1", "s2",
 
 # The camera of record in OpenCV's convention, for the driver.
 function write_opencv_camera(path)
-    store = VgtkIO.load(Dict{Symbol, BoundedCamera}, camera_of_record(SESSION))
+    store = VgtkIO.load(Dict{Symbol, BoundedCamera}, CAMERA)
     name, c = only(store)
     bc = c isa BoundedCamera ? c : c.value
     K = bc.camera.intrinsics.K                        # canonical frame (VisualGeometryToolkitIO's CANONICAL_PIXEL_FRAME)
@@ -64,7 +67,7 @@ function write_opencv_camera(path)
     body = merge(
         (fx = Float64(K[1, 1]), fy = Float64(K[2, 2]), cx = Float64(K[1, 3]) + shift[1], cy = Float64(K[2, 3]) + shift[2]),
         NamedTuple{Tuple(Symbol.(OPENCV_KEYS[1:length(k)]))}(Tuple(k)),
-        (pixel_frame = "opencv", camera = String(name), source = basename(camera_of_record(SESSION))),
+        (pixel_frame = "opencv", camera = String(name), source = basename(CAMERA)),
     )
     open(io -> JSON.json(io, body; pretty = 4), path, "w")
     return (; name = String(name), K)
@@ -80,9 +83,9 @@ function main()
     prov = (driver = relpath(DRIVER, dirname(dirname(@__DIR__))), run_key = KEY)   # bmvc2026/scripts/baselines/…
     for (system, sub) in ((s, CFG["subsets"][s]) for s in ("apriltags", "aruco"))
         parts = [
-            (joinpath("poses", system), joinpath(SESSION, "images", sub["images"])),
-            (joinpath("poses", "calibration", system), joinpath(SESSION, "images", sub["calibration"])),
-            ((joinpath("occlusion", l, "poses", system), joinpath(SESSION, "occlusion", l, "images", sub["images"])) for l in LEVELS)...,
+            (joinpath("poses", system), joinpath(IMAGES, sub["images"])),
+            (joinpath("poses", "calibration", system), joinpath(IMAGES, sub["calibration"])),
+            ((joinpath("occlusion", l, "poses", system), joinpath(OCCLUSION[l], sub["images"])) for l in LEVELS)...,
         ]
         for (rel, images) in parts
             out = export_target_poses(joinpath(EXPORTS, rel), images, joinpath(RUN_ROOT, rel);
@@ -91,9 +94,9 @@ function main()
         end
     end
     write_run_records(RUN_ROOT, CFG; driver = "bmvc2026/scripts/detect_baselines.jl", config_source = CFG_PATH, key = KEY,
-        inputs = [SESSION])
+        inputs = [SESSION, IMAGES, CAMERA, (OCCLUSION[l] for l in LEVELS)...])
     println("baselines -> $(RUN_ROOT)")
     return nothing
 end
 
-isfile(joinpath(RUN_ROOT, "_provenance.toml")) ? println("detect_baselines: run $(KEY) complete at $(RUN_ROOT)") : main()
+run_complete(RUN_ROOT; sidecar = "camera_opencv.json") ? println("detect_baselines: run $(KEY) complete at $(RUN_ROOT)") : main()

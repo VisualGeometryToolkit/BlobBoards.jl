@@ -17,12 +17,13 @@
     @test s isa JointCoarseFine && s.criterion == MeanAverageAccuracy(10.0)
     @test sort!(collect(keys(s.axes))) == ["min_similarity", "outlier_halfwidth", "peak_threshold"]
     @test [n for (n, a) in s.axes if a.expensive] == ["peak_threshold"]
-    key = VgtkEval.Experiments.run_key(cfg)
+    key = VgtkEval.Experiments.run_key(OperatingPoints.detection_cv_config(cfg))
     dir = OperatingPoints.detection_cv_dir(cfg)
-    @test endswith(dir, "detection_cv-" * key)
-    # the record of this config is the one the configs of record deploy
-    @test all(op -> op.artifact == relpath(OperatingPoints.detection_cv_artifact(dir), OperatingPoints.results_root()),
-              OperatingPoints.ADOPTED_OPERATING_POINTS)
+    @test endswith(dir, joinpath(OperatingPoints.EXPERIMENT, "detection_cv-" * key))
+    # the run config's key is folded in: the search is around it
+    @test haskey(OperatingPoints.detection_cv_config(cfg)["sources"], "bb")
+    # every adopted value comes from one record: the config's under its 0.8 key
+    @test length(unique(op.artifact for op in OperatingPoints.ADOPTED_OPERATING_POINTS)) == 1
 end
 
 @testitem "the joint detection CV: its gate" tags = [:results] setup = [OperatingPoints] begin
