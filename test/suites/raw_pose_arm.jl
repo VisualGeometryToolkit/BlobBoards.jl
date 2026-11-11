@@ -46,10 +46,10 @@ end
     @test _model_to_homography(pose, _PIN) isa HomographyMap                          # exact plane map
     @test _model_to_homography(pose, _CAM) isa PosedCamera                                 # no homography exists through a lens
     cam = _model_to_homography(pose, _CAM)
-    # the guided transfer compares in the RAW image and searches at the same centre
+    # the guided transfer compares in the RAW image and searches with the same ellipse
     wreg = Circle(Point2(60.0, -40.0), 2.5)
-    ep, sc = _guided_transfer(cam, wreg)
-    @test ep isa Ellipse && SVector{2, Float64}(sc) == SVector{2, Float64}(ep.center)
+    ep, es = _guided_transfer(cam, wreg)
+    @test ep isa Ellipse && es === ep
     # the conic is transferred, not the point: a projective map does not carry
     # a centre to the transferred conic's centre (second order — 4e-3 px here),
     # and the conic centre is what the imaged blob actually has
@@ -112,4 +112,26 @@ end
     via_H = _project_blob_centers(_model_to_homography(pose, _PIN), wd)
     via_cam = _project_blob_centers(PosedCamera(_PIN, _POSE), wd)
     @test all(SVector{2, Float64}(a) ≈ SVector{2, Float64}(b) for (a, b) in zip(via_H, via_cam))
+end
+
+# Guided association is ellipse overlap alone (the owner's ruling, 2026-11-11): a projected blob's candidates
+# are the detections whose ellipses' boxes intersect its own projected ellipse's box, it takes the candidate
+# of highest exact IoU when that IoU is ≥ min_iou, and there is no radius. Every candidate is a read
+# dependency (recorded before the IoU gate), accepted or not.
+@testset "guided association: ellipse IoU only, no radius" begin
+    H = HomographyMap(VisualGeometryToolkitCore.HomographyMat(SMatrix{3, 3, Float64}(1, 0, 0, 0, 1, 0, 0, 0, 1)))
+    wregions = [Circle(Point2(100.0, 100.0), 6.0), Circle(Point2(200.0, 100.0), 6.0), Circle(Point2(300.0, 100.0), 6.0)]
+    E(x, y, r) = Ellipse(Point2(x, y), r, r, 0.0)
+    det_ells = [E(103.0, 100.0, 6.0),     # blob 1: 3 px off centre, IoU 0.52 — accepted, far past any sub-pixel radius
+                E(200.0, 100.0, 1.5),     # blob 2: the nearest centre (0 px), IoU 0.06 — refused
+                E(301.0, 100.0, 4.0),     # blob 3: the nearer centre, IoU 0.44
+                E(298.5, 100.0, 6.0)]     # blob 3: the farther centre, IoU 0.73 — the one taken
+    reads = Int32[]
+    c = BlobBoards._guided_candidates(BlobBoards.detection_rtree(det_ells), H, wregions, det_ells, 0.5, j -> push!(reads, j))
+    @test [(wi, di) for (_, wi, di) in c] == [(1, 1), (3, 4)]
+    @test all(v -> v[1] >= 0.5, c)
+    @test sort(reads) == Int32[1, 2, 3, 4]                       # every candidate read, the refused ones too
+    # no radius anywhere in the API: guided_search takes none, and find_board supplies none
+    @test !any(m -> :max_px in Base.kwarg_decl(m), methods(BlobBoards.guided_search))
+    @test !any(m -> :guided_detc in Base.kwarg_decl(m), methods(BlobBoards.find_board))
 end

@@ -8,7 +8,9 @@
 #   outlier_halfwidth  [find_boards.geometry] — the support of the uniform
 #                      outlier component of the self-scaling Student-t +
 #                      uniform model of the RANSAC scorer and the local
-#                      optimization, and the guided-association band (px)
+#                      optimization (px); the record of 2026-10 also used it as
+#                      the guided-association radius, which is now ellipse
+#                      overlap alone (2026-11-11)
 #   peak_threshold     [find_boards.detect] — the blob detector's peak
 #                      threshold (a DETECTION parameter: each value costs one
 #                      detection run over the validation frames)

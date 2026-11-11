@@ -156,8 +156,9 @@ local_optimization = { type = "student_t_uniform" }   # posterior-weight IRLS LO
 # changes config_dict and therefore the run key — a fresh run directory.
 min_inliers = 9
 # Reprojection outlier half-width, PIXELS — the support of the uniform outlier
-# component of the Student-t + uniform scorer and LO, and the guided-association
-# band. CROSS-VALIDATED, jointly with [find_boards.detect] peak_threshold and
+# component of the Student-t + uniform scorer and LO (guided association is by
+# ellipse overlap alone since 2026-11-11; until then this was also its radius).
+# CROSS-VALIDATED, jointly with [find_boards.detect] peak_threshold and
 # [find_boards] min_similarity: the record of configs/detection_cv.toml,
 # results_root()/tuning/detection_cv-f5a385376eda453e/detection.jld2 (run key
 # f5a385376eda453e), kept this operating point as its incumbent — the joint

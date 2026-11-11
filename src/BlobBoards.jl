@@ -77,7 +77,7 @@ using StructArrays: StructArrays, StructArray
 using GeometryBasics:
     GeometryBasics, Circle, Point2, Rect, Rect2, origin, widths
 using SpatialIndexing: SpatialIndexing   # RTree, SpatialElem, Rect, insert!, id
-using VisualGeometryToolkitCore.SpatialQueries: foreach_intersecting, nearest_neighbor!, NearestNeighborState, bulk_load!
+using VisualGeometryToolkitCore.SpatialQueries: foreach_intersecting, bulk_load!
 
 # Units and physical quantities: FlexUnits with VisualGeometryToolkitCore's pixel
 # dimension (values in base units — name the unit at every `ustrip`)

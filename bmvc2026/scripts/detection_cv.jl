@@ -17,7 +17,8 @@ by every (half-width, similarity) cell at that value. The half-width and the
 similarity gate are post-detection: everything they touch runs per cell inside
 `find_boards`, exactly as deployed (the descriptor gate on the seed matches,
 the RANSAC scorer, the local optimization, the pose-ambiguity refine and the
-guided association, whose band IS the half-width).
+guided association, by ellipse overlap alone since 2026-11-11; the record's
+run, before that, also used the half-width as its radius).
 
 The criterion (VisualGeometryToolkitEval `rigid_invariance_errors`): in every frame
 the relative pose of two detected boards is a constant of the rigid panel, so

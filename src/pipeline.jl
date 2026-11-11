@@ -563,20 +563,19 @@ end
 _new_rtree() = SpatialIndexing.RTree{Float64, 2}(Int, Nothing; leaf_capacity = 25, branch_capacity = 25)
 
 """
-    detection_rtree(detc; skip = nothing) -> SpatialIndexing.RTree
+    detection_rtree(detections; skip = nothing) -> SpatialIndexing.RTree
 
-An R-tree over the detection centroids `detc`.
+An R-tree over the detections, indexed by position `j`: over their centroids
+(`detections` a vector of points: point rects, the warm track's radius queries)
+or over their ellipses (`detections` a vector of `Ellipse`s at a board's
+rendered boundary: each ellipse's bounding box). The ellipse form is the
+`rtree` that [`guided_search`](@ref) queries: a projected blob's candidates
+are the detections whose boxes intersect its own.
 
-It holds point rects, and is the `rtree` that
-[`guided_search`](@ref) queries; `skip` (a `BitVector` over `detc`) leaves the
-detections already claimed out of the index, so they can never be
-re-associated. The codebase's standard
-spatial index (`pattern.jl` collision detection, `annotate.jl` IoU
-matching), built once per phase. `_rtree_nearest` turns the per-projected-
-blob nearest-detection scan from O(D) into an O(log D) rect query: the
-`point ± radius` box is a superset of the radius disc, so the min-distance
-scan over the hits followed by the caller's radius gate is EXACTLY the
-brute-force result.
+`skip` (a `BitVector` over the detections) leaves the detections already
+claimed out of the index, so they can never be re-associated. The codebase's
+standard spatial index (`pattern.jl` collision detection, `annotate.jl` IoU
+matching), built once per phase (per round, against the claim state).
 """
 function detection_rtree(detc::AbstractVector; skip::Union{Nothing, BitVector} = nothing)
     rt = _new_rtree()
@@ -590,28 +589,18 @@ function detection_rtree(detc::AbstractVector; skip::Union{Nothing, BitVector} =
     # rounds) are simply not indexed, so guided association can never
     # re-associate one. `bulk_load!` sorts this fresh vector in place
     # (SpatialIndexing's `load!` builds the same tree from sorted copies).
-    elems = map(idxs) do j
-        p = detc[j]
-        x = Float64(p[1]); y = Float64(p[2])
-        SpatialIndexing.SpatialElem(SpatialIndexing.Rect((x, y), (x, y)), j, nothing)
-    end
+    elems = map(j -> SpatialIndexing.SpatialElem(_detection_rect(detc[j]), j, nothing), idxs)
     return bulk_load!(rt, elems)
 end
 
-# Nearest detection to `(px, py)` within `radius`: VisualGeometryToolkitCore's
-# branch-and-bound `nearest_neighbor!` (SpatialQueries, written for this call
-# site) — subtree pruning by MBR min-distance, no candidate materialization, no
-# callback closure. `(dist², index)`, `(Inf, 0)` when nothing is within radius.
-@inline function _rtree_nearest(
-        rt::SpatialIndexing.RTree, st, px::Float64, py::Float64,
-        radius::Float64
-    )
-    # `st` is a per-CALL `NearestNeighborState(rt)`: one holder per guided
-    # search instead of one heap allocation per projected blob.
-    # Thread-private — each fit owns its own.
-    res = nearest_neighbor!(st, rt, (px, py); max_sqdist = radius * radius)
-    return res === nothing ? (Inf, 0) : (res[2], res[1])
+# A detection's index rect: a centroid's point rect, an ellipse's bounding box.
+_detection_rect(e::Ellipse) = _float_rect(bbox(e))
+function _detection_rect(p)
+    x = Float64(p[1]); y = Float64(p[2])
+    return SpatialIndexing.Rect((x, y), (x, y))
 end
+_float_rect(r::SpatialIndexing.Rect) =
+    SpatialIndexing.Rect((Float64(r.low[1]), Float64(r.low[2])), (Float64(r.high[1]), Float64(r.high[2])))
 
 # A pose model never pairs with the radial token or with `nothing` (those
 # geometries fit homographies), so those combinations refuse loudly. Both
@@ -717,31 +706,33 @@ _model_to_homography(m::VgtkCore.RadialHomography, _) = m
     transfer_ellipse(inv(distortion_map(m)), e)
 
 # The two operands guided association needs, per projected blob:
-#   (ellipse to COMPARE, centre to SEARCH at)
-# Projective: both are the transferred conic — unchanged from before.
-# Radial: compare in UNDISTORTED coordinates where the transfer is exact, but
-# search at the exactly-distorted centre so the detection index and `max_px`
-# stay in distorted pixels and need no remapping.
+#   (ellipse to COMPARE, ellipse to SEARCH with)
+# The search ellipse lives where the detections are (the raw image) and its
+# bounding box is the R-tree query; the compare ellipse is what the IoU reads.
+# Projective: both are the transferred conic.
+# Radial: compare in UNDISTORTED coordinates where the transfer is exact; search
+# with the conic carried into the distorted image by the distortion's local
+# affinity at its centre, so the detection index stays in distorted pixels.
 @inline function _guided_transfer(H::HomographyMap, wreg)
     ep = transfer_ellipse(H, wreg)
     ep === nothing && return nothing
-    return (ep, ep.center)
+    return (ep, ep)
 end
 @inline function _guided_transfer(m::VgtkCore.RadialHomography, wreg)
     ep = transfer_ellipse(HomographyMap(m.H), wreg)
     ep === nothing && return nothing
-    q = distortion_map(m)(ep.center)
-    all(isfinite, q) || return nothing
-    return (ep, q)
+    es = transfer_ellipse(distortion_map(m), ep)
+    es === nothing && return nothing
+    return (ep, es)
 end
 # Full camera (the :none policy): the transferred conic already lives in the
 # RAW image — the plane homography exactly, the lens's affinity at the
-# centre (VGC `transfer_ellipse(::PosedCamera, _)`) — so it is compared where
-# the detections are and searched at its own centre.
+# centre (VGC `transfer_ellipse(::PosedCamera, _)`) — so it is compared and
+# searched where the detections are.
 @inline function _guided_transfer(camera::PosedCamera, wreg)
     ep = transfer_ellipse(camera, wreg)
     ep === nothing && return nothing
-    return (ep, ep.center)
+    return (ep, ep)
 end
 
 # The detection ellipse in the COMPARISON domain. Projective: as measured.
@@ -754,19 +745,18 @@ end
 
 """
     guided_search(H, bundle, image_features;
-                  max_px, min_iou, keep = Pair{Int,Int}[],
-                  detc, rtree, det_ells, wdiscs, wregions) -> StructArray
+                  min_iou, keep = Pair{Int,Int}[],
+                  rtree, det_ells, wdiscs, wregions) -> StructArray
 
 Final-fit correspondence builder. Project every world blob of `bundle`'s
 pattern into the image through `H` (build it with
-`_model_to_homography`),
-then associate each projected blob to its nearest detection within `max_px` px
-**only if the projected blob and the adapted detection overlap** — exact
-ellipse IoU ≥ `min_iou`, both ellipses at the blob's rendered boundary
-(`region(·, cutoff(bundle))`, the same convention `annotate_blobs` uses for
-GT labeling). Supply the estimator's `outlier_halfwidth` as `max_px` so guided
-association uses the same inlier band as the RANSAC fit (a tighter 3σ band
-would drop seed inliers between 3σ and the half-width).
+`_model_to_homography`) and associate it by OVERLAP alone: its candidates are
+the detections whose ellipses' bounding boxes intersect the bounding box of the
+projected ellipse (an R-tree query; both ellipses at the blob's rendered
+boundary, `region(·, cutoff(bundle))`, the same convention `annotate_blobs` uses
+for GT labeling), and it is associated with the candidate of highest exact
+ellipse IoU when that IoU is ≥ `min_iou`. The IoU is the only acceptance
+criterion: there is no radius, the projected ellipse bounds the search.
 
 The IoU gate is purely geometric — descriptors are not consulted. It is
 what rejects *confuser* boards: a wrong board can be smeared onto a
@@ -785,10 +775,10 @@ taken at the transferred centre.
 
 `keep` (`world blob => detection` index pairs) are admitted first and
 unconditionally. The remaining keywords are hoistable context, each computed
-here when absent: `detc` the detection centroids, `rtree` an index over them
-([`detection_rtree`](@ref), whose `skip` keeps claimed detections out),
-`det_ells` the detections' ellipses at the board's rendered boundary, and
-`wdiscs`/`wregions` the board's world blobs and their regions.
+here when absent: `det_ells` the detections' ellipses at the board's rendered
+boundary, `rtree` an index over THOSE ellipses ([`detection_rtree`](@ref)`(det_ells)`,
+whose `skip` keeps claimed detections out), and `wdiscs`/`wregions` the board's
+world blobs and their regions.
 It is not a bare point map because the work here is CONIC transfer, not
 point transfer — the IoU gate tests a blob's projected *shape*, so the map has
 to carry the conic, not just its centre.
@@ -814,17 +804,15 @@ that case would need a local linearisation at each blob centre.
 """
 function guided_search(
         H::Union{HomographyMap, VgtkCore.RadialHomography, PosedCamera}, bundle, image_features;
-        max_px::Real, min_iou::Real,
+        min_iou::Real,
         keep::AbstractVector{Pair{Int, Int}} = Pair{Int, Int}[],
-        detc::Union{Nothing, Vector} = nothing,
         rtree::Union{Nothing, SpatialIndexing.RTree} = nothing,
         det_ells::Union{Nothing, Vector} = nothing,
         wdiscs::Union{Nothing, Vector} = nothing,
         wregions::Union{Nothing, Vector} = nothing,
         # Sink for the detection indices this association READ: called
-        # `on_read(j::Int32)` once per projected blob that had a neighbour in
-        # range (see `_guided_accept!`). Nothing to do with the returned
-        # correspondences.
+        # `on_read(j::Int32)` once per candidate of each projected blob (see
+        # `_guided_accept!`). Nothing to do with the returned correspondences.
         on_read = nothing,
         # Write-only out-parameter: the `NNMatch`es the returned table was built
         # from, in row order — for a caller that appends to them (`find_board`
@@ -832,31 +820,23 @@ function guided_search(
         # decompiling the table.
         matches_out::Union{Nothing, Vector} = nothing
     )
-    radius = max_px
     # Board-constant and phase-constant context is hoistable — callers that
-    # loop over boards (`_claim_boards`) precompute and supply `detc`, an
-    # R-tree over it (`detection_rtree`, O(log D) nearest queries), `det_ells`
-    # (per distinct cutoff — one Ellipse per detection), and the board's
-    # `wdiscs`/`wregions`. Every fallback below computes the identical value.
+    # loop over boards (`_run_matching_phase!`) precompute and supply
+    # `det_ells` (per distinct cutoff — one Ellipse per detection), the R-tree
+    # over them (per cutoff, per round against the claim state) and the
+    # board's `wdiscs`/`wregions`. Every fallback below computes the identical
+    # value.
     wdiscs = wdiscs === nothing ? blobs(bundle, :world) : wdiscs
     board_cutoff = cutoff(bundle)
-    detc = detc === nothing ? [centroid(d) for d in image_features] : detc
     # Adapted detections at the rendered-boundary scale — one Ellipse per
-    # detection, shared by every projected blob that lands near it.
+    # detection, shared by every projected blob that overlaps it.
     det_ells = det_ells === nothing ?
         [Ellipse(region(feature_frame(f), board_cutoff)) for f in image_features] : det_ells
+    rtree = rtree === nothing ? detection_rtree(det_ells) : rtree
     # World blobs at the same rendered boundary — constant per board.
     wregions = wregions === nothing ?
         [region(d, board_cutoff) for d in wdiscs] : wregions
-    cands = rtree === nothing ?
-        _guided_candidates(
-            H, wregions, detc, det_ells,
-            Float64(radius), Float64(min_iou), on_read
-        ) :
-        _guided_candidates(
-            rtree, H, wregions, detc, det_ells,
-            Float64(radius), Float64(min_iou), on_read
-        )
+    cands = _guided_candidates(rtree, H, wregions, det_ells, Float64(min_iou), on_read)
     # The RANSAC inliers (`keep`) were certified by descriptors AND spatial
     # consensus — guided search may only ADD to them, never drop them. They
     # claim their csponds first, unconditionally (no IoU gate); the IoU
@@ -900,74 +880,52 @@ _scored_with_ids(sources, image_features, matches) = withattrs(
     src_id = Int[m.first for m in matches]
 )
 
-# Shared tail of both _guided_candidates variants: radius gate, dependency
-# push, IoU accept. @inline so each caller keeps its function-barrier shape.
+# The overlap query of one projected blob `wi`: every detection whose
+# ellipse's box intersects the box of the projected ellipse `es` (in the raw
+# image) is a candidate, scored by its exact IoU with the compare ellipse `ep`
+# (`t` carries the comparison domain); the blob takes the candidate of highest
+# IoU if that IoU is ≥ `min_iou` (ties to the lower detection index, so the
+# outcome does not depend on the tree's traversal order).
 #
-# THE DEPENDENCY IS RECORDED BEFORE THE IoU GATE. Association is ONE-SHOT:
-# nearest surviving detection, then accept/reject on IoU with NO fallback to
-# the next-nearest. So a board's guided outcome depends on exactly `bestj`
-# per projected blob: claiming anything FARTHER leaves bestj nearest (no
-# change), and claiming bestj itself promotes the next-nearest, which may
-# satisfy IoU where bestj failed. That last case is why the push precedes the
-# gate — a dependency set covers what the computation READ, never what it
-# ACCEPTED. Recording only IoU-satisfying csponds would make a blob whose nearest
-# fails IoU look independent of that detection: the same class of error that
-# killed the match-list re-admission filter (see _run_matching_phase!).
-@inline function _guided_accept!(cands, on_read, ep, best2, bestj, det_ells, radius, min_iou, wi, t = nothing)
-    bestj == 0 && return nothing
-    sqrt(best2) <= radius || return nothing
-    on_read === nothing || on_read(Int32(bestj))
-    # overlap gate: the adapted detection must agree with THIS blob's
-    # projected boundary in scale and shape, not just position. `t` carries the
-    # comparison domain — nothing means the detection is already in it.
-    de = t === nothing ? det_ells[bestj] : _guided_detell(t, det_ells, bestj)
-    de === nothing && return nothing
-    v = iou(ep, de)
-    v >= min_iou || return nothing
-    push!(cands, (v, wi, bestj))
+# THE DEPENDENCY IS EVERY CANDIDATE, RECORDED BEFORE THE IoU GATE. A blob's
+# outcome is the argmax over its candidate set: claiming any candidate removes
+# it from the index (the per-round `skip`) and can change the argmax or the
+# gate's verdict, while claiming a detection outside the set changes nothing.
+# So every candidate is pushed to `on_read` as it is read, accepted or not —
+# a dependency set covers what the computation READ, never what it ACCEPTED.
+# (Under the retired nearest-centre rule the outcome depended on the one nearest
+# detection within the radius, and that one index was pushed; the set is now
+# the query's candidates, a superset of it whenever the nearest overlaps.)
+@inline function _guided_accept!(cands, on_read, rt, ep, es, det_ells, min_iou, wi, t)
+    bestv = -Inf; bestj = 0
+    foreach_intersecting(rt, _float_rect(bbox(es))) do elem
+        j = SpatialIndexing.id(elem)
+        on_read === nothing || on_read(Int32(j))
+        de = _guided_detell(t, det_ells, j)
+        if de !== nothing
+            v = iou(ep, de)
+            (v > bestv || (v == bestv && j < bestj)) && (bestv = v; bestj = j)
+        end
+        false
+    end
+    bestj != 0 && bestv >= min_iou && push!(cands, (bestv, wi, bestj))
     return nothing
 end
 
 # Function barrier for guided_search: `H` arrives concrete here, so the
-# transfer + nearest-detection loop compiles allocation-free. Keep this a
+# transfer + overlap-query loop compiles without union splits. Keep this a
 # separate function — inlining it back into guided_search reintroduces the
 # union-split boxing.
 function _guided_candidates(
-        H, wregions, detc, det_ells::AbstractVector,
-        radius::Float64, min_iou::Float64, on_read = nothing
+        rt::SpatialIndexing.RTree, H, wregions, det_ells::AbstractVector,
+        min_iou::Float64, on_read = nothing
     )
     cands = Tuple{Float64, Int, Int}[]
     for (wi, wreg) in enumerate(wregions)
         tr = _guided_transfer(H, wreg)
         tr === nothing && continue
-        ep, sc = tr
-        best2 = Inf; bestj = 0
-        @inbounds for j in eachindex(detc)
-            dc = detc[j]
-            d2 = (sc[1] - dc[1])^2 + (sc[2] - dc[2])^2
-            d2 < best2 && (best2 = d2; bestj = j)
-        end
-        _guided_accept!(cands, on_read, ep, best2, bestj, det_ells, radius, min_iou, wi, H)
-    end
-    return cands
-end
-
-# R-tree-accelerated variant: O(log D) rect-query nearest per projected blob
-# instead of the O(D) scan. The `± radius` query box is a superset of the
-# radius disc, so the post-radius-gate output is IDENTICAL to the
-# brute-force method above.
-function _guided_candidates(
-        rt::SpatialIndexing.RTree, H, wregions, detc, det_ells::AbstractVector,
-        radius::Float64, min_iou::Float64, on_read = nothing
-    )
-    cands = Tuple{Float64, Int, Int}[]
-    st = NearestNeighborState(rt)
-    for (wi, wreg) in enumerate(wregions)
-        tr = _guided_transfer(H, wreg)
-        tr === nothing && continue
-        ep, sc = tr
-        best2, bestj = _rtree_nearest(rt, st, Float64(sc[1]), Float64(sc[2]), radius)
-        _guided_accept!(cands, on_read, ep, best2, bestj, det_ells, radius, min_iou, wi, H)
+        ep, es = tr
+        _guided_accept!(cands, on_read, rt, ep, es, det_ells, min_iou, wi, H)
     end
     return cands
 end
@@ -1311,7 +1269,6 @@ function find_board(
         dm = nothing,
         matches = nothing,
         bundle = nothing,
-        guided_detc = nothing,
         guided_rtree = nothing,
         guided_det_ells = nothing,
         guided_wdiscs = nothing,
@@ -1359,15 +1316,15 @@ function find_board(
     end
 
     # Guided final fit: project the full board pattern through the RANSAC
-    # model, re-associate every blob to its nearest detection, and refit with
-    # posterior-weighted IRLS. Recovers pattern blobs the descriptor matcher
+    # model, re-associate every blob with the detection it overlaps best (ellipse
+    # IoU, the one acceptance criterion), and refit with posterior-weighted IRLS. Recovers pattern blobs the descriptor matcher
     # missed; falls back to the RANSAC fit if the guided set is too small or
     # the refit fails to converge. Drop `workspace` from fit_kw — the guided
     # set can exceed the descriptor-match count the workspace was sized for.
     if !isnothing(bundle) && _guided_enabled(camera)
-        # association band = estimator outlier_halfwidth + per-blob IoU gate
-        # at the bundle's rendered-boundary cutoff (fallback matches the
-        # PoseGeometry/HomographyGeometry default of 5 px)
+        # The guided refit's scorer half-width (fallback matches the
+        # PoseGeometry/HomographyGeometry default of 5 px). It is the scorer's
+        # alone: the association below is by ellipse overlap, with no radius.
         outlier_halfwidth = get(fit_kw, :outlier_halfwidth, 5.0)
         # RANSAC inliers are already certified (descriptor match + spatial
         # consensus): guided search keeps them unconditionally and only ADDS
@@ -1382,7 +1339,7 @@ function find_board(
         g_matches = NNMatch[]
         g_scored = guided_search(
             _model_to_homography(res.estimate, camera), bundle, image_features;
-            max_px = outlier_halfwidth, min_iou, keep, detc = guided_detc, rtree = guided_rtree,
+            min_iou, keep, rtree = guided_rtree,
             det_ells = guided_det_ells, wdiscs = wd,
             wregions = guided_wregions, on_read = on_guided_read, matches_out = g_matches
         )
@@ -1397,7 +1354,7 @@ function find_board(
             if !isnothing(res2) && res2.converged
                 # EVERY correspondence the board was fitted on comes back,
                 # weighted: the guided union with the refit's posterior, and
-                # the descriptor matches the arm's own band rejected with the
+                # the descriptor matches the arm's own scorer rejected with the
                 # RANSAC's (all ≤ ½). Inliers are `is_map_inlier(weight)` on both return
                 # paths, so a consumer that reads inliers sees no difference;
                 # one that can re-judge a rejected cspond under another model
@@ -1929,9 +1886,10 @@ Configuration for `find_boards` pipeline. The `geometry` field
   inliers that must agree in appearance for the board to be accepted.
 
 Geometry cannot make this call. Guided association is descriptor-blind, and
-at measured detection densities (13,844/MP, 5 px band) 66% of arbitrary
-positions have SOME detection in range — a fabricated board fills its inlier
-set geometrically, so counts and fractions satisfy it. The inliers' APPEARANCE
+at measured detection densities (13,844/MP, measured under the retired 5 px
+association radius) 66% of arbitrary positions had SOME detection in range — a
+fabricated board fills its inlier set geometrically, so counts and fractions
+satisfy it. The inliers' APPEARANCE
 separates real from fabricated with zero measured overlap (real ≥ 0.993
 support, false = 0.0 at a 0.8 sim gate; see verify.jl). This gate replaced
 the geometry structs' `min_inlier_fraction` (a proxy for the same attack,
@@ -2669,7 +2627,8 @@ end
 #     boundary `filter!` had shrunk. That one was WRONG. A fit has two
 #     claim-sensitive inputs, and the filter tracked one: the guided R-tree
 #     is rebuilt from `in_claimed` every round, and `_guided_candidates`
-#     takes the single nearest detection per projected blob, so a commit can
+#     takes the best-overlapping of each projected blob's candidates (then:
+#     the single nearest detection), so a commit can
 #     change what a board's fresh fit would see WITHOUT touching that
 #     board's match list. Refit-all inside a loop does not cover it —
 #     refit-all only reaches boards already ON that loop's agenda, so a
@@ -2782,8 +2741,13 @@ function _find_boards_serial(
         detc = [centroid(d) for d in feat_pool]
         Di = descriptor_matrix(feat_pool)
         claimed = falses(length(feat_pool))
+        # The detections' ellipses at each board cutoff, and per round the
+        # guided search's overlap index over them (claimed detections skipped).
+        det_ells_at = Dict{Float64, Vector}()
+        ells_at(c) = get!(() -> [Ellipse(region(feature_frame(f), c)) for f in feat_pool], det_ells_at, c)
         while !isempty(gallery)
-            rt = detection_rtree(detc; skip = claimed)
+            rts = Dict{Float64, Any}()
+            rt_at(c) = get!(() -> detection_rtree(ells_at(c); skip = claimed), rts, c)
             cands = Tuple[]
             for uid in sort!(collect(keys(gallery)))
                 # Per-round one-to-one resolution on the claim-filtered RAW
@@ -2805,7 +2769,8 @@ function _find_boards_serial(
                         cam, gallery[uid], feat_pool;
                         min_similarity = config.min_similarity,
                         matches = resolved, bundle = bdl,
-                        guided_detc = detc, guided_rtree = rt,
+                        guided_rtree = rt_at(Float64(cutoff(bdl))),
+                        guided_det_ells = ells_at(Float64(cutoff(bdl))),
                         resolve_pose_ambiguity = _pose_ambiguity_enabled(config.geometry),
                         fit_kw = board_fit_keywords(config, uid, bdl),
                     )
@@ -2970,9 +2935,9 @@ function _claim_boards(
     )
 
     outlier_halfwidth = cfg.geometry.outlier_halfwidth
-    # Hoisted guided_search context: detection centroids are identical for
-    # every board in this phase (also reused for claim containment below).
-    guided_detc = [centroid(d) for d in image_features]
+    # The detection centroids, identical for every board in this phase: the
+    # claim containment below reads them (guided search reads the ellipses).
+    claim_detc = [centroid(d) for d in image_features]
 
     # ---- Agenda: per-round one-to-one resolution + match-count floor --------
     n_feats = length(image_features)
@@ -3073,7 +3038,7 @@ function _claim_boards(
     # (function barrier `_mark_inside!`), then every per-match dirty/touched/
     # filter check is an O(1) BitVector lookup instead of point-in-polygon
     # over a Vector{Any} of quads.
-    in_claimed = falses(length(guided_detc))
+    in_claimed = falses(length(claim_detc))
     # ONE COMMIT PER ROUND (2026-08-14). Fit every live entry in parallel,
     # commit only the single best by (inlier count, quality), claim its quad,
     # refit everything still live. This DELETED the multi-commit round's
@@ -3096,7 +3061,10 @@ function _claim_boards(
         # phase's earlier commits, so guided association can never re-associate
         # a claimed detection (documented invariant at detection_rtree).
         # O(D log D) bulk load, a few ms.
-        guided_rtree = detection_rtree(guided_detc; skip = in_claimed)
+        # One index per board cutoff, over the detections' ellipses at it (the
+        # guided overlap query's candidates are the boxes it intersects).
+        guided_rtrees = det_ells_by_cutoff === nothing ? nothing :
+            Dict(c => detection_rtree(ells; skip = in_claimed) for (c, ells) in det_ells_by_cutoff)
         # Per-round one-to-one resolution on the claim-filtered RAW match
         # lists. Filtering the RESOLVED list instead (the pre-2026-08-17
         # within-phase behavior) cannot promote a blob's next-best candidate
@@ -3162,7 +3130,7 @@ function _claim_boards(
                     bundle = bdl,
                     on_guided_read = track_deps ? (j -> push!(e.deps, j)) : nothing,
                     telemetry,
-                    guided_detc, guided_rtree,
+                    guided_rtree = guided_rtrees === nothing ? nothing : guided_rtrees[Float64(cutoff(bdl))],
                     guided_det_ells = det_ells_by_cutoff === nothing ? nothing :
                         det_ells_by_cutoff[Float64(cutoff(bdl))],
                     guided_wdiscs = geom === nothing ? nothing : geom.wdiscs,
@@ -3257,7 +3225,7 @@ function _claim_boards(
         isempty(candidates) && break
         sort!(candidates; by = c -> (c[5], c[3]), rev = true)
         (uid, model, quality, scored) = candidates[1]
-        _mark_inside!(in_claimed, guided_detc, _quad(uid, model))
+        _mark_inside!(in_claimed, claim_detc, _quad(uid, model))
         push!(committed, (uid, model, quality, scored))
 
         # ---- Rebuild agenda: EVERY surviving entry refits next round on the
