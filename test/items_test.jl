@@ -17,6 +17,12 @@
     include("suites/naming.jl")
 end
 
+# One implementation per concept across the stack: VisualGeometryToolkitCore's check_duplication,
+# its open findings listed (each waits for a hoist; .release/duplication-checklist.md).
+@testitem "duplication" begin
+    include("suites/duplication.jl")
+end
+
 @testitem "quality gates" begin
     include("suites/quality_gates.jl")
 end
