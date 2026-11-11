@@ -21,10 +21,6 @@ import TOML
 assert_active_project(joinpath("src", "BlobBoardsEval.jl"))   # VisualGeometryToolkitEval's check: projectdir() is this paper project
 
 const _ARTIFACTS_TOML = projectdir("Artifacts.toml")
-# DEFERRED: the shared convention puts the view AT datadir("exp_raw"); this
-# project's stays at output/data_view until its next full regeneration, so no
-# consumer path moves now.
-const _VIEW_DIR = projectdir("output", "data_view")
 
 # Tiers needed per use; images/occlusion stay lazy until a driver asks. Every
 # tier holds INPUTS only (configs/data_artifacts.toml): the results are
@@ -64,7 +60,8 @@ _tier_mount(t) = t in _ROOT_TIERS ? "" : "absolute_pose_experiments"
 #   3. BlobBoards.data_dir()       the author's copy of the inputs
 #                                  (BLOBBOARDS_DATA / LocalPreferences.toml)
 #   4. the artifact view           consumers: lazy per-tier download,
-#                                  symlink-merged, READ-ONLY
+#                                  symlink-merged, READ-ONLY, AT
+#                                  datadir("exp_raw") (ArtifactView's default)
 #
 # Rungs 2-4 resolve to the same tree on the author's machine. Invariant:
 # staging-tree layout ≡ packed-tier layout ≡ composed view — artifact tarballs
@@ -77,7 +74,7 @@ set_project_root!(
     projectdir();
     resolve_links = true,
     data_fallback = () -> BlobBoards.data_dir(),
-    artifacts = ArtifactView(_ARTIFACTS_TOML; dir = _VIEW_DIR, mount = _tier_mount, default = _DEFAULT_TIERS),
+    artifacts = ArtifactView(_ARTIFACTS_TOML; mount = _tier_mount, default = _DEFAULT_TIERS),
     create_results = true,
 )
 

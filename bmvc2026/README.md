@@ -146,15 +146,16 @@ stack's one implementation (VisualGeometryToolkitEval.Experiments), bound in
 2. `datadir("exp_raw")` — the per-machine link, resolved;
 3. `BlobBoards.data_dir()` (`BLOBBOARDS_DATA` / `LocalPreferences.toml`) —
    the author's primary **writable** copy;
-4. composed artifact view (`output/data_view`; it moves to
-   `datadir("exp_raw")` at the next full regeneration) — consumers; read-only,
-   downloads only the tiers a driver needs.
+4. composed artifact view (at `datadir("exp_raw")`, ArtifactView's default)
+   — consumers; read-only, downloads only the tiers a driver needs.
 
 Expected download time: Zenodo served ~0.1–0.5 MB/s per single stream (measured 2026-10-09), so a multi-GB tier takes hours.
 
 The data policy (VisualGeometryToolkitEval `data_policy_violations`): D1 no machine paths in
 code or launchers; D2 nothing writes under `data_root()`;
-D3 output directories are keyed (`<stage>-<run_key>`, `<prefix>_<hash>`).
+D3 output directories are keyed (Eval's `keyed_cell_dir`:
+`<dataset>/<matcher>/<problem>/bmvc2026/<stage>-<run_key>`; caches
+`<prefix>_<run_key>`).
 `test/paper_project_tests.jl` checks it (VisualGeometryToolkitEval PaperProjects).
 
 The descriptor's frozen training set ships as two further root-mounted tiers,
