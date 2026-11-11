@@ -8,9 +8,9 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
 
 ## BlobBoards ↔ CaliBlobs (cascade list)
 
-- [ ] the shared helpers → one owner: BlobBoards (audit 6). BlobBoards' side: `board_fit_keywords`, `board_endpoints`,
+- [x] the shared helpers → one owner: BlobBoards (audit 6). BlobBoards' side: `board_fit_keywords`, `board_endpoints`,
   `distortion_center`, `load_descriptor_network` and `geometry_local_optimization` are public (48a592f);
-  CaliBlobs deletes its copies in its own leg (cb-09, `caliblobs-09`). Closes when CaliBlobs' deletion lands.
+  CaliBlobs deleted its copies in its own leg (cb-09 `caliblobs-09`, 639abd1).
 - [x] BlobBoards' CPU twin of its GPU kernels → one KernelAbstractions implementation (audit 7): `_adapt_cpu`,
   `_adapt_cpu_one!`, `_cpu_residuals!`, `_cpu_weights!` deleted; the per-blob kernels run on `KA.CPU()` with one
   work item per blob (0e14141). CPU frames vs the deleted twin's: max 2.2e-7 px centroid; GPU frames vs the old
