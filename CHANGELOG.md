@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased (the VisualGeometryToolkit 0.9 stack)
+
+On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1 as
+the 0.9 branch states them), with the 0.9 ports of RANSACScoringDoneRight and
+LocalOptimizationDoneRight. Breaking (the next release is a minor bump):
+
+- **`image_origin` is `pixel_frame`**, the stack's name for the pixel convention
+  (`:colmap`, `:opencv`, `:julia`), everywhere: `AffineMap(…; pixel_frame)`, the
+  `*_python` functions and the Python package's keywords (`pixel_frame="opencv"`).
+  No alias.
+- **`detect_blobs(…; max_detections)` keeps about that many of the strongest
+  detections spread over the image** (VisualGeometryToolkitFeatures'
+  `spread_strongest`, which replaces its `strongest`), ordered by response. The
+  default (`"unbounded"`) is unchanged.
+- **`config_dict` is VisualGeometryToolkitEstimation's generic** (one of its
+  CONTRACT_GENERICS); BlobBoards adds its methods. `BlobBoards.config_dict` is the
+  same function, and a downstream configuration adds its method as before;
+  `BlobBoards.CONTRACT_GENERICS` no longer lists it.
+- **New public helpers for a downstream geometry arm** (CaliBlobs'):
+  `board_fit_keywords`, `board_endpoints`, `distortion_center`,
+  `load_descriptor_network`, `geometry_local_optimization`.
+- **One adaptation implementation on every backend**: the per-blob
+  KernelAbstractions kernels run on `KA.CPU()` (one work item per blob); the
+  threaded host twin is deleted. CPU frames move by at most ~2e-7 px.
+- The docstring gates are VisualGeometryToolkitCore's `test_docs`; the suite runs
+  Core's `check_duplication` (its open findings listed, each an item of
+  `.release/duplication-checklist.md`).
+
 ## 0.5.1 (2026-11-09)
 
 On the VisualGeometryToolkit 0.8 stack, from General: VisualGeometryToolkitCore, IO and

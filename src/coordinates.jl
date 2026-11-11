@@ -190,12 +190,12 @@ _given_or_own_density(::PointGrid, ::Nothing) = nothing
 # =============================================================================
 
 """
-    AffineMap(bundle::BoardBundle, from::Symbol, to::Symbol; image_origin=:colmap, density=nothing) -> AffineMap
+    AffineMap(bundle::BoardBundle, from::Symbol, to::Symbol; pixel_frame=:colmap, density=nothing) -> AffineMap
 
 Affine transformation between board coordinate systems.
 
 # Coordinate Systems
-- `:pixel` - Pixel coordinates (uses `image_origin` for convention)
+- `:pixel` - Pixel coordinates (uses `pixel_frame` for convention)
 - `:physical` - Physical units in mm (y-down, origin at canvas top-left)
 - `:world` - World coordinates (y-up, centered at canvas center, unitless mm)
 
@@ -203,7 +203,7 @@ Affine transformation between board coordinate systems.
 - `bundle::BoardBundle`: Board bundle containing geometry information
 - `from::Symbol`: Source coordinate system (one of `:pixel`, `:physical`, `:world`)
 - `to::Symbol`: Target coordinate system (one of `:pixel`, `:physical`, `:world`)
-- `image_origin::Symbol=:colmap`: Image origin convention when `:pixel` is involved
+- `pixel_frame::Symbol=:colmap`: Image origin convention when `:pixel` is involved
   (`:julia`, `:colmap`, or `:opencv`). Default is `:colmap` since blobs are stored in
   COLMAP convention (pixel centers at 0.5, 0.5).
 - `density`: the density of the `:pixel` coordinates (e.g. `300dpi`), whenever
@@ -224,7 +224,7 @@ world_pt = H(Point2(100.0, 200.0))
 """
 function CoordinateTransformations.AffineMap(
         bundle::BoardBundle, from::Symbol, to::Symbol;
-        image_origin::Symbol = :colmap, density::Union{Nothing, Quantity} = nothing
+        pixel_frame::Symbol = :colmap, density::Union{Nothing, Quantity} = nothing
     )
     for s in (from, to)
         s in (:pixel, :physical, :world) || throw(
@@ -242,17 +242,17 @@ function CoordinateTransformations.AffineMap(
     density = _given_or_own_density(board_config(bundle).layout_grid, density)
 
     if from == :pixel && to == :physical
-        return _pixel_to_physical(_pixel_density(density, from, to), image_origin)
+        return _pixel_to_physical(_pixel_density(density, from, to), pixel_frame)
     elseif from == :physical && to == :pixel
-        return inv(_pixel_to_physical(_pixel_density(density, from, to), image_origin))
+        return inv(_pixel_to_physical(_pixel_density(density, from, to), pixel_frame))
     elseif from == :physical && to == :world
         return _physical_to_world(bundle)
     elseif from == :world && to == :physical
         return inv(_physical_to_world(bundle))
     elseif from == :pixel && to == :world
-        return _physical_to_world(bundle) ∘ _pixel_to_physical(_pixel_density(density, from, to), image_origin)
+        return _physical_to_world(bundle) ∘ _pixel_to_physical(_pixel_density(density, from, to), pixel_frame)
     elseif from == :world && to == :pixel
-        return inv(_pixel_to_physical(_pixel_density(density, from, to), image_origin)) ∘ inv(_physical_to_world(bundle))
+        return inv(_pixel_to_physical(_pixel_density(density, from, to), pixel_frame)) ∘ inv(_physical_to_world(bundle))
     end
 end
 
@@ -263,13 +263,13 @@ _pixel_density(::Nothing, from, to) = throw(
 )
 
 """
-    _pixel_to_physical(density, image_origin::Symbol) -> AffineMap
+    _pixel_to_physical(density, pixel_frame::Symbol) -> AffineMap
 
 Internal: Create transform from pixel coordinates at `density` (the
 canvas frame) to physical (mm) coordinates. Composes origin convention mapping
 with scaling.
 """
-function _pixel_to_physical(density::Quantity, image_origin::Symbol)
+function _pixel_to_physical(density::Quantity, pixel_frame::Symbol)
 
     # Scale factor: pixels to mm
     s = Float64(ustrip(px / mm, density))
@@ -281,9 +281,9 @@ function _pixel_to_physical(density::Quantity, image_origin::Symbol)
     # map itself can act on primitives since VGC 0.21.1): this keeps the eager
     # `LinearMap ∘ Translation → AffineMap` fusion (the documented
     # `-> AffineMap` contract) and a concrete return type — a bare
-    # `EuclideanMap{2, …, PixelFrame{image_origin}}` would compose lazily and
+    # `EuclideanMap{2, …, PixelFrame{pixel_frame}}` would compose lazily and
     # carry the runtime symbol into the type domain.
-    origin_map = Translation(EuclideanMap(PixelFrame{:colmap}, PixelFrame{image_origin}).t)
+    origin_map = Translation(EuclideanMap(PixelFrame{:colmap}, PixelFrame{pixel_frame}).t)
 
     return scale_map ∘ inv(origin_map)
 end

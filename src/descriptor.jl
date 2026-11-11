@@ -76,12 +76,17 @@ merely detectable.
 """
 patch_size(m::AbstractDescriptorNetwork) = m.patch_size
 
-_ensure_network(m::AbstractDescriptorNetwork) = m
+"""
+    load_descriptor_network(network_or_path) -> AbstractDescriptorNetwork
 
-# Path-based dispatch: .jld2 → Lux (requires BlobBoardsLuxExt loaded),
-# anything else → ONNX. This is the single switch point — every caller
-# that has a path and wants a model funnels through here.
-function _ensure_network(path::AbstractString)
+The descriptor network a pipeline runs: a network as given, or one read from a
+path — a `.jld2` checkpoint as a [`LuxDescriptorNetwork`](@ref) (BlobBoardsLuxExt
+must be loaded), anything else as an ONNX [`DescriptorNetwork`](@ref). The single
+switch point: every caller that has a path and wants a model funnels through here.
+"""
+load_descriptor_network(m::AbstractDescriptorNetwork) = m
+
+function load_descriptor_network(path::AbstractString)
     return if endswith(lowercase(path), ".jld2")
         LuxDescriptorNetwork(path)
     else

@@ -1150,29 +1150,29 @@ end
 # The canonical tree of a value, in the identity's own form (json.jl: lowered
 # on `_IdentityStyle`, each quantity an object `{value, unit}`, whatever the
 # file format is).
-function _plain(x)
+function _identity_lowering(x)
     x isa Union{AbstractString, Bool, Nothing} && return x
     x isa Integer && return Int64(x)
     x isa AbstractFloat && return Float64(x)
     x isa Symbol && return string(x)
     x isa NamedTuple &&
-        return Dict{String, Any}(string(k) => _plain(v) for (k, v) in pairs(x))
+        return Dict{String, Any}(string(k) => _identity_lowering(v) for (k, v) in pairs(x))
     x isa AbstractDict &&
-        return Dict{String, Any}(string(k) => _plain(v) for (k, v) in x)
+        return Dict{String, Any}(string(k) => _identity_lowering(v) for (k, v) in x)
     # A type's JSON lowering takes precedence over container-ness, so the
     # canonical tree mirrors the serialized structure (Size2 is an
     # AbstractVector but serializes as {width, height}; quantities, in the
     # identity's form, as {value, unit}). A type without one lowers to itself (a plain Vector{Any},
     # a config_dict value such as a tilt schedule, is then a container).
     l = JSON.lower(_IdentityStyle(), x)
-    l !== x && return _plain(l)
-    x isa Union{AbstractVector, Tuple} && return Any[_plain(v) for v in x]
+    l !== x && return _identity_lowering(l)
+    x isa Union{AbstractVector, Tuple} && return Any[_identity_lowering(v) for v in x]
     throw(ArgumentError("cannot canonicalize $(typeof(x)): it has no JSON lowering"))
 end
 
 # The canonical encoding itself (sorted keys, bare integral floats, Ryu for the
 # rest, loud on non-finite numbers) is VisualGeometryToolkitIO's `canonical_json` since
-# 0.7.6; the LOWERING of a config into that tree (`_plain`) stays here with the
+# 0.7.6; the LOWERING of a config into that tree (`_identity_lowering`) stays here with the
 # schema. Board identities are `sha256_hex` over exactly that string.
 using VisualGeometryToolkitIO: canonical_json
 using VisualGeometryToolkitCore: sha256_hex
@@ -1184,7 +1184,7 @@ The blobboards canonical (v1) encoding of a config's lowered tree — the byte
 string board identities are minted from. Stable across JSON library/serializer
 versions by construction.
 """
-canonical_config_json(config) = canonical_json(_plain(config))
+canonical_config_json(config) = canonical_json(_identity_lowering(config))
 
 """
     hash_config(config)
@@ -1217,7 +1217,7 @@ _hash_board(::PointGrid, p::BoardPreamble) = _board_identity(p, _place_board_blo
 _board_identity(p::BoardPreamble, blobs) = _board_identity(p.board_config.layout_grid, p, blobs)
 _board_identity(g::PixelGrid, p::BoardPreamble, _) = _hash_board(g, p)
 function _board_identity(g::PointGrid, p::BoardPreamble, blobs)
-    record = Dict{String, Any}("schema" => IDENTITY_SCHEMA, "preamble" => _plain(p), "blobs" => _plain(_identity_blobs(blobs, _blob_unit(g))))
+    record = Dict{String, Any}("schema" => IDENTITY_SCHEMA, "preamble" => _identity_lowering(p), "blobs" => _identity_lowering(_identity_blobs(blobs, _blob_unit(g))))
     return sha256_hex(canonical_json(record))
 end
 

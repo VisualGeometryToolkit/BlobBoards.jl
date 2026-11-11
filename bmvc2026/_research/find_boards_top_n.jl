@@ -11,7 +11,7 @@ using BlobBoards: find_board   # advanced API (unexported)
 using BlobBoards: data_dir, detect_blobs, DescriptorNetwork, BoardGallery, uid_from_hash,
                   cutoff, find_board, FindBoardsConfig, DetectConfig,
                   DEFAULT_CUTOFF, load_bundle, blobs, board!
-using BlobBoards: _ensure_network, canonicalize, describe, described_features
+using BlobBoards: load_descriptor_network, canonicalize, describe, described_features
 using VisualGeometryToolkitFeatures: nn_match_stacked, MutualNN
 using VisualGeometryToolkitFeatures: Detection
 using VisualGeometryToolkitCore: is_map_inlier, imshow, HomographyMap, matches!, window!, ustrip, centroid, Rect
@@ -49,7 +49,7 @@ frames = BlobBoards.filter_blobs(
     [Detection(d.frame, (; id = i)) for (i, d) in enumerate(detections)],
     detections; cutoff = CUTOFF, image = img)
 patches = canonicalize(frames, img; inner_extent = CUTOFF, outer_extent = 96.0, device = DEVICE)
-descriptors = describe(_ensure_network(desc_model), patches)
+descriptors = describe(load_descriptor_network(desc_model), patches)
 image_features = described_features(frames, descriptors)
 @info "features" n=length(image_features)
 

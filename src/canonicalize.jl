@@ -32,7 +32,7 @@
 # `ComputeBackend`s, not `KA.Backend`s, and match no `_canonicalize` method.
 
 using VisualGeometryToolkitCore: logpolar_map, canonical_map, image_warp,
-    image_warp_batch_to!, region, Circle
+    image_warp_batch_to!, region, Circle, ka_upload
 # the supersampling downfilter: Feat's block mean, in Float32 for a Gray{Float32} patch
 using VisualGeometryToolkitFeatures: box_downsample
 
@@ -139,14 +139,8 @@ function _canonicalize(
     # on this device), run the same batched kernel, download + reshape into
     # the legacy Vector{Matrix{Gray}} API.
     d_img = (KA.get_backend(img) == device && eltype(img) == Float32) ? img :
-        begin
-            h = Float32.(Gray{Float32}.(gray_f32(img)))
-            d = KA.allocate(device, Float32, size(h)...)
-            copyto!(d, h)
-            d
-        end
-    d_warps = KA.allocate(device, eltype(warps), N)
-    copyto!(d_warps, warps)
+        ka_upload(Float32, device, Float32.(Gray{Float32}.(gray_f32(img))))
+    d_warps = ka_upload(eltype(warps), device, warps)
     d_cube = KA.zeros(device, Float32, P_hi, P_hi, N)
     image_warp_batch_to!(d_cube, d_warps, d_img; fillvalue = 0.5f0)
     cube = Array(d_cube)

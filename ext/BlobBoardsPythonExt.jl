@@ -172,7 +172,7 @@ function BlobBoards.blob_board_python(
         max_trials = nothing,
         α = nothing,
         polarity = nothing,
-        image_origin = "colmap"
+        pixel_frame = "colmap"
     )
     # a paper name, a (width, height) pair, or one length (a square page)
     canvas_size_jl = if canvas_size isa AbstractString || (canvas_size isa Py && pyisinstance(canvas_size, pybuiltins.str))
@@ -205,7 +205,7 @@ function BlobBoards.blob_board_python(
     bundle = BlobBoards.blob_board(canvas_size_jl; julia_kwargs...)
 
     return _py_board_result(
-        bundle, image_origin, BlobBoards._bundle_identity(bundle),
+        bundle, pixel_frame, BlobBoards._bundle_identity(bundle),
         something(density_jl, BlobBoards._default_density(bundle))
     )
 end
@@ -245,13 +245,13 @@ end
 # convention at `density` (given, else the board's own raster density),
 # the configs, and the board's identity — minted for a fresh board, the STORED
 # one for a loaded or re-rendered board.
-function _py_board_result(bundle::BoardBundle, image_origin, config_hash::AbstractString, density)
+function _py_board_result(bundle::BoardBundle, pixel_frame, config_hash::AbstractString, density)
     np = pyimport("numpy")
-    image_origin_sym = image_origin isa Py ? Symbol(pyconvert(String, image_origin)) : Symbol(image_origin)
+    pixel_frame_sym = pixel_frame isa Py ? Symbol(pyconvert(String, pixel_frame)) : Symbol(pixel_frame)
     blob_list = BlobBoards.blobs(bundle, :pattern; units = px, density)
     # px by the `units = px` call above, stripped in px; the per-field ustrip
     # in the loop below is then an identity.
-    blob_list = EuclideanMap(PixelFrame{:colmap}, PixelFrame{image_origin_sym}).(ustrip.(px, blob_list))
+    blob_list = EuclideanMap(PixelFrame{:colmap}, PixelFrame{pixel_frame_sym}).(ustrip.(px, blob_list))
 
     blobs_array = zeros(Float64, length(blob_list), 3)
     for (i, blob) in enumerate(blob_list)
@@ -298,9 +298,9 @@ function _py_load_board(json_path, density, fname)
     return bundle, config_hash, BlobBoards._image_density(image_path, bundle; density = d)
 end
 
-function BlobBoards.load_board_python(json_path; image_origin = "colmap", density = nothing)
+function BlobBoards.load_board_python(json_path; pixel_frame = "colmap", density = nothing)
     bundle, config_hash, d = _py_load_board(json_path, density, "load_board")
-    return _py_board_result(bundle, image_origin, config_hash, d)
+    return _py_board_result(bundle, pixel_frame, config_hash, d)
 end
 
 # The file is written at the OUTPUT's density (a raster's own; a PDF has none),
@@ -308,7 +308,7 @@ end
 # or — for a PDF — at `density` when given, else the board's own raster density.
 function BlobBoards.render_board_python(
         json_path; dir, format = nothing, density = nothing, icc_profile = nothing,
-        id_label = false, shading_function = nothing, bleed = nothing, image_origin = "colmap",
+        id_label = false, shading_function = nothing, bleed = nothing, pixel_frame = "colmap",
     )
     bundle, _, config_hash = BlobBoards.load_bundle(string(json_path))
     bundle isa BoardBundle || throw(ArgumentError("render_board: $(json_path) is not a board bundle"))
@@ -320,7 +320,7 @@ function BlobBoards.render_board_python(
         bundle; dir = string(dir), output, id_label = id_label isa Py ? pyconvert(Bool, id_label) : Bool(id_label), config_hash
     )
     pixels = something(BlobBoards._density(output), given, BlobBoards._default_density(bundle))
-    return _py_board_result(bundle, image_origin, config_hash, pixels)
+    return _py_board_result(bundle, pixel_frame, config_hash, pixels)
 end
 
 # =============================================================================
@@ -406,7 +406,7 @@ end
 # JSON-loaded blob extraction
 # =============================================================================
 
-function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "pattern", image_origin = "colmap", density = nothing)
+function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "pattern", pixel_frame = "colmap", density = nothing)
     path = string(filepath)
     bundle = BlobBoards._bundle_of(BlobBoards._read_record(path), path)   # its schema checked; an earlier one through its steps
 
@@ -426,7 +426,7 @@ function BlobBoards.blobs_python(filepath; units = "px", reference_frame = "patt
     end
 
     if (units == "px" || units == "pd")
-        blob_list = EuclideanMap(PixelFrame{:colmap}, PixelFrame{Symbol(image_origin)}).(ustrip.(px, blob_list))
+        blob_list = EuclideanMap(PixelFrame{:colmap}, PixelFrame{Symbol(pixel_frame)}).(ustrip.(px, blob_list))
     else
         # a length, stripped in the unit asked for (:world blobs are bare mm already)
         blob_list = [strip_or_bare(units_jl, b) for b in blob_list]
@@ -459,7 +459,7 @@ function BlobBoards.detect_blobs_python(
         peak_threshold = 0.01,
         edge_threshold = 5.0,
         polarity = "dark",
-        image_origin = "opencv"
+        pixel_frame = "opencv"
     )
     img_jl = pyconvert(Array, img)
 
@@ -475,8 +475,8 @@ function BlobBoards.detect_blobs_python(
         ),
     )
 
-    image_origin_sym = pyisinstance(image_origin, pybuiltins.str) ? Symbol(string(image_origin)) : Symbol(image_origin)
-    T = EuclideanMap(PixelFrame{:colmap}, PixelFrame{image_origin_sym})
+    pixel_frame_sym = pyisinstance(pixel_frame, pybuiltins.str) ? Symbol(string(pixel_frame)) : Symbol(pixel_frame)
+    T = EuclideanMap(PixelFrame{:colmap}, PixelFrame{pixel_frame_sym})
 
     result = Vector{Any}(undef, length(detections))
     # Defensive identity-or-strip (audited): detections arrive bare (adapted
@@ -577,14 +577,14 @@ end
 #   knobs (the mandatory per-inlier descriptor gate; Julia-side defaults
 #   0.6 / 0.5)
 #
-# - `image_origin`: the pixel convention of the returned homography, `"opencv"`
+# - `pixel_frame`: the pixel convention of the returned homography, `"opencv"`
 #   (default, as `detect_blobs_python`: top-left pixel centre at (0, 0)),
 #   `"colmap"` ((0.5, 0.5), BlobBoards' own) or `"julia"` ((1, 1))
 #
 # Returns a list of dicts with keys `uid`, `model`, `quality`, `n_inliers`,
 # `n_csponds`, `weights` (numpy array). `model` is the 3×3 homography H mapping a
 # point of the board's world plane — centred, y up, in MILLIMETRES — to a pixel
-# in `image_origin`'s convention; on the pose path (`camera_json`) it is a dict
+# in `pixel_frame`'s convention; on the pose path (`camera_json`) it is a dict
 # with `R` (3×3) and `t` (3-vector, millimetres), the board → camera pose, which
 # carries no pixel convention.
 function BlobBoards.find_boards_python(
@@ -602,11 +602,11 @@ function BlobBoards.find_boards_python(
         outlier_halfwidth = nothing,
         verify_similarity = nothing,
         min_appearance_support = nothing,
-        image_origin = "opencv",
+        pixel_frame = "opencv",
     )
-    origin = Symbol(string(image_origin))
+    origin = Symbol(string(pixel_frame))
     origin in (:opencv, :colmap, :julia) ||
-        throw(ArgumentError("find_boards_python: image_origin must be \"opencv\", \"colmap\" or \"julia\", got $(repr(image_origin))"))
+        throw(ArgumentError("find_boards_python: pixel_frame must be \"opencv\", \"colmap\" or \"julia\", got $(repr(pixel_frame))"))
     backend = _python_backend(device, "find_boards_python")
     img_jl = _py_gray(img)
     model, board_feature_dict, board_bundles = _python_boards_cached(board_paths, model_path, gallery_path, backend)
@@ -677,11 +677,11 @@ _py_model(np, m, origin, posed::Bool) = posed ?
 
 function BlobBoards.track_boards_python(
         board_paths::Union{AbstractVector, Py}, model_path::Union{AbstractString, Py}, frames;
-        gallery_path, camera_json = nothing, device = "cuda", image_origin = "opencv",
+        gallery_path, camera_json = nothing, device = "cuda", pixel_frame = "opencv",
     )
-    origin = Symbol(string(image_origin))
+    origin = Symbol(string(pixel_frame))
     origin in (:opencv, :colmap, :julia) ||
-        throw(ArgumentError("track_boards_python: image_origin must be \"opencv\", \"colmap\" or \"julia\", got $(repr(image_origin))"))
+        throw(ArgumentError("track_boards_python: pixel_frame must be \"opencv\", \"colmap\" or \"julia\", got $(repr(pixel_frame))"))
     backend = _python_backend(device, "track_boards_python")
     model, board_feature_dict, board_bundles = _python_boards_cached(board_paths, model_path, gallery_path, backend)
     provider = string(model.session.execution_provider)

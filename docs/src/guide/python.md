@@ -266,7 +266,7 @@ json_path = [os.path.join(out, f) for f in os.listdir(out) if f.endswith(".json"
 b = blobs(json_path, density=300)                       # px at 300 dpi, pattern frame, COLMAP
 b_mm = blobs(json_path, units="mm", reference_frame="board")  # mm, board frame
 w = blobs(json_path, units="mm", reference_frame="world")     # the board plane: centred, y up
-b_cv = blobs(json_path, image_origin="opencv", density=300)   # for NumPy/OpenCV sampling
+b_cv = blobs(json_path, pixel_frame="opencv", density=300)   # for NumPy/OpenCV sampling
 ```
 
 A board's layout has no density (it is physical; see the Julia board guide), so
@@ -274,7 +274,7 @@ pixel coordinates need the density they are at: on a v4 board, `units="px"`
 (the default) without `density` raises an error. A board stored in schema
 v3 was laid out on its printer's pixels, and its own density is the default.
 
-| `image_origin` | First pixel centre | Use |
+| `pixel_frame` | First pixel centre | Use |
 |----------------|--------------------|-----|
 | `"colmap"` | (0.5, 0.5) | COLMAP/SfM, geometry (the default for coordinates) |
 | `"opencv"` | (0, 0) | NumPy/OpenCV image sampling (the default for detection results) |

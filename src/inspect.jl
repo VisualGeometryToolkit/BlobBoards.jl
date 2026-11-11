@@ -151,7 +151,7 @@ function trace_pipeline(
         accepted = find_boards(board_feature_dict, descriptor_network, img; config = cfg, device, board_bundles)
         (; accepted, bundles = board_bundles, cam)
     end
-    net = descriptor_network === nothing ? nothing : _ensure_network(descriptor_network)
+    net = descriptor_network === nothing ? nothing : load_descriptor_network(descriptor_network)
     return VgtkCore.Attributed(
         PipelineCapture(img, u8, detections, arms, Float64(cutoff)),
         _trace_attrs(;

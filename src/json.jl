@@ -56,14 +56,14 @@
 # each quantity an object `{value, unit}`. That form is the identity's own
 # encoding, frozen — not a file format; nothing reads it back — and it is what
 # keeps a uid from moving when the file format does. It is a STYLE of its own,
-# `_IdentityStyle` (`_plain` lowers on it); a file is lowered on IO's
+# `_IdentityStyle` (`_identity_lowering` lowers on it); a file is lowered on IO's
 # `VgioStyle`. `_lowered(style, q)` is the one function every lowering calls
 # for a quantity, and `_identity_form` the one place the frozen form is written.
 
 """
     _IdentityStyle <: JSON.JSONStyle
 
-The style a board's identity tree is lowered on (`_plain`): every BlobBoards
+The style a board's identity tree is lowered on (`_identity_lowering`): every BlobBoards
 type's lowering is the file's, except that each quantity is the frozen
 `{value, unit}` object (`_identity_form`).
 """
@@ -94,7 +94,7 @@ const _FILE_STYLE = _file_style(mm)
 const _FILE_LENGTH_UNITS = (mm, inch, m)
 
 # A length as the number a file in `u` holds, read back (`_file_quantity`'s product).
-_reads_back(q::Quantity, u) = Float64(ustrip(u, q)) * u === q
+_holds_exactly(q::Quantity, u) = Float64(ustrip(u, q)) * u === q
 
 """
     _file_length_unit(lengths) -> Units
@@ -105,7 +105,7 @@ length exactly.
 """
 function _file_length_unit(lengths)
     for u in _FILE_LENGTH_UNITS
-        all(q -> _reads_back(q, u), lengths) && return u
+        all(q -> _holds_exactly(q, u), lengths) && return u
     end
     return m
 end

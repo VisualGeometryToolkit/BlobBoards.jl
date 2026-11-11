@@ -183,7 +183,7 @@
 
         @testset "Pixel units: at a density the caller names" begin
             @test_throws Exception BlobBoards.blobs_python(json_file; units = "px")
-            blobs_py = BlobBoards.blobs_python(json_file; units = "px", reference_frame = "pattern", image_origin = "opencv", density = 100)
+            blobs_py = BlobBoards.blobs_python(json_file; units = "px", reference_frame = "pattern", pixel_frame = "opencv", density = 100)
             blobs_arr = pyconvert(Matrix{Float64}, blobs_py)
             @test size(blobs_arr, 1) == length(bundle.blobs)
             @test size(blobs_arr, 2) == 3  # x, y, σ
@@ -208,9 +208,9 @@
         end
 
         @testset "Image origin conventions" begin
-            b_opencv = pyconvert(Matrix{Float64}, BlobBoards.blobs_python(json_file; units = "px", image_origin = "opencv", density = 100))
-            b_colmap = pyconvert(Matrix{Float64}, BlobBoards.blobs_python(json_file; units = "px", image_origin = "colmap", density = 100))
-            b_julia = pyconvert(Matrix{Float64}, BlobBoards.blobs_python(json_file; units = "px", image_origin = "julia", density = 100))
+            b_opencv = pyconvert(Matrix{Float64}, BlobBoards.blobs_python(json_file; units = "px", pixel_frame = "opencv", density = 100))
+            b_colmap = pyconvert(Matrix{Float64}, BlobBoards.blobs_python(json_file; units = "px", pixel_frame = "colmap", density = 100))
+            b_julia = pyconvert(Matrix{Float64}, BlobBoards.blobs_python(json_file; units = "px", pixel_frame = "julia", density = 100))
 
             # OpenCV: center at (0, 0)
             # COLMAP: center at (0.5, 0.5)
@@ -384,7 +384,7 @@
 
     @testset "find_boards_python: the homography's pixel convention is stated" begin
         # BlobBoards' H maps the board's world plane (mm) to COLMAP pixels; the
-        # binding re-expresses it in `image_origin`'s convention, image side only.
+        # binding re-expresses it in `pixel_frame`'s convention, image side only.
         ext = Base.get_extension(BlobBoards, :BlobBoardsPythonExt)
         SA = BlobBoards.StaticArrays
         H = SA.SMatrix{3, 3, Float64}(900.0, -8.0, 1.0e-4, 12.0, 905.0, 2.0e-4, 2100.0, 1400.0, 1.0)   # column-major
@@ -393,7 +393,7 @@
         @test pix(ext._homography_in(:opencv, H)) ≈ pix(H) .- 0.5
         @test pix(ext._homography_in(:colmap, H)) == pix(H)
         @test pix(ext._homography_in(:julia, H)) ≈ pix(H) .+ 0.5
-        @test_throws ArgumentError BlobBoards.find_boards_python(["b.json"], "m.onnx", zeros(UInt8, 4, 4); gallery_path = "g.jld2", image_origin = "matlab")
+        @test_throws ArgumentError BlobBoards.find_boards_python(["b.json"], "m.onnx", zeros(UInt8, 4, 4); gallery_path = "g.jld2", pixel_frame = "matlab")
     end
 
     @testset "find_boards_python: board paths and model lead, the image follows" begin

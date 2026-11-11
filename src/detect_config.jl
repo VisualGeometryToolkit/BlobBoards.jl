@@ -96,7 +96,7 @@ Base.@kwdef struct DetectConfig{N}
     # suppression in VGF's retired WORKSPACE pipeline; detection now routes
     # through `asift_detect`, which has no such parameter. The field survived
     # the migration unread — settable, round-tripping through write_config,
-    # and inert. `_check_keys` could not catch it because the key was KNOWN;
+    # and inert. `_check_run_keys` could not catch it because the key was KNOWN;
     # that validator rejects unknown keys, not dead ones. Removed 2026-08.
     # ASIFT-specific (no-ops for non-ASIFT backends):
     tilts::Vector{Tuple{Float64, Float64}} = _dflt_tilts()   # empty ⇒ IMAS-25

@@ -281,7 +281,7 @@ function extract_image_features(
         max_detections::Int = typemax(Int),
         patch_size::Int = 64
     )
-    model = _ensure_network(descriptor_network)
+    model = load_descriptor_network(descriptor_network)
     detections = detect_blobs(
         detect_img;
         config = detect_config, max_detections, device
@@ -450,11 +450,10 @@ _refine(
     cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
-    _bounded(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
+    # the board's world extent bounds the problem as the `find_*` pipelines' `extent` keyword does
+    extent === nothing ? AbsolutePoseProblem(cam, pt_csponds) : BoundedProblem(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
     scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization
 )
-_bounded(p, ::Nothing) = p
-_bounded(p, extent) = BoundedProblem(p, extent)
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
 # z=0-lifts them to world points. (The radial arm's method — 2D, like H —
@@ -462,9 +461,18 @@ _bounded(p, extent) = BoundedProblem(p, extent)
 # `exact` (VisualGeometryToolkitCore conventions/measurement-noise.md): board points are
 # known, not measured, so the H residual is the transfer error in image pixels —
 # as a plain (unit isotropic) point in board mm it was scored in board mm.
-_fit_endpoints(::Nothing, scored) = _board_exact(scored)
+_fit_endpoints(::Nothing, scored) = board_endpoints(scored)
 _fit_endpoints(::CameraModel, scored) = planar_lift(scored)
-_board_exact(scored) = lift(scored; source = exact ∘ centroid, target = centroid)
+"""
+    board_endpoints(scored) -> correspondences
+
+A scored board → image correspondence set as a 2D fit's endpoints: the board
+centroids `exact` (board points are known, not measured: VisualGeometryToolkitCore
+conventions/measurement-noise.md), the image centroids plain (unit isotropic
+pixel noise); the attribute columns ride along. The endpoints of the
+homography arms' fits, and of a downstream arm's (CaliBlobs' radial camera).
+"""
+board_endpoints(scored) = lift(scored; source = exact ∘ centroid, target = centroid)
 
 # guided_search projects the board pattern through ONE HomographyMap; arms
 # whose transfer is not a collineation opt out (radial method below).
@@ -1749,7 +1757,7 @@ _estimation_camera(g::RadialHomographyGeometry) = g
 # The arm estimates its own model, the one-sided division homography (H, k), k
 # free per fit; the guided final fit transfers through its plain homography.
 _default_lo(g::RadialHomographyGeometry) = g.local_optimization
-_fit_endpoints(::RadialHomographyGeometry, scored) = _board_exact(scored)   # the board exact, as for H
+_fit_endpoints(::RadialHomographyGeometry, scored) = board_endpoints(scored)   # the board exact, as for H
 _guided_enabled(::RadialHomographyGeometry) = true
 # Detection runs on the RAW image unless an arm says otherwise — the
 # homography arm has no camera, and the radial arm's distortion is part of the
@@ -1771,7 +1779,7 @@ _find_model(
     g::RadialHomographyGeometry, pt_csponds; local_optimization = g.local_optimization,
     outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.radial_homography, kw...
 ) = find_radial_homography(
-    pt_csponds; center = _distortion_center(g),
+    pt_csponds; center = distortion_center(g),
     scoring = _scoring(_RadialProblem5, outlier_halfwidth), local_optimization, kw...
 )
 
@@ -1780,15 +1788,21 @@ _find_model(
 # sample size and codimension off it.
 const _RadialProblem5 = RadialHomographyProblem{Float64, 5}
 
-# The radial arm's distortion centre: the middle of the sensor the pixels were
-# measured in (its `image_size`), in those pixels' COLMAP convention.
-_distortion_center(g) = VgtkCore.Point2{Float64}(g.image_size[1] / 2, g.image_size[2] / 2)
+"""
+    distortion_center(g) -> Point2{Float64}
+
+A radial arm's distortion centre: the middle of the sensor the pixels were
+measured in (`g.image_size`), in those pixels' COLMAP convention. `g` is a
+radial geometry config (`RadialHomographyGeometry`, or a downstream arm's with
+an `image_size`).
+"""
+distortion_center(g) = VgtkCore.Point2{Float64}(g.image_size[1] / 2, g.image_size[2] / 2)
 
 _refine(g::RadialHomographyGeometry, pt_csponds, θ₀::HomographyMat; local_optimization = g.local_optimization, kw...) =
     _refine(nothing, pt_csponds, θ₀; local_optimization, kw...)
 # The radial homography is its own manifold (sl(3) ⊕ k) — polish it there, not
 # through a plain homography. The problem's distortion centre is the model's
-# own, which `_find_model` set to `_distortion_center(g)`.
+# own, which `_find_model` set to `distortion_center(g)`.
 _refine(
     g::RadialHomographyGeometry, pt_csponds, θ₀::VgtkCore.RadialHomography;
     outlier_halfwidth, local_optimization = g.local_optimization,
@@ -1825,10 +1839,17 @@ comparable with the engine's derives its streams here.
 fit_rng(seed::Integer, uid::AbstractString) =
     Xoshiro(reinterpret(UInt64, Int64(seed)) ⊻ parse(UInt64, uid; base = 16))
 
-# One board's `fit_kw` outside the threaded engine (which adds its per-thread
-# workspace to the same fields): the serial oracle builds it here, so its fits
-# stay comparable with the engine's by construction.
-_board_fit_kw(config, uid, bundle) = (;
+"""
+    board_fit_keywords(config::FindBoardsConfig, uid, bundle) -> NamedTuple
+
+One board's fit keywords, as `find_boards`' engine builds them (less its
+per-thread workspace): the arm's `outlier_halfwidth` and `local_optimization`,
+the RANSAC `config`, the board's world `extent` and its own seeded stream
+(`rng = fit_rng(config.ransac_seed, uid)`). The serial oracle builds them here,
+and so does a downstream arm (CaliBlobs'), so their fits stay comparable with
+the engine's by construction.
+"""
+board_fit_keywords(config, uid, bundle) = (;
     outlier_halfwidth = config.geometry.outlier_halfwidth,
     local_optimization = config.geometry.local_optimization,
     config = config.ransac_config,
@@ -2147,7 +2168,7 @@ adapt/canonicalize/describe, which run once per polarity group at the
 gallery's shared extent (see `_find_boards_grouped`).
 """
 function _detect_for_boards(img, descriptor_network; config, device::KA.Backend)
-    model = _ensure_network(descriptor_network)
+    model = load_descriptor_network(descriptor_network)
     detect_img, adapt_img = _undistorted_pair(img, config.geometry, device)
     # NB no `max_detections` here. The cap ranks by |response| over whatever
     # it is given, and this detection is deliberately polarity-UNFILTERED, so
@@ -2409,7 +2430,7 @@ function find_boards(
         kwargs...,
     )
     gpu_index = @something gpu_index GalleryIndex(device, board_feature_dict) Some(nothing)
-    model = _ensure_network(descriptor_network)
+    model = load_descriptor_network(descriptor_network)
     return map(frames) do frame
         _find_boards_grouped(
             frame, board_feature_dict, model;
@@ -2761,7 +2782,7 @@ function _find_boards_serial(
                         matches = resolved, bundle = bdl,
                         guided_detc = detc, guided_rtree = rt,
                         resolve_pose_ambiguity = _pose_ambiguity_enabled(config.geometry),
-                        fit_kw = _board_fit_kw(config, uid, bdl),
+                        fit_kw = board_fit_keywords(config, uid, bdl),
                     )
                 catch err
                     @warn "find_board failed for board $uid (serial reference)" exception = (err, catch_backtrace())

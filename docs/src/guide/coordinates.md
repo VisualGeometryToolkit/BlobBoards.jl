@@ -91,7 +91,7 @@ For transforms between pixel and physical units, use `:pixel`, `:physical`, and 
 
 | System | Units | Description |
 |--------|-------|-------------|
-| `:pixel` | `px` | Pixel coordinates at `density`, the density of the pixels you ask for (and `image_origin`) |
+| `:pixel` | `px` | Pixel coordinates at `density`, the density of the pixels you ask for (and `pixel_frame`) |
 | `:physical` | `mm` | Physical coordinates, y down, origin at the canvas top-left |
 | `:world` | unitless mm | Origin at the canvas centre, y-axis up |
 
@@ -101,7 +101,7 @@ For transforms between pixel and physical units, use `:pixel`, `:physical`, and 
 bundle, _ = BlobBoards.load("blob_board.json")
 
 # Get affine transform from pixels (of a 300 dpi image of the board) to mm
-H = BlobBoards.AffineMap(bundle, :pixel, :physical; image_origin=:julia, density=300dpi)
+H = BlobBoards.AffineMap(bundle, :pixel, :physical; pixel_frame=:julia, density=300dpi)
 
 # Transform a pixel point to physical coordinates
 physical_pt = H(Point2(100.0, 200.0))
@@ -111,7 +111,7 @@ physical_pt = H(Point2(100.0, 200.0))
 
 ```julia
 # Direct transform from pixels to world frame
-H = BlobBoards.AffineMap(bundle, :pixel, :world; image_origin=:opencv, density=300dpi)
+H = BlobBoards.AffineMap(bundle, :pixel, :world; pixel_frame=:opencv, density=300dpi)
 world_pt = H(Point2(100.0, 200.0))
 ```
 
@@ -229,7 +229,7 @@ physical_point = uconvert.(mm, pixel_point ./ density)
 
 | What | Keyword/Argument | Values | Default |
 |------|------------------|--------|---------|
-| Pixel convention | `image_origin` (keyword) | `:colmap`, `:opencv`, `:julia` | `:colmap` (internal) |
+| Pixel convention | `pixel_frame` (keyword) | `:colmap`, `:opencv`, `:julia` | `:colmap` (internal) |
 | Spatial origin | reference frame (positional) | `:pattern`, `:board`, `:canvas` | required |
 | Unit system | `units` (keyword) | `px`, `mm`, `inch`, etc. | `px` |
 | Pixel density | `density` (keyword of `blobs` and `AffineMap`) | e.g. `300dpi` | required for a board with `units = px`: a board has no density of its own |

@@ -6,7 +6,7 @@
 #
 # =============================================================================
 
-using VisualGeometryToolkitFeatures: VisualGeometryToolkitFeatures, Detection, strongest
+using VisualGeometryToolkitFeatures: VisualGeometryToolkitFeatures, Detection, spread_strongest
 using VisualGeometryToolkitCore: EllipticFrame, feature_frame
 
 # The float-gray input ladder is VisualGeometryToolkitFeatures' `gray_f32` since 0.7.1
@@ -30,8 +30,10 @@ for quality filtering.
 # Keyword Arguments
 - `config::DetectConfig`: detector-stage parameters (see `DetectConfig`).
   These are read by the detector backend.
-- `max_detections=typemax(Int)`: Final cap by response magnitude.
-  Default is effectively no cap; supply a finite integer to enable.
+- `max_detections=typemax(Int)`: final cap: about this many of the strongest
+  detections, spread over the image (VisualGeometryToolkitFeatures'
+  `spread_strongest`), ordered by response magnitude. Default is effectively
+  no cap; supply a finite integer to enable.
 
 `max_detections` is a BB-side post-processing knob, not an input the
 detector backend consumes — that's why it lives here rather than on
@@ -73,10 +75,12 @@ function detect_blobs(
         device::KA.Backend = default_device(),
     )
     detections = _detect(img, device; config)
-    # the cap is Feat's selection (the largest |response|, ties to the earlier);
-    # the capped set is then ordered by response, as the detector's consumers read it
+    # the cap is Feat's selection (about `max_detections` of the strongest,
+    # spread over the image: `spread_strongest`); the capped set is then ordered
+    # by response, as the detector's consumers read it
     length(detections) > max_detections || return detections
-    return sort!(strongest(detections, max_detections); by = d -> abs(d.response), rev = true)
+    kept = spread_strongest(detections, size(img), max_detections; device)
+    return sort!(kept; by = d -> abs(d.response), rev = true)
 end
 
 # =============================================================================
@@ -111,9 +115,9 @@ function _detect(
         intensity_thr = cfg.peak_threshold,
         edge_thr = cfg.edge_threshold,
         polarity = cfg.polarity,
-        # VGF spells "the IMAS-25 schedule" as `tilts = nothing`; BB spells it as
-        # the empty vector (see `_tilts_from_toml`). Translate at the boundary.
-        tilts = isempty(cfg.tilts) ? nothing : cfg.tilts,
+        # VGF names the IMAS-25 schedule `:imas25`; BB spells it as the empty
+        # vector (see `_tilts_from_toml`). Translate at the boundary.
+        tilts = isempty(cfg.tilts) ? :imas25 : cfg.tilts,
         # 2x upsample: pyramid starts at octave -1. Live as of VGF 0.4.0,
         # which is the first release to implement it — the `upsample` kwarg
         # existed as a no-op placeholder since the original KA ASIFT import,

@@ -22,7 +22,7 @@ import VisualGeometryToolkitIO
 using FileIO: load as load_image
 
 using VisualGeometryToolkitCore: CameraModel, EllipticFrame, Point2, Size2
-import VisualGeometryToolkitFeatures   # tilt-schedule guard reaches _imas_tilts_25
+import VisualGeometryToolkitFeatures   # tilt-schedule guard reaches tilt_schedule(:imas25)
 
 # =============================================================================
 # Data — the package's OWN example artifacts (Artifacts.toml, Zenodo):
@@ -127,7 +127,7 @@ end
 # Keep the test fast: single image, 2 video frames, default cutoff/patch_size.
 const _N_FRAMES = 2
 
-# FULL IMAS-25 tilt schedule (empty tilts → VGF `_imas_tilts_25()`).
+# FULL IMAS-25 tilt schedule (empty tilts → VGF `tilt_schedule(:imas25)`).
 # Do NOT reintroduce a reduced schedule here: the historical 17-tilt
 # workaround dated from before the ASIFT driver chunked the warp schedule
 # to fit device memory (VGF asift/driver.jl `_chunk_warps`) — the full 25
@@ -142,11 +142,11 @@ _detect_cfg() = DetectConfig(
 
 @testset "detect config uses the full IMAS-25 tilt schedule" begin
     # An EMPTY schedule routes to VGF's IMAS-25 default (BB spells it as the
-    # empty vector, VGF as `nothing`; `detect_blobs` translates at the
+    # empty vector, VGF as `:imas25`; `detect_blobs` translates at the
     # boundary) — assert both halves so a reduced schedule can't sneak back in
     # via either layer.
     @test isempty(_detect_cfg().tilts)
-    @test length(VgtkFeatures._imas_tilts_25()) == 25
+    @test length(VgtkFeatures.tilt_schedule(:imas25)) == 25
 end
 
 @testset "board rasterization dpi (bare-ustrip density regression)" begin

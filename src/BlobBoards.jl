@@ -244,13 +244,15 @@ configuration through them:
 
 - [`geometry_tag`](@ref) and [`geometry_from_toml`](@ref): the TOML tag of a
   `GeometryConfig` defined outside this package, and its reader;
-- [`config_dict`](@ref) and [`write_config`](@ref): a run configuration's TOML
-  table, and its writer, for a configuration type defined outside this package.
+- [`write_config`](@ref): a run configuration's TOML writer, for a
+  configuration type defined outside this package. (Its table, `config_dict`,
+  is VisualGeometryToolkitEstimation's generic, one of its CONTRACT_GENERICS:
+  BlobBoards and CaliBlobs add methods to it.)
 
 (BlobBoards also adds methods of VisualGeometryToolkitIO's `migrate_schema`, the
 extension point IO declares for the owner of a schema: src/migrate_boards.jl.)
 """
-const CONTRACT_GENERICS = (geometry_tag, geometry_from_toml, config_dict, write_config)
+const CONTRACT_GENERICS = (geometry_tag, geometry_from_toml, write_config)
 
 # Training pipeline (Lux + Optimisers + Enzyme + Reactant + NNlib + cuDNN)
 # lives in ext/BlobBoardsTrainingExt.jl — loads only when all those trigger

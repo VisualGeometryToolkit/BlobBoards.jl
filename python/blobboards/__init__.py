@@ -601,7 +601,7 @@ def blob_board(paper, *, blob_sizes, seed=None,
                scales_per_octave=None,
                max_trials=None, alpha=None, cutoff=None,
                polarity=None,
-               image_origin="colmap") -> BoardResult:
+               pixel_frame="colmap") -> BoardResult:
     """
     Generate a printable calibration board — Julia's ``blob_board``.
 
@@ -707,7 +707,7 @@ def blob_board(paper, *, blob_sizes, seed=None,
     polarity : str, optional
         Blob polarity: "dark" (dark blobs on light background, default) or
         "light" (light blobs on dark background for negative/inverted boards).
-    image_origin : str
+    pixel_frame : str
         Pixel coordinate convention for the returned blobs:
         "colmap" (first pixel centre at (0.5, 0.5); default), "opencv" ((0, 0))
         or "julia" ((1, 1)).
@@ -761,7 +761,7 @@ def blob_board(paper, *, blob_sizes, seed=None,
 
     result = _jl.BlobBoards.blob_board_python(
         paper,
-        image_origin=image_origin,
+        pixel_frame=pixel_frame,
         **kwargs
     )
     return _board_result(result)
@@ -793,7 +793,7 @@ def _board_result(result) -> BoardResult:
     )
 
 
-def load_board(json_path, *, image_origin="colmap", density=None) -> BoardResult:
+def load_board(json_path, *, pixel_frame="colmap", density=None) -> BoardResult:
     """
     Load a board from its JSON sidecar — Julia's ``load_board`` / ``load_bundle``.
 
@@ -804,7 +804,7 @@ def load_board(json_path, *, image_origin="colmap", density=None) -> BoardResult
     ----------
     json_path : str
         The board's ``blob_board_<uid>.json``.
-    image_origin : str, default "colmap"
+    pixel_frame : str, default "colmap"
         Pixel convention of the returned blobs: "colmap", "opencv" or "julia".
     density : float or Pint quantity, optional
         The density (dpi) the returned pixel blobs are at. Default: that of the
@@ -836,11 +836,11 @@ def load_board(json_path, *, image_origin="colmap", density=None) -> BoardResult
     """
     _init()
     return _board_result(_jl.BlobBoards.load_board_python(
-        str(json_path), image_origin=image_origin, density=density))
+        str(json_path), pixel_frame=pixel_frame, density=density))
 
 
 def render_board(json_path, *, dir, format=None, density=None, icc_profile=None,
-                 id_label=False, shading_function=None, bleed=None, image_origin="colmap") -> BoardResult:
+                 id_label=False, shading_function=None, bleed=None, pixel_frame="colmap") -> BoardResult:
     """
     Re-render a stored board without re-running placement — Julia's ``render_board``.
 
@@ -873,7 +873,7 @@ def render_board(json_path, *, dir, format=None, density=None, icc_profile=None,
     bleed : float or pint.Quantity, optional
         A print shop's trim allowance in mm on every side (default: 0), PDF
         only; see ``blob_board``.
-    image_origin : str, default "colmap"
+    pixel_frame : str, default "colmap"
         Pixel convention of the returned blobs.
 
     Returns
@@ -902,7 +902,7 @@ def render_board(json_path, *, dir, format=None, density=None, icc_profile=None,
     return _board_result(_jl.BlobBoards.render_board_python(
         str(json_path), dir=str(dir), format=format, density=density,
         icc_profile=icc_profile, id_label=bool(id_label), shading_function=shading_function,
-        bleed=bleed, image_origin=image_origin))
+        bleed=bleed, pixel_frame=pixel_frame))
 
 
 def example_data(name) -> str:
@@ -976,7 +976,7 @@ def __getattr__(name):
     raise AttributeError(f"module 'blobboards' has no attribute {name!r}")
 
 
-def blobs(json_path, *, units="px", reference_frame="pattern", image_origin="colmap", density=None) -> np.ndarray:
+def blobs(json_path, *, units="px", reference_frame="pattern", pixel_frame="colmap", density=None) -> np.ndarray:
     """
     A bundle's blobs in a chosen frame and unit — Julia's ``blobs(bundle, frame; units)``.
 
@@ -990,7 +990,7 @@ def blobs(json_path, *, units="px", reference_frame="pattern", image_origin="col
         For a board: "pattern", "board", "canvas" (pixel frames, y down) or
         "world" (the board's centred, y-up plane in mm — what a homography from
         ``find_boards`` maps to image pixels).
-    image_origin : str, default "colmap"
+    pixel_frame : str, default "colmap"
         Pixel convention for ``units="px"``: "colmap" (first pixel centre at
         (0.5, 0.5)), "opencv" ((0, 0)) or "julia" ((1, 1)).
     density : float or Pint quantity, optional
@@ -1019,7 +1019,7 @@ def blobs(json_path, *, units="px", reference_frame="pattern", image_origin="col
         json_path,
         units=units,
         reference_frame=reference_frame,
-        image_origin=image_origin,
+        pixel_frame=pixel_frame,
         density=density,
     ))
 
@@ -1030,7 +1030,7 @@ def detect_blobs(
     peak_threshold: float = 0.01,
     edge_threshold: float = 5.0,
     polarity: str = "dark",
-    image_origin: str = "opencv",
+    pixel_frame: str = "opencv",
 ) -> DetectionResult:
     """
     Detect blobs in an image using scale-space analysis.
@@ -1052,7 +1052,7 @@ def detect_blobs(
         - "dark": Dark blobs on light background (default)
         - "light": Light blobs on dark background
         - "none": No polarity filtering (detect all)
-    image_origin : str
+    pixel_frame : str
         Output coordinate convention:
         - "opencv": (0, 0) at top-left pixel center (default, matches NumPy)
         - "colmap": (0.5, 0.5) at top-left pixel center
@@ -1089,7 +1089,7 @@ def detect_blobs(
         peak_threshold=peak_threshold,
         edge_threshold=edge_threshold,
         polarity=polarity,
-        image_origin=image_origin,
+        pixel_frame=pixel_frame,
     )
 
     # Convert tuples to DiscDetection objects
@@ -1287,7 +1287,7 @@ def find_boards(board_paths, model_path, img, *, gallery_path,
                 camera_json=None, device="auto",
                 min_inliers=None, outlier_halfwidth=None,
                 verify_similarity=None, min_appearance_support=None,
-                image_origin="opencv"):
+                pixel_frame="opencv"):
     """
     Find known boards in an image and estimate each one's homography or pose —
     Julia's ``find_boards(board_feature_dict, descriptor_network, img)``.
@@ -1320,7 +1320,7 @@ def find_boards(board_paths, model_path, img, *, gallery_path,
     verify_similarity, min_appearance_support : optional
         Appearance-verification knobs — the mandatory per-inlier descriptor
         gate (defaults 0.6 / 0.5 on the Julia side).
-    image_origin : str
+    pixel_frame : str
         Pixel convention of the returned homography: "opencv" (default, as
         `detect_blobs`: top-left pixel centre at (0, 0)), "colmap" ((0.5, 0.5))
         or "julia" ((1, 1)).
@@ -1333,7 +1333,7 @@ def find_boards(board_paths, model_path, img, *, gallery_path,
         `execution_provider` (the network's ONNX Runtime provider, "cuda" or
         "cpu"). `model` is the 3×3 homography H
         from the board's world plane — centred, y up, in millimetres — to
-        pixels in `image_origin`'s convention; on the pose path (`camera_json`)
+        pixels in `pixel_frame`'s convention; on the pose path (`camera_json`)
         it is `{"R": 3×3, "t": 3-vector}`, the board → camera pose in
         millimetres, which carries no pixel convention.
 
@@ -1373,7 +1373,7 @@ def find_boards(board_paths, model_path, img, *, gallery_path,
                         f"a 2-D grayscale array, got ndim={img.ndim}")
     _init()
     dev = _detection_device(device, "find_boards")
-    kwargs = {"gallery_path": gallery_path, "device": dev, "image_origin": str(image_origin)}
+    kwargs = {"gallery_path": gallery_path, "device": dev, "pixel_frame": str(pixel_frame)}
     if camera_json is not None:
         kwargs["camera_json"] = camera_json
     if min_inliers is not None:
@@ -1409,7 +1409,7 @@ def _detection_device(device, caller):
 
 
 def track_boards(board_paths, model_path, frames, *, gallery_path, camera_json=None,
-                 device="auto", image_origin="opencv"):
+                 device="auto", pixel_frame="opencv"):
     """
     Track boards through a video or a sequence of frames — Julia's ``track_boards``.
 
@@ -1430,7 +1430,7 @@ def track_boards(board_paths, model_path, frames, *, gallery_path, camera_json=N
         Camera-calibration JSON → poses instead of homographies.
     device : str, default "auto"
         "auto", "cuda" or "cpu", as for ``find_boards``.
-    image_origin : str, default "opencv"
+    pixel_frame : str, default "opencv"
         Pixel convention of returned homographies: "opencv", "colmap" or "julia".
 
     Returns
@@ -1469,7 +1469,7 @@ def track_boards(board_paths, model_path, frames, *, gallery_path, camera_json=N
         frames = [np.asarray(f) for f in frames]
     else:
         frames = str(frames)
-    kwargs = {"gallery_path": gallery_path, "device": dev, "image_origin": str(image_origin)}
+    kwargs = {"gallery_path": gallery_path, "device": dev, "pixel_frame": str(pixel_frame)}
     if camera_json is not None:
         kwargs["camera_json"] = camera_json
     result = _jl.BlobBoards.track_boards_python(list(board_paths), str(model_path), frames, **kwargs)

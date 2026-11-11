@@ -126,7 +126,7 @@ where the board origin is at the centroid.
 BlobBoards extends `CoordinateTransformations` constructors:
 
 - `Translation(bc::BoardConfig, from, to)` — reference-frame translations (`:pattern`/`:board`/`:canvas`)
-- `AffineMap(bundle::BoardBundle, from, to; image_origin, density)` — coordinate-system transforms (`:pixel`/`:physical`/`:world`)
+- `AffineMap(bundle::BoardBundle, from, to; pixel_frame, density)` — coordinate-system transforms (`:pixel`/`:physical`/`:world`)
 
 For image-origin conventions (`:colmap`/`:julia`/`:opencv`), use
 `EuclideanMap(PixelFrame{:colmap}, PixelFrame{:julia})` (from VisualGeometryToolkitCore;

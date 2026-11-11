@@ -180,7 +180,7 @@ function track_boards(
     )
     camera = _camera(config.geometry)
     cam_est = _estimation_camera(config.geometry)
-    desc_network = _ensure_network(descriptor_network)
+    desc_network = load_descriptor_network(descriptor_network)
 
     # The configuration of record every emitted `TrackFrame` carries — resolved
     # AFTER the board-derived polarity is folded in, so a trace records what

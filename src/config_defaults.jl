@@ -94,8 +94,8 @@ _dflt_max_detections() = _max_detections(_dflt("max_detections"))
 # Empty list ⇒ the IMAS-25 schedule, and the EMPTY VECTOR carries that meaning
 # all the way through: the TOML already spells it `tilts = []`, so translating
 # it to `nothing` in the struct only made the field a union for no gain.
-# `detect_blobs` maps empty back to VGF's own `tilts = nothing` (its spelling
-# for IMAS-25) at the call boundary. Shared with the loader (they were
+# `detect_blobs` maps empty to VGF's own name for it, `tilts = :imas25`, at
+# the call boundary. Shared with the loader (they were
 # expression-identical twins).
 _tilts_from_toml(v) = Tuple{Float64, Float64}[(Float64(t[1]), Float64(t[2])) for t in v]
 _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
@@ -114,8 +114,17 @@ _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, local_optimization_from_toml
 import LocalOptimizationDoneRight
 const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.LO_TAGS)
-_local_optimization_from_toml(d, class::Symbol) = local_optimization_from_toml(
+"""
+    geometry_local_optimization(d, class::Symbol) -> AbstractLocalOptimization
+
+The RANSAC local-optimization strategy a `[find_boards.geometry]`
+`local_optimization` table `d` names, read by VisualGeometryToolkitEstimation's
+loader over its strategies and LocalOptimizationDoneRight's (`class` is the
+arm's pipeline class: `:homography`, `:absolute_pose`, `:radial_homography`, …).
+The one reader for every geometry arm's TOML, downstream arms' included.
+"""
+geometry_local_optimization(d, class::Symbol) = local_optimization_from_toml(
     d; class, section = "find_boards.geometry.local_optimization", tags = _LO_TAGS
 )
 _dflt_local_optimization(class::Symbol) =
-    _local_optimization_from_toml(_dflt("geometry", "local_optimization"), class)
+    geometry_local_optimization(_dflt("geometry", "local_optimization"), class)

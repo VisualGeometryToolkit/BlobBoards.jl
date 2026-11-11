@@ -344,20 +344,20 @@ const PINNED_PATTERN_V3_JSON = """
     @testset "the identity tree is the frozen {value, unit} form, whole (no quantity leaks a bare number)" begin
         quantity_object(d, k) = d[k] isa AbstractDict && keys(d[k]) == Set(["value", "unit"])
         pt_board = blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir = mktempdir())
-        bc = BlobBoards._plain(pt_board.preamble)["board_config"]
-        pc = BlobBoards._plain(pt_board.preamble)["pattern_config"]
+        bc = BlobBoards._identity_lowering(pt_board.preamble)["board_config"]
+        pc = BlobBoards._identity_lowering(pt_board.preamble)["pattern_config"]
         @test all(k -> quantity_object(pc, k), ("min_scale", "max_scale"))
         @test pc["min_scale"]["unit"] == "pt" && bc["layout_grid"] == Dict{String, Any}("value" => 0.01, "unit" => "pt")
         @test all(k -> quantity_object(bc["canvas_size"], k), ("width", "height")) && all(k -> quantity_object(bc["margin"], k), ("width", "height"))
         @test all(k -> quantity_object(bc, k), ("ruler_width", "corner_size", "frame_padding"))
         @test all(t -> all(k -> quantity_object(bc["ruler_spec"][t], k), ("spacing", "width")), ("major_tick", "minor_tick"))
         px_board, _, _ = BlobBoards.load_bundle(joinpath(_FIXTURES, "odd300.json"))
-        tree = BlobBoards._plain(px_board.preamble)
+        tree = BlobBoards._identity_lowering(px_board.preamble)
         @test quantity_object(tree["board_config"], "print_density") && quantity_object(tree["board_config"], "frame_width")
         @test all(k -> quantity_object(tree["pattern_config"]["pattern_resolution"], k), ("width", "height"))
         @test all(k -> quantity_object(tree["pattern_config"], k), ("min_scale", "max_scale"))
         # and the blob columns of the identity declare their unit, as they always have; the FILE's do not
-        @test BlobBoards._plain(BlobBoards._identity_blobs(pt_board.blobs, "pt"))["unit"] == "pt"
+        @test BlobBoards._identity_lowering(BlobBoards._identity_blobs(pt_board.blobs, "pt"))["unit"] == "pt"
         @test !haskey(BlobBoards._file_blobs(pt_board.blobs), :unit)
     end
 
@@ -366,14 +366,14 @@ const PINNED_PATTERN_V3_JSON = """
         @test BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"            # frozen: a bump of the file schema moves no uid
         b = blob_board("A5"; blob_sizes = (4.0mm, 0.2short_side), seed = 0x1234, dir = mktempdir())
         # the identity tree names the identity schema and holds the quantities in its own form
-        tree = BlobBoards._plain(b.preamble)
+        tree = BlobBoards._identity_lowering(b.preamble)
         @test tree["board_config"]["canvas_size"]["width"] == Dict{String, Any}("value" => 148, "unit" => "mm") ||
             tree["board_config"]["canvas_size"]["width"] == Dict{String, Any}("value" => 148.0, "unit" => "mm")
         # … while the file holds numbers, and the two forms never leak into each other: they are two styles
         file(q) = BlobBoards._lowered(BlobBoards._FILE_STYLE, q)
         @test file(148.0mm) == 148.0 && file(300dpi) == 300 && file(64px) == 64
-        @test BlobBoards._plain(148.0mm) == Dict{String, Any}("value" => 148.0, "unit" => "mm")
-        @test file(148.0mm) == 148.0                              # after `_plain`, still a file's number
+        @test BlobBoards._identity_lowering(148.0mm) == Dict{String, Any}("value" => 148.0, "unit" => "mm")
+        @test file(148.0mm) == 148.0                              # after `_identity_lowering`, still a file's number
         # no BlobBoards lowering lands on JSON.jl's own style
         for T in (typeof(b), typeof(b.preamble), typeof(b.preamble.board_config), typeof(b.preamble.pattern_config), typeof(148.0mm))
             @test parentmodule(which(JSON.lower, Tuple{JSON.JSONStyle, T})) !== BlobBoards

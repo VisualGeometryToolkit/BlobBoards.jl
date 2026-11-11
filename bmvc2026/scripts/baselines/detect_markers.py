@@ -44,9 +44,9 @@ def read_camera(path, cfg):
     reader returned them."""
     with open(path) as f:
         d = json.load(f)
-    origin = d.get("image_origin")
+    origin = d.get("pixel_frame")
     if origin is not None and origin != "opencv":
-        raise ValueError(f"{path}: image_origin {origin!r}; the baselines take OpenCV's pixel frame")
+        raise ValueError(f"{path}: pixel_frame {origin!r}; the baselines take OpenCV's pixel frame")
     dtype = np.dtype(cfg["camera"]["dtype"])
     K = np.array([[d["fx"], 0.0, d["cx"]], [0.0, d["fy"], d["cy"]], [0.0, 0.0, 1.0]], dtype=dtype)
     names = cfg["camera"]["distortion"]

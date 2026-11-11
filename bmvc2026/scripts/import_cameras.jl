@@ -10,7 +10,7 @@ The upstream export is BlobBoards-Evaluation `calibrate_pinhole`'s
 fourteen-coefficient `distortion_coefficients`, `reprojection_error` (a MEAN
 per-image error), `num_calibration_images`, `chessboard_size`, `square_size`,
 `flags`. This script reads it ONCE (src/cameras.jl `upstream_camera`): the
-camera is built in VisualGeometryToolkitCore (`CameraModel(K; lens = opencv_lens(k), image_origin =
+camera is built in VisualGeometryToolkitCore (`CameraModel(K; lens = opencv_lens(k), pixel_frame =
 :opencv)`, which moves the principal point into the canonical frame exactly),
 its calibration block is filled from the export, and it is written ONLY through
 VisualGeometryToolkitIO's `save`, read back, and checked equal.

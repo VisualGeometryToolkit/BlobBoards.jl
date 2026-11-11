@@ -69,9 +69,9 @@ def example_blobs_from_json():
         print(f"Loading from: {json_path}")
 
         # Extract with different coordinate conventions
-        blobs_opencv = blobs(json_path, image_origin="opencv")
-        blobs_colmap = blobs(json_path, image_origin="colmap")
-        blobs_julia = blobs(json_path, image_origin="julia")
+        blobs_opencv = blobs(json_path, pixel_frame="opencv")
+        blobs_colmap = blobs(json_path, pixel_frame="colmap")
+        blobs_julia = blobs(json_path, pixel_frame="julia")
 
         print(f"\nFirst blob in different conventions:")
         print(f"  OpenCV (0,0):    {blobs_opencv[0]}")

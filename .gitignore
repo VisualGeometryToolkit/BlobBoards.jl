@@ -82,3 +82,6 @@ docs/**/*.pdf
 
 # figures drawn by docs/diagrams.jl at build time
 docs/src/assets/generated/
+
+# Local suite logs (the 0.9 port gate runs)
+logs/

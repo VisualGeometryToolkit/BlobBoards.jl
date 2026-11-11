@@ -54,7 +54,7 @@ function upstream_camera(entry::AbstractDict, UP::AbstractDict)
     n = UP["n_fitted"]
     length(k) == 14 || error("$(src): $(length(k)) distortion coefficients, expected OpenCV's 14")
     all(iszero, k[(n + 1):end]) || error("$(src): coefficients past the fitted $(n) are not zero: $(k[(n + 1):end])")
-    model = CameraModel(K; lens = opencv_lens(k[1:n]), image_origin = Symbol(UP["pixel_frame"]))
+    model = CameraModel(K; lens = opencv_lens(k[1:n]), pixel_frame = Symbol(UP["pixel_frame"]))
     cb, sq = collect(d.chessboard_size), d.square_size
     calibration = (
         tool = String(UP["tool"]),

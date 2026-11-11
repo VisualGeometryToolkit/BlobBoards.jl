@@ -50,6 +50,9 @@ using TOML: TOML
 using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table,
     allowed_keys, write_toml, TagRegistry, tag_of
 import VisualGeometryToolkitCore: toml_key, toml_skip_fields, toml_field
+# A run configuration's TOML table is VisualGeometryToolkitEstimation's `config_dict`
+# (one of its CONTRACT_GENERICS): BlobBoards adds the methods of its configs.
+import VisualGeometryToolkitEstimation: config_dict
 
 _present_kwargs(d::AbstractDict, spec::Pair{String}...; fallback = nothing) =
     present_kwargs(d, spec...; fallback)
@@ -82,11 +85,11 @@ function _nms_table(d, section)
     t = get(d, "type", nothing)
     t isa AbstractString || throw(ArgumentError("[$section] needs a `type` key; one of $(keys(NMS_TAGS))"))
     v = _nms_from_toml(NMS_TAGS[t], d)   # an unknown tag: the registry's ArgumentError, naming the known ones
-    # Validate the INNER keys too. `_check_keys` upstream only sees the parent
+    # Validate the INNER keys too. `_check_run_keys` upstream only sees the parent
     # table, so `nms = { type = "ellipse", cutof = 2.0 }` used to construct an
     # EllipseNms at the DEFAULT cutoff and report success — the typo'd-knob
     # failure this loader exists to prevent, one nesting level down.
-    _check_keys(d, v === nothing ? ["type"] : _allowed_keys(typeof(v), :type), section)   # `none` too
+    _check_run_keys(d, v === nothing ? ["type"] : _allowed_keys(typeof(v), :type), section)   # `none` too
     return v
 end
 
@@ -108,14 +111,14 @@ end
 #                  sidecars still carry it (package-cleanup audit 2026-08-31).
 #   ("find_boards.adapt", "store") — per-pixel storage precision; inert since
 #                  the KA port (598f535 dropped the reader), deleted 2026-09.
-const _RETIRED_KEYS = Set(
+const _RETIRED_RUN_KEYS = Set(
     [
         ("find_boards.adapt", "init"), ("descriptor", "patch_size"),
         ("find_boards.adapt", "store"),
     ]
 )
 
-_check_keys(d, allowed, section) = check_keys(d, allowed, section; retired = _RETIRED_KEYS)
+_check_run_keys(d, allowed, section) = check_keys(d, allowed, section; retired = _RETIRED_RUN_KEYS)
 
 # -----------------------------------------------------------------------------
 # Section readers
@@ -125,7 +128,7 @@ function _detect_from_toml(d)
     # No `polarity`: it is a property of the boards being sought, recorded in
     # each bundle, and derived per run (see _board_settings). Asserting it here
     # could only agree — or disagree and silently filter away every blob.
-    _check_keys(d, _allowed_keys(DetectConfig), "find_boards.detect")
+    _check_run_keys(d, _allowed_keys(DetectConfig), "find_boards.detect")
     kw = _present_kwargs(
         d,
         "peak_threshold" => Float64,
@@ -156,7 +159,7 @@ function _adapt_from_toml(d)
     # (`_shared_image_cutoff`). Do not restore the key — oversize or undersize
     # the window with `scan_padding`, which is the lever for exactly that and
     # keeps the extent anchored to the print.
-    _check_keys(d, _allowed_keys(AdaptConfig), "find_boards.adapt")
+    _check_run_keys(d, _allowed_keys(AdaptConfig), "find_boards.adapt")
     return AdaptConfig(;
         _present_kwargs(
             d,
@@ -193,7 +196,7 @@ function _geometry_from_toml(d, camera, image_size = nothing)
 end
 
 function _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size)
-    _check_keys(d, _allowed_keys(RadialHomographyGeometry, :type), "find_boards.geometry")
+    _check_run_keys(d, _allowed_keys(RadialHomographyGeometry, :type), "find_boards.geometry")
     # The image size is data, like the pose arm's camera: the sensor extent
     # that fixes the distortion centre (the image middle), and it differs
     # per capture session — a value in the file would drift.
@@ -211,7 +214,7 @@ function _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size)
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
-            "local_optimization" => t -> _local_optimization_from_toml(t, :radial_homography)
+            "local_optimization" => t -> geometry_local_optimization(t, :radial_homography)
         )...
     )
 end
@@ -230,20 +233,20 @@ function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
                 "uncalibrated arm estimates H directly and has no second branch"
         )
     )
-    _check_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
+    _check_run_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
     camera === nothing || @warn "geometry type = \"homography\" ignores the `camera` keyword"
     return HomographyGeometry(;
         _present_kwargs(
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
-            "local_optimization" => t -> _local_optimization_from_toml(t, :homography)
+            "local_optimization" => t -> geometry_local_optimization(t, :homography)
         )...
     )
 end
 
 function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
-    _check_keys(d, _allowed_keys(PoseGeometry, :type), "find_boards.geometry")
+    _check_run_keys(d, _allowed_keys(PoseGeometry, :type), "find_boards.geometry")
     camera === nothing && throw(
         ArgumentError(
             "[find_boards.geometry] type = \"pose\" needs a camera: " *
@@ -256,7 +259,7 @@ function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
             "resolve_pose_ambiguity" => Bool,
-            "local_optimization" => t -> _local_optimization_from_toml(t, :absolute_pose),
+            "local_optimization" => t -> geometry_local_optimization(t, :absolute_pose),
             "undistortion" => Symbol
         )...
     )
@@ -394,7 +397,7 @@ FindBoardsConfig(table::AbstractDict; camera = nothing, image_size = nothing) =
     _find_boards_from_toml(table; camera, image_size)
 
 function _track_from_toml(d::AbstractDict)
-    _check_keys(d, _allowed_keys(TrackConfig), "find_boards.track")
+    _check_run_keys(d, _allowed_keys(TrackConfig), "find_boards.track")
     return TrackConfig(;
         _present_kwargs(
             d, "iou_threshold" => Float64, "support_fraction" => Float64,
@@ -404,9 +407,9 @@ function _track_from_toml(d::AbstractDict)
 end
 
 function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size = nothing)
-    _check_keys(fb, _allowed_keys(FindBoardsConfig), "find_boards")
+    _check_run_keys(fb, _allowed_keys(FindBoardsConfig), "find_boards")
     ransac = get(fb, "ransac", Dict{String, Any}())
-    _check_keys(ransac, _allowed_keys(RansacConfig), "find_boards.ransac")
+    _check_run_keys(ransac, _allowed_keys(RansacConfig), "find_boards.ransac")
     return FindBoardsConfig(;
         detect = _detect_from_toml(get(fb, "detect", Dict{String, Any}())),
         adapt = _adapt_from_toml(get(fb, "adapt", Dict{String, Any}())),
@@ -692,13 +695,13 @@ there is refused.)
 function read_run_config(path::AbstractString; tables = ())
     isfile(path) || throw(ArgumentError("no such config file: $path"))
     root = TOML.parsefile(path)
-    _check_keys(
+    _check_run_keys(
         root,
         vcat(["find_boards", "experiment", "gallery", "descriptor"], String[String(t) for t in tables]),
         "top level"
     )
     descriptor = get(root, "descriptor", Dict{String, Any}())
-    _check_keys(descriptor, ["model"], "descriptor")
+    _check_run_keys(descriptor, ["model"], "descriptor")
     empty_ = Dict{String, Any}()
     return (;
         config_toml = root,

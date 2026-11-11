@@ -171,12 +171,16 @@ authoritative.
 
 `adapt(detections, img; config=AdaptConfig(), device=CUDABackend())` fits
 elliptical frames to raw blob detections. **Adaptation is backend-generic**
-(src/adapt_ka.jl, KernelAbstractions): `KA.CPU()` runs a per-blob threaded
-host implementation of the same math; GPU backends run `cpu=false` KA
-kernels. CUDA keeps two bit-exactness hooks in BlobBoardsCUDAExt — the
-cuBLAS batched 6×6 LU (its getrf `info` decides which near-degenerate blobs
-are invalidated) and the `__nv_lgamma` libdevice call; other backends get a
-per-blob register LU and a pure-Julia Lanczos lgamma. Adapt output was
+(src/adapt_ka.jl, KernelAbstractions): ONE set of KA kernels runs on every
+backend, a blob one workgroup — 256 work items on a GPU, ONE on `KA.CPU()`,
+which then walks the blob's pixels in scan order (the threaded host twin the
+CPU used to run was deleted 2026-11; its frames and the kernels' agree to
+~2e-7 px). Barriers in those kernels follow KA's CPU rules (the header of
+"The per-blob kernels" in adapt_ka.jl). CUDA keeps two bit-exactness hooks in
+BlobBoardsCUDAExt — the cuBLAS batched 6×6 LU (its getrf `info` decides which
+near-degenerate blobs are invalidated) and the `__nv_lgamma` libdevice call;
+other backends get a per-blob register LU, and the CPU SpecialFunctions'
+`loggamma` (the rest a pure-Julia Lanczos lgamma). Adapt output was
 ALREADY nondeterministic run-to-run on CUDA (atomic pixel-slot assignment),
 so cross-backend parity is frame-level with tolerances, never bitwise.
 
@@ -233,8 +237,8 @@ is the sole device implementation and is intentional.
 
 The CPU `posterior_adapt.jl` implementation that extended RVG's `irls!` hooks
 was removed: that driver is now VGC's `block_coordinate_descent!`.
-The KA adapt path provides its own per-blob CPU implementation of the same
-math (Threads.@threads, plain sort — no bitonic needed).
+The CPU runs the same kernels (one work item per blob: its bitonic sort and
+sweep run sequentially in that item).
 
 ## Unit System
 
@@ -255,7 +259,7 @@ Critical distinction:
 
 ## Coordinate Systems
 
-### Image Origin Conventions
+### Pixel Frames (`pixel_frame`)
 - `:julia` - pixel center at (1, 1)
 - `:colmap` - pixel center at (0.5, 0.5)
 - `:opencv` - pixel center at (0, 0)
@@ -265,7 +269,7 @@ Critical distinction:
 - `:board` - origin at board top-left (includes borders, negative coords possible)
 - `:canvas` - origin at page top-left (includes margins)
 
-Both `image_origin` and `reference_frame` are **positional arguments with no defaults** - users must explicitly choose.
+Both `pixel_frame` and `reference_frame` are **positional arguments with no defaults** - users must explicitly choose.
 
 ## Serialization
 
@@ -307,7 +311,7 @@ VgtkIO; include(joinpath(pkgdir(VgtkIO), "bin", "vgio_migrate.jl"))' tree --appl
 Two forms of the same lowering, never mixed (src/json.jl): a FILE holds numbers
 (lowered on `VgioStyle`), and a board's IDENTITY is minted over a canonical tree
 in which each quantity is the object `{value, unit}` (lowered on BlobBoards'
-`_IdentityStyle`, by `_plain`) — frozen, because it is what every printed uid
+`_IdentityStyle`, by `_identity_lowering`) — frozen, because it is what every printed uid
 was minted from. The file format version is not in the
 identity: `IDENTITY_SCHEMA` ("blobboards/board/v4", frozen) is the tree's schema
 field and the source of the QR code's `BB4` tag; `BOARD_SCHEMA` is the file's.

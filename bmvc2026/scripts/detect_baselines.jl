@@ -64,7 +64,7 @@ function write_opencv_camera(path)
     body = merge(
         (fx = Float64(K[1, 1]), fy = Float64(K[2, 2]), cx = Float64(K[1, 3]) + shift[1], cy = Float64(K[2, 3]) + shift[2]),
         NamedTuple{Tuple(Symbol.(OPENCV_KEYS[1:length(k)]))}(Tuple(k)),
-        (image_origin = "opencv", camera = String(name), source = basename(camera_of_record(SESSION))),
+        (pixel_frame = "opencv", camera = String(name), source = basename(camera_of_record(SESSION))),
     )
     open(io -> JSON.json(io, body; pretty = 4), path, "w")
     return (; name = String(name), K)

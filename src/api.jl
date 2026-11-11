@@ -48,7 +48,7 @@ export find_boards                         # THE detection entry point
 export FindBoardsConfig                    # All pipeline knobs in one struct
 export GeometryConfig, HomographyGeometry, PoseGeometry, RadialHomographyGeometry  # config.geometry selects H vs P3P vs radial (H, k)
 public geometry_from_toml, geometry_tag    # the TOML tag of a GeometryConfig defined outside this package
-public CONTRACT_GENERICS                  # the functions another stack package may add methods to (geometry_tag, geometry_from_toml, config_dict, write_config)
+public CONTRACT_GENERICS                  # the functions another stack package may add methods to (geometry_tag, geometry_from_toml, write_config; config_dict is Estimation's)
 export DetectConfig, MxmNms, EllipseNms
 export AbstractDescriptorNetwork, DescriptorNetwork, LuxDescriptorNetwork
 export BoardGallery                        # Cached per-board feature extraction
@@ -130,6 +130,10 @@ public find_board                          # single-board match+estimate
 public match_boards                        # one image's features against the board gallery, global mutual-NN, keyed per board
 public guided_search, detection_rtree      # a board's printed blobs transferred through a map and associated by IoU; the detection index it queries
 public fit_rng                             # one board's RANSAC stream (config.ransac_seed ⊻ uid)
+public board_fit_keywords, board_endpoints # one board's fit keywords; a scored set as a 2D fit's endpoints (board side exact)
+public distortion_center                   # a radial arm's distortion centre (the sensor's middle)
+public load_descriptor_network             # a descriptor network as given, or read from a path (.jld2 → Lux, else ONNX)
+public geometry_local_optimization         # a [find_boards.geometry] local_optimization table → its strategy
 public BoardDetection                      # one board in one frame: track_boards' record
 public GalleryIndex                        # the staged board gallery; the type of every `gpu_index` keyword
 public board_palette                       # one stable color per board id (sorted) — every overlay uses it
@@ -193,7 +197,7 @@ The Julia side of the Python package's `blobboards.blob_pattern`.
 
 It is [`blob_pattern`](@ref) for arguments as Python
 objects — Python numbers or pint lengths (bare numbers: pixels) — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
@@ -206,33 +210,33 @@ The Julia side of the Python package's `blobboards.blob_board`.
 
 It is [`blob_board`](@ref) for arguments as Python
 objects — a paper name, or Python numbers / pint lengths (bare numbers: mm) — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
 """
 function blob_board_python end
 """
-    blobs_python(json_path; units = "px", reference_frame = "pattern", image_origin = "colmap", density = nothing)
+    blobs_python(json_path; units = "px", reference_frame = "pattern", pixel_frame = "colmap", density = nothing)
 
 The Julia side of the Python package's `blobboards.blobs`.
 
 It is [`blobs`](@ref) for arguments as Python
 objects — a pattern or board JSON path — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
 """
 function blobs_python end
 """
-    detect_blobs_python(img; peak_threshold = 0.01, edge_threshold = 5.0, polarity = "dark", image_origin = "opencv")
+    detect_blobs_python(img; peak_threshold = 0.01, edge_threshold = 5.0, polarity = "dark", pixel_frame = "opencv")
 
 The Julia side of the Python package's `blobboards.detect_blobs`.
 
 It is [`detect_blobs`](@ref) for arguments as Python
 objects — a 2-D numpy image — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
@@ -245,46 +249,46 @@ The Julia side of the Python package's `blobboards.find_boards`.
 
 It is [`find_boards`](@ref) for arguments as Python
 objects — board JSON paths, the descriptor ONNX path and a numpy image — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
 """
 function find_boards_python end
 """
-    load_board_python(json_path; image_origin = "colmap", density = nothing)
+    load_board_python(json_path; pixel_frame = "colmap", density = nothing)
 
 The Julia side of the Python package's `blobboards.load_board`.
 
 It is [`load_board`](@ref) for arguments as Python
 objects — a board JSON path — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
 """
 function load_board_python end
 """
-    render_board_python(json_path; dir, format, density, icc_profile, id_label, shading_function, image_origin)
+    render_board_python(json_path; dir, format, density, icc_profile, id_label, shading_function, pixel_frame)
 
 The Julia side of the Python package's `blobboards.render_board`.
 
 It is [`render_board`](@ref) for arguments as Python
 objects — a board JSON path — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
 """
 function render_board_python end
 """
-    track_boards_python(board_paths, model_path, frames; gallery_path, camera_json, device, image_origin)
+    track_boards_python(board_paths, model_path, frames; gallery_path, camera_json, device, pixel_frame)
 
 The Julia side of the Python package's `blobboards.track_boards`.
 
 It is [`track_boards`](@ref) for arguments as Python
 objects — board JSON paths, the descriptor ONNX path and numpy frames — returning Python dicts and numpy arrays, with every pixel
-coordinate in the stated `image_origin` convention. Its method is
+coordinate in the stated `pixel_frame` convention. Its method is
 defined by `BlobBoardsPythonExt`, which loads with PythonCall (the Python
 package's Julia side); call it from Python, see docs/src/guide/python.md.
 Without PythonCall the call raises an error naming the install line.
