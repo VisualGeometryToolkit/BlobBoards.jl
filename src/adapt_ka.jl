@@ -99,6 +99,9 @@ using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamm
 # type with the backend's lgamma (one per blob per iteration: ν and ŝ² change per
 # blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
 using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_weight, is_peak, is_valid_shape
+# The ν M-step is Core's: a point's Q-derivative terms and the safeguarded Newton
+# update from the reduced sums (Newton only where Q is concave).
+using VisualGeometryToolkitCore: nu_point_terms, next_nu_from_sums
 # The sweep's per-partition score is RANSACScoringDoneRight's one formula.
 using RANSACScoringDoneRight: partition_score
 using VisualGeometryToolkitCore: IGPrior
@@ -394,33 +397,14 @@ end
     return lgamma_f(Ta(jdof) / Ta(2.0))
 end
 
-# The ν-Newton step's special-function terms at ν.
+# The ν-Newton step's special functions at ν (the digammas Core's
+# `nu_point_terms` reads, the trigammas its `next_nu_from_sums` reads).
 @inline function _nu_terms(ν::Ta) where {Ta}
     ψ_half_νp1 = digamma_stirling((ν + Ta(1.0)) / Ta(2.0))
     ψ_half_ν = digamma_stirling(ν / Ta(2.0))
     ψ1_half_νp1 = trigamma_stirling((ν + Ta(1.0)) / Ta(2.0))
     ψ1_half_ν = trigamma_stirling(ν / Ta(2.0))
-    inv_ν = Ta(1.0) / ν
-    return ψ_half_νp1, ψ_half_ν, ψ1_half_νp1, ψ1_half_ν, inv_ν, inv_ν * inv_ν
-end
-
-# One pixel's contribution to the ν-Newton objective: (dq_i, d2q_data_i).
-@inline function _nu_point_terms(τ_i::Ta, ν::Ta, inv_ν::Ta, inv_ν2::Ta, ψ_half_νp1::Ta, ψ_half_ν::Ta) where {Ta}
-    inv_1pτ = Ta(1.0) / (Ta(1.0) + τ_i)
-    dq_i = Ta(0.5) * ψ_half_νp1 - Ta(0.5) * ψ_half_ν - Ta(0.5) * inv_ν -
-        Ta(0.5) * log1p(τ_i) + (ν + Ta(1.0)) * τ_i * inv_1pτ * Ta(0.5) * inv_ν
-    d2q_data_i = Ta(0.5) * τ_i * inv_1pτ * inv_ν -
-        Ta(0.5) * τ_i * (ν + Ta(2.0) + τ_i) * inv_1pτ * inv_1pτ * inv_ν2
-    return dq_i, d2q_data_i
-end
-
-# The ν-Newton step from the reduced sums: returns (ν_new, stop::Bool).
-@inline function _next_nu(ν::Ta, dQ::Ta, d2Q_data::Ta, sum_w::Ta, ψ1_half_νp1::Ta, ψ1_half_ν::Ta, inv_ν2::Ta) where {Ta}
-    sum_w < Ta(1.0e-10) && return ν, true
-    d2Q = sum_w * (Ta(0.25) * ψ1_half_νp1 - Ta(0.25) * ψ1_half_ν + Ta(0.5) * inv_ν2) + d2Q_data
-    abs(d2Q) < Ta(1.0e-30) && return ν, true
-    ν_new = clamp(ν - dQ / d2Q, Ta(2.0), Ta(1.0e4))
-    return ν_new, abs(dQ / sum_w) < Ta(1.0e-8)
+    return ψ_half_νp1, ψ_half_ν, ψ1_half_νp1, ψ1_half_ν
 end
 
 # The apply-time shape gate on (θ₄, θ₅, θ₆), the quadratic form
@@ -754,7 +738,7 @@ end
         n, base = _blob_span(cnt, valid, converged, offsets, blob)
         ν = nu[blob]
         s2 = max(s_hat_sq[blob], Ta(1.0e-30))
-        ψ_half_νp1, ψ_half_ν, _, _, inv_ν, inv_ν2 = _nu_terms(ν)
+        ψ_half_νp1, ψ_half_ν, _, _ = _nu_terms(ν)
         local_dQ = zero(Ta)
         local_d2Q = zero(Ta)
         local_w = zero(Ta)
@@ -763,9 +747,7 @@ end
             gid = base + i
             wi = Ta(pin[gid])
             if wi >= Ta(1.0e-15)
-                dq_i, d2q_data_i = _nu_point_terms(
-                    Ta(r2[gid]) / (ν * s2), ν, inv_ν, inv_ν2, ψ_half_νp1, ψ_half_ν
-                )
+                dq_i, d2q_data_i = nu_point_terms(Ta(r2[gid]) / (ν * s2), ν, ψ_half_νp1, ψ_half_ν)
                 local_dQ += wi * dq_i
                 local_w += wi
                 local_d2Q += wi * d2q_data_i
@@ -788,10 +770,8 @@ end
         end
         if tid == 1
             ν = nu[blob]
-            _, _, ψ1_half_νp1, ψ1_half_ν, _, inv_ν2 = _nu_terms(ν)
-            ν_new, stop_b = _next_nu(
-                ν, smem_a[1], smem_b[1], smem_c[1], ψ1_half_νp1, ψ1_half_ν, inv_ν2
-            )
+            _, _, ψ1_half_νp1, ψ1_half_ν = _nu_terms(ν)
+            ν_new, stop_b = next_nu_from_sums(ν, smem_a[1], smem_b[1], smem_c[1], ψ1_half_νp1, ψ1_half_ν)
             ν_new != ν && (nu[blob] = ν_new)
             sflag[1] = stop_b ? Int32(1) : Int32(0)
         end
