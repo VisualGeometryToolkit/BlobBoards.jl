@@ -181,6 +181,23 @@ config = FindBoardsConfig("my_run.toml"; camera)                       # [find_b
 To change one setting, rebuild the immutable config with `Accessors.@set`, as
 shown in the [`FindBoardsConfig`](@ref) docstring.
 
+Each geometry fits its boards with RANSAC, scored by the Student-t + uniform
+mixture at the geometry's `outlier_halfwidth`, then refines the RANSAC model
+with a local optimization. That strategy is the geometry's
+`local_optimization_strategy`, written in TOML as a tagged table:
+
+```toml
+[find_boards.geometry]
+type = "homography"
+outlier_halfwidth = 5.0
+local_optimization_strategy = { type = "student_t_uniform" }   # the default on every arm
+```
+
+`outlier_halfwidth` is the half-width of the uniform outlier component in
+pixels, not an inlier threshold: the scale is estimated from the data, and the
+inlier decision follows from it. The same keyword sets the strategy in Julia,
+for example `HomographyGeometry(; local_optimization_strategy = …)`.
+
 ## Blob outcomes
 
 [`adapt`](@ref) fits each detected blob's elliptical frame with an IRLS, and

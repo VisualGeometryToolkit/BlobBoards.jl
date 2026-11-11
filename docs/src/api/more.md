@@ -85,7 +85,7 @@ BlobBoards.find_board
 BlobBoards.board_fit_keywords
 BlobBoards.board_endpoints
 BlobBoards.distortion_center
-BlobBoards.geometry_local_optimization
+BlobBoards.geometry_local_optimization_strategy
 BlobBoards.load_descriptor_network
 BlobBoards.match_boards
 BlobBoards.guided_search
