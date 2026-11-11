@@ -41,14 +41,10 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   Callers: BlobBoards `_sort_sweep_ka!` (src/adapt_ka.jl, the kernel's sweep, IG prior α₀ = β₀ = 0, `lg_k` the
   backend's lgamma with the j = 1, 2 closed forms). The switch is one function body; numerically the RSDR form
   (`log(2π)`, `log(RSS/2)`) differs from BlobBoards' (`log(π·RSS)`) in the last bits only.
-- [ ] hoist the package defaults reader → VisualGeometryToolkitCore (beside `toml_default`; `test_duplication`:
-  `_dflt` and `default_config_path` owned by Estimation, `_TOML_DEFAULTS` by LODR; audit 20). Proposed:
-  `ConfigDefaults(path)` (the parsed config of record and its path) callable as `d(table, key)`, and
-  `default_config_path(M::Module) = joinpath(pkgdir(M), "configs", "default.toml")`. Callers: BlobBoards
-  (src/config_defaults.jl: `default_config_path`, `_TOML_DEFAULTS`, `_dflt`, `_board_dflt`, `_pattern_dflt`,
-  `_raster_dflt`), Estimation (`default_config_path`, `_dflt`), LODR (`_TOML_DEFAULTS`, `_config_default`),
-  Eval (`_config_default`), CaliBlobs (`_CALIB_DEFAULTS`, `_dflt_*`). BlobBoards exports `default_config_path()`:
-  the switch is a breaking change of its API (a 0.6), the owner's call.
+- [x] the package defaults reader (`test_duplication`: `_dflt` and `default_config_path` owned by Estimation,
+  `_TOML_DEFAULTS` by LODR; audit 20): not the same concept but each package's own data, read through Core's one
+  `parse_defaults` (BlobBoards now parses its two files with it) and `toml_default` — the idiom `parse_defaults`'
+  docstring states. DUPLICATION.toml entries with the proof, per the owner's ruling (eef3144).
 - [ ] hoist `_Record` (an exact copy) and `_snap_integer` → VisualGeometryToolkitIO, public (IO src/style.jl:93,
   src/core_json.jl:74). Proposed: `Record = Union{JSON.Object, NamedTuple}` and `snap_integer(v)` with BlobBoards'
   `Integer` and `Rational` methods beside IO's float one. Callers: BlobBoards src/json.jl, src/types.jl,
@@ -73,8 +69,9 @@ item says what it waits for. The release leg refuses while any `- [ ]` line is l
   owns (`load(::Type{T}, path)`, `save(path, x)`). They become IO methods only if IO declares `load`/`save` among its
   CONTRACT_GENERICS (a hoist) and BlobBoards' reader takes IO's form, `load(AbstractBundle, path)`: a breaking change
   of BlobBoards' documented API (README, docs), the owner's call.
-- [ ] `board`/`board!` (BlobBoards' Makie recipe), a name Core's Cameras owns (`board(t::PlanarTarget)`, the target's
-  board): a recipe rename (`boardplot`/`boardplot!`) is a breaking change of the exported API, the owner's call.
+- [x] `board`/`board!` (BlobBoards' Makie recipe), a name Core's Cameras owns (`board(t::PlanarTarget)`): not the
+  same concept (a recipe that draws a board vs the accessor of a target's physical board); a DUPLICATION.toml entry
+  with the proof, per the owner's ruling (eef3144).
 
 ## test_duplication
 
