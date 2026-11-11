@@ -188,8 +188,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # are working figures and land in plotsdir("results"), never in papers/ —
     # an unincluded file there only reads as a paper asset nobody checks.
     # Never inside the dataset either: data/exp_raw is the immutable input
-    # tree. BB_FIG still overrides.
-    fig_dir = get(ENV, "BB_FIG", plotsdir("results"))
+    # tree.
+    fig_dir = plotsdir("results")
     mkpath(fig_dir)
     # Unoccluded reference figure.
     plot_pose_errors(df, "none"; out_dir = fig_dir)

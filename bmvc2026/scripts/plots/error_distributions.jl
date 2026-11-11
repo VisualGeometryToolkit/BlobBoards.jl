@@ -322,7 +322,7 @@ const DRV, ED = EVAL["drivers"], EVAL["error_distributions"]
 #   error_floorplan_standalone.tex compilable preview of the table
 # Requires \usepackage{graphicx,pgfplots} + \pgfplotsset{compat=1.18}.
 
-function write_floorplan_tikz(src; out_dir, labels = true)
+function write_floorplan_tikz(src; out_dir, labels = true, prefix = DRV["tex_prefix"])
     cg = cgrad(:RdYlGn)
     _rgb(x) = let c = get(cg, x)
         "{rgb,1:red,$(round(c.r; digits = 4));green,$(round(c.g; digits = 4));blue,$(round(c.b; digits = 4))}"
@@ -416,7 +416,6 @@ function write_floorplan_tikz(src; out_dir, labels = true)
         "rot" => raw"Median Rotation Error [$^\circ$]",
         "det" => "Probability of Detection"
     )
-    prefix = get(ENV, "BB_TEX_PREFIX", DRV["tex_prefix"])
     # Two assemblies of the same panels: the full three-row table (the
     # supplement's per-level floor plans) and rows (a)+(b) only — the main
     # paper's Fig. floorplan, which omits the per-station median rotation
@@ -474,8 +473,7 @@ end
 # systems overlaid, dashed medians) as editable pgfplots panels, plus the
 # error_histograms_table.tex assembly (two panels + (a)/(b) captions).
 
-function write_histograms_tikz(src; out_dir)
-    prefix = get(ENV, "BB_TEX_PREFIX", DRV["tex_prefix"])
+function write_histograms_tikz(src; out_dir, prefix = DRV["tex_prefix"])
     colors = Dict(
         "blob" => ("bbBlue", "0072B2"), "april" => ("bbOrange", "E69F00"),
         "aruco" => ("bbGreen", "009E73")
@@ -564,8 +562,7 @@ function _legend_tikz(io, colors)
     return println(io, "\\end{tikzpicture}")
 end
 
-function write_scale_ecdfs_tikz(src; out_dir)
-    prefix = get(ENV, "BB_TEX_PREFIX", DRV["tex_prefix"])
+function write_scale_ecdfs_tikz(src; out_dir, prefix = DRV["tex_prefix"])
     colors = Dict(
         "blob" => ("bbBlue", "0072B2"), "april" => ("bbOrange", "E69F00"),
         "aruco" => ("bbGreen", "009E73")
@@ -780,7 +777,7 @@ function write_occlusion_stats(src; out_dir, levels = Tuple(ED["macro_levels"]))
     # probability of detection is below BB_COLLAPSE_POD (default 1%) and stays
     # below it at every higher level — the levels the prose cites as where a
     # tag system "fails catastrophically".
-    collapse_pod = something(tryparse(Float64, get(ENV, "BB_COLLAPSE_POD", "")), Float64(DRV["collapse_pod"]))
+    collapse_pod = Float64(DRV["collapse_pod"])
     for (key, mac) in (("april", "apr"), ("aruco", "uco"))
         rates = filter(r -> !isnan(r[2]), [(parse(Int, l), detrate(key, l)) for l in all_levels])
         k = findfirst(i -> all(r -> r[2] < collapse_pod, rates[i:end]), eachindex(rates))
@@ -801,7 +798,7 @@ end
 # the row rather than a legend inside an axis. Same quantities and the same
 # min-20-detections median rule as the Makie version, so the numbers are
 # unchanged -- only the rendering moves into LaTeX.
-function write_occlusion_sweep_tikz(src; out_dir, prefix = get(ENV, "BB_TEX_PREFIX", DRV["tex_prefix"]))
+function write_occlusion_sweep_tikz(src; out_dir, prefix = DRV["tex_prefix"])
     # same palette as the ECDF panels (write_scale_ecdfs_tikz), which keeps it
     # local rather than global
     colors = Dict(
@@ -897,7 +894,7 @@ end
 # Median with an interquartile band, per system, per bin. The band is emitted
 # as a closed polygon (lows forward, highs backward) rather than through the
 # fillbetween library, so the figure needs no extra pgfplots library.
-function write_unoccluded_tikz(src; out_dir, prefix = get(ENV, "BB_TEX_PREFIX", DRV["tex_prefix"]))
+function write_unoccluded_tikz(src; out_dir, prefix = DRV["tex_prefix"])
     colors = Dict(
         "blob" => ("bbBlue", "0072B2"), "april" => ("bbOrange", "E69F00"),
         "aruco" => ("bbGreen", "009E73")
@@ -1014,8 +1011,7 @@ end
 # Each level writes its own TikZ set under a per-level prefix, so the paper can
 # \input them independently of the unoccluded figure.
 function write_occlusion_floorplans(src; fig_dir)
-    levels = get(ENV, "BB_OCC_LEVELS", DRV["occlusion_levels"])
-    for lvl in filter(!isempty, strip.(split(levels, ',')))
+    for lvl in String.(DRV["occlusion_levels"])
         lvl_dir = joinpath(fig_dir, "occ_" * lvl)
         mkpath(lvl_dir)
         with_level(lvl) do
@@ -1024,12 +1020,9 @@ function write_occlusion_floorplans(src; fig_dir)
                 return
             end
             plot_error_floorplan(src; out_dir = lvl_dir)
-            prefix = get(ENV, "BB_TEX_PREFIX", DRV["tex_prefix"])
-            withenv(
-                "BB_TEX_PREFIX" => prefix == "" ? "" : replace(prefix, "floorplan/" => "floorplan_occ_$lvl/")
-            ) do
-                write_floorplan_tikz(src; out_dir = lvl_dir)
-            end
+            prefix = DRV["tex_prefix"]
+            write_floorplan_tikz(src; out_dir = lvl_dir,
+                prefix = prefix == "" ? "" : replace(prefix, "floorplan/" => "floorplan_occ_$lvl/"))
             println("occlusion floor plan @ $lvl% -> $lvl_dir")
         end
     end
@@ -1085,8 +1078,7 @@ function main()
     src = pose_results(sources)
     # plotsdir(), not a "figures/" dir inside the dataset: figures are DERIVED
     # products of this project, and data/exp_raw is the immutable input tree.
-    # BB_FIG still overrides.
-    fig_dir = get(ENV, "BB_FIG", plotsdir())
+    fig_dir = plotsdir()
     mkpath(fig_dir)
     plot_trans_distributions(src; out_dir = fig_dir)
     plot_rot_distributions(src; out_dir = fig_dir)

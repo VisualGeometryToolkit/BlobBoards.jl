@@ -17,6 +17,7 @@ repository root) and `]add GLMakie`, on a machine with a display.
 =#
 
 using BlobBoards
+using VisualGeometryToolkitEval: cli_option
 using Images, FileIO
 using Statistics
 using LinearAlgebra
@@ -301,9 +302,9 @@ end
 # =============================================================================
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    # Override via env vars (handy for non-default split locations).
-    splits_dir = get(() -> error("set BB_SPLITS_DIR to the splits directory (train.jld2, …)"), ENV, "BB_SPLITS_DIR")
-    splits = split(get(ENV, "BB_SPLITS", "train"), ',')   # e.g. "train,val,test"
+    # julia … dataset_viewer.jl --splits-dir=<the annotations run's splits/> [--splits=train,val,test]
+    splits_dir = cli_option(ARGS, "splits-dir")                    # the splits directory (train.jld2, …)
+    splits = split(cli_option(ARGS, "splits", "train"), ',')       # e.g. --splits=train,val,test
 
     data_paths = filter(
         ispath,
@@ -313,7 +314,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if isempty(data_paths)
         @warn "No split files found under $splits_dir for splits=$splits"
         @info "Expected files like $(joinpath(splits_dir, "train.jld2"))"
-        @info "Override with BB_SPLITS_DIR / BB_SPLITS env vars."
+        @info "Name them with --splits-dir=<dir> [--splits=train,val,test]."
     else
         @info "Processing $(length(data_paths)) split file(s) from $splits_dir"
         data = inspect_training_data(data_paths; n_samples = 20)

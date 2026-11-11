@@ -30,7 +30,7 @@ using .BlobBoardsEval
 function main()
     eval_cfg, _ = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
     src = eval_sources(eval_cfg)
-    force = haskey(ENV, "BB_FORCE")
+    force = "--force" in ARGS
     println("dataset: $(src.dataset); sources: $(src.keys)")
     write_pose_results(src; force)
 

@@ -3,7 +3,7 @@ branch_lrt_accuracy.jl — how often does the post-LO likelihood-ratio test
 pick the true planar-pose branch?
 
 Joins the branch telemetry emitted by _resolve_pose_ambiguity
-(BB_BRANCH_LOG jsonl: both branches' rotations, the post-LO marginal-score
+(--branch-log jsonl: both branches' rotations, the post-LO marginal-score
 margin = the log likelihood ratio, the discriminability d) against the mocap
 ground truth (hand-eye chain), and reports, overall and binned by d:
 
@@ -25,10 +25,10 @@ translation, and every geometric proxy for that join has been measured to
 fail (see the BRANCH_LOG comment in src/pipeline.jl).
 
 Usage:
-  julia --project=bmvc2026 bmvc2026/scripts/branch_lrt_accuracy.jl
+  julia --project=bmvc2026 bmvc2026/scripts/branch_lrt_accuracy.jl --branch-log=<jsonl>
 
-Env knob: BB_BRANCH_LOG (required: the telemetry a sweep wrote with
-BB_BRANCH_LOG set). The detections and the motion-capture records are the
+--branch-log is required: the telemetry a sweep wrote with go_bmvc2026.jl
+--branch-log=<jsonl>. The detections and the motion-capture records are the
 evaluation's runs (configs/figures/evaluation.toml [runs], src/runs.jl).
 =#
 
@@ -45,9 +45,10 @@ import VisualGeometryToolkitCore
 import Rotations
 using StaticArrays
 using Statistics
+import VisualGeometryToolkitEval
 
 SRC = eval_sources(load_config("figures/evaluation.toml"))
-logpath = get(() -> error("set BB_BRANCH_LOG to a sweep's branch telemetry (jsonl)"), ENV, "BB_BRANCH_LOG")
+logpath = VisualGeometryToolkitEval.cli_option(ARGS, "branch-log")   # required: a sweep's branch telemetry (jsonl)
 
 _stem(f) = splitext(basename(f))[1]
 # Rotations.jl's rotation_angle of the relative rotation, not a local
@@ -62,7 +63,7 @@ cd_ = load_detected_poses(poses_dir(SRC, "bb"; calibration = true))
 # The ONE hand-eye authority (src/calibration.jl): cached, keyed on the
 # frames and markers that determine the fit, and tagged with the commit.
 # This was an independent refit — the project had FOUR of them.
-he = hand_eye(cf, cd_; dataset = SRC.dataset, subset = "calibration_bb")
+he = hand_eye(SRC, cf, cd_; subset = "calibration_bb")
 Tcb = Dict(_stem(f.image) => f.T_cb for f in frames if f.T_cb !== nothing)
 
 gt_by_frame = Dict{String, Vector{Tuple{SMatrix{3, 3, Float64, 9}, SVector{3, Float64}}}}()

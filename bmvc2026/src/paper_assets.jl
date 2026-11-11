@@ -1,11 +1,11 @@
 # =============================================================================
 # Paper assets — where a figure generator writes.
 #
-# Every generator of a paper asset writes under `paper_images_dir(...)`, which
-# is `papers/images` unless `BB_PAPER_IMAGES` points elsewhere. The override is
-# how a regeneration is REVIEWED before it replaces the submitted asset: run the
-# generators into a scratch tree, compare, and only then let them write into
-# papers/images (REPRODUCE.md, "Reviewing a regeneration").
+# Every generator of a paper asset writes under `paper_images_dir(...)`
+# (`papers/images`) or `paper_figures_dir(...)` (`papers/figures`) — no
+# environment override. A regeneration is REVIEWED as the working tree's diff
+# against the submitted assets, which git tracks (REPRODUCE.md, "Reviewing a
+# regeneration").
 # =============================================================================
 
 import VisualGeometryToolkitEval as VgtkEval
@@ -15,20 +15,17 @@ using DrWatson: projectdir, plotsdir
     paper_images_dir(parts...) -> String
 
 The directory the paper's `\\includegraphics` assets live in
-(`papers/images/<parts...>`), or `ENV["BB_PAPER_IMAGES"]/<parts...>` when the
-override is set. Creates nothing.
+(`papers/images/<parts...>`). Creates nothing.
 """
-paper_images_dir(parts::AbstractString...) =
-    joinpath(get(ENV, "BB_PAPER_IMAGES", projectdir("papers", "images")), parts...)
+paper_images_dir(parts::AbstractString...) = projectdir("papers", "images", parts...)
 
 """
     paper_figures_dir(parts...) -> String
 
 The directory the paper's `\\input` tables and macro files live in
-(`papers/figures/<parts...>`), or `ENV["BB_PAPER_FIGURES"]/<parts...>`.
+(`papers/figures/<parts...>`).
 """
-paper_figures_dir(parts::AbstractString...) =
-    joinpath(get(ENV, "BB_PAPER_FIGURES", projectdir("papers", "figures")), parts...)
+paper_figures_dir(parts::AbstractString...) = projectdir("papers", "figures", parts...)
 
 # =============================================================================
 # Figure configs of record + run records.
