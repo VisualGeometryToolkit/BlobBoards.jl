@@ -7,7 +7,7 @@
 #
 # `adapt` returns VALID frames only, id-indexed (`_finalize_frames` drops
 # failed fits) — so parity is judged by MATCHING IDS: a frame present on one
-# side only is a validity disagreement (allowed for a few knife-edge blobs),
+# side only is a validity disagreement (none is allowed),
 # and centroids are compared on the common id set.
 # Skips without a functional CUDA device (the divergence risk lives on GPU
 # machines, which is where this runs).
@@ -55,13 +55,15 @@ if CUDA.functional()
         ]
         n = length(dc)
         @test n >= 25
-        # Validity may disagree for a few knife-edge blobs (the paths clamp and
-        # iterate in different orders at the margins). Agreeing frames differ
-        # by accumulation ORDER only (reduction trees, atomics): measured max
-        # 0.188 px on this field at the gate's introduction (2026-08-31) —
-        # the bound is 2.5× that, and tightening it is a ratchet.
-        @test oneside <= max(2, round(Int, 0.05n))
-        @test maximum(dc) < 0.5
+        # One code on both backends (one ν step with Core's ascent safeguard,
+        # one lgamma, one 6×6 solve: the owner's ruling of 2026-11-11), so the
+        # frames differ by accumulation ORDER only (reduction trees, atomics)
+        # and the validity sets agree. The baseline: 8.3e-9 px on this field, on the 2026-11-11
+        # B200 (0.188 px when the gate was introduced, 2026-08-31, before the
+        # safeguard and the one lgamma/solve); the bound is rounding level, and
+        # tightening it is a ratchet.
+        @test oneside == 0
+        @test maximum(dc) < 1.0e-6
     end
 else
     @info "adapt parity: skipped (no functional CUDA device)"
