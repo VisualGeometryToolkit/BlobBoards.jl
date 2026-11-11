@@ -47,10 +47,12 @@ estimates pose. The camera lives inside `config.geometry` — `PoseGeometry`
 for the calibrated P3P path, `HomographyGeometry` for the uncalibrated one —
 so a camera/geometry mismatch is unrepresentable rather than a runtime error.
 
-Adaptation is **backend-generic** (KernelAbstractions): `device = KA.CPU()`
-runs the threaded host implementation, `CUDABackend()` (or any KA GPU
-backend) the same kernels on the device. Results agree to rounding (the
-accumulation order of the device's atomics).
+Adaptation is **backend-generic** (KernelAbstractions): one set of kernels
+runs on `device = KA.CPU()` (one work item per blob) and on `CUDABackend()`
+(or any KA GPU backend). Results agree to about 1e-8 px, not bitwise (the
+accumulation order of the device's atomics). Each adapted blob records its
+outcome (converged, capped or rejected); see [Blob outcomes](@ref) in the
+Detection and Pose guide.
 
 ```@docs
 find_boards

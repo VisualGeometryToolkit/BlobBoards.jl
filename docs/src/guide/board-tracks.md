@@ -352,6 +352,6 @@ rather than drawing an empty one.
   8 MP photos — the detector's internal buffer caps below the detected count
   (before `max_detections` applies). This biases which blobs survive; raise the
   SIFT buffer size if completeness matters. Non-fatal.
-- `DomainError: sqrt(-1.5e-11)` from `RANSACScoringDoneRight._mahalanobis` during
-  RANSAC is caught per-board by `find_board` ("skipping this board for this
-  frame"). Rare, upstream, non-fatal.
+- An error inside one board's fit is caught per board by `find_board`, which
+  warns "find_board failed for board …; skipping this board for this frame"
+  and goes on with the others. Non-fatal.

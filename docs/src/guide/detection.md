@@ -181,6 +181,34 @@ config = FindBoardsConfig("my_run.toml"; camera)                       # [find_b
 To change one setting, rebuild the immutable config with `Accessors.@set`, as
 shown in the [`FindBoardsConfig`](@ref) docstring.
 
+## Blob outcomes
+
+[`adapt`](@ref) fits each detected blob's elliptical frame with an IRLS, and
+records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)):
+
+| `retcode` | `stop_rule` | The blob |
+|---|---|---|
+| `:Success` | `:ParameterChange` | converged: the step fell below `rtol` |
+| `:MaxIters` | `:IterationCap` | unconverged: capped at `max_irls_iter` (default 100) |
+| `:Failure` | `:ShapeGate` | rejected: the shape gate refused a step, and the blob keeps its previous iterate |
+| `:InitialFailure` | `:ShapeGate` | rejected at the first step from its seed |
+
+A rejected blob's `rejection` says why: `:not_peak` (the fitted paraboloid is
+not concave) or `:aspect_ratio` (beyond `max_aspect_ratio`). Capped and
+rejected blobs are still returned, flagged, never silently valid. Count them
+with [`count_unconverged`](@ref) and [`count_rejected`](@ref):
+
+```julia
+detections = BlobBoards.detect_blobs(img)
+frames = BlobBoards.adapt(detections, img)
+BlobBoards.count_unconverged(frames)              # capped at max_irls_iter
+BlobBoards.count_rejected(frames)                 # refused by the shape gate
+BlobBoards.count_rejected(frames, :aspect_ratio)  # refused for one reason
+```
+
+The iteration cap and `rtol` are the `[find_boards.adapt]` keys of
+`configs/default.toml` ([`AdaptConfig`](@ref)'s `max_irls_iter` and `rtol`).
+
 ## Video: `track_boards`
 
 For video, [`track_boards`](@ref) carries each board from frame to frame:
@@ -201,9 +229,11 @@ runs each frame independently and still stages the gallery only once.
 ## [The GPU environment](@id gpu-env)
 
 Every stage of the pipeline is written against KernelAbstractions. The
-`device` keyword picks the backend: `KA.CPU()` runs the threaded host code, and
-`CUDABackend()` runs the device kernels. The default, `default_device()`,
-picks the GPU when CUDA is loaded and functional, and the CPU otherwise. The
+`device` keyword picks the backend the kernels run on: `KA.CPU()` (the host)
+or `CUDABackend()` (the GPU). The blob adaptation is one set of kernels on
+both, and its CPU and GPU frames agree to about 1e-8 px; the order of the
+device's atomic sums differs, so they are not bitwise equal. The default,
+`default_device()`, picks the GPU when CUDA is loaded and functional, and the CPU otherwise. The
 descriptor network runs in ONNX Runtime, on its CUDA execution provider or its
 CPU one.
 
