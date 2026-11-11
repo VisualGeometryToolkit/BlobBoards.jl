@@ -40,8 +40,8 @@ function strongest_detection(dets, cx, cy, R)
     best
 end
 
-# CPU detector → list of (x, y, σ, response) in COLMAP
-function detect_cpu(img_f32)
+# BlobBoards' detector (its one KernelAbstractions path, here on CUDA) → list of (x, y, σ, response) in COLMAP
+function detect_blobboards(img_f32)
     img_gray = Gray{Float32}.(img_f32)
     ds = BlobBoards.detect_blobs(img_gray;
         device = CUDABackend(),
@@ -53,8 +53,8 @@ function detect_cpu(img_f32)
       Float64(d.metadata.response)) for d in ds]
 end
 
-# GPU detector: identity warp, no σ_aa, raw VKS detect → COLMAP
-function detect_gpu(h, img_f32, W, H)
+# The VKS reference detector (the AsiftGpu C library): identity warp, no σ_aa, raw VKS detect → COLMAP
+function detect_vks(h, img_f32, W, H)
     img_u8 = round.(UInt8, clamp.(img_f32 .* 255f0, 0f0, 255f0))
     buf = vec(permutedims(img_u8, (2, 1)))
     feats = AsiftGpu.vks_detect!(h, buf, W, H)
@@ -74,30 +74,30 @@ h = AsiftGpu.vks_init(W, H;
 AsiftGpu.vks_set_warp!(h, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.5f0)
 AsiftGpu.vks_set_preblur!(h, 0.0, 0.0, 1.0)
 
-println("σ_true   N_cpu  N_gpu     CPU σ        GPU σ        CPU/true  GPU/true   pos_cpu  pos_gpu")
+println("σ_true   N_bb   N_vks     BB σ         VKS σ        BB/true   VKS/true   pos_bb   pos_vks")
 println("-------- -----  -----   ---------    ---------   ---------  ---------   -------  -------")
 results = []
 for σ in σ_values
     img = render_one_blob(W, H, cx, cy, σ)
-    cpu_dets = detect_cpu(img)
-    gpu_dets = detect_gpu(h, img, W, H)
+    bb_dets = detect_blobboards(img)
+    vks_dets = detect_vks(h, img, W, H)
     R = max(3.0, 2σ)
-    cpu_best = strongest_detection(cpu_dets, cx, cy, R)
-    gpu_best = strongest_detection(gpu_dets, cx, cy, R)
-    σ_cpu = isnothing(cpu_best) ? NaN : cpu_best[3]
-    σ_gpu = isnothing(gpu_best) ? NaN : gpu_best[3]
-    pos_cpu = isnothing(cpu_best) ? NaN : sqrt((cpu_best[1]-cx)^2 + (cpu_best[2]-cy)^2)
-    pos_gpu = isnothing(gpu_best) ? NaN : sqrt((gpu_best[1]-cx)^2 + (gpu_best[2]-cy)^2)
-    push!(results, (σ, length(cpu_dets), length(gpu_dets), σ_cpu, σ_gpu, pos_cpu, pos_gpu))
+    bb_best = strongest_detection(bb_dets, cx, cy, R)
+    vks_best = strongest_detection(vks_dets, cx, cy, R)
+    σ_bb = isnothing(bb_best) ? NaN : bb_best[3]
+    σ_vks = isnothing(vks_best) ? NaN : vks_best[3]
+    pos_bb = isnothing(bb_best) ? NaN : sqrt((bb_best[1]-cx)^2 + (bb_best[2]-cy)^2)
+    pos_vks = isnothing(vks_best) ? NaN : sqrt((vks_best[1]-cx)^2 + (vks_best[2]-cy)^2)
+    push!(results, (σ, length(bb_dets), length(vks_dets), σ_bb, σ_vks, pos_bb, pos_vks))
     println(rpad(string(σ), 8), " ",
-        lpad(string(length(cpu_dets)), 5), "  ",
-        lpad(string(length(gpu_dets)), 5), "   ",
-        lpad(isnan(σ_cpu) ? "miss" : string(round(σ_cpu; digits=3)), 9), "    ",
-        lpad(isnan(σ_gpu) ? "miss" : string(round(σ_gpu; digits=3)), 9), "    ",
-        lpad(isnan(σ_cpu) ? "—" : string(round(σ_cpu/σ; digits=3)), 8), "   ",
-        lpad(isnan(σ_gpu) ? "—" : string(round(σ_gpu/σ; digits=3)), 8), "    ",
-        lpad(isnan(pos_cpu) ? "—" : string(round(pos_cpu; digits=3)), 5), "    ",
-        lpad(isnan(pos_gpu) ? "—" : string(round(pos_gpu; digits=3)), 5))
+        lpad(string(length(bb_dets)), 5), "  ",
+        lpad(string(length(vks_dets)), 5), "   ",
+        lpad(isnan(σ_bb) ? "miss" : string(round(σ_bb; digits=3)), 9), "    ",
+        lpad(isnan(σ_vks) ? "miss" : string(round(σ_vks; digits=3)), 9), "    ",
+        lpad(isnan(σ_bb) ? "—" : string(round(σ_bb/σ; digits=3)), 8), "   ",
+        lpad(isnan(σ_vks) ? "—" : string(round(σ_vks/σ; digits=3)), 8), "    ",
+        lpad(isnan(pos_bb) ? "—" : string(round(pos_bb; digits=3)), 5), "    ",
+        lpad(isnan(pos_vks) ? "—" : string(round(pos_vks; digits=3)), 5))
 end
 
 AsiftGpu.vks_destroy!(h)

@@ -22,3 +22,8 @@ reason = "each package's own data: the path of BlobBoards' configs/default.toml 
 module = "BlobBoards"
 name = "board"
 reason = "different concepts: BlobBoards' `board(args...)` is its Makie recipe that DRAWS a board's blobs into an image axis; Core's `board(t::PlanarTarget)` is the accessor returning the physical Board a target is printed on; no call of one is a call of the other"
+
+[[backend]]
+file = "src/training.jl"
+function = "_execution_provider"
+reason = "a provider choice, not a second computation: the training pipeline's ONNX session runs the same network on the provider that matches its compute backend (:cpu on KA.CPU, :cuda otherwise), so a CPU run does not ask for the CUDA provider; no kernel or arithmetic differs by backend"
