@@ -193,7 +193,7 @@ min_inliers = 7
 # paper's value is cross-validated (bmvc2026/scripts/outlier_halfwidth_cv.jl).
 outlier_halfwidth = 5.0
 # The RANSAC local-optimization strategy, selected by tag through
-# VisualGeometryToolkitEstimation's loader over LocalOptimizationDoneRight's `LO_TAGS`. BB
+# VisualGeometryToolkitEstimation's loader over its `OPTIMIZATION_STRATEGY_TAGS` and LocalOptimizationDoneRight's `LODR_STRATEGY_TAGS`. BB
 # pins the posterior-weight Student-t/uniform IRLS on every arm (switched back
 # from the Welsch-HQ arm, 2026-07-28); the Welsch-HQ arm would be
 # `{ type = "hq", loss = "welsch", efficiency_constant = "cross_validated" }` here.
