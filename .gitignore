@@ -48,7 +48,7 @@ simple_warp_test.png
 /patterns/
 /boards/
 
-# SLURM logs from examples/training/slurm/
+# SLURM logs of the training scripts (bmvc2026/scripts/training)
 bb-annot*.log
 bb-train*.log
 slurm-*.out

@@ -59,10 +59,12 @@ that moves any member's `Project.toml`, the git hooks (VisualGeometryToolkitCore
 CUDA and cuDNN are `[weakdeps]` (they must be, or `BlobBoardsCUDAExt` could not
 be an extension), and Julia refuses to load a package's own weakdeps from that
 package's project env — `julia --project=. -e 'using CUDA'` is an
-`ArgumentError`. The failure is quiet rather than fatal: `default_device()`
-stays `KA.CPU()`, ONNXRunTime's CUDAExt never registers, and `DescriptorNetwork`
-logs *"ONNX CUDA execution provider unavailable; falling back to CPU EP"* before
-running the descriptor on the CPU.
+`ArgumentError`. The adaptation side is quiet: `default_device()` stays
+`KA.CPU()`. The descriptor side is not: ONNXRunTime's CUDAExt never registers,
+and `DescriptorNetwork(path)` (default `execution_provider = :cuda`) THROWS,
+naming the extension to load and the two opt-outs, `execution_provider = :cpu`
+and `allow_cpu_fallback = true` (the latter warns and runs the CPU provider).
+GPU first: a CPU descriptor is always the caller's explicit choice.
 
 Board authoring used to bite the same way (an extension triggered by
 `using CairoMakie`); since 2026-10-14 it is the submodule `BlobBoards.Authoring`
@@ -81,8 +83,9 @@ Project.toml — ORT's CUDA provider takes 12.x only). The pin lives in `Project
 because `.gitignore` excludes the latter. Use `--project=.` for CPU-only work;
 `test/Project.toml` carries CUDA + cuDNN (and the same pin) of its own.
 
-`examples/training/build_tracks.jl` (the `.tracks` builder CLI and its SLURM
-drivers) runs under this env. `examples/Project.toml` is the desktop superset
+`examples/training/build_tracks.jl` (the `.tracks` builder CLI) runs under this
+env. The package ships no Slurm launcher: a cluster run of record goes through
+VisualGeometryToolkitEval's runner (the paper project's job). `examples/Project.toml` is the desktop superset
 (gpu + GLMakie + CairoMakie + every package the example scripts import) for
 `examples/pipeline/*.jl` and `examples/generate/*.jl`; GLMakie cannot
 precompile headless, which is why the two envs are separate. The paper-side annotation and training scripts
