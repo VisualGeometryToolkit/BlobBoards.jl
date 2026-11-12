@@ -469,21 +469,18 @@ _find_model(
 # radial homography arms called `refine_homography`/`refine_radial_homography`,
 # which were this same `locally_optimize` on the same (bounded) problem, so the
 # switch moves no number.
-_bounded(problem, ::Nothing) = problem
-_bounded(problem, extent) = BoundedProblem(problem, extent)   # the board's world extent, as `find_*`'s `extent`
 _refine(
     cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = length(pt_csponds) < 4 ? nothing : locally_optimize(
-    _bounded(HomographyProblem(pt_csponds), extent), θ₀;
+    (extent === nothing ? HomographyProblem(pt_csponds) : BoundedProblem(HomographyProblem(pt_csponds), extent)), θ₀;
     scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
 )
 _refine(
     cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
-    # the board's world extent bounds the problem as the `find_*` pipelines' `extent` keyword does
-    _bounded(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
+    (extent === nothing ? AbsolutePoseProblem(cam, pt_csponds) : BoundedProblem(AbsolutePoseProblem(cam, pt_csponds), extent)), θ₀;
     scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
@@ -1850,7 +1847,7 @@ _refine(
     outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy,
     extent = nothing, workspace = nothing,
 ) = length(pt_csponds) < 5 ? nothing : locally_optimize(
-    _bounded(RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)), extent), θ₀;
+    (extent === nothing ? RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)) : BoundedProblem(RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)), extent)), θ₀;
     scoring = _scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
