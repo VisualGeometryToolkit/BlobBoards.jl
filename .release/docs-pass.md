@@ -1,4 +1,8 @@
-docs-pass: 89b260e98443c8b833d328a36312a8a30335eb86
+docs-pass: adcba1347fd6ad360b7e1138efaec4e39e2339a1
+
+Re-pointed to adcba1347fd6ad360b7e1138efaec4e39e2339a1: the change since 89b260e is VisualGeometryToolkitFeatures 0.8 (csponds imported from
+VisualGeometryToolkitCore in src/pipeline.jl, [compat] Features "0.8", the CHANGELOG's stack line); no docstring,
+docs page or README moved.
 
 Re-pointed to 89b260e98443c8b833d328a36312a8a30335eb86: the change since 153f622 is [compat] LocalOptimizationDoneRight 0.6 (Project.toml, test/Project.toml);
 no docstring, docs page, README or source moved.
