@@ -116,3 +116,21 @@ end
     using VisualGeometryToolkitEval.Reproduce: reproduce_script
     @test read(projectdir("scripts", "reproduce", "reproduce.sh"), String) == reproduce_script(; julia_project = "bmvc2026")
 end
+
+# A driver's imports are code, never part of its `#= … =#` header (an import that landed in the header left
+# make_pipeline_panels.jl's `VgtkIO` undefined, found only when the stage ran).
+@testitem "bmvc2026 drivers import nothing inside their header comment" begin
+    using DrWatson: projectdir
+    hits = String[]
+    for (root, _, files) in walkdir(projectdir("scripts")), f in files
+        endswith(f, ".jl") || continue
+        lines = readlines(joinpath(root, f))
+        (isempty(lines) || !startswith(lines[1], "#=")) && continue
+        close = findfirst(l -> startswith(l, "=#"), lines)
+        close === nothing && continue
+        for i in 2:(close - 1)
+            occursin(r"^(using|import) ", lines[i]) && push!(hits, "$(relpath(joinpath(root, f), projectdir())):$i")
+        end
+    end
+    @test isempty(hits)
+end

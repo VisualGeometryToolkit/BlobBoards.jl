@@ -1,6 +1,4 @@
 #=
-import VisualGeometryToolkitFeatures as VgtkFeatures
-import VisualGeometryToolkitIO as VgtkIO
 make_supp_tables.jl — the macros behind the supplement's two settings tables
 (and the main paper's prose that quotes them), generated from data instead of
 transcribed:
@@ -35,6 +33,8 @@ Data: the inputs tier (boards/, the camera of record) and the BlobBoards run (it
 
 using DrWatson
 @quickactivate
+import VisualGeometryToolkitFeatures as VgtkFeatures
+import VisualGeometryToolkitIO as VgtkIO
 using DrWatson: projectdir
 
 import JSON
@@ -42,8 +42,6 @@ import TOML
 using Statistics: median
 using BlobBoards: FindBoardsConfig, config_dict
 using VisualGeometryToolkitCore: BoundedCamera, ustrip, mm, dpi
-import VisualGeometryToolkitIO
-import VisualGeometryToolkitFeatures
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))

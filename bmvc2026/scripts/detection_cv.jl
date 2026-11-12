@@ -1,6 +1,4 @@
 #=
-import VisualGeometryToolkitEval as VgtkEval
-import VisualGeometryToolkitIO as VgtkIO
 detection_cv.jl — cross-validate the detection operating point JOINTLY:
 (outlier_halfwidth, peak_threshold, min_similarity) of the pose arm, against
 the inter-board invariance mAA.
@@ -45,13 +43,13 @@ Usage:
 
 using DrWatson
 @quickactivate
+import VisualGeometryToolkitIO as VgtkIO
 using DrWatson: projectdir
 using BlobBoards
 using BlobBoards: FindBoardsConfig, DescriptorNetwork, BoardGallery, uid_from_hash, find_boards, load_bundle
 using CUDA
 import cuDNN
 using CUDA: CUDABackend
-import VisualGeometryToolkitIO
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: BoundedCamera
 using Accessors: @set

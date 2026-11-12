@@ -1,5 +1,4 @@
 #=
-import VisualGeometryToolkitIO as VgtkIO
 make_pipeline_panels.jl — Fig. `fig:pipeline` of the BMVC paper: the four
 stages of the detection-to-pose pipeline on ONE detected board.
 
@@ -78,7 +77,7 @@ using Statistics: mean
 using CoordinateTransformations: PerspectiveMap
 using VisualGeometryToolkitCore: VisualGeometryToolkitCore, imshow, ellipses!, HomographyMap, feature_frame,
     centroid, ustrip, targets, sources, EllipticFrame, CameraModel, BoundedCamera, Pinhole, intrinsics
-import VisualGeometryToolkitIO
+import VisualGeometryToolkitIO as VgtkIO   # the camera store reader (VgtkIO.load)
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 if !isdefined(Main, :BlobBoardsEval)

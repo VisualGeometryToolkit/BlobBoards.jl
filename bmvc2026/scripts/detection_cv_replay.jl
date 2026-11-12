@@ -1,5 +1,4 @@
 #=
-import VisualGeometryToolkitEval as VgtkEval
 detection_cv_replay.jl — the record of configs/detection_cv.toml produced from
 the saved evaluations of earlier runs, without running detection.
 
@@ -32,10 +31,10 @@ Usage:
 
 using DrWatson
 @quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
+import VisualGeometryToolkitEval as VgtkEval
 using TOML: TOML
 using Random: Xoshiro
 using Statistics: quantile
-import VisualGeometryToolkitEval
 using VisualGeometryToolkitEval.Tuning: tuning_spec, tuning_table, load_tuning_artifact, grid_spec, bootstrap_argmin,
     unit_statistics, QueryUnit
 using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, save_coarse_fine_artifact, deployed_setting
@@ -101,7 +100,7 @@ function replay()
     a = (1 - unc["interval"]) / 2
     ns = String.(collect(names))
     interval = Dict{String,Any}(n => quantile([b[Symbol(n)] for b in boot], [a, 1 - a]) for n in ns)
-    sha(p) = VisualGeometryToolkitEval.file_sha256(joinpath(results_root(), p))
+    sha(p) = VgtkEval.file_sha256(joinpath(results_root(), p))
     mkpath(OUTDIR)
     save_coarse_fine_artifact(OP.detection_cv_artifact(OUTDIR), SPEC, rec;
         unit = QueryUnit(), code = (VisualGeometryToolkitCore,), frames = src["frames"], pairs = src["pairs"],

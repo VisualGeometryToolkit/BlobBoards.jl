@@ -1,5 +1,4 @@
 #=
-import VisualGeometryToolkitIO as VgtkIO
 Test script for annotate_blobs — visualize extracted patches and blob IDs
 
 Goal: Check if blob transformation is correct by visually inspecting
@@ -11,13 +10,13 @@ it from an interactive environment that adds GLMakie beside this project, e.g.
 `julia --project=bmvc2026 -i` then `]activate --temp`, `]dev .` (the
 repository root) and `]add GLMakie`, on a machine with a display.
 =#
+import VisualGeometryToolkitIO as VgtkIO
 
 using BlobBoards
 using FileIO, Colors
 using GLMakie
 using VideoIO
 
-import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
 using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
 
 # =============================================================================
