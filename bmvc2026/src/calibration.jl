@@ -55,32 +55,27 @@ provenance.
 
 Supply `force = true` to refit and overwrite.
 """
-# THE ARTIFACT IS a `vgio/transforms/v3` file (X) and a `vgio/rig/v6` file
-# (the Y_m), written by VisualGeometryToolkitIO's `save` from the labeled poses and
-# read back through `load`, the labels minted from the files' typed frames.
-# Keyed like every run: the file is `handeye_<dataset>_<subset>.json` in the
-# fit's `keyed_cell_dir` (`…/bmvc2026/hand_eye_fit-<run_key>`, the key over the
-# evaluation's [experiment] layout and everything the fit reads, below), `force`
-# preserving the outgoing files as `#<n>` — but not through Eval's JLD2 cache,
-# `cached_result`: its JLD2 would embed either a private layout (the 16-float
-# 4×4 this replaced on 2026-09-14) or a package type.
-using DrWatson: gitdescribe
-
-# DrWatson's `safesave` semantics for the vgio JSON about to be overwritten:
-# move it aside to the next free `x#1.json`, `x#2.json`, … Kept here because
-# `safesave` writes through `wsave` (FileIO), which cannot write a
-# VisualGeometryToolkitIO record; returns the new name, or `nothing`.
-function _backup!(file::AbstractString)
-    isfile(file) || return nothing
-    base, ext = splitext(file)
-    n = 1
-    while isfile("$(base)#$(n)$(ext)")
-        n += 1
-    end
-    dst = "$(base)#$(n)$(ext)"
-    mv(file, dst)
-    return dst
-end
+# THE ARTIFACT IS a vgio transforms file (X) and a vgio rig file (the Y_m),
+# written by VisualGeometryToolkitIO's `save` from the labeled poses and read
+# back through `load`, the labels minted from the files' typed frames — never a
+# JLD2, which would embed either a private layout (the 16-float 4×4 this
+# replaced on 2026-09-14) or a package type. Keyed like every run: Eval's
+# `cached_result` with `key = run_key` and a vgio codec, the file
+# `handeye_<dataset>_<subset>_<key>.json` in the fit's `keyed_cell_dir`
+# (`…/bmvc2026/hand_eye_fit-<run_key>`, the key over the evaluation's
+# [experiment] layout and everything the fit reads, below); `force` keeps the
+# outgoing file as Eval's `_#<n>`.
+# The fit as Eval's `cached_result` codec of a vgio record (ext = ".json"):
+# `save` writes the two VisualGeometryToolkitIO records, every other field of
+# the cached Dict (the keying config, the scalar diagnostics, the code trees and
+# DrWatson's tag) in the transforms file's provenance; `load` reads that
+# provenance back (an incomplete pair — no mount beside it — reads as nothing,
+# so the fit is computed again). The previous version is kept by Eval
+# (safesave's `_#n`).
+_save_hand_eye_record(file, data::AbstractDict) =
+    save_hand_eye(file, data["fit"]; provenance = (; (Symbol(k) => v for (k, v) in data if k != "fit")...))
+_load_hand_eye_record(file) = isfile(hand_eye_mount_file(file)) ?
+    JSON.parse(read(file, String); dicttype = Dict{String, Any})["provenance"] : Dict{String, Any}()
 
 function hand_eye(
         src::Sources, frames::Vector{RigFrame}, detected::Dict;
@@ -127,29 +122,18 @@ function hand_eye(
             stem => [Dict{String, Any}("id" => p.id, "R" => collect(vec(p.R)), "t" => collect(p.t)) for p in ps]
             for (stem, ps) in detected))),
     )
-    dir = keyed_cell_dir(cfg, EXPERIMENT, "hand_eye_fit")
-    mkpath(dir)
-    file = joinpath(dir, string("handeye_", dataset, "_", subset, ".json"))
-    if force
-        kept = _backup!(file)
-        kept === nothing || println("  preserved previous version -> $(basename(kept))")
-    end
-    mount = hand_eye_mount_file(file)
-    if !(isfile(file) && isfile(mount))
-        he = hand_eye_calibrate(frames, detected; min_rel_angle)
-        save_hand_eye(
-            file, he;
-            provenance = (
-                config = cfg,
-                n_frames = length(usable),
-                n_markers = length(markers),
+    _, file = cached_result(
+        c -> let he = hand_eye_calibrate(frames, detected; min_rel_angle)
+            Dict{String, Any}(
+                "fit" => he, "config" => c, "n_frames" => length(usable), "n_markers" => length(markers),
                 # Scalars only — see the header on not embedding RVG's fit object.
-                sigma_rot_rad = he.fit.metadata.σ_rot,      # the fit's per-block noise scales (its metadata)
-                sigma_trans_mm = he.fit.metadata.σ_trans,
-                gitcommit = gitdescribe(projectdir()),
-            ),
-        )
-    end
+                "sigma_rot_rad" => he.fit.metadata.σ_rot,      # the fit's per-block noise scales (its metadata)
+                "sigma_trans_mm" => he.fit.metadata.σ_trans,
+            )
+        end,
+        string("handeye_", dataset, "_", subset), cfg, keyed_cell_dir(cfg, EXPERIMENT, "hand_eye_fit");
+        key = run_key, ext = ".json", load = _load_hand_eye_record, save = _save_hand_eye_record, force,
+    )
 
     X, targets = load_hand_eye(file)
     # `load` hands back the records only; the diagnostics ride in the file's
