@@ -28,7 +28,7 @@ using VisualGeometryToolkitCore: VisualGeometryToolkitCore, imshow, ellipses!, m
     HomographyMap, PosedCamera, project
 # `Colors` is a hard dep of the package, so an extension may use it directly.
 using Colors: Colors
-using StaticArrays: SMatrix, SVector
+using StaticArrays: SMatrix
 using FlexUnits: Quantity
 using GeometryBasics: Point2, Point2f, Point3, Rect
 using VisualGeometryToolkitCore: EllipticFrame, Ellipse
@@ -383,10 +383,9 @@ end
 # trace's `detect_img` is undistorted and fitted poses live in undistorted
 # coordinates. Measured on board "336" — pinhole reprojects a matched blob to
 # 0.03 px of its detection, the OpenCV-model camera to 72 px.
-# Deliberately NOT routed through BlobBoards._model_to_homography (its
-# documented sixth spelling): plotting receives quantity-carrying poses that
-# the pipeline path never sees, and this defensive strip is the contract
-# difference (2026-09 audit).
+# Core's plane-induced homography of the pinhole camera (`HomographyMap` of a
+# `PosedCamera`); plotting may receive a quantity-carrying pose, which strips
+# in mm first (Extrinsics3.t is bare mm by convention).
 function _board_proj(camera::VgtkCore.BoundedCamera, pose; lens::Bool = true)
     camera_model = VgtkCore.model(camera)   # the projection is the model's; the bound is the image extent
     # `lens = true` (the default): the FULL camera, raw pixels — what a board
@@ -394,11 +393,8 @@ function _board_proj(camera::VgtkCore.BoundedCamera, pose; lens::Bool = true)
     # plane homography below, for an image that has already been undistorted
     # (the trace viewer's `detect_img`).
     lens && return CameraBoardProj(VgtkCore.PosedCamera(camera_model, pose))
-    K = SMatrix{3, 3, Float64}(camera_model.intrinsics.K)
-    R = SMatrix{3, 3, Float64}(pose.R)
-    # Extrinsics3.t is bare mm by convention; a quantity-carrying pose strips in mm.
-    t = SVector{3, Float64}(VgtkCore.strip_or_bare.(VgtkCore.mm, pose.t))
-    return PerspectiveMap() ∘ HomographyMap(K * hcat(R[:, 1], R[:, 2], t))
+    pose_mm = VgtkCore.has_units(pose) ? VgtkCore.ustrip(VgtkCore.mm, pose) : pose
+    return PerspectiveMap() ∘ HomographyMap(VgtkCore.PosedCamera(VgtkCore.pinhole(camera_model), pose_mm))
 end
 _board_proj(::Nothing, H; lens::Bool = true) = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H))
 
