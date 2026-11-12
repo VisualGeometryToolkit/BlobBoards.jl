@@ -1,4 +1,4 @@
-using VisualGeometryToolkitCore: EllipticFrame, feature_frame
+using VisualGeometryToolkitCore: EllipticFrame, feature_frame, aspect_ratio
 
 # =============================================================================
 # Blob Adaptation — Unified Interface
@@ -109,12 +109,12 @@ function adapt(detections::AbstractVector, img::AbstractMatrix; config::AdaptCon
     else
         [strip_or_bare(px, Disc(d)) for d in detections]
     end
-    return _adapt(img, sites, config, device)
+    return _adapt_ka(img, sites, config, device)
 end
 
 function adapt(discs::AbstractVector{<:Disc}, img::AbstractMatrix; config::AdaptConfig = AdaptConfig(), device = default_device())
     # px regime: px-united discs strip in px, bare ones are kept.
-    return _adapt(img, strip_or_bare.(px, discs), config, device)
+    return _adapt_ka(img, strip_or_bare.(px, discs), config, device)
 end
 
 # Backend-generic KernelAbstractions adaptation (src/adapt_ka.jl): the same
@@ -143,12 +143,6 @@ function count_rejected(frames::AbstractVector, rejection::Symbol)
         throw(ArgumentError("rejection $(repr(rejection)): the shape gate refuses for :not_peak or :aspect_ratio"))
     return count(f -> f.rejection === rejection, frames)
 end
-
-_adapt(
-    img, sites::AbstractVector{<:Union{Disc, EllipticFrame}},
-    cfg::AdaptConfig, device::KA.Backend = default_device()
-) =
-    _adapt_ka(img, sites, cfg, device)
 
 # =============================================================================
 # filter_blobs — Geometric quality filters
@@ -180,10 +174,10 @@ function filter_blobs(
         frames, detections;
         cutoff = DEFAULT_CUTOFF,
         image = nothing,
-        max_aspect_ratio = 10.0,
-        max_scale_ratio = 4.0,
+        max_aspect_ratio = _dflt("adapt", "max_aspect_ratio"),
+        max_scale_ratio = _dflt("adapt", "max_scale_ratio"),
         max_center_drift = 10.0,
-        max_clip_ratio = 0.2
+        max_clip_ratio = _dflt("adapt", "max_clip_ratio")
     )
     image_rect = image !== nothing ? Rect(Size2(image)) : nothing
 
@@ -196,7 +190,7 @@ function filter_blobs(
         # method for bare input and broke the dataset-gated smokes. A future
         # quantity-emitting producer will fail loudly in the arithmetic below.
         σ_orig = orig.σ
-        max(e.a, e.b) / min(e.a, e.b) <= max_aspect_ratio || return false
+        aspect_ratio(e) <= max_aspect_ratio || return false
         σ_fit = characteristic_scale(det.frame)
         sr = σ_fit / σ_orig
         1 / max_scale_ratio <= sr <= max_scale_ratio || return false
