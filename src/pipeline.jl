@@ -23,7 +23,7 @@ using VisualGeometryToolkitFeatures:
     match, csponds,
     # Hoisted to VGF 0.5: the stacked multi-gallery matcher and the greedy
     # one-to-one reduction. BB owned both until they proved general.
-    StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one
+    StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one, resolve_one_to_one!
 
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_homography, find_absolute_pose, RansacConfig,
     locally_optimize,
@@ -33,7 +33,7 @@ using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_hom
     find_radial_homography, RadialHomographyProblem
 # The constraint-problem protocol is VisualGeometryToolkitCore's; RVG's problems add
 # methods to it.
-using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map
+using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map, overlap_area
 # Every fit scores with the Student-t + uniform marginal at the geometry's
 # `outlier_halfwidth`, stated explicitly: RVG's own default is MSAC at a
 # threshold. The scorer is VisualGeometryToolkitCore's, built by
@@ -398,16 +398,12 @@ function _canon_describe(device, model, frames::AbstractVector, img::AbstractMat
     N = length(frames)
     N == 0 && return Matrix{Float32}(undef, 0, 0)
     d_img = _device_image(device, img)
-    out = Matrix{Float32}(undef, 0, 0)
-    for start in 1:_DESCRIBE_CHUNK:N
-        stop = min(start + _DESCRIBE_CHUNK - 1, N)
-        cube = _patch_cube(device, d_img, view(frames, start:stop); patch_size, inner_extent, outer_extent)
+    return batched_rows(N, _DESCRIBE_CHUNK) do offset, n
+        cube = _patch_cube(device, d_img, view(frames, (offset + 1):(offset + n)); patch_size, inner_extent, outer_extent)
         rows = _describe_patches(model, cube)
         finalize(cube)   # a device cube back to its pool now, not at the next collection
-        isempty(out) && (out = Matrix{Float32}(undef, N, size(rows, 2)))
-        out[start:stop, :] .= rows
+        rows
     end
-    return out
 end
 const _DESCRIBE_CHUNK = 16_384
 
@@ -542,9 +538,7 @@ function _undistort_detect(
         cam::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}}
     )
     H, W = size(img)
-    raw = gray_u8(img)
-    d_u8 = KernelAbstractions.allocate(dev, UInt8, H, W)
-    copyto!(d_u8, raw)
+    d_u8 = on_device(UInt8, dev, gray_u8(img))   # Core's one upload (the image itself on the host)
     d_out = KernelAbstractions.allocate(dev, UInt8, H, W)   # kernel writes every pixel
     # u8→u8: VGC's kernel samples the 8-bit source bilinearly in the 0–255
     # domain (linear ops commute with the scale) and stores saturating UInt8.
@@ -847,15 +841,13 @@ function guided_search(
     used_d = falses(length(image_features)); used_w = falses(length(wdiscs))
     matches = NNMatch[]
     sizehint!(matches, length(keep) + length(cands))
-    for (wi, di) in keep
-        (used_d[di] || used_w[wi]) && continue
-        used_d[di] = true; used_w[wi] = true
+    for k in resolve_one_to_one!(used_w, used_d, keep)
+        wi, di = keep[k]
         push!(matches, NNMatch(wi, di, 1.0f0, 0.0f0))
     end
     sort!(cands; by = first, rev = true)
-    for (v, wi, di) in cands
-        (used_d[di] || used_w[wi]) && continue
-        used_d[di] = true; used_w[wi] = true
+    for k in resolve_one_to_one!(used_w, used_d, cands; a = c -> c[2], b = c -> c[3])
+        v, wi, di = cands[k]
         # score by overlap (higher = better); ratio unused for geometric matches
         push!(matches, NNMatch(wi, di, Float32(v), 0.0f0))
     end
@@ -951,18 +943,8 @@ const _IOU_PRUNE_SLACK = 1.0e-6
     r1 = Float64(e1.a); r2 = Float64(e2.a)
     d = hypot(Float64(e1.center[1]) - Float64(e2.center[1]), Float64(e1.center[2]) - Float64(e2.center[2]))
     d >= (r1 + r2) * (1 + _IOU_PRUNE_SLACK) && return true                        # 2
-    return _disc_lens(r1, r2, d) < tt * pi * Amax                                 # 3
-end
-
-# The area of the intersection of two discs of radii r1, r2 whose centres are
-# d apart (the circular lens; the smaller disc when one contains the other).
-@inline function _disc_lens(r1::Float64, r2::Float64, d::Float64)
-    d >= r1 + r2 && return 0.0
-    d <= abs(r1 - r2) && return pi * min(r1, r2)^2
-    c1 = clamp((d^2 + r1^2 - r2^2) / (2 * d * r1), -1.0, 1.0)
-    c2 = clamp((d^2 + r2^2 - r1^2) / (2 * d * r2), -1.0, 1.0)
-    k = (-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2)
-    return r1^2 * acos(c1) + r2^2 * acos(c2) - sqrt(max(k, 0.0)) / 2
+    lens = overlap_area(Circle(Point2{Float64}(e1.center), r1), Circle(Point2{Float64}(e2.center), r2))   # Core's disc lens
+    return lens < tt * pi * Amax                                                  # 3
 end
 
 # Function barrier for guided_search: `H` arrives concrete here, so the
@@ -1267,7 +1249,7 @@ function _resolve_pose_ambiguity(
     blog = telemetry === nothing ? "" : telemetry.branch_log
     if !isempty(blog)
         # discriminability d: inter-branch distance gap over the noise floor
-        prob = VgtkEstimation.AbsolutePoseProblem(camera, pt_csponds)
+        prob = VgtkEstimation.AbsolutePoseProblem(VgtkCore.model(camera), pt_csponds)   # the problem takes the model (BoundedCamera is the pixel bound)
         n = length(pt_csponds)
         rA = zeros(n); rB = zeros(n)
         mahalanobis_distances!(rA, prob, inc.estimate)
@@ -1363,7 +1345,7 @@ function find_board(
     if resolve_pose_ambiguity && camera isa BoundedCamera
         res = _resolve_pose_ambiguity(
             camera, scored, pt_csponds, res;
-            outlier_halfwidth = get(fit_kw, :outlier_halfwidth, 5.0), local_optimization_strategy,
+            outlier_halfwidth = get(_dflt_outlier_halfwidth, fit_kw, :outlier_halfwidth), local_optimization_strategy,
             extent = get(fit_kw, :extent, nothing),
             workspace = refine_workspace, telemetry
         )
@@ -1379,7 +1361,7 @@ function find_board(
         # The guided refit's scorer half-width (fallback matches the
         # PoseGeometry/HomographyGeometry default of 5 px). It is the scorer's
         # alone: the association below is by ellipse overlap, with no radius.
-        outlier_halfwidth = get(fit_kw, :outlier_halfwidth, 5.0)
+        outlier_halfwidth = get(_dflt_outlier_halfwidth, fit_kw, :outlier_halfwidth)
         # RANSAC inliers are already certified (descriptor match + spatial
         # consensus): guided search keeps them unconditionally and only ADDS
         # IoU-certified csponds — the union, per-board support can't shrink.

@@ -424,12 +424,10 @@ function _warm_track_frame(
     n_pred == 0 && return (nothing, _finish_diag(diag))
 
     sort!(cands)                          # lexicographic: sim desc, iou desc
-    used_w = Set{Int}(); used_d = Set{Int}()
     assoc = Tuple{Int, Int}[]
     sims = Float32[]
-    for (nsim, niou, wi, di) in cands
-        (wi in used_w || di in used_d) && continue
-        push!(used_w, wi); push!(used_d, di)
+    for k in resolve_one_to_one!(falses(length(wdiscs)), falses(length(det_ells)), cands; a = c -> c[3], b = c -> c[4])
+        nsim, niou, wi, di = cands[k]
         push!(assoc, (wi, di))
         push!(sims, -nsim)
         diag === nothing || push!(diag.assoc, (Float64(wi), Float64(di), -niou))
