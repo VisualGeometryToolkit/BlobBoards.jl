@@ -70,6 +70,9 @@ detection_cv_dir(cfg::AbstractDict) = keyed_cell_dir(cfg, EXPERIMENT, "detection
 "The tuning artifact inside a joint detection CV run directory."
 detection_cv_artifact(dir::AbstractString) = joinpath(dir, "detection.jld2")
 
+"The supplementary table of the axes `ax` (one axis: its curve; two: their surface) inside a joint detection CV run directory."
+detection_cv_table(dir::AbstractString, ax) = joinpath(dir, "table_" * join(ax, "__") * ".tex")
+
 """
     ADOPTED_OPERATING_POINTS
 

@@ -122,9 +122,8 @@ end
 
 const AXES = sort!(collect(keys(SPEC.scheme.axes)))
 const TABLES = vcat([[n] for n in AXES], [[AXES[i], AXES[j]] for i in eachindex(AXES) for j in i+1:length(AXES)])
-table_path(ax) = joinpath(OUTDIR, "table_" * join(ax, "__") * ".tex")
 write_tables() = foreach(TABLES) do ax
-    emit_tuning_table(OP.detection_cv_artifact(OUTDIR), table_path(ax); axes = ax,
+    emit_tuning_table(OP.detection_cv_artifact(OUTDIR), OP.detection_cv_table(OUTDIR, ax); axes = ax,
                       labels = [CFG["tables"]["labels"][n] for n in ax], fmt = "%.4g")
 end
 
@@ -133,6 +132,6 @@ run_stages("detection_cv_replay", [
         () -> run_complete(OUTDIR; sidecar = basename(OP.detection_cv_artifact(OUTDIR))),
         () -> (replay(); nothing)),
     Stage(:tables, "the curve of each axis and the surface of each pair -> $(OUTDIR)/table_*.tex",
-        () -> all(isfile ∘ table_path, TABLES),
+        () -> all(ax -> isfile(OP.detection_cv_table(OUTDIR, ax)), TABLES),
         () -> (write_tables(); nothing)),
 ])

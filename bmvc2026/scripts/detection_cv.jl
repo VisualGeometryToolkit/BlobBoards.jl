@@ -72,7 +72,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, results_root, input_path, config_path, load_config,
-    detection_cv_key, detection_cv_dir, detection_cv_artifact
+    detection_cv_key, detection_cv_dir, detection_cv_artifact, detection_cv_table
 
 const CFG_PATH = config_path("detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
@@ -192,9 +192,8 @@ end
 # coarse argmin (VisualGeometryToolkitEval `emit_tuning_table`): supplementary tables.
 const AXES = sort!(collect(keys(SPEC.scheme.axes)))
 const TABLES = vcat([[n] for n in AXES], [[AXES[i], AXES[j]] for i in eachindex(AXES) for j in i+1:length(AXES)])
-table_path(ax) = joinpath(OUTDIR, "table_" * join(ax, "__") * ".tex")
 write_tables() = foreach(TABLES) do ax
-    emit_tuning_table(detection_cv_artifact(OUTDIR), table_path(ax); axes = ax,
+    emit_tuning_table(detection_cv_artifact(OUTDIR), detection_cv_table(OUTDIR, ax); axes = ax,
                       labels = [CFG["tables"]["labels"][n] for n in ax], fmt = "%.4g")
 end
 
@@ -203,6 +202,6 @@ run_stages("detection_cv", [
         () -> run_complete(OUTDIR; sidecar = basename(detection_cv_artifact(OUTDIR))),
         () -> (run_cv(); nothing)),
     Stage(:tables, "the curve of each axis and the surface of each pair -> $(OUTDIR)/table_*.tex",
-        () -> all(isfile ∘ table_path, TABLES),
+        () -> all(ax -> isfile(detection_cv_table(OUTDIR, ax)), TABLES),
         () -> (write_tables(); nothing)),
 ])

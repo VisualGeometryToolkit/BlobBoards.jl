@@ -14,7 +14,7 @@ differing only in a nested value would share one artifact. `hash` sees the whole
 container but is not stable across Julia versions (Eval's `legacy_hash_key`,
 which `cached_result` falls back to, is that). `run_key` is the stack's one run
 identity: the SHA-256 of the sorted TOML of the config, stable across key order,
-processes and Julia versions. Every call here passes `key = run_key`.
+processes and Julia versions. Every call here supplies `key = run_key`.
 
 `prefix` keeps the artifacts greppable: `pose_<run_key>.jld2`.
 
