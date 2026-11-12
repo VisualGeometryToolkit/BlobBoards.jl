@@ -1,12 +1,13 @@
 # Config of record of scripts/training/build_annotations.jl: the descriptor
 # training corpus — every source of the training footage annotated with its
 # boards (per-frame canonical patches, BlobBoards `build_annotations`), then
-# split by board identity into train/val/test (`split_training_data`). Written
-# add-only into the run's keyed directory (VisualGeometryToolkitEval
-# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/annotations-<run_key>):
+# split by board identity into train/val/test (`split_training_data`). The
+# corpus is DATA of its own tier, [output] tier below: written add-only by its
+# one producer into VisualGeometryToolkitEval's keyed_data_dir
+# (data_root()/<tier>/annotations-<run_key>), never into another tier's tree:
 #   truth_images/   the per-frame annotations (+ refs/, _log.jsonl, build.log)
 #   splits/         train.jld2, val.jld2, test.jld2
-# NOTHING is written into the input tree. The same config is the same
+# The same config is the same
 # directory, which the annotation resumes (each source's _log.jsonl marker);
 # a changed value is a new run. The descriptor network of record is NOT made
 # here: it is an input (bb_assets), trained by the bootstrap chain the
@@ -14,10 +15,6 @@
 
 [experiment]
 generator = "annotations"
-dataset = "blobboard_training"
-# The results tree's layout (keyed_cell_dir: <dataset>/<matcher>/<problem>).
-matcher = "blobboards"
-problem = "descriptor_training"
 
 # The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-
 # relative). The footage tree is the authors' (unpublished as laid out here;
@@ -42,6 +39,9 @@ tier = "bb_assets"
 path = "models/track_logpolar_circ_s96_iter4.onnx"
 provenance = "the descriptor network that finds the boards (the network of record, as configs/bmvc2026_260527.toml)"
 sha256 = "6efc291ab94e812ce043d919ecc72ded7e4b16bd1c0c50b1492b1ce245bae8b9"
+
+[output]
+tier = "bb_descriptor_annotations"     # the data tier the corpus is (Eval keyed_data_dir)
 
 [gallery]
 path = "board_gallery_training.jld2"   # a cache: results_root()/galleries/<path> (src/runs.jl gallery_path)
