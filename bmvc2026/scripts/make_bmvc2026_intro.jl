@@ -48,7 +48,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using DrWatson: projectdir
-using Main.BlobBoardsEval: input_path, network_path, gallery_path, paper_images_dir, figure_config, write_figure_records, load_config
+using Main.BlobBoardsEval: input_path, gallery_path, paper_images_dir, figure_config, write_figure_records, load_config
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 # ---- config of record --------------------------------------------------------
@@ -82,7 +82,7 @@ function main()
     # ---- gallery + boards + descriptor model (ONNX) -----------------------------
     # Same network as the main sweep — this figure used to resolve a package
     # default that pointed at the OLD SupCon model, so the paper mixed networks.
-    descriptor_network = DescriptorNetwork(network_path(load_config(CFG["runs"]["bb"])))
+    descriptor_network = DescriptorNetwork(input_path(load_config(CFG["runs"]["bb"]), "network"))
     mkpath(dirname(GALLERY))
     gallery = BoardGallery(GALLERY, descriptor_network)
     board_paths = filter(endswith(".json"), readdir(BOARDS_DIR; join = true))

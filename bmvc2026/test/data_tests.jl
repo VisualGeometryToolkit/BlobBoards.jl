@@ -43,7 +43,7 @@ end
 @testitem "every run resolves into results_root(), never data_root()" setup = [BBEval] begin
     using DrWatson: projectdir
     using .BBEval.BlobBoardsEval: eval_sources, poses_dir, val_dir, hand_eye_dir, records_dir, mocap_dir,
-        sweep_dir, baselines_dir, load_config, network_path
+        sweep_dir, baselines_dir, load_config, input_path
     mktempdir() do tmp
         data, results = mkpath(joinpath(tmp, "data")), mkpath(joinpath(tmp, "results"))
         # an inputs-only data root: the network a run config names (the sweep
@@ -54,7 +54,7 @@ end
         mkpath(joinpath(data, "absolute_pose_experiments", "260527"))
         withenv("VGTK_DATA_ROOT" => data, "VGTK_RESULTS_ROOT" => results) do
             # Eval's input_path checks the stated sha256: another content is refused
-            @test_throws ArgumentError network_path(rc)
+            @test_throws ArgumentError input_path(rc, "network")
             src = eval_sources(load_config("figures/evaluation.toml"))
             under(p, root) = startswith(abspath(p), abspath(root) * "/")
             @test under(src.inputs, data)

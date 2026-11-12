@@ -38,7 +38,7 @@ using Logging, Dates
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: figure_config, input_path, network_path, gallery_path
+using Main.BlobBoardsEval: figure_config, input_path, gallery_path
 
 const CFG, CFG_PATH = figure_config("annotations"; default = projectdir("configs", "training", "annotations.toml"))
 const KEY = run_key(CFG)
@@ -101,7 +101,7 @@ function main()
     @info "=== build_annotations: run $(KEY) -> $(RUN_DIR) ==="
 
     boards_dir = input_path(CFG, "boards")
-    network = DescriptorNetwork(network_path(CFG))
+    network = DescriptorNetwork(input_path(CFG, "network"))
     gallery = BoardGallery(gallery_path(CFG), network)
     board_paths = filter(endswith(".json"), readdir(boards_dir; join = true))
     board_feature_dict = Dict(uid => f for (uid, f) in [insert!(gallery, bp, network) for bp in board_paths])
@@ -131,7 +131,7 @@ function main()
     @info "train $(result.stats.train_patches) patches ($(result.stats.train_boards) boards), " *
         "val $(result.stats.val_patches) ($(result.stats.val_boards_n)), test $(result.stats.test_patches) ($(result.stats.test_boards_n))"
     write_run_records(RUN_DIR, CFG; driver = "bmvc2026/scripts/training/build_annotations.jl", config_source = CFG_PATH, key = KEY,
-        inputs = [boards_dir, input_path(CFG, "images"), input_path(CFG, "videos"), network_path(CFG)], producer = true)
+        inputs = [boards_dir, input_path(CFG, "images"), input_path(CFG, "videos"), input_path(CFG, "network")], producer = true)
     close(log_io)
     return RUN_DIR
 end

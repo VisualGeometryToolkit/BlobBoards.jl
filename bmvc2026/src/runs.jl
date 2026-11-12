@@ -39,27 +39,10 @@ using DrWatson: projectdir
 using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, input_path
 
 # `EXPERIMENT`, the name every run directory is filed under, is
-# src/operating_points.jl's (a self-contained file; BlobBoardsEval includes it).
-
-"""
-    config_path(name) -> String
-
-A config of record by name: `configs/<name>` of the project (an absolute path
-is returned as is).
-"""
-config_path(name::AbstractString) = isabspath(name) ? String(name) : projectdir("configs", name)
-
-"""
-    load_config(name) -> Dict
-
-The parsed config of record `configs/<name>`.
-"""
-load_config(name::AbstractString) = TOML.parsefile(config_path(name))
+# src/operating_points.jl's (a self-contained file; BlobBoardsEval includes it), and so are
+# `config_path`/`load_config`, the config of record by name.
 
 # --- motion-capture records ---------------------------------------------------
-
-"The run key of the motion-capture records (scripts/convert_formats.jl)."
-records_key(name::AbstractString = "convert_formats.toml") = run_key(load_config(name))
 
 """
     records_dir(dataset; config = "convert_formats.toml") -> String
@@ -77,14 +60,6 @@ mocap_dir(dataset::AbstractString; config::AbstractString = "convert_formats.tom
 # --- BlobBoards sweeps --------------------------------------------------------
 
 """
-    network_path(run_config) -> String
-
-The descriptor network a run config names: its `[inputs.network]` (an input of
-the assets tier).
-"""
-network_path(rc::AbstractDict) = input_path(rc, "network")
-
-"""
     gallery_path(run_config) -> String
 
 Where a sweep keeps its gallery: a CACHE of (board set × network), under
@@ -92,15 +67,6 @@ Where a sweep keeps its gallery: a CACHE of (board set × network), under
 own cache key carries the network, patch and each board's cutoff).
 """
 gallery_path(rc::AbstractDict) = joinpath(results_root(), "galleries", basename(String(rc["gallery"]["path"])))
-
-"""
-    sweep_key(config) -> String
-
-The run key of a BlobBoards sweep: `run_key` of its run config of record (its
-`[inputs]` carry the network's sha256). The main sweep and the occlusion sweep
-of one config share it; their directories differ by kind ([`sweep_dir`](@ref)).
-"""
-sweep_key(config::AbstractString) = run_key(load_config(config))
 
 """
     sweep_dir(config; kind = "bb") -> String
@@ -114,9 +80,6 @@ function sweep_dir(config::AbstractString; kind::AbstractString = "bb")
 end
 
 # --- AprilTag/ArUco baselines -------------------------------------------------
-
-"The run key of the AprilTag/ArUco baselines (scripts/detect_baselines.jl)."
-baselines_key(config::AbstractString = "baselines.toml") = run_key(load_config(config))
 
 "The directory of the AprilTag/ArUco baselines."
 baselines_dir(config::AbstractString = "baselines.toml") = keyed_cell_dir(load_config(config), EXPERIMENT, "baselines")
@@ -183,8 +146,8 @@ function eval_sources(cfg::AbstractDict; tiers = EVAL_TIERS)
         "bb_noflip" => PoseRun(sweep_dir(nf), nothing, "bb"),
     )
     keys = Dict(
-        "records" => records_key(String(r["records"])), "baselines" => baselines_key(bl),
-        "bb" => sweep_key(bb), "occlusion" => sweep_key(bb), "bb_noflip" => sweep_key(nf),
+        "records" => run_key(load_config(String(r["records"]))), "baselines" => run_key(load_config(bl)),
+        "bb" => run_key(load_config(bb)), "occlusion" => run_key(load_config(bb)), "bb_noflip" => run_key(load_config(nf)),
     )
     # the [experiment] keys Eval's experiment_dir lays a run out by
     layout = Dict{String, Any}(k => v for (k, v) in cfg["experiment"] if k in ("dataset", "matcher", "problem", "layout"))

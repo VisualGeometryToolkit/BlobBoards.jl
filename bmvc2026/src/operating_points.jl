@@ -31,6 +31,21 @@ self-contained: src/runs.jl reads the same binding through BlobBoardsEval.
 const EXPERIMENT = "bmvc2026"
 
 """
+    config_path(name) -> String
+
+A config of record by name: `configs/<name>` of the project (an absolute path
+is returned as is).
+"""
+config_path(name::AbstractString) = isabspath(name) ? String(name) : projectdir("configs", name)
+
+"""
+    load_config(name) -> Dict
+
+The parsed config of record `configs/<name>`.
+"""
+load_config(name::AbstractString) = TOML.parsefile(config_path(name))
+
+"""
     detection_cv_upstream(cfg) -> Dict
 
 What the joint detection CV folds into its key beside `cfg` (the parsed
@@ -38,7 +53,7 @@ configs/detection_cv.toml): the run key of the run config of record it
 searches around (`[runs] bb`), Eval's `run_key(…; upstream)`.
 """
 detection_cv_upstream(cfg::AbstractDict) =
-    Dict{String, String}("bb" => run_key(TOML.parsefile(projectdir("configs", cfg["runs"]["bb"]))))
+    Dict{String, String}("bb" => run_key(load_config(cfg["runs"]["bb"])))
 
 "The run key of the joint detection CV: `run_key(cfg; upstream = detection_cv_upstream(cfg))`."
 detection_cv_key(cfg::AbstractDict) = run_key(cfg; upstream = detection_cv_upstream(cfg))

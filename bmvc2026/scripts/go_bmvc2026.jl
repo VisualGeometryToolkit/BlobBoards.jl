@@ -65,13 +65,13 @@ const FRAME_LIMIT = Int(RUN.experiment["limit"])
 mkpath(dirname(GALLERY))
 ctx = sweep_context(;
     config_path = CONFIG_PATH, run_config = RUN,
-    network_path = BBE.network_path(RUN.config_toml),
+    network_path = BBE.input_path(RUN.config_toml, "network"),
     gallery_path = GALLERY, boards_dir = BOARDS_DIR,
     camera_json = CAMERA_JSON, device = CUDABackend()
 )
 
 # The run's directory: its config of record and network content (src/runs.jl).
-const RUN_KEY = BBE.sweep_key(CONFIG_PATH)
+const RUN_KEY = BBE.run_key(BBE.load_config(CONFIG_PATH))
 const RUN_ROOT = BBE.sweep_dir(CONFIG_PATH)
 
 const ALL_UNITS = [

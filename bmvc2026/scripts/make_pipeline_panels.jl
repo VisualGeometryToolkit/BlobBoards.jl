@@ -84,19 +84,19 @@ using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: input_path, network_path, paper_images_dir, figure_config, write_figure_records, gallery_path
+using Main.BlobBoardsEval: input_path, config_path, paper_images_dir, figure_config, write_figure_records, gallery_path
 const BlobBoardsEval = Main.BlobBoardsEval
 
 const CFG, CFG_PATH = figure_config("pipeline_panels"; default = projectdir("configs", "figures", "pipeline_panels.toml"))
 const RND = CFG["render"]
-const CONFIG_PATH = projectdir("configs", CFG["runs"]["bb"])
+const CONFIG_PATH = config_path(CFG["runs"]["bb"])
 const RUN = read_run_config(CONFIG_PATH)
 # The inputs of record: a descriptor-training still, its session's camera and
 # the gallery boards; the descriptor network is the run config of record's.
 const IMAGE = input_path(CFG, "image")
 const CAMERA_JSON = input_path(CFG, "camera")
 const BOARDS_DIR = input_path(CFG, "boards")
-const NETWORK = network_path(RUN.config_toml)
+const NETWORK = input_path(RUN.config_toml, "network")
 const GALLERY = isempty(CFG["gallery"]["path"]) ? joinpath(tempdir(), "blobboards_pipeline_gallery.jld2") : gallery_path(CFG)
 const BOARD = CFG["panel"]["board"]
 

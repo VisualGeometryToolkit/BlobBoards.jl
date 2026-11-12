@@ -48,7 +48,7 @@ module ReplayOperatingPoints
 end
 const OP = ReplayOperatingPoints
 
-const CFG_PATH = projectdir("configs", "detection_cv.toml")
+const CFG_PATH = OP.config_path("detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
 const SPEC = tuning_spec(CFG, "detection")
 const SEARCH = joinpath("tuning", "detection_cv-c80d42e9055f8cd5", "detection.jld2")
@@ -73,7 +73,7 @@ function replay()
     t == tuning_table(src.spec) || error("$SEARCH ran another search than [tuning.detection] (less its incumbent)")
     src["frames"] == inc["frames"] && src["pairs"] == inc["pairs"] || error("the two sources differ in frames or board pairs")
     v = SPEC.scheme.incumbent.values
-    rc = TOML.parsefile(projectdir("configs", CFG["runs"]["bb"]))["find_boards"]
+    rc = OP.load_config(CFG["runs"]["bb"])["find_boards"]
     (rc["detect"]["peak_threshold"], rc["min_similarity"]) == (v["peak_threshold"], v["min_similarity"]) ||
         error("the incumbent's peak threshold and similarity are not the run config of record's, under which $INCUMBENT ran")
     j = findfirst(==(v["outlier_halfwidth"]), inc["evaluated_x"])

@@ -12,7 +12,7 @@
     import TOML
     using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy
 
-    cfg = TOML.parsefile(projectdir("configs", "detection_cv.toml"))
+    cfg = OperatingPoints.load_config("detection_cv.toml")
     s = tuning_spec(cfg, "detection").scheme
     @test s isa JointCoarseFine && s.criterion == MeanAverageAccuracy(10.0)
     @test sort!(collect(keys(s.axes))) == ["min_similarity", "outlier_halfwidth", "peak_threshold"]
@@ -33,7 +33,7 @@ end
     using VisualGeometryToolkitEval.Evaluation: deployed_setting
     using VisualGeometryToolkitEval.Tuning: tuning_spec
 
-    cfg = TOML.parsefile(projectdir("configs", "detection_cv.toml"))
+    cfg = OperatingPoints.load_config("detection_cv.toml")
     s = tuning_spec(cfg, "detection").scheme
     # without a bound results root there is no run to read: a recorded skip
     path = try OperatingPoints.detection_cv_artifact(OperatingPoints.detection_cv_dir(cfg)) catch; "" end
@@ -51,7 +51,7 @@ end
 @testitem "operating points: the configs of record name their tuning runs" setup = [OperatingPoints] begin
     using DrWatson: projectdir
     for op in OperatingPoints.ADOPTED_OPERATING_POINTS, rc in OperatingPoints.RUN_CONFIGS
-        @test occursin(basename(dirname(op.artifact)), read(projectdir("configs", rc), String))
+        @test occursin(basename(dirname(op.artifact)), read(OperatingPoints.config_path(rc), String))
     end
 end
 
@@ -70,7 +70,7 @@ end
         end
         tuned = deployed_setting(path; context = "bmvc2026 $(op.axis)")[op.axis]
         for rc in OperatingPoints.RUN_CONFIGS
-            @test foldl(getindex, op.key; init = TOML.parsefile(projectdir("configs", rc))) == tuned
+            @test foldl(getindex, op.key; init = OperatingPoints.load_config(rc)) == tuned
         end
     end
 end

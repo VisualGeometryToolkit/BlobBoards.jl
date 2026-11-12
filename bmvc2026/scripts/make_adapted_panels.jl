@@ -81,7 +81,7 @@ using VisualGeometryToolkitCore: is_map_inlier, imshow, ellipses!, HomographyMap
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: input_path, network_path, gallery_path, paper_images_dir, figure_config, write_figure_records
+using Main.BlobBoardsEval: input_path, gallery_path, paper_images_dir, figure_config, write_figure_records
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
 
@@ -108,7 +108,7 @@ function main()
     # panels look washed out next to Fig. 1.
     img_color = load_image(IMG_PATH)
     img = Gray.(img_color)
-    net = DescriptorNetwork(network_path(CFG))
+    net = DescriptorNetwork(input_path(CFG, "network"))
     mkpath(dirname(GALLERY))
     gallery = BoardGallery(GALLERY, net)
     board_paths = filter(endswith(".json"), readdir(input_path(CFG, "boards"); join = true))
@@ -213,7 +213,7 @@ function main()
         @info "panel" uid n_inliers = count(keep) path = out
     end
     write_figure_records(CFG, CFG_PATH; driver = "bmvc2026/scripts/make_adapted_panels.jl", outputs,
-        inputs = [IMG_PATH, GALLERY, input_path(CFG, "boards"), network_path(CFG)])
+        inputs = [IMG_PATH, GALLERY, input_path(CFG, "boards"), input_path(CFG, "network")])
     return nothing
 end
 

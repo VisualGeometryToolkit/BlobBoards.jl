@@ -71,10 +71,10 @@ using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, wr
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, results_root, input_path, network_path, load_config,
+using Main.BlobBoardsEval: data_root, results_root, input_path, config_path, load_config,
     detection_cv_key, detection_cv_dir, detection_cv_artifact
 
-const CFG_PATH = projectdir("configs", "detection_cv.toml")
+const CFG_PATH = config_path("detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
 const PANEL = CFG["panel"]
 const SPEC = tuning_spec(CFG, "detection")
@@ -107,10 +107,10 @@ end
 function run_cv()
     image_dir, frames = validation_frames(SPEC.scheme.cross_validation)
     camera = VgtkIO.load(BoundedCamera, input_path(CFG, "camera"))   # pixel operations take a BoundedCamera
-    run_config = projectdir("configs", CFG["runs"]["bb"])
+    run_config = config_path(CFG["runs"]["bb"])
     base = FindBoardsConfig(run_config; camera)
     # the network is the run config's [inputs.network]
-    net = DescriptorNetwork(network_path(load_config(CFG["runs"]["bb"])))
+    net = DescriptorNetwork(input_path(load_config(CFG["runs"]["bb"]), "network"))
     gallery_path = joinpath(results_root(), CFG["gallery"]["path"]); mkpath(dirname(gallery_path))
     gallery = BoardGallery(gallery_path, net)
     board_paths = filter(endswith(".json"), readdir(input_path(CFG, "boards"); join = true))
