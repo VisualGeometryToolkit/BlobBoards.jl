@@ -1027,7 +1027,7 @@ function _finalize_frames(sites, valid, outcomes, theta_out::AbstractMatrix, σ_
         p = Paraboloid3D(θ)
         is_peak(p) || continue
         Σ = shape_matrix(p)
-        is_valid_shape(Symmetric(Σ)) || continue
+        is_valid_shape(Symmetric(Σ); cfg.max_aspect_ratio) || continue   # the kernel gate's bound (cfg), not Core's default
 
         cx, cy = Float64.(centroid(sites[i]))
         σ = σ_vec[i]

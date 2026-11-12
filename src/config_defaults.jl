@@ -16,7 +16,7 @@
 #     everything it does not name (`FindBoardsConfig(min_similarity = 0.7)`
 #     means "the file, with min_similarity overridden").
 #   * The loader (`FindBoardsConfig(path)`) still overrides per key via
-#     `_present_kwargs`, so a run config that sets only some keys inherits the
+#     `present_kwargs`, so a run config that sets only some keys inherits the
 #     rest from the file rather than from a parallel set of literals.
 #   * Values are baked at PRECOMPILE time, so editing the TOML needs a
 #     recompile to take effect. That is the intended trade: these are

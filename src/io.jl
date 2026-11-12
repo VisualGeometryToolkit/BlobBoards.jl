@@ -410,12 +410,7 @@ function _icc_from_record(c::_ParsedObject)
     h = sha256_hex(bytes)
     h == recorded || throw(ArgumentError("render.icc_profile: the embedded profile does not match its recorded sha256"))
     path = joinpath(@get_scratch!("icc_profiles"), h, basename(name))
-    if !isfile(path)
-        mkpath(dirname(path))
-        tmp = string(path, ".", getpid(), ".tmp")
-        write(tmp, bytes)
-        mv(tmp, path; force = true)
-    end
+    isfile(path) || VgtkIO.write_staged(p -> write(p, bytes), path => basename(path); dry_run = false)
     return path
 end
 
@@ -577,9 +572,7 @@ function _board_raster(image_path::AbstractString, bundle, config_hash::Abstract
     path = joinpath(@get_scratch!("board_rasters"), key * ".png")
     isfile(path) && return PNGFiles.load(String(path); gamma = 1.0)
     raster = rasterize_pdf(image_path, render_dpi)
-    tmp = string(path, ".", getpid(), ".", objectid(raster), ".tmp.png")
-    PNGFiles.save(tmp, raster; file_gamma = 1.0)
-    mv(tmp, path; force = true)
+    VgtkIO.write_staged(p -> PNGFiles.save(p, raster; file_gamma = 1.0), path => basename(path); dry_run = false)
     return raster
 end
 

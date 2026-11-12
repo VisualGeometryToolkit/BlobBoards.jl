@@ -13,7 +13,7 @@ using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeom
 using VisualGeometryToolkitCore: ustrip, m, mm, cm, μm
 using VisualGeometryToolkitCore: px, dpi, pt, inch, Size2, parse_unit, strip_or_bare
 using FlexUnits: Quantity, dimension
-using VisualGeometryToolkitCore: EuclideanMap, PixelFrame  # pixel-origin frame maps (VGC 0.7)
+using VisualGeometryToolkitCore: EuclideanMap, PixelFrame, to_homogeneous  # pixel-origin frame maps (VGC 0.7) and their 3×3 lift
 using VisualGeometryToolkitFeatures: is_dark
 using StaticArrays: SMatrix
 using Colors: Gray
@@ -552,8 +552,7 @@ end
 # A board → image homography in BlobBoards' COLMAP pixels, re-expressed in the
 # `origin` convention: the pixel-frame map composed on the image side.
 function _homography_in(origin::Symbol, H::SMatrix{3, 3, Float64})
-    t = EuclideanMap(PixelFrame{:colmap}, PixelFrame{origin}).t
-    return SMatrix{3, 3, Float64}(1, 0, 0, 0, 1, 0, t[1], t[2], 1) * H
+    return to_homogeneous(EuclideanMap(PixelFrame{:colmap}, PixelFrame{origin})) * H   # Core's lift of the frame map
 end
 
 #     find_boards_python(board_paths, model_path, img; kwargs...) -> list
@@ -606,8 +605,7 @@ function BlobBoards.find_boards_python(
         pixel_frame = "opencv",
     )
     origin = Symbol(string(pixel_frame))
-    origin in (:opencv, :colmap, :julia) ||
-        throw(ArgumentError("find_boards_python: pixel_frame must be \"opencv\", \"colmap\" or \"julia\", got $(repr(pixel_frame))"))
+    VisualGeometryToolkitIO.pixel_frame_from_name(string(pixel_frame))   # IO's check: a frame VGC does not know is an ArgumentError
     backend = _python_backend(device, "find_boards_python")
     img_jl = _py_gray(img)
     model, board_feature_dict, board_bundles = _python_boards_cached(board_paths, model_path, gallery_path, backend)
@@ -681,8 +679,7 @@ function BlobBoards.track_boards_python(
         gallery_path, camera_json = nothing, device = "cuda", pixel_frame = "opencv",
     )
     origin = Symbol(string(pixel_frame))
-    origin in (:opencv, :colmap, :julia) ||
-        throw(ArgumentError("track_boards_python: pixel_frame must be \"opencv\", \"colmap\" or \"julia\", got $(repr(pixel_frame))"))
+    VisualGeometryToolkitIO.pixel_frame_from_name(string(pixel_frame))   # IO's check: a frame VGC does not know is an ArgumentError
     backend = _python_backend(device, "track_boards_python")
     model, board_feature_dict, board_bundles = _python_boards_cached(board_paths, model_path, gallery_path, backend)
     provider = string(model.session.execution_provider)
