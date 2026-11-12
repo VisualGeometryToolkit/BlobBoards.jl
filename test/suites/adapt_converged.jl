@@ -44,12 +44,11 @@ end
     function consistent(frames)
         all(frames) do f
             f.retcode in retcodes && f.stop_rule == rules[f.retcode] &&
-                f.converged == VisualGeometryToolkitCore.successful_retcode(f.retcode) &&
                 (f.rejection === :none) == !(f.retcode in (RC.Failure, RC.InitialFailure)) &&
                 f.rejection in (:none, :not_peak, :aspect_ratio)
         end
     end
-    total(frames) = count(f -> f.converged, frames) + BlobBoards.count_unconverged(frames) + BlobBoards.count_rejected(frames)
+    total(frames) = count(f -> VisualGeometryToolkitCore.successful_retcode(f.retcode), frames) + BlobBoards.count_unconverged(frames) + BlobBoards.count_rejected(frames)
 
     # The default budget is 100 (the owner's ruling, 2026-11-11): at the old
     # 20, 21 of this field's 30 blobs were still moving at the cap (rtol 1e-6)

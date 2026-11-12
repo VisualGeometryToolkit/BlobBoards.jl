@@ -30,9 +30,10 @@ Breaking (the next release is a minor bump, 0.6.0):
   they converge. Adapted frames move accordingly; the bmvc2026 sets of record
   take 100 too.
 - **`adapt` records every blob's outcome.** `BlobDetection`'s metadata is
-  `(; id, converged, retcode, stop_rule, rejection)`, in
+  `(; id, retcode, stop_rule, rejection)`, in
   VisualGeometryToolkitCore's termination record (`retcode::ReturnCode.T`,
-  `stop_rule::StopRule`): converged at `rtol` (`Success`, `ParameterChange`),
+  `stop_rule::StopRule`; a blob's convergence is `successful_retcode(retcode)`,
+  §14, not a field of its own): converged at `rtol` (`Success`, `ParameterChange`),
   capped at `max_irls_iter` (`MaxIters`, `IterationCap`: unconverged), or
   rejected by the shape gate (`Failure`, or `InitialFailure` at the first step
   from the seed; `ShapeGate`; `rejection` is `:not_peak` or `:aspect_ratio`). Capped and

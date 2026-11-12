@@ -630,9 +630,9 @@ const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_
 # step from the seed was refused; `rejection` names the gate that refused.
 function _blob_outcome(state::Int32, initial::Bool)
     RC = VgtkCore.ReturnCode
-    state == _ADAPT_CONVERGED && return (; converged = true, retcode = RC.Success, stop_rule = VgtkCore.ParameterChange, rejection = :none)
-    state == Int32(0) && return (; converged = false, retcode = RC.MaxIters, stop_rule = VgtkCore.IterationCap, rejection = :none)
-    return (; converged = false, retcode = initial ? RC.InitialFailure : RC.Failure, stop_rule = VgtkCore.ShapeGate, rejection = _REJECTION[state])
+    state == _ADAPT_CONVERGED && return (; retcode = RC.Success, stop_rule = VgtkCore.ParameterChange, rejection = :none)
+    state == Int32(0) && return (; retcode = RC.MaxIters, stop_rule = VgtkCore.IterationCap, rejection = :none)
+    return (; retcode = initial ? RC.InitialFailure : RC.Failure, stop_rule = VgtkCore.ShapeGate, rejection = _REJECTION[state])
 end
 
 # Apply solution + convergence/validity check — one thread per blob.
@@ -836,6 +836,7 @@ function _adapt_ka(
     σ_vec = Vector{Float64}(undef, N)
     valid = trues(N)
     max_scale_px = _max_scale_px(cfg, W, H)
+    image_rect = Rect(Size2(img))   # the clip rule is filter_blobs': the exact uncovered fraction of the blob's region
 
     for i in 1:N
         cx, cy = Float64.(centroid(sites[i]))
@@ -847,12 +848,7 @@ function _adapt_ka(
 
         σ > max_scale_px && (valid[i] = false; continue)
 
-        mr = cutoff * σ
-        clip_x = max(0.0, mr - cx + 1.0, cx + mr - W)
-        clip_y = max(0.0, mr - cy + 1.0, cy + mr - H)
-        if (clip_x + clip_y) * mr / (π * mr^2) > cfg.max_clip_ratio
-            valid[i] = false
-        end
+        (1.0 - coverage(region(sites[i], cutoff), image_rect)) > cfg.max_clip_ratio && (valid[i] = false)
     end
     for i in 1:N
         valid[i] || (hw_vec[i] = Int32(0))
