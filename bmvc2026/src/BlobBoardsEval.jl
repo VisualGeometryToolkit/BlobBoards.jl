@@ -61,7 +61,7 @@ export RigFrame, rig_sequence, load_detected_poses, marker_sizes, detected_marke
     config_path, load_config, input_path, records_dir, mocap_dir, gallery_path,
     sweep_dir, baselines_dir, PoseRun, Sources, eval_sources, poses_dir, val_dir, derived_dir, hand_eye_dir,
     write_provenance, read_provenance,
-    hand_eye, save_hand_eye, load_hand_eye, uncertain_hand_eye, inv_pose_covariance,
+    hand_eye, save_hand_eye, load_hand_eye, uncertain_hand_eye,
     write_pose_results, pose_results, BOARD_TYPES,
     export_target_poses, upstream_camera
 

@@ -213,7 +213,7 @@ end
 # (VisualGeometryToolkitCore conventions/persisted-geometry.md): `save_hand_eye(file,
 # he)` of a fit always writes `Uncertain` poses.
 
-using VisualGeometryToolkitCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame, skew, propagate
+using VisualGeometryToolkitCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame
 
 """
     save_hand_eye(file, he; provenance = (;)) -> (file, mount)
@@ -229,22 +229,6 @@ save_hand_eye(file::AbstractString, he::NamedTuple; provenance::NamedTuple = (;)
 # The geometric target rig of an uncertain one (the chain is composed on values).
 _plain_targets(r::Rig) = Rig{BoardRigFrame}(Dict(id => PosedTarget(model(r[id]), geom(pose(r[id]))) for id in ids(r)))
 
-"""
-    inv_pose_covariance(Y, Σ) -> SMatrix{6, 6}
-
-The covariance of `inv(Y)` given that of `Y`, both over `[δω; δt]` in the
-`RigidExpManifold6` chart (`R ↦ exp(δω)·R, t ↦ t + δt`): with `R`, `t` those of
-`Y`, `δω_X = −Rᵀδω` and `δt_X = −Rᵀδt − Rᵀ[t]ₓδω`, so `Σ_X = J·Σ·Jᵀ`
-(symmetrized exactly).
-"""
-function inv_pose_covariance(Y, Σ::AbstractMatrix)
-    R, t = SMatrix{3, 3, Float64}(Y.R), SVector{3, Float64}(Y.t)
-    Z = zero(SMatrix{3, 3, Float64})
-    J = [-R' Z; -R' * skew(t) -R']
-    S = propagate(J, SMatrix{6, 6, Float64, 36}(Σ))
-    return SMatrix{6, 6, Float64, 36}((S + S') / 2)
-end
-
 # Block `b` (0-based) of a joint covariance over 6-blocks, symmetrized exactly.
 _cov_block(C::AbstractMatrix, b::Integer) = (B = SMatrix{6, 6, Float64, 36}(C[(6b + 1):(6b + 6), (6b + 1):(6b + 6)]); (B + B') / 2)
 
@@ -254,14 +238,14 @@ _cov_block(C::AbstractMatrix, b::Integer) = (B = SMatrix{6, 6, Float64, 36}(C[(6
 A fit's poses with their covariances (RVG's joint covariance over
 `[Y_rvg | X_rvg(ids…)]`, each block `(δω, δt)` in the `RigidExpManifold6`
 chart): `Y_m = X_rvg[m]` takes its own block; `X = inv(Y_rvg)` takes Y_rvg's
-block pushed through the inverse ([`inv_pose_covariance`](@ref)). A fit whose
+block pushed through the inverse (VisualGeometryToolkitCore's `inv` of an uncertain pose). A fit whose
 covariance is unbounded (an unobservable direction) is refused: an estimate is
 not published without its uncertainty.
 """
 function uncertain_hand_eye(he)
     C = he.fit.metadata.cov
     all(isfinite, C) || error("hand-eye: the fit's covariance is unbounded (an unobservable direction) — not publishing it")
-    X = Uncertain(he.X, CovMat(inv_pose_covariance(he.fit.estimate.Y, _cov_block(C, 0))))
+    X = Uncertain(he.X, cov(inv(Uncertain(he.fit.estimate.Y, CovMat(_cov_block(C, 0))))))   # Core's uncertain inverse; X keeps its frames
     Y = Dict(id => Uncertain(he.Y[id], CovMat(_cov_block(C, b))) for (b, id) in enumerate(he.fit.estimate.ids))
     return X, Y
 end

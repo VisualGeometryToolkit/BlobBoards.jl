@@ -86,17 +86,17 @@
             @test all(isfinite, cov(X)) && !iszero(cov(X))
             # the covariance of X is the fit's Y_rvg block pushed through the inverse
             Σ = he.fit.metadata.cov[1:6, 1:6]
-            @test cov(X) ≈ BBE.inv_pose_covariance(he.fit.estimate.Y, (Σ + Σ') / 2)
+            @test cov(X) ≈ cov(inv(Uncertain(he.fit.estimate.Y, CovMat(SMatrix{6, 6}((Σ + Σ') / 2)))))
             # an estimate whose covariance is unbounded is not published
             bad = (; X = he.X, Y = he.Y, fit = (; metadata = (; cov = fill(Inf, size(he.fit.metadata.cov))), estimate = he.fit.estimate))
             @test_throws ErrorException BBE.save_hand_eye(joinpath(dir, "bad.json"), bad)
         end
 
-        @testset "inv_pose_covariance: the chart's first-order law" begin
+        @testset "the uncertain inverse (Core's): the chart's first-order law" begin
             # perturb Y on the chart (R ↦ exp(δω)·R, t ↦ t + δt), compare the
             # inverse's perturbation with J·δ
             Y = _map(0.4, -0.3, 0.2, [100.0, -50.0, 300.0])
-            J = BBE.inv_pose_covariance(Y, Matrix{Float64}(I, 6, 6))     # J·Jᵀ
+            J = Matrix(cov(inv(Uncertain(Y, CovMat(SMatrix{6, 6, Float64}(I))))))     # J·Jᵀ
             exp_so3(w) = (θ = norm(w); θ == 0 ? SMatrix{3, 3, Float64}(I) : SMatrix{3, 3, Float64}(RotMatrix(Rotations.RotationVec(w...))))
             ε = 1.0e-6
             Jfd = zeros(6, 6)
