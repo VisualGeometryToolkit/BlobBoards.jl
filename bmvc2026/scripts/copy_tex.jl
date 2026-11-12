@@ -21,8 +21,9 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: paper_figures_dir, figure_config, write_figure_records
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
-const CFG, CFG_PATH = figure_config("copy_tex")
+const CFG, CFG_PATH = figure_config("copy_tex"; default = projectdir("configs", "figures", "copy_tex.toml"))
 const PLOTS = plotsdir()
 
 _copied(f) = endswith(f, ".tex") && !any(x -> endswith(f, x), CFG["copy"]["exclude_suffixes"])
@@ -46,4 +47,4 @@ function copy_tex()
     return copied
 end
 
-copy_tex()
+run_stages("copy_tex", [Stage(:copy, "plots/*.tex (and plots/occ_<L>/*.tex) into papers/figures", () -> false, () -> (copy_tex(); nothing))])

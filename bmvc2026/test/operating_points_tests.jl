@@ -34,7 +34,8 @@ end
 
     cfg = TOML.parsefile(projectdir("configs", "detection_cv.toml"))
     s = tuning_spec(cfg, "detection").scheme
-    path = OperatingPoints.detection_cv_artifact(OperatingPoints.detection_cv_dir(cfg))
+    # without a bound results root there is no run to read: a recorded skip
+    path = try OperatingPoints.detection_cv_artifact(OperatingPoints.detection_cv_dir(cfg)) catch; "" end
     if !isfile(path)
         @info "no joint detection CV artifact at $path (results root not bound or not run): gate check SKIPPED"
         @test_skip false
@@ -58,8 +59,9 @@ end
     import TOML
     using VisualGeometryToolkitEval.Evaluation: deployed_setting
 
+    root = try OperatingPoints.results_root() catch; nothing end   # unbound: every check a recorded skip
     for op in OperatingPoints.ADOPTED_OPERATING_POINTS
-        path = joinpath(OperatingPoints.results_root(), op.artifact)
+        path = root === nothing ? "" : joinpath(root, op.artifact)
         if !isfile(path)
             @info "no tuning artifact at $path (results root not bound here): config-vs-artifact check SKIPPED"
             @test_skip false
