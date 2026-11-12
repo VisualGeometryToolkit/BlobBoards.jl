@@ -26,7 +26,7 @@ using VisualGeometryToolkitFeatures:
     StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one
 
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_homography, find_absolute_pose, RansacConfig,
-    refine_homography, refine_radial_homography, locally_optimize,
+    locally_optimize,
     AbsolutePoseProblem, HomographyProblem, BoundedProblem,
     # The radial arm's OWN search. `find_*` is RANSAC and lives here by the
     # verb table; `fit_*` (inliers given) lives in VisualGeometryToolkitCore.
@@ -461,24 +461,29 @@ _find_model(
 # supplies per-thread warm workspaces so the guided refit stops allocating one
 # per candidate fit. `nothing` below a minimal sample.
 #
-# The pose arm stays on `locally_optimize` (the step `refine_absolute_pose` runs):
-# VisualGeometryToolkitEstimation 0.2.1's `refine_absolute_pose` returns the pose
-# with an `SVector` translation, while `find_absolute_pose` returns the solvers'
-# `Extrinsics3` (a `Vec`), and a track holds one model type — the guided refit's
-# result would not convert into it.
+# Every arm runs `locally_optimize`, the RANSAC family's local optimization from
+# a seed: the arm's scorer, its consensus set and the strategy anchored on it,
+# so the guided refit and the pose-ambiguity LRT compare scorer qualities. It is
+# not a `refine_*`: a refine runs no scorer (it estimates no scale and forms no
+# consensus set; the robust-estimation contract, B1). Until B1 the plain and
+# radial homography arms called `refine_homography`/`refine_radial_homography`,
+# which were this same `locally_optimize` on the same (bounded) problem, so the
+# switch moves no number.
+_bounded(problem, ::Nothing) = problem
+_bounded(problem, extent) = BoundedProblem(problem, extent)   # the board's world extent, as `find_*`'s `extent`
 _refine(
     cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
-) = refine_homography(
-    θ₀, pt_csponds; extent, workspace, optimization_strategy = local_optimization_strategy,   # a refine_*'s keyword
-    scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth)
+) = length(pt_csponds) < 4 ? nothing : locally_optimize(
+    _bounded(HomographyProblem(pt_csponds), extent), θ₀;
+    scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
 )
 _refine(
     cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
     # the board's world extent bounds the problem as the `find_*` pipelines' `extent` keyword does
-    extent === nothing ? AbsolutePoseProblem(cam, pt_csponds) : BoundedProblem(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
+    _bounded(AbsolutePoseProblem(cam, pt_csponds), extent), θ₀;
     scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
@@ -1844,9 +1849,9 @@ _refine(
     g::RadialHomographyGeometry, pt_csponds, θ₀::VgtkCore.RadialHomography;
     outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy,
     extent = nothing, workspace = nothing,
-) = refine_radial_homography(
-    θ₀, pt_csponds; extent, workspace, optimization_strategy = local_optimization_strategy,   # a refine_*'s keyword
-    scoring = _scoring(_RadialProblem5, outlier_halfwidth)
+) = length(pt_csponds) < 5 ? nothing : locally_optimize(
+    _bounded(RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)), extent), θ₀;
+    scoring = _scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
 # The pose arm: undistort the image under :global, detect raw under :none

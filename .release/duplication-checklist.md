@@ -128,9 +128,10 @@ Each item names the contract step it waits for.
 - [ ] switch the outcome Symbols to Core's `ReturnCode`/`StopRule` (`ShapeGate` added by s14-core): waits for the s14-core stubs
 - [x] refine_* with `robust =`: none in BlobBoards (scanned); `refine_homography`/`refine_radial_homography` (src/pipeline.jl
   `_refine`) take their strategy as a keyword already; after the 0.9 rename it is `optimization_strategy` (this commit)
-- [ ] the same two `_refine` calls supply `scoring` (the Student-t at `outlier_halfwidth`): B1 refuses a scorer on refine_* and
-  needs exactly one of `scale`/`width` (the scale of the board's `find_*` result, `noise_scale(res)`); the pose arm's
-  `locally_optimize` keeps its scorer (not a refine_*). Waits for B1
+- [x] B1 (robust-core 17ab6cc2): a `refine_*` runs no scorer. BlobBoards' `_refine` (the guided refit and the pose-ambiguity
+  LRT) needs the scorer's quality and consensus set, so the plain and radial homography arms call `locally_optimize` on the
+  same (bounded) problem, as the pose arm always did. Until B1 `refine_homography`/`refine_radial_homography` were exactly
+  that call, so no number moves (by construction: the same call on the same problem). Audit P11
 - [x] A3, the width multiple is `efficiency_constant` (the width mode `EfficiencyConstant`; old names in Core's RETIRED_NAMES): four files, Welsch only (no
   Geman–McClure or BarronHQ value in BlobBoards, so no number moves) (this commit)
 - [x] the strategy rename (owner, 0.9): the geometry's strategy key/keyword/field `local_optimization_strategy`, the public
@@ -140,7 +141,7 @@ Each item names the contract step it waits for.
   test/suites/raw_pose_arm.jl, bmvc2026/_research/fit_homography.jl), its scale `noise_scale(r)`: the branch telemetry
   read `inc.scale`, a field RansacMetadata never had, so a run with a branch log threw there (fixed, this commit). The
   other weights consumers already read `weights` with `is_map_inlier`, and the persisted `n_inliers` keys are unchanged
-- [ ] refine_homography's `RefineMetadata` (src/pipeline.jl's refine sites read `.inlier_mask`): waits for B1
+- [x] refine_homography's `RefineMetadata`: BlobBoards calls no `refine_*` since B1 (above), so it reads none
 - [ ] §14 termination fields on BlobBoards' find/refine reads (`res.converged` as "a model exists" → `found_model`): waits for the
   s14-core stubs
 
