@@ -24,8 +24,8 @@ including its author. Every parameter — photo, gallery, network, detector
 settings, render sizes, background, output name — is in the config of record,
 configs/figures/intro.toml; a variant (the project site's transparent
 background) is a second config, named by `--config=<path>`. The PNG goes to
-paper_images_dir() (src/paper_assets.jl, honouring BB_PAPER_IMAGES — how a
-regeneration is reviewed before it replaces the submitted figure). Each run
+paper_images_dir() (src/paper_assets.jl; a regeneration is reviewed as the
+working tree's diff against the submitted figure). Each run
 writes its record under plotsdir("records").
 =#
 # reproduce: writes papers/images/intro_overlay.png

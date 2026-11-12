@@ -53,8 +53,8 @@ Every parameter — source photo, gallery, detector settings, render sizes and
 strokes, the paper's boards, output names — is in the config of record,
 configs/figures/adapted_panels.toml (`--config=<path>` overrides; `uids = []`
 writes every detected board, `write_vector = true` adds the PDF masters). Env:
-BB_PAPER_IMAGES (images root, default papers/images — see src/paper_assets.jl;
-set it to review a regeneration before it replaces the submitted panels).
+papers/images (src/paper_assets.jl; a regeneration is reviewed as the working
+tree's diff against the submitted panels).
 Each run writes its record under plotsdir("records").
 =#
 # reproduce: writes papers/images/adapted/adapted_*.png

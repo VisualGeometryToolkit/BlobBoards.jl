@@ -21,7 +21,7 @@ being the main paper's panel, each with its crop. Each run writes its record
 
 Usage:
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/copy_val_overlays.jl [--config=<path>]
-Env: BB_PAPER_IMAGES (output root, default papers/images). Data: the detection runs.
+Writes under papers/images. Data: the detection runs.
 =#
 
 using DrWatson

@@ -773,7 +773,7 @@ function write_occlusion_stats(src; out_dir, levels = Tuple(ED["macro_levels"]))
         k === nothing || add_number!(nums, "$(mac)ZeroFromOccPct", "$(rates[k][1])")
     end
     # The onset of catastrophic failure: the first occlusion level whose
-    # probability of detection is below BB_COLLAPSE_POD (default 1%) and stays
+    # probability of detection is below [drivers] collapse_pod (1%) and stays
     # below it at every higher level — the levels the prose cites as where a
     # tag system "fails catastrophically".
     collapse_pod = Float64(DRV["collapse_pod"])

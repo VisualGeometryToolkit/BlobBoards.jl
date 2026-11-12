@@ -17,8 +17,8 @@ the panel facing the camera.
 
 Usage:
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/make_occlusion_picks.jl [--config=<path>]
-Env: BB_PAPER_IMAGES (output root, default papers/images). Data: the occlusion
-tier of the level (bb_absolute_pose_occlusion_70_260527).
+Writes under papers/images. Data: the occlusion
+tier of the level ([inputs.images], bb_absolute_pose_occlusion_70_260527).
 =#
 
 using DrWatson

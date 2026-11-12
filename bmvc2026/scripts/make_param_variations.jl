@@ -16,8 +16,7 @@ panels and their file names — is in the config of record,
 configs/figures/param_variations.toml; each run writes its record under
 plotsdir("records").
 
-Env: BB_PAPER_IMAGES (output root, default papers/images — see
-src/paper_assets.jl; point it at a scratch tree to review a regeneration).
+Writes under papers/images (src/paper_assets.jl `paper_images_dir`).
 CPU only; no dataset needed.
 
 ## What was recovered, and what was not

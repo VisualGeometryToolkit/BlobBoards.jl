@@ -53,7 +53,7 @@ Every parameter — the run config, frame, board, camera, gallery (a cache: poin
 it at a writable copy when the dataset is read-only), panel size, crop padding,
 highlight count, patch size, palette, output names — is in the config of
 record, configs/figures/pipeline_panels.toml (`--config=<path>` overrides).
-Env: BB_PAPER_IMAGES (output root; see src/paper_assets.jl). Each run writes
+Writes under papers/images (src/paper_assets.jl). Each run writes
 its record under plotsdir("records").
 =#
 # reproduce: reads configs/figures/pipeline_panels.toml
@@ -62,7 +62,7 @@ using DrWatson
 @quickactivate
 using DrWatson: projectdir
 using BlobBoards
-using BlobBoards: trace_pipeline, PoseGeometry, DetectConfig, EllipseNms, descriptor_network_path, load_bundle, cutoff, blobs, is_map_inlier,
+using BlobBoards: trace_pipeline, PoseGeometry, DetectConfig, EllipseNms, load_bundle, cutoff, blobs, is_map_inlier,
     canonicalize, DEFAULT_OUTER_EXTENT
 using CairoMakie; CairoMakie.activate!()
 using CUDA
