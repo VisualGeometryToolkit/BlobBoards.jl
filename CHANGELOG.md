@@ -3,7 +3,7 @@
 ## 0.6.0 (2026-11-12)
 
 On the VisualGeometryToolkit 0.9 stack, from General: VisualGeometryToolkitCore, IO and
-Estimation 0.9, Features 0.7 (bmvc2026 also Eval 0.7), with LocalOptimizationDoneRight 0.6
+Estimation 0.9, Features 0.8 (bmvc2026 also Eval 0.7), with LocalOptimizationDoneRight 0.6
 (its 0.9 port). Breaking:
 
 - **The pose arm takes a `BoundedCamera`** (the stack's rule: pixel operations

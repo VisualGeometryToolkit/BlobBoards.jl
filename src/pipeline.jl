@@ -15,12 +15,13 @@ using VisualGeometryToolkitCore:
     Extrinsics3, CameraModel, BoundedCamera, AbstractIntrinsics, Pinhole, AbstractLensModel,
     undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
-    sources, Attributed, withattrs, planar_lift, lift, exact   # #21 correspondence layer; `exact`: the board side of a 2D fit
+    sources, Attributed, withattrs, planar_lift, lift, exact,  # #21 correspondence layer; `exact`: the board side of a 2D fit
+    csponds                                                    # the columnar correspondence set (Core's; Features no longer re-exports it)
 
 using VisualGeometryToolkitFeatures:
     MutualNN, KnnMatch, NNStrategy,
     described_features,
-    match, csponds,
+    match,
     # Hoisted to VGF 0.5: the stacked multi-gallery matcher and the greedy
     # one-to-one reduction. BB owned both until they proved general.
     StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one, resolve_one_to_one!
