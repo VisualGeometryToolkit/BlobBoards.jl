@@ -63,8 +63,6 @@ import VisualGeometryToolkitIO as VgtkIO
 using LinearAlgebra: LinearAlgebra, dot, norm, normalize
 using Statistics: Statistics
 using Random: Random, MersenneTwister, RandomDevice, Xoshiro
-import Artifacts   # descriptor-network catalog lookups (config_toml.jl)
-import Pkg         # Pkg.Artifacts.ensure_artifact_installed — lazy artifact fetch
 import VisualGeometryToolkitIO   # append_jsonl — run logs / telemetry (one JSONL writer)
 using Scratch: @get_scratch!   # regenerated board-render cache (io.jl)
 using Base: ImmutableDict

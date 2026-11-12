@@ -795,7 +795,7 @@ end
                          ("pose", VgtkEstimation.AbsolutePoseProblem, (; camera = _CAM)))
         c = FindBoardsConfig(_write(dir, "a_$arm.toml", "[find_boards.geometry]\ntype = \"$arm\"\noutlier_halfwidth = $a\n"); kw...)
         @test c.geometry.outlier_halfwidth === a
-        sc = BlobBoards._scoring(P, c.geometry.outlier_halfwidth)
+        sc = VgtkEstimation.default_student_t_uniform_scoring(P, c.geometry.outlier_halfwidth)
         @test sc isa StudentTUniformScoring && VgtkCore.outlier_halfwidth(sc) === a
     end
     HP = VgtkEstimation.HomographyProblem{Float64}

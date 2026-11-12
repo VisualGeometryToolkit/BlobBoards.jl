@@ -27,7 +27,7 @@ using VisualGeometryToolkitFeatures:
 
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_homography, find_absolute_pose, RansacConfig,
     locally_optimize,
-    AbsolutePoseProblem, HomographyProblem, BoundedProblem,
+    AbsolutePoseProblem, HomographyProblem,
     # The radial arm's OWN search. `find_*` is RANSAC and lives here by the
     # verb table; `fit_*` (inliers given) lives in VisualGeometryToolkitCore.
     find_radial_homography, RadialHomographyProblem
@@ -38,7 +38,8 @@ using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map, overlap
 # `outlier_halfwidth`, stated explicitly: RVG's own default is MSAC at a
 # threshold. The scorer is VisualGeometryToolkitCore's, built by
 # VisualGeometryToolkitEstimation's one scorer-table reader (`_scoring` below).
-using VisualGeometryToolkitEstimation: scoring_from_toml
+using VisualGeometryToolkitEstimation: default_student_t_uniform_scoring   # the scorer of record at a half-width
+using VisualGeometryToolkitEstimation: with_extent   # a problem bounded by an image extent (`nothing`: unbounded)
 
 # =============================================================================
 # load_board — parse JSON metadata only (no rasterization)
@@ -423,14 +424,10 @@ _describe_patches(model, cube) = describe(model, _host_patches(cube))
 # `fit_kw`; the keyword default re-reads the file for a bare `find_board`.
 _default_lo(::Nothing) = _dflt_local_optimization_strategy(:homography)
 _default_lo(::BoundedCamera) = _dflt_local_optimization_strategy(:absolute_pose)
-# The scorer of every fit and refine: the Student-t + uniform marginal at the
-# arm's outlier half-width (`P` the arm's problem type). Its table states the
-# half-width and nothing else: the scale and label priors are the stack's
-# configuration of record (VisualGeometryToolkitEstimation's
-# `[scoring.student_t_uniform]`: Jeffreys and flat, the priors this scorer
-# always defaulted to), so no prior is restated here.
-_scoring(::Type{P}, outlier_halfwidth) where {P} = scoring_from_toml(
-    Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => Float64(outlier_halfwidth)); problem = P)
+# The scorer of every fit and refine is VisualGeometryToolkitEstimation's
+# `default_student_t_uniform_scoring(P, outlier_halfwidth)`: the Student-t +
+# uniform marginal at the arm's half-width, its priors the stack's configuration
+# of record (`[scoring.student_t_uniform]`).
 # The half-width a fit falls back to when `fit_kw` carries none (a bare
 # `find_board` call), px: the package configuration's `[find_boards.geometry]
 # outlier_halfwidth` (configs/default.toml), never a literal here. Every engine
@@ -441,13 +438,13 @@ _find_model(
     cam::Nothing, pt_csponds; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_homography(
-    pt_csponds; scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
+    pt_csponds; scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
 )
 _find_model(
     cam::BoundedCamera, pt_csponds; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_absolute_pose(
-    VgtkCore.model(cam), pt_csponds; scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
+    VgtkCore.model(cam), pt_csponds; scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
 # Seeded warm local-optimization refine (no second RANSAC) for the guided final
@@ -470,15 +467,15 @@ _refine(
     cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = length(pt_csponds) < 4 ? nothing : locally_optimize(
-    (extent === nothing ? HomographyProblem(pt_csponds) : BoundedProblem(HomographyProblem(pt_csponds), extent)), θ₀;
-    scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
+    with_extent(HomographyProblem(pt_csponds), extent), θ₀;
+    scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
 )
 _refine(
     cam::BoundedCamera, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
-    (extent === nothing ? AbsolutePoseProblem(VgtkCore.model(cam), pt_csponds) : BoundedProblem(AbsolutePoseProblem(VgtkCore.model(cam), pt_csponds), extent)), θ₀;
-    scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
+    with_extent(AbsolutePoseProblem(VgtkCore.model(cam), pt_csponds), extent), θ₀;
+    scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
@@ -1812,7 +1809,7 @@ _find_model(
     outlier_halfwidth = g.outlier_halfwidth, kw...
 ) = find_radial_homography(
     pt_csponds; center = distortion_center(g),
-    scoring = _scoring(_RadialProblem5, outlier_halfwidth), local_optimization_strategy, kw...
+    scoring = default_student_t_uniform_scoring(_RadialProblem5, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
 # The arm's problem type: the radial 5-point kernel's (`find_radial_homography`'s
@@ -1840,8 +1837,8 @@ _refine(
     outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy,
     extent = nothing, workspace = nothing,
 ) = length(pt_csponds) < 5 ? nothing : locally_optimize(
-    (extent === nothing ? RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)) : BoundedProblem(RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)), extent)), θ₀;
-    scoring = _scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization_strategy
+    with_extent(RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)), extent), θ₀;
+    scoring = default_student_t_uniform_scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
 # The pose arm: undistort the image under :global, detect raw under :none
@@ -2616,9 +2613,9 @@ end
 # A workspace is built for the scorer and the local optimizer it serves
 # (`outlier_halfwidth`, `local_optimization_strategy`: the geometry's).
 _fit_workspace_builder(::Nothing, a, lo) =
-    n -> VgtkEstimation.RansacWorkspace(HomographyProblem{Float64}, n, _scoring(HomographyProblem{Float64}, a), lo)
+    n -> VgtkEstimation.RansacWorkspace(HomographyProblem{Float64}, n, default_student_t_uniform_scoring(HomographyProblem{Float64}, a), lo)
 _fit_workspace_builder(::BoundedCamera, a, lo) =
-    n -> VgtkEstimation.RansacWorkspace(AbsolutePoseProblem, n, _scoring(AbsolutePoseProblem, a), lo)
+    n -> VgtkEstimation.RansacWorkspace(AbsolutePoseProblem, n, default_student_t_uniform_scoring(AbsolutePoseProblem, a), lo)
 # Radial arm: no pooled workspace yet (it would need K=5 /
 # RadialHomography-shaped buffers) — RVG sizes fresh ones per fit.
 _fit_workspace_builder(::RadialHomographyGeometry, _a, _lo) = nothing
