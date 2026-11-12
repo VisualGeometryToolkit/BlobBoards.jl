@@ -48,7 +48,6 @@ using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, ge
     PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids, with_unit, mm, ustrip
 using Rotations: QuatRotation, params
 using VisualGeometryToolkitEval.Experiments: run_key, write_run_records, run_complete
-using DrWatson: gitdescribe
 import VisualGeometryToolkitCore
 using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix, rotation_angle
@@ -386,13 +385,8 @@ function main()
         RUN_ROOT, CFG; driver = "bmvc2026/scripts/convert_formats.jl",
         config_source = CFG_PATH, key = KEY, inputs = [joinpath(SRC_ROOT, s) for s in SESSIONS],
     )
-    # The code that converted: the commit of every repository whose source ran
-    # (the project's own tree, and the packages that own the kinds).
-    REPORT["code"] = Dict(
-        "bmvc2026" => something(gitdescribe(projectdir()), "?"),
-        "VisualGeometryToolkitIO" => something(gitdescribe(pkgdir(VgtkIO)), "?"),
-        "VisualGeometryToolkitCore" => something(gitdescribe(pkgdir(VisualGeometryToolkitCore)), "?"),
-    )
+    # The code that converted is in the run's records: Eval's code trees of the project and of every stack
+    # package it loads (_provenance.toml).
     open(joinpath(RUN_ROOT, "_report.json"), "w") do io
         JSON.json(io, REPORT; pretty = 4, sort_keys = false)
     end
