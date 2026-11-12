@@ -113,7 +113,7 @@ Each item names the contract step it waits for.
 
 - [x] `[sources]` of every workspace member (root, test, docs, gpu, examples, authoring, bmvc2026) → the integration branch
   robust-core, through a PINNED snapshot worktree `vgtk-pin-<sha>` (never the integrator's live worktree, which merges
-  move under running suites); now `vgtk-pin-17ab6cc2`, with LocalOptimizationDoneRight at `lodr-pin-2f113bd` (temporary, like the hoists pointer it replaces)
+  move under running suites); now `vgtk-pin-c29e0373`, with LocalOptimizationDoneRight at `lodr-pin-2f113bd` (temporary, like the hoists pointer it replaces)
 - [x] `decision_boundary` (Core 648cd520): BlobBoards binds none of the three retired names (Core's RETIRED_NAMES); the one left was
   prose, configs/default.toml's note on the Student-t boundary → Core's `decision_boundary` (this commit)
 - [x] R12 (the Student-t scorer has no threshold): test/suites/config_toml.jl's two refusal tests named the refused word beside the
@@ -125,7 +125,7 @@ Each item names the contract step it waits for.
   Core's `ReturnCode`/`StopRule` until s14-core lands them. Capped blobs are unconverged (`count_unconverged`), refused ones
   rejected (`count_rejected[, reason]`); a `@debug` line per call counts each. Validity and frames unchanged. Fail-first test
   `test/suites/adapt_converged.jl`; the parity item checks the flag CPU ≡ GPU (408de3d, this commit)
-- [ ] switch the outcome Symbols to Core's `ReturnCode`/`StopRule` (`ShapeGate` added by s14-core): waits for the s14-core stubs
+- [x] the outcome Symbols are Core's `ReturnCode`/`StopRule` (`ShapeGate` added by s14-core; robust-core c29e0373); `rejection`, the gate's reason, stays a BlobBoards Symbol (this commit)
 - [x] refine_* with `robust =`: none in BlobBoards (scanned); `refine_homography`/`refine_radial_homography` (src/pipeline.jl
   `_refine`) take their strategy as a keyword already; after the 0.9 rename it is `optimization_strategy` (this commit)
 - [x] B1 (robust-core 17ab6cc2): a `refine_*` runs no scorer. BlobBoards' `_refine` (the guided refit and the pose-ambiguity
@@ -142,8 +142,7 @@ Each item names the contract step it waits for.
   read `inc.scale`, a field RansacMetadata never had, so a run with a branch log threw there (fixed, this commit). The
   other weights consumers already read `weights` with `is_map_inlier`, and the persisted `n_inliers` keys are unchanged
 - [x] refine_homography's `RefineMetadata`: BlobBoards calls no `refine_*` since B1 (above), so it reads none
-- [ ] §14 termination fields on BlobBoards' find/refine reads (`res.converged` as "a model exists" → `found_model`): waits for the
-  s14-core stubs
+- [x] §14 on BlobBoards' find/LO reads: "a model exists" is Core's `found_model(r)` (src/pipeline.jl ×4, src/track.jl, the raw pose arm test), never the now strict `converged` (this commit)
 
 ## Public names an upstream package owns: an API decision
 

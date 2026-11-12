@@ -87,8 +87,8 @@ end
         scoring = scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => 5.0); problem = AbsolutePoseProblem),
         local_optimization_strategy = HQ{WelschShape}(; efficiency_constant = tuning_constant(:absolute_pose, "welsch").efficiency_constant)
     )
-    @test est.converged   # a failed search is a :no_model result, not `nothing` (Estimation 0.5)
-    if est.converged      # a failed search has no estimate to read
+    @test VisualGeometryToolkitCore.found_model(est)   # a failed search is a :no_model result, not `nothing` (Estimation 0.5)
+    if VisualGeometryToolkitCore.found_model(est)      # a failed search has no estimate to read
         @test rad2deg(rotation_angle(RotMatrix{3}(est.estimate.R' * _POSE.R))) < 0.05
         @test norm(est.estimate.t - _POSE.t) < 1.0
         @test count(VisualGeometryToolkitCore.inlier_mask(est) .& (radius .> 1100)) == count(radius .> 1100)   # the rim is kept

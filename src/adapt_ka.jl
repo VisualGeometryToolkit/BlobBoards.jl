@@ -623,16 +623,16 @@ const _ADAPT_NOT_PEAK = Int32(2)
 const _ADAPT_ASPECT_RATIO = Int32(3)
 const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_ASPECT_RATIO => :aspect_ratio)
 
-# The outcome record of one blob, in BB-local Symbols named one-to-one after
-# VisualGeometryToolkitCore's ReturnCode and StopRule (switched to the Core
-# enums once they land): converged → Success / ParameterChange (rtol on the
-# relative parameter step); capped → MaxIters / IterationCap; refused by the
-# shape gate → Failure / ShapeGate, or InitialFailure when the very first step
-# from the seed was refused; `rejection` names the gate that refused.
+# The outcome record of one blob, in VisualGeometryToolkitCore's termination
+# vocabulary (§14): converged → ReturnCode.Success / ParameterChange (rtol on
+# the relative parameter step); capped → MaxIters / IterationCap; refused by
+# the shape gate → Failure / ShapeGate, or InitialFailure when the very first
+# step from the seed was refused; `rejection` names the gate that refused.
 function _blob_outcome(state::Int32, initial::Bool)
-    state == _ADAPT_CONVERGED && return (; converged = true, retcode = :Success, stop_rule = :ParameterChange, rejection = :none)
-    state == Int32(0) && return (; converged = false, retcode = :MaxIters, stop_rule = :IterationCap, rejection = :none)
-    return (; converged = false, retcode = initial ? :InitialFailure : :Failure, stop_rule = :ShapeGate, rejection = _REJECTION[state])
+    RC = VgtkCore.ReturnCode
+    state == _ADAPT_CONVERGED && return (; converged = true, retcode = RC.Success, stop_rule = VgtkCore.ParameterChange, rejection = :none)
+    state == Int32(0) && return (; converged = false, retcode = RC.MaxIters, stop_rule = VgtkCore.IterationCap, rejection = :none)
+    return (; converged = false, retcode = initial ? RC.InitialFailure : RC.Failure, stop_rule = VgtkCore.ShapeGate, rejection = _REJECTION[state])
 end
 
 # Apply solution + convergence/validity check — one thread per blob.

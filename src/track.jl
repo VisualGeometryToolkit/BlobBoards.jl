@@ -468,7 +468,7 @@ function _warm_track_frame(
         extent = Rect(bundle, :world),
         rng = fit_rng(config.ransac_seed, tr.uid)
     )
-    (res !== nothing && res.converged) || return (nothing, _finish_diag(diag))
+    (res !== nothing && VgtkCore.found_model(res)) || return (nothing, _finish_diag(diag))
 
     # ---- verify with find_boards' gates
     w = res.weights

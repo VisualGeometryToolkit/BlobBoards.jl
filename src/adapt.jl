@@ -26,7 +26,7 @@ Configuration for blob adaptation (paraboloid fitting).
 # IRLS
 - `spatial_weighting::Bool = true` — adaptive spatial weights from current shape
 - `cutoff::Float64 = 2.0` — pixel window in units of σ
-- `max_irls_iter::Int = 100` — maximum IRLS iterations (a blob still moving after it is returned flagged `retcode = :MaxIters`)
+- `max_irls_iter::Int = 100` — maximum IRLS iterations (a blob still moving after it is returned flagged `retcode = ReturnCode.MaxIters`)
 - `rtol::Float64 = 1e-6` — relative parameter convergence threshold
 
 # Filtering
@@ -90,9 +90,9 @@ Accepts `Vector{Detection}` (from `detect_blobs`) or `Vector{Disc}` (ground trut
 # Returns
 `Vector{BlobDetection{Float64}}` — fitted elliptical frames with `.id` indexing
 into the original detection vector, and the blob's outcome (see
-[`BlobDetection`](@ref)): converged at `rtol` (`retcode = :Success`), capped
-at `max_irls_iter` (`:MaxIters`, unconverged), or rejected by the shape gate
-(`:Failure`, or `:InitialFailure` at the first step; `rejection` says why:
+[`BlobDetection`](@ref)): converged at `rtol` (`retcode = ReturnCode.Success`),
+capped at `max_irls_iter` (`MaxIters`, unconverged), or rejected by the shape
+gate (`Failure`, or `InitialFailure` at the first step; `rejection` says why:
 `:not_peak` or `:aspect_ratio`; the blob keeps its previous iterate). Capped
 and rejected blobs are returned, flagged, never silently valid;
 [`count_unconverged`](@ref) and [`count_rejected`](@ref) count them.
@@ -124,20 +124,20 @@ end
     count_unconverged(frames) -> Int
 
 The number of adapted frames whose IRLS was capped at `max_irls_iter` before
-meeting `rtol` (`retcode = :MaxIters`). Rejected blobs are not counted here
+meeting `rtol` (`retcode = ReturnCode.MaxIters`). Rejected blobs are not counted here
 (see [`count_rejected`](@ref)). See [`adapt`](@ref).
 """
-count_unconverged(frames::AbstractVector) = count(f -> f.retcode === :MaxIters, frames)
+count_unconverged(frames::AbstractVector) = count(f -> f.retcode == VgtkCore.ReturnCode.MaxIters, frames)
 
 """
     count_rejected(frames) -> Int
     count_rejected(frames, rejection::Symbol) -> Int
 
 The number of adapted frames whose IRLS step the shape gate refused
-(`retcode = :Failure` or `:InitialFailure`); with `rejection`, only those
+(`retcode = ReturnCode.Failure` or `InitialFailure`, `stop_rule = ShapeGate`); with `rejection`, only those
 refused for that reason, `:not_peak` or `:aspect_ratio`. See [`adapt`](@ref).
 """
-count_rejected(frames::AbstractVector) = count(f -> f.stop_rule === :ShapeGate, frames)
+count_rejected(frames::AbstractVector) = count(f -> f.stop_rule == VgtkCore.ShapeGate, frames)
 function count_rejected(frames::AbstractVector, rejection::Symbol)
     rejection in (:not_peak, :aspect_ratio) ||
         throw(ArgumentError("rejection $(repr(rejection)): the shape gate refuses for :not_peak or :aspect_ratio"))

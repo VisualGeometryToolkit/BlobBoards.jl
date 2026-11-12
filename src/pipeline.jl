@@ -1217,7 +1217,7 @@ function _resolve_pose_ambiguity(
         camera, pt_csponds, res.estimate;
         outlier_halfwidth, local_optimization_strategy, extent, workspace
     )
-    if isnothing(inc) || !inc.converged
+    if isnothing(inc) || !VgtkCore.found_model(inc)
         # Returns the UNREFINED incumbent and never refines the mirror at all.
         # The incumbent's own refinement failing is arguably evidence AGAINST
         # it, so this arm looked like the prime suspect for the large flips —
@@ -1230,7 +1230,7 @@ function _resolve_pose_ambiguity(
         return res
     end
     alt = _refine(camera, pt_csponds, θm; outlier_halfwidth, local_optimization_strategy, extent, workspace)
-    if isnothing(alt) || !alt.converged
+    if isnothing(alt) || !VgtkCore.found_model(alt)
         _log_branch_bail(
             telemetry, :alt_not_converged; sep_deg = sep, inc_conv = true,
             alt_conv = false, n = length(Xw)
@@ -1351,7 +1351,7 @@ function find_board(
     pt_csponds = _fit_endpoints(camera, scored)
 
     res = _find_model(camera, pt_csponds; fit_kw...)
-    (!isnothing(res) && res.converged) || return nothing
+    (!isnothing(res) && VgtkCore.found_model(res)) || return nothing
     # The refines below use the SAME strategy the fit used.
     local_optimization_strategy = get(fit_kw, :local_optimization_strategy, _default_lo(camera))
 
@@ -1404,7 +1404,7 @@ function find_board(
                 outlier_halfwidth, local_optimization_strategy, extent = get(fit_kw, :extent, nothing),
                 workspace = refine_workspace
             )
-            if !isnothing(res2) && res2.converged
+            if !isnothing(res2) && VgtkCore.found_model(res2)
                 # EVERY correspondence the board was fitted on comes back,
                 # weighted: the guided union with the refit's posterior, and
                 # the descriptor matches the arm's own scorer rejected with the

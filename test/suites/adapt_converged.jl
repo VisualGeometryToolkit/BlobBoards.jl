@@ -1,10 +1,9 @@
 # The adaptation IRLS records, per blob, how it ended (the owner's §14 rulings
-# for BlobBoards, 2026-11-11), in BB-local Symbols mapped one-to-one onto Core's
-# ReturnCode / StopRule until those land:
-#   converged at rtol             retcode :Success        stop_rule :ParameterChange
-#   capped at max_irls_iter       retcode :MaxIters       stop_rule :IterationCap
-#   step refused by the shape gate retcode :Failure        stop_rule :ShapeGate
-#     (refused at the first step from the seed: :InitialFailure)
+# for BlobBoards, 2026-11-11), in Core's termination record:
+#   converged at rtol             ReturnCode.Success        StopRule ParameterChange
+#   capped at max_irls_iter       ReturnCode.MaxIters       StopRule IterationCap
+#   step refused by the shape gate ReturnCode.Failure        StopRule ShapeGate
+#     (refused at the first step from the seed: ReturnCode.InitialFailure)
 # with the refusal's reason in `rejection` (:not_peak or :aspect_ratio; :none
 # otherwise). Capped blobs are UNCONVERGED (`count_unconverged`); refused ones
 # are REJECTED (`count_rejected`), a separate terminal outcome. Neither changes
@@ -14,6 +13,7 @@ using BlobBoards
 using BlobBoards.KernelAbstractions: CPU
 using Random
 using Colors: Gray
+import VisualGeometryToolkitCore
 
 # Dark Gaussian blobs on a light ground (the parity suite's field, smaller).
 function _converged_blob_field(rng; H = 240, W = 320, n = 30)
@@ -36,14 +36,16 @@ end
     img = _converged_blob_field(MersenneTwister(7))
     dets = BlobBoards.detect_blobs(img; device = CPU())
     @test length(dets) >= 15
-    retcodes = (:Success, :MaxIters, :Failure, :InitialFailure)
-    rules = Dict(:Success => :ParameterChange, :MaxIters => :IterationCap, :Failure => :ShapeGate, :InitialFailure => :ShapeGate)
+    RC = VisualGeometryToolkitCore.ReturnCode
+    retcodes = (RC.Success, RC.MaxIters, RC.Failure, RC.InitialFailure)
+    rules = Dict(RC.Success => VisualGeometryToolkitCore.ParameterChange, RC.MaxIters => VisualGeometryToolkitCore.IterationCap,
+                 RC.Failure => VisualGeometryToolkitCore.ShapeGate, RC.InitialFailure => VisualGeometryToolkitCore.ShapeGate)
 
     function consistent(frames)
         all(frames) do f
-            f.retcode in retcodes && f.stop_rule === rules[f.retcode] &&
-                f.converged == (f.retcode === :Success) &&
-                (f.rejection === :none) == !(f.retcode in (:Failure, :InitialFailure)) &&
+            f.retcode in retcodes && f.stop_rule == rules[f.retcode] &&
+                f.converged == VisualGeometryToolkitCore.successful_retcode(f.retcode) &&
+                (f.rejection === :none) == !(f.retcode in (RC.Failure, RC.InitialFailure)) &&
                 f.rejection in (:none, :not_peak, :aspect_ratio)
         end
     end
@@ -71,7 +73,7 @@ end
     one_ = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(max_irls_iter = 1), device = CPU())
     @test consistent(one_)
     @test BlobBoards.count_unconverged(one_) > BlobBoards.count_unconverged(old)
-    @test all(f -> f.retcode !== :Failure, one_)                    # no refusal after the first step exists
+    @test all(f -> f.retcode != RC.Failure, one_)                    # no refusal after the first step exists
 
     # The record changes no validity and no geometry: the same run twice.
     again = BlobBoards.adapt(dets, img; config = BlobBoards.AdaptConfig(), device = CPU())
