@@ -806,4 +806,11 @@ end
     @test_throws MethodError StudentTUniformScoring(HP, a; refused_kw..., priors...)
     pts = [VgtkCore.Point2(x, y) => VgtkCore.Point2(x + 1.0, y + 2.0) for x in 0.0:10:40 for y in 0.0:10:40]
     @test_throws ArgumentError BlobBoards._find_model(nothing, pts; threshold = 3.0)
+    # A bare fit's half-width is the configuration's, never a code literal (the
+    # owner's TOML-literals rule): the homography and pose arms fall back to
+    # `[find_boards.geometry] outlier_halfwidth` of the package defaults, the
+    # radial arm to its geometry's own value. No literal table remains.
+    @test !isdefined(BlobBoards, :_FIT_HALFWIDTH_FALLBACK)
+    @test BlobBoards._dflt_outlier_halfwidth() ===
+        Float64(TOML.parsefile(joinpath(pkgdir(BlobBoards), "configs", "default.toml"))["find_boards"]["geometry"]["outlier_halfwidth"])
 end

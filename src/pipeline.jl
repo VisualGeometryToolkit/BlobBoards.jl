@@ -435,25 +435,20 @@ _default_lo(::CameraModel) = _dflt_local_optimization_strategy(:absolute_pose)
 _scoring(::Type{P}, outlier_halfwidth) where {P} = scoring_from_toml(
     Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => Float64(outlier_halfwidth)); problem = P)
 # The half-width a fit falls back to when `fit_kw` carries none (a bare
-# `find_board` call), px. Every engine path supplies the geometry's own value.
-# Homography: 5.0. The bmvc2026 outlier half-width CV's run of record
-# (bmvc2026/scripts/outlier_halfwidth_cv.jl, run key 3a346460b90dc25d,
-# 2026-10-09) selects 6.05 px for the homography arm, but its curve is flat:
-# inter-board invariance mAA@10 mm 0.0466-0.0495 over 1-16 px (0.0480 at
-# 4.9 px), a spread of 0.003 (an earlier run, on a separately built gallery,
-# moved single points by 3e-4). Flat, so the fallback is the package's 5.0
-# rather than VisualGeometryToolkitEstimation 1.0's per-class 20. The radial arm keeps 20
-# (not cross-validated).
-const _FIT_HALFWIDTH_FALLBACK = (homography = 5.0, absolute_pose = 5.0, radial_homography = 20.0)
+# `find_board` call), px: the package configuration's `[find_boards.geometry]
+# outlier_halfwidth` (configs/default.toml), never a literal here. Every engine
+# path supplies the geometry's own value; the radial arm, which holds its
+# geometry, falls back to that geometry's value.
+_dflt_outlier_halfwidth() = Float64(_dflt("geometry", "outlier_halfwidth"))
 _find_model(
     cam::Nothing, pt_csponds; local_optimization_strategy = _default_lo(cam),
-    outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.homography, kw...
+    outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_homography(
     pt_csponds; scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
 )
 _find_model(
     cam::CameraModel, pt_csponds; local_optimization_strategy = _default_lo(cam),
-    outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.absolute_pose, kw...
+    outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_absolute_pose(
     cam, pt_csponds; scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
 )
@@ -1819,7 +1814,7 @@ board_quad(::RadialHomographyGeometry, m::VgtkCore.RadialHomography, bundle::Boa
 # not re-converted.
 _find_model(
     g::RadialHomographyGeometry, pt_csponds; local_optimization_strategy = g.local_optimization_strategy,
-    outlier_halfwidth = _FIT_HALFWIDTH_FALLBACK.radial_homography, kw...
+    outlier_halfwidth = g.outlier_halfwidth, kw...
 ) = find_radial_homography(
     pt_csponds; center = distortion_center(g),
     scoring = _scoring(_RadialProblem5, outlier_halfwidth), local_optimization_strategy, kw...
