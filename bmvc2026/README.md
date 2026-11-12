@@ -196,7 +196,6 @@ dev chain) as path dependencies:
 bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh           # every result + the paper's assets (dgx01, Slurm)
 bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh       # the same here, stage by stage
 julia --project=bmvc2026 bmvc2026/scripts/make_pose_results.jl     # just the result cells (after the detections)
-julia --project=bmvc2026 bmvc2026/scripts/plots/absolute_pose.jl   # working figures
 ```
 
 (or `cd bmvc2026/papers && make figures`). The AprilTag/ArUco baselines run
@@ -219,7 +218,7 @@ on the load path (the Reactant/cuDNN split of the extensions).
 | Error metrics | `src/pose_error.jl` | relative-to-base rotation error (calibration-free) + robot-world hand-eye absolute rotation/translation errors |
 | Hand-eye | `make_hand_eye.jl` | `hand_eye-<key>/hand_eye_<type>.json` (vgio transform records + fit covariance) |
 | Error table | `src/error_table.jl` (`evaluate_dataset`), `make_pose_results.jl` | one DrWatson cell per (system, level) under `pose_results-<key>/`; read as one long-form DataFrame with `pose_results(eval_sources(cfg))` |
-| Figures | `plots/absolute_pose.jl` | error vs rig angle/distance, detection rate, occlusion sweep |
+| Figures | `plots/error_distributions.jl` | error vs rig angle/distance, detection rate, occlusion sweep (the paper's pgfplots panels: one figure pipeline) |
 
 Hand-eye calibration (the fixed camera-rig→camera and marker→board-rig
 transforms) is estimated from the `calibration_*` subsets via
