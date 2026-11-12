@@ -9,7 +9,7 @@ VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
 [sources]
 BlobBoards = {path = ".."}
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] from the registry before any push or registration
-VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-pin-5fb1627d/VisualGeometryToolkitFeatures"}
+VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-pin-f776e696/VisualGeometryToolkitFeatures"}
 
 [compat]
 CairoMakie = "0.15"
