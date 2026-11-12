@@ -22,8 +22,8 @@ and pair count); the incumbent's are its saved errors. A cell the search asks
 for that neither artifact holds is an error — never interpolated — and the
 replayed coarse and fine objectives must equal the source run's. The record
 lands where detection_cv.jl would write it (same config, same run key), its
-provenance naming both sources by path and sha256 and the code by repository
-and commit.
+records (Eval's write_run_records, with its code trees) naming both sources by
+path and sha256.
 
 Usage:
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/detection_cv_replay.jl
@@ -39,7 +39,7 @@ import VisualGeometryToolkitEval
 using VisualGeometryToolkitEval.Tuning: tuning_spec, tuning_table, load_tuning_artifact, grid_spec, bootstrap_argmin,
     unit_statistics, QueryUnit
 using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, save_coarse_fine_artifact, deployed_setting
-using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, results_root, write_provenance
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, results_root, write_run_records
 using VisualGeometryToolkitEval.Render: emit_tuning_table
 import VisualGeometryToolkitCore
 
@@ -48,8 +48,6 @@ module ReplayOperatingPoints
 end
 const OP = ReplayOperatingPoints
 
-const PROJECT = projectdir()                                  # bmvc2026/, the project @quickactivate activated
-const REPO = dirname(PROJECT)                                 # the BlobBoards checkout
 const CFG_PATH = projectdir("configs", "detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
 const SPEC = tuning_spec(CFG, "detection")
@@ -67,12 +65,6 @@ function errors_of(S, T)
     return E
 end
 
-_git(dir, args...) = readchomp(`git -C $dir $args`)
-_commit(dir) = _git(dir, "rev-parse", "HEAD") * (isempty(_git(dir, "status", "--porcelain", "--untracked-files=no")) ? "" : "-dirty")
-# a checkout's repository: the directory holding its common .git (a worktree's main checkout)
-_reponame(dir) = basename(dirname(_git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir")))
-_repo(dir::AbstractString) = Dict{String,Any}("repo" => _reponame(dir), "commit" => _commit(dir))
-_repo(m::Module) = _repo(pkgdir(m))
 
 function replay()
     src = load_tuning_artifact(joinpath(results_root(), SEARCH))
@@ -117,19 +109,13 @@ function replay()
         bootstrap_interval = interval, objective = src["objective"], arm = "pose",
         replayed_from = Dict{String,Any}(SEARCH => sha(SEARCH), INCUMBENT => sha(INCUMBENT)))
     sel = deployed_setting(OP.detection_cv_artifact(OUTDIR); context = "joint detection CV (replay)")
-    open(joinpath(OUTDIR, "_config.toml"), "w") do io
-        println(io, "# EFFECTIVE configuration of this run. Source: bmvc2026/configs/detection_cv.toml")
-        TOML.print(io, VgtkEval.Tuning.resolve_tuning!(deepcopy(CFG)); sorted = true)
-    end
-    write_provenance(OUTDIR, Dict{String,Any}(
-            "run_key" => OP.detection_cv_key(CFG),
-            "config" => merge(_repo(REPO), Dict{String,Any}("path" => "bmvc2026/configs/detection_cv.toml")),
-            "code" => Dict{String,Any}("BlobBoards" => _repo(REPO),
-                                       "VisualGeometryToolkitEval" => _repo(VisualGeometryToolkitEval),
-                                       "VisualGeometryToolkitCore" => _repo(VisualGeometryToolkitCore)),
+    # The run's records through Eval (its code trees name the repositories and their trees); the replay's own
+    # payload: its sources by results_root-relative path and sha256, and the method.
+    write_run_records(OUTDIR, CFG; driver = "bmvc2026/scripts/detection_cv_replay.jl", config_source = CFG_PATH,
+        key = OP.detection_cv_key(CFG),
+        fields = Dict{String,Any}(
             "data" => Dict{String,Any}("results_root_relative" => Dict{String,Any}(SEARCH => sha(SEARCH), INCUMBENT => sha(INCUMBENT))),
-            "method" => "replay of the joint search from the saved evaluations (no detection run)");
-        driver = "bmvc2026/scripts/detection_cv_replay.jl", gitpath = REPO)
+            "method" => "replay of the joint search from the saved evaluations (no detection run)"))
     @info "replayed" selected = sel kept_incumbent = rec.kept_incumbent gain = rec.gain interval
     return OUTDIR
 end
