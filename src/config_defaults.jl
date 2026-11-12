@@ -113,7 +113,7 @@ _dflt_tilts() = _tilts_from_toml(_dflt("detect", "tilts"))
 # :radial_homography); `section` only names the table in error messages.
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, optimization_strategy_from_toml
 import LocalOptimizationDoneRight
-const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.STRATEGY_TAGS)
+const _LO_TAGS = merge(VgtkEstimation.LO_TAGS, LocalOptimizationDoneRight.LODR_STRATEGY_TAGS)
 """
     geometry_local_optimization_strategy(d, class::Symbol) -> AbstractOptimizationStrategy
 
