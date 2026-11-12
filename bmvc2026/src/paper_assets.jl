@@ -96,7 +96,6 @@ end
 # one writer (`PaperNumbers`, `add_number!`, `write_numbers`).
 # =============================================================================
 
-using DrWatson: gitdescribe
 
 """
     figure_numbers(cfg, path; driver) -> VisualGeometryToolkitEval.Reproduce.PaperNumbers
@@ -104,11 +103,11 @@ using DrWatson: gitdescribe
 The number macros a figure generator writes, empty, each carrying its
 provenance: the `driver` (project-relative), its config of record `path` (made
 project-relative), the config's run key (`Experiments.run_key`, the key its run
-record is filed under) and the checkout's commit (DrWatson's `gitdescribe`). Fill
+record is filed under) and the checkout's commit (Eval's `checkout_commit`). Fill
 it with `add_number!`, write it with `write_numbers` (VisualGeometryToolkitEval's).
 """
 function figure_numbers(cfg::AbstractDict, path::AbstractString; driver::AbstractString)
-    commit = replace(something(gitdescribe(projectdir()), "unknown"), r"[\s;]" => "_")
-    return VgtkEval.Reproduce.PaperNumbers(; driver, config = relpath(abspath(path), projectdir()),
-        run_key = VgtkEval.Experiments.run_key(cfg), commit)
+    return VgtkEval.Reproduce.PaperNumbers(; driver,
+        config = VgtkEval.Reproduce.project_relative_path(abspath(path), projectdir()),
+        run_key = VgtkEval.Experiments.run_key(cfg), commit = VgtkEval.Reproduce.checkout_commit(projectdir()))
 end
