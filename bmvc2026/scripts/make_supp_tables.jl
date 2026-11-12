@@ -40,7 +40,6 @@ using DrWatson: projectdir
 import JSON
 import TOML
 using Statistics: median
-using Printf: @sprintf
 using BlobBoards: FindBoardsConfig, config_dict
 using VisualGeometryToolkitCore: BoundedCamera, ustrip, mm, dpi
 import VisualGeometryToolkitIO
@@ -58,8 +57,6 @@ const BOARDS_DIR = input_path(CFG, "boards")
 const CAMERA_JSON = input_path(CFG, "camera")
 const RUN_CONFIG = joinpath(sweep_dir(CFG["runs"]["bb"]), "poses", "bb", "_config.toml")
 
-# A number macro of this driver (VisualGeometryToolkitEval's one writer), its body as typeset here.
-_macro(nums, name, value) = add_number!(nums, name, string(value))
 
 # ---- tab:supp:params ---------------------------------------------------------
 
@@ -78,7 +75,6 @@ function _pattern(path)
     )
 end
 
-_num(x) = isinteger(x) ? string(Int(x)) : string(x)
 
 # The evaluation gallery's boards, as `_pattern` reads them.
 _gallery() = [_pattern(f) for f in readdir(BOARDS_DIR; join = true) if endswith(f, ".json")]
@@ -88,28 +84,28 @@ function write_board_params(nums)
     boards = _gallery()
     extents = sort(unique(b.extent_mm for b in boards))
     length(extents) == length(size_words) || error("expected $(length(size_words)) size classes, found extents $extents mm")
-    _macro(nums, "bbGalleryBoards", length(boards))
+    add_number!(nums, "bbGalleryBoards", length(boards))
     # the per-board range over the whole gallery (all sizes)
-    _macro(nums, "bbBlobsMinAll", minimum(b.n_blobs for b in boards))
-    _macro(nums, "bbBlobsMaxAll", maximum(b.n_blobs for b in boards))
+    add_number!(nums, "bbBlobsMinAll", minimum(b.n_blobs for b in boards))
+    add_number!(nums, "bbBlobsMaxAll", maximum(b.n_blobs for b in boards))
     for (word, ext) in zip(size_words, extents)
         n = [b.n_blobs for b in boards if b.extent_mm == ext]
-        _macro(nums, "bbBoards$word", length(n))
-        _macro(nums, "bbExtentMM$word", ext)
-        _macro(nums, "bbBlobsMed$word", _num(median(n)))
-        _macro(nums, "bbBlobsMin$word", minimum(n))
-        _macro(nums, "bbBlobsMax$word", maximum(n))
+        add_number!(nums, "bbBoards$word", length(n))
+        add_number!(nums, "bbExtentMM$word", ext)
+        add_number!(nums, "bbBlobsMed$word", median(n); sigdigits = 15)
+        add_number!(nums, "bbBlobsMin$word", minimum(n))
+        add_number!(nums, "bbBlobsMax$word", maximum(n))
     end
     # The shared values must be shared: a gallery mixing parameter sets would
     # make one table column a lie.
     shared(f) = (v = unique(f.(boards)); length(v) == 1 ? only(v) : error("boards disagree on $f: $v"))
-    _macro(nums, "bbPatMinScaleMM", _num(round(shared(b -> b.min_scale_mm); digits = 3)))
-    _macro(nums, "bbPatMaxDiamFrac", _num(shared(b -> b.max_diameter_fraction)))
-    _macro(nums, "bbPatCutoff", _num(shared(b -> b.cutoff)))
-    _macro(nums, "bbPatAlpha", _num(shared(b -> b.alpha)))
-    _macro(nums, "bbPatScalesPerOctave", shared(b -> b.scales_per_octave))
-    _macro(nums, "bbPatDPI", _num(shared(b -> b.dpi)))
-    _macro(nums, "bbPatPolarity", shared(b -> b.polarity))
+    add_number!(nums, "bbPatMinScaleMM", shared(b -> b.min_scale_mm); digits = 3)
+    add_number!(nums, "bbPatMaxDiamFrac", shared(b -> b.max_diameter_fraction); sigdigits = 15)
+    add_number!(nums, "bbPatCutoff", shared(b -> b.cutoff); sigdigits = 15)
+    add_number!(nums, "bbPatAlpha", shared(b -> b.alpha); sigdigits = 15)
+    add_number!(nums, "bbPatScalesPerOctave", shared(b -> b.scales_per_octave))
+    add_number!(nums, "bbPatDPI", shared(b -> b.dpi); sigdigits = 15)
+    add_number!(nums, "bbPatPolarity", shared(b -> b.polarity))
     return nothing
 end
 
@@ -131,8 +127,6 @@ function _pow10(x)
     return "10^{$(Int(e))}"
 end
 
-_thousands(n::Integer) = n < 10_000 ? string(n) : replace(string(n), r"(\d)(\d{3})$" => s"\1\\,\2")
-
 function write_run_settings(nums)
     fb = _run_find_boards()
     cfg = FindBoardsConfig(fb; camera = _camera())     # the loader's key checking, on the run of record
@@ -145,30 +139,30 @@ function write_run_settings(nums)
     # the boards' cutoff (one across the gallery): the adaptation's scan window
     # and inner radius are stated in it
     board_cutoff = only(unique(b.cutoff for b in _gallery()))
-    _macro(nums, "bbSetWarps", length(tilts))
+    add_number!(nums, "bbSetWarps", length(tilts))
     for (word, (t, n)) in zip(("One", "Two"), groups)
-        _macro(nums, "bbSetTilt$word", @sprintf("%.2f", t))
-        _macro(nums, "bbSetTiltAngles$word", n)
+        add_number!(nums, "bbSetTilt$word", t; digits = 2)
+        add_number!(nums, "bbSetTiltAngles$word", n)
     end
-    _macro(nums, "bbSetPeakThreshold", _num(det["peak_threshold"]))
-    _macro(nums, "bbSetEdgeThreshold", @sprintf("%.1f", det["edge_threshold"]))
-    _macro(nums, "bbSetNmsCutoff", @sprintf("%.1f", det["nms"]["cutoff"]))
-    _macro(nums, "bbSetScanWindow", @sprintf("%.1f", ad["scan_padding"] * board_cutoff))
-    _macro(nums, "bbSetMaxIrls", ad["max_irls_iter"])
-    _macro(nums, "bbSetRtol", _pow10(ad["rtol"]))
-    _macro(nums, "bbSetMaxScaleFraction", _num(ad["max_scale_fraction"]))
-    _macro(nums, "bbSetMaxScaleRatio", _num(ad["max_scale_ratio"]))
-    _macro(nums, "bbSetMaxClipRatio", _num(ad["max_clip_ratio"]))
-    _macro(nums, "bbSetMaxAspectRatio", _num(ad["max_aspect_ratio"]))
-    _macro(nums, "bbSetInnerRadius", @sprintf("%.1f", board_cutoff))
-    _macro(nums, "bbSetMinSimilarity", _num(d["min_similarity"]))
-    _macro(nums, "bbSetMinInliers", geo["min_inliers"])
-    _macro(nums, "bbSetHalfwidthPx", _num(geo["outlier_halfwidth"]))
-    _macro(nums, "bbSetRansacMin", _thousands(ran["min_trials"]))
-    _macro(nums, "bbSetRansacMax", _thousands(ran["max_trials"]))
-    _macro(nums, "bbSetConfidence", _num(ran["success_prob"]))
-    _macro(nums, "bbSetAppearanceSupportPct", round(Int, 100 * d["min_appearance_support"]))
-    _macro(nums, "bbSetVerifySimilarity", _num(d["verify_similarity"]))
+    add_number!(nums, "bbSetPeakThreshold", det["peak_threshold"]; sigdigits = 15)
+    add_number!(nums, "bbSetEdgeThreshold", det["edge_threshold"]; digits = 1)
+    add_number!(nums, "bbSetNmsCutoff", det["nms"]["cutoff"]; digits = 1)
+    add_number!(nums, "bbSetScanWindow", ad["scan_padding"] * board_cutoff; digits = 1)
+    add_number!(nums, "bbSetMaxIrls", ad["max_irls_iter"])
+    add_number!(nums, "bbSetRtol", _pow10(ad["rtol"]))
+    add_number!(nums, "bbSetMaxScaleFraction", ad["max_scale_fraction"]; sigdigits = 15)
+    add_number!(nums, "bbSetMaxScaleRatio", ad["max_scale_ratio"]; sigdigits = 15)
+    add_number!(nums, "bbSetMaxClipRatio", ad["max_clip_ratio"]; sigdigits = 15)
+    add_number!(nums, "bbSetMaxAspectRatio", ad["max_aspect_ratio"]; sigdigits = 15)
+    add_number!(nums, "bbSetInnerRadius", board_cutoff; digits = 1)
+    add_number!(nums, "bbSetMinSimilarity", d["min_similarity"]; sigdigits = 15)
+    add_number!(nums, "bbSetMinInliers", geo["min_inliers"])
+    add_number!(nums, "bbSetHalfwidthPx", geo["outlier_halfwidth"]; sigdigits = 15)
+    add_number!(nums, "bbSetRansacMin", ran["min_trials"]; group_from = 5)
+    add_number!(nums, "bbSetRansacMax", ran["max_trials"]; group_from = 5)
+    add_number!(nums, "bbSetConfidence", ran["success_prob"]; sigdigits = 15)
+    add_number!(nums, "bbSetAppearanceSupportPct", round(Int, 100 * d["min_appearance_support"]))
+    add_number!(nums, "bbSetVerifySimilarity", d["verify_similarity"]; sigdigits = 15)
     return nothing
 end
 

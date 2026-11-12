@@ -85,8 +85,8 @@ function main()
         add_number!(nums, "$(r.pfx)HeFrames", "$(r.frames)")
         add_number!(nums, "$(r.pfx)HeRecovered", "$(r.recovered)")
         add_number!(nums, "$(r.pfx)HeMarkers", "$(r.markers)")
-        add_number!(nums, "$(r.pfx)HeResidTransMM", "$(round(r.resid_mm; digits = 2))")
-        add_number!(nums, "$(r.pfx)HeResidRotDeg", "$(round(r.resid_deg; digits = 3))")
+        add_number!(nums, "$(r.pfx)HeResidTransMM", r.resid_mm; digits = 2)
+        add_number!(nums, "$(r.pfx)HeResidRotDeg", r.resid_deg; digits = 3)
     end
     write_numbers(stats, nums)
 
