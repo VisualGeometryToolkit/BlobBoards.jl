@@ -77,7 +77,7 @@ VisualGeometryToolkitEstimation = {path = "/home/jpr/src/vgtk-pin-4770458a/Visua
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
 VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-pin-4770458a/VisualGeometryToolkitFeatures"}
 # TEMPORARY: its 0.9 port (on the unregistered 0.9 stack) is not registered yet; replace by its released version from the registry before any push or registration
-LocalOptimizationDoneRight = {path = "/home/jpr/src/lodr-pin-8184394"}
+LocalOptimizationDoneRight = {path = "/home/jpr/src/lodr-pin-7d022d1"}
 
 [compat]
 Artifacts = "1"
