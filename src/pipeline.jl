@@ -548,7 +548,7 @@ function _undistort_detect(
     d_out = KernelAbstractions.allocate(dev, UInt8, H, W)   # kernel writes every pixel
     # u8→u8: VGC's kernel samples the 8-bit source bilinearly in the 0–255
     # domain (linear ops commute with the scale) and stores saturating UInt8.
-    undistort!(d_out, Float32, VgtkCore.model(cam), d_u8)   # Core forwards `undistort`, not the in-place kernel
+    undistort!(d_out, Float32, cam, d_u8)
     return Array(d_out)
 end
 

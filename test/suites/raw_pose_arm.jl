@@ -117,18 +117,14 @@ end
         @test rad2deg(rotation_angle(RotMatrix{3}(res.estimate.R' * _POSE.R))) < 0.1
         @test norm(res.estimate.t - _POSE.t) < 2.0
     end
-    # The spline camera: the pose arm hands it to the estimator the same way, but the
-    # Student-t LO differentiates the projection with ForwardDiff, and a SplineLens
-    # projection's cold start converts its point to Float64 (VisualGeometryToolkitCore
-    # src/geometry/cameras/spline_lens.jl `_cold_start`), so a Dual is a MethodError: a
-    # Core gap, reported; the test turns green when Core keeps the element type.
-    spline_fit = try
-        BlobBoards._find_model(spline, src .=> dst; rng = MersenneTwister(1))
-    catch e
-        e isa MethodError || rethrow()
-        nothing
+    # The spline camera, the same way: the Student-t LO differentiates its projection
+    # (a Dual ray through the spline's implicit Jacobian, VisualGeometryToolkitCore).
+    spline_fit = BlobBoards._find_model(spline, src .=> dst; rng = MersenneTwister(1))
+    @test VisualGeometryToolkitCore.found_model(spline_fit)
+    if VisualGeometryToolkitCore.found_model(spline_fit)
+        @test rad2deg(rotation_angle(RotMatrix{3}(spline_fit.estimate.R' * _POSE.R))) < 0.1
+        @test norm(spline_fit.estimate.t - _POSE.t) < 2.0
     end
-    @test_broken spline_fit !== nothing && VisualGeometryToolkitCore.found_model(spline_fit)
     @test hasmethod(BlobBoards.board_quad, Tuple{BoundedCamera, Any, BlobBoards.BoardBundle})
     @test !hasmethod(BlobBoards.board_quad, Tuple{CameraModel, Any, BlobBoards.BoardBundle})
     # The old call: a bare model is refused, naming the bounded camera.
