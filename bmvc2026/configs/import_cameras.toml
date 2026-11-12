@@ -16,11 +16,9 @@
 
 [experiment]
 generator = "import_cameras"
-dataset = "absolute_pose_experiments"
-# The results tree's layout of this stage's run (VisualGeometryToolkitEval
-# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
-matcher = "opencv_calibration"
-problem = "cameras"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["cameras"]
 
 [[cameras]]
 session = "260527"

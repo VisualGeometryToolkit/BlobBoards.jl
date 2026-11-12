@@ -12,10 +12,9 @@ generator = "convert_formats"
 # The published session converted (260521 is unpublished: it fails end-to-end
 # validation).
 dataset = "260527"
-# The results tree's layout of this stage's run (VisualGeometryToolkitEval
-# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
-matcher = "motion_capture"
-problem = "records"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["260527", "records"]
 # The generation of VisualGeometryToolkitIO's kinds the copy is written in: "direct" —
 # every kind the serialization of a VisualGeometryToolkitCore value (2026-10-09; the
 # measurement kinds renamed target_points2d/3d, target rigs rig/v4). The

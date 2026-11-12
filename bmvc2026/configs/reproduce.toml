@@ -125,12 +125,13 @@ inputs_from = [{ config = "bmvc2026/configs/figures/evaluation.toml", key = "run
 # ---- the descriptor training (the paper's network of record is an input: only with --only) ---------------------------
 [[stage]]
 name = "annotations"
-what = "the descriptor training corpus: annotate + split (annotations-<key>), one GPU"
+what = "the descriptor training corpus: annotate + split into its data tier (bb_descriptor_annotations/annotations-<key>), one GPU; the split concatenates ~240 GB"
 after = ["setup"]
 command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/training/build_annotations.jl"]
 driver = "bmvc2026/scripts/training/build_annotations.jl"
 config = "bmvc2026/configs/training/annotations.toml"
 gpu = true
+mem_per_cpu = "18G"   # 28 CPUs × 18 GB ≈ 500 GB: the split holds the whole corpus
 time = "24:00:00"
 default = false
 
@@ -143,6 +144,7 @@ driver = "bmvc2026/scripts/training/train_descriptor.jl"
 config = "bmvc2026/configs/training/train_descriptor.toml"
 inputs_from = [{ config = "bmvc2026/configs/training/train_descriptor.toml", key = "runs.annotations", base = "bmvc2026/configs" }]
 gpu = true
+mem_per_cpu = "32G"   # 28 CPUs × 32 GB ≈ 900 GB: the training loads the whole split
 time = "48:00:00"
 default = false
 

@@ -23,7 +23,7 @@ using DrWatson
 
 using BlobBoards
 using Lux, Optimisers, Enzyme, Reactant, NNlib, TensorBoardLogger, Zygote
-using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, write_run_records, run_complete
+using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, keyed_data_dir, write_run_records, run_complete
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
@@ -36,11 +36,12 @@ Training === nothing && error("BlobBoardsTrainingExt is not loaded: its triggers
 
 const CFG, CFG_PATH = figure_config("train_descriptor"; default = projectdir("configs", "training", "train_descriptor.toml"))
 const ANNOTATIONS = load_config(CFG["runs"]["annotations"])
-# What the run is keyed on: this config with the corpus' run key folded in.
-const KEYED = merge(CFG, Dict{String, Any}("sources" => Dict{String, Any}("annotations" => run_key(ANNOTATIONS))))
-const KEY = run_key(KEYED)
-const RUN_DIR = keyed_cell_dir(KEYED, EXPERIMENT, "descriptor")
-const SPLITS = joinpath(keyed_cell_dir(ANNOTATIONS, EXPERIMENT, "annotations"), "splits")
+# The run is keyed on this config with the corpus' run key folded in (`upstream`).
+const UPSTREAM = Dict{String, String}("annotations" => run_key(ANNOTATIONS))
+const KEY = run_key(CFG; upstream = UPSTREAM)
+const RUN_DIR = keyed_cell_dir(CFG, EXPERIMENT, "descriptor"; upstream = UPSTREAM)
+# the corpus: data of its tier, where its producer wrote it (Eval keyed_data_dir)
+const SPLITS = joinpath(keyed_data_dir(ANNOTATIONS, ANNOTATIONS["output"]["tier"], "annotations"), "splits")
 
 function main()
     T = CFG["train"]
@@ -57,7 +58,7 @@ function main()
     @info "training" run = KEY train val RUN_DIR
     result = Training.train_descriptor(train, val; cfg, output_dir = RUN_DIR)
     @info "training done" epochs = result.epoch best_fpr = result.best_fpr
-    write_run_records(RUN_DIR, KEYED; driver = "bmvc2026/scripts/training/train_descriptor.jl", config_source = CFG_PATH,
+    write_run_records(RUN_DIR, CFG; driver = "bmvc2026/scripts/training/train_descriptor.jl", config_source = CFG_PATH,
         key = KEY, inputs = [train, val])
     return RUN_DIR
 end

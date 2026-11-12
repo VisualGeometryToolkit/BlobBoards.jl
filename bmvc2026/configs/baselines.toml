@@ -10,10 +10,9 @@
 [experiment]
 generator = "baselines"
 dataset = "260527"
-# The results tree's layout of this stage's run (VisualGeometryToolkitEval
-# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
-matcher = "apriltag_aruco"
-problem = "absolute_pose"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["260527", "baselines"]
 port_of = "BlobBoards-Evaluation 88bca9f: evaluation_pipe/pose_extractor.py (extract_pose, packing_poses, validate_image), evaluation_pipe/pose_estimators.py (estimate_apriltag_pose, estimate_aruco_pose_opencv, estimate_pose_from_corners)"
 
 [camera]

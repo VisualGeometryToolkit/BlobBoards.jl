@@ -7,10 +7,9 @@
 [experiment]
 generator = "evaluation"
 dataset = "260527"
-# The results tree's layout of the derived stages' runs (hand_eye, pose_results:
-# VisualGeometryToolkitEval keyed_cell_dir, <dataset>/<matcher>/<problem>/bmvc2026/<kind>-<key>).
-matcher = "marker_systems"
-problem = "absolute_pose"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["260527", "evaluation"]
 tiers = ["bb_absolute_pose_inputs", "bb_absolute_pose_images_260527"]
 
 [runs]

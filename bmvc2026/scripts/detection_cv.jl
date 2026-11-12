@@ -72,7 +72,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, results_root, input_path, network_path, load_config,
-    detection_cv_config, detection_cv_dir, detection_cv_artifact
+    detection_cv_key, detection_cv_dir, detection_cv_artifact
 
 const CFG_PATH = projectdir("configs", "detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
@@ -182,8 +182,8 @@ function run_cv()
         arm = "pose")
     # the read-side gate, before anything is recorded complete
     @info "selected" deployed_setting(detection_cv_artifact(OUTDIR); context = "joint detection CV") interval
-    write_run_records(OUTDIR, detection_cv_config(CFG); driver = "bmvc2026/scripts/detection_cv.jl",
-        config_source = CFG_PATH, key = VgtkEval.Experiments.run_key(detection_cv_config(CFG)),
+    write_run_records(OUTDIR, CFG; driver = "bmvc2026/scripts/detection_cv.jl",
+        config_source = CFG_PATH, key = detection_cv_key(CFG),
         inputs = [image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), run_config])
     return OUTDIR
 end

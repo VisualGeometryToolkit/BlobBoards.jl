@@ -23,17 +23,20 @@
 #   pose-error cells            the evaluation's [runs]          …/pose_results-<key>/
 #
 # Every directory is VisualGeometryToolkitEval's `keyed_cell_dir(cfg, EXPERIMENT,
-# kind)`: `results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>`,
-# the three layout names the literals of the config's [experiment]. A key is
-# Eval's `run_key` of the config of record, which states every input it reads
-# as `[inputs.<id>]` (tier, path, provenance, sha256 — the descriptor network's
+# kind)`: `results_root()/<layout…>/bmvc2026/<kind>-<run_key>`, the layout the
+# config's `[experiment] layout` literal. A key is Eval's `run_key` of the config
+# of record, which states every input it reads as `[inputs.<id>]` (tier, path,
+# provenance, sha256, checked by Eval's `input_path` — the descriptor network's
 # content is in the key that way); a derived stage keys the evaluation's
-# [experiment] together with the run keys of the upstreams it reads. Code is
+# [experiment] layout with the run keys of the upstreams it reads folded in
+# (`run_key(…; upstream)`). Code is
 # provenance (DrWatson `tag!` in every run's records), not key.
 
 import TOML
 using DrWatson: projectdir
-using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir
+# `input_path(cfg, id)`: Eval's one reader of an `[inputs.<id>]` (its tier's
+# root, its sha256 checked); re-exported by BlobBoardsEval for the drivers.
+using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, input_path
 
 # `EXPERIMENT`, the name every run directory is filed under, is
 # src/operating_points.jl's (a self-contained file; BlobBoardsEval includes it).
@@ -52,17 +55,6 @@ config_path(name::AbstractString) = isabspath(name) ? String(name) : projectdir(
 The parsed config of record `configs/<name>`.
 """
 load_config(name::AbstractString) = TOML.parsefile(config_path(name))
-
-"""
-    input_path(cfg, id) -> String
-
-The input `[inputs.<id>]` of a config of record: its `path` under the data
-root, its `tier` installed.
-"""
-function input_path(cfg::AbstractDict, id::AbstractString)
-    t = cfg["inputs"][id]
-    return joinpath(data_root(; tiers = [String(t["tier"])]), String(t["path"]))
-end
 
 # --- motion-capture records ---------------------------------------------------
 
@@ -149,7 +141,7 @@ end
     Sources
 
 Everything the evaluation of one dataset reads, resolved from its config of
-record: its `[experiment]` layout (`experiment`: dataset, matcher, problem), the
+record: its `[experiment]` layout (`experiment`: its `layout`, and `dataset`), the
 INPUTS (`inputs`, data_root()'s session directory: images, boards), the
 motion-capture records (`mocap`), the detections of each series
 (`poses[series]`) and the run keys that identify them all (`keys`).
@@ -194,7 +186,8 @@ function eval_sources(cfg::AbstractDict; tiers = EVAL_TIERS)
         "records" => records_key(String(r["records"])), "baselines" => baselines_key(bl),
         "bb" => sweep_key(bb), "occlusion" => sweep_key(bb), "bb_noflip" => sweep_key(nf),
     )
-    layout = Dict{String, Any}(k => cfg["experiment"][k] for k in ("dataset", "matcher", "problem"))
+    # the [experiment] keys Eval's experiment_dir lays a run out by
+    layout = Dict{String, Any}(k => v for (k, v) in cfg["experiment"] if k in ("dataset", "matcher", "problem", "layout"))
     return Sources(layout, ds, joinpath(data_root(; tiers), "absolute_pose_experiments", ds),
         mocap_dir(ds; config = String(r["records"])), poses, keys)
 end
@@ -221,14 +214,16 @@ The detection overlays (`<image>_val.png`) of a series' main run.
 val_dir(src::Sources, series::AbstractString) = joinpath(src.poses[series].main, "val", src.poses[series].name)
 
 """
-    derived_config(src, which) -> Dict
+    derived_dir(src, kind, which) -> String
 
-The config a stage derived from the evaluation's sources is keyed on (the
-hand-eye records, the pose-error cells): the evaluation's [experiment] layout
-and the run keys of the upstreams `which` it reads.
+The run directory of a stage derived from the evaluation's sources (the
+hand-eye records, the pose-error cells): Eval's `keyed_cell_dir` over the
+evaluation's [experiment] layout, the run keys of the upstreams `which` folded
+in (`upstream`).
 """
-derived_config(src::Sources, which) =
-    Dict{String, Any}("experiment" => copy(src.experiment), "sources" => Dict{String, Any}(k => src.keys[k] for k in which))
+derived_dir(src::Sources, kind::AbstractString, which) =
+    keyed_cell_dir(Dict{String, Any}("experiment" => copy(src.experiment)), EXPERIMENT, kind;
+        upstream = Dict{String, String}(k => src.keys[k] for k in which))
 
 """
     hand_eye_dir(src) -> String
@@ -237,4 +232,4 @@ The hand-eye records of the evaluation (scripts/make_hand_eye.jl):
 `hand_eye-<key>/`, keyed on the motion-capture records and the detections of
 the calibration subsets they are fitted on.
 """
-hand_eye_dir(src::Sources) = keyed_cell_dir(derived_config(src, ["records", "baselines", "bb"]), EXPERIMENT, "hand_eye")
+hand_eye_dir(src::Sources) = derived_dir(src, "hand_eye", ["records", "baselines", "bb"])

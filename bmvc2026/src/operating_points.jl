@@ -31,23 +31,26 @@ self-contained: src/runs.jl reads the same binding through BlobBoardsEval.
 const EXPERIMENT = "bmvc2026"
 
 """
-    detection_cv_config(cfg) -> Dict
+    detection_cv_upstream(cfg) -> Dict
 
-What the joint detection CV is keyed on: `cfg` (the parsed
-configs/detection_cv.toml) with the run key of the run config of record it
-searches around (`[runs] bb`) folded in as `sources`.
+What the joint detection CV folds into its key beside `cfg` (the parsed
+configs/detection_cv.toml): the run key of the run config of record it
+searches around (`[runs] bb`), Eval's `run_key(…; upstream)`.
 """
-detection_cv_config(cfg::AbstractDict) = merge(cfg, Dict{String, Any}("sources" =>
-    Dict{String, Any}("bb" => run_key(TOML.parsefile(projectdir("configs", cfg["runs"]["bb"]))))))
+detection_cv_upstream(cfg::AbstractDict) =
+    Dict{String, String}("bb" => run_key(TOML.parsefile(projectdir("configs", cfg["runs"]["bb"]))))
+
+"The run key of the joint detection CV: `run_key(cfg; upstream = detection_cv_upstream(cfg))`."
+detection_cv_key(cfg::AbstractDict) = run_key(cfg; upstream = detection_cv_upstream(cfg))
 
 """
     detection_cv_dir(cfg) -> String
 
 The run directory of the joint detection CV under the config `cfg`:
-`keyed_cell_dir(detection_cv_config(cfg), EXPERIMENT, "detection_cv")` — keyed,
-so a changed config (or run config) is a new run.
+`keyed_cell_dir(cfg, EXPERIMENT, "detection_cv"; upstream)` — keyed, so a
+changed config (or run config) is a new run.
 """
-detection_cv_dir(cfg::AbstractDict) = keyed_cell_dir(detection_cv_config(cfg), EXPERIMENT, "detection_cv")
+detection_cv_dir(cfg::AbstractDict) = keyed_cell_dir(cfg, EXPERIMENT, "detection_cv"; upstream = detection_cv_upstream(cfg))
 
 "The tuning artifact inside a joint detection CV run directory."
 detection_cv_artifact(dir::AbstractString) = joinpath(dir, "detection.jld2")

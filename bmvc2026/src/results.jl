@@ -57,11 +57,11 @@ const CELL_SOURCES = ["records", "baselines", "bb", "occlusion"]
 
 Where the pose-error cells of one evaluation's sources live:
 `pose_results-<key>/` (Eval's `keyed_cell_dir`), keyed on the run keys of every
-upstream it reads ([`derived_config`](@ref)). A new detection run is a new
+upstream it reads ([`derived_dir`](@ref)). A new detection run is a new
 directory, so `collect_results` can enumerate everything in it: there is
 nothing older to select against.
 """
-results_dir(src::Sources) = keyed_cell_dir(derived_config(src, CELL_SOURCES), EXPERIMENT, "pose_results")
+results_dir(src::Sources) = derived_dir(src, "pose_results", CELL_SOURCES)
 
 # The cache key of one cell: the dataset, the marker system and the occlusion
 # level (`"none"` unoccluded); the directory carries the sources' run keys.

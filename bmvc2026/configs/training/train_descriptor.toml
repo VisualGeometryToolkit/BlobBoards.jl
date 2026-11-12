@@ -7,10 +7,9 @@
 
 [experiment]
 generator = "train_descriptor"
-dataset = "blobboard_training"
-# The results tree's layout (keyed_cell_dir: <dataset>/<matcher>/<problem>).
-matcher = "blobboards"
-problem = "descriptor_training"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["descriptor_training"]
 
 [runs]
 annotations = "training/annotations.toml"   # configs/-relative: the corpus (its splits/)

@@ -121,8 +121,8 @@ Tuned values are selected on the validation side of a registered scene split
 260521/bb, report on 260527/bb — 260527 is never read by a tuning step) by
 VisualGeometryToolkitEval's coarse-fine search and stored in its tuning artifacts
 (`save_coarse_fine_artifact`) in the keyed, add-only run directory
-Eval's `keyed_cell_dir` (`<dataset>/<matcher>/<problem>/bmvc2026/<step>-<run_key>`,
-the run config's key folded in), beside its `_config.toml` and
+Eval's `keyed_cell_dir` (`tuning/bmvc2026/<step>-<run_key>`, the `[experiment]
+layout` of its config, the run config's key folded in as `upstream`), beside its `_config.toml` and
 `_provenance.toml`. The record below predates that layout: it stays where it
 was made, `results_root()/tuning/<step>-<run_key>` under its 0.8 run key. A consumer reads them through VisualGeometryToolkitEval
 `deployed_setting` (paths in src/operating_points.jl), which refuses a search

@@ -26,10 +26,9 @@
 
 [experiment]
 dataset = "260527"
-# The results tree's layout of every run of this config (VisualGeometryToolkitEval
-# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
-matcher = "blobboards"
-problem = "absolute_pose"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["260527", "blobboards"]
 # Frame cap per subset for smoke runs (0 = every frame; `select_frames` in
 # src/sweep.jl STRIDES rather than taking a prefix). Stated, so it is keyed: a
 # capped run is another run directory, never mistaken for the full one.

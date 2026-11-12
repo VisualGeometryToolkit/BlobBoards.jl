@@ -48,11 +48,9 @@
 
 [experiment]
 generator = "detection_cv"
-dataset = "260521"
-# The results tree's layout of this stage's run (VisualGeometryToolkitEval
-# keyed_cell_dir: results_root()/<dataset>/<matcher>/<problem>/bmvc2026/<kind>-<run_key>).
-matcher = "blobboards"
-problem = "detection_cv"
+# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
+# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+layout = ["tuning"]
 
 [runs]
 # configs/-relative: the EVALUATION's run config of record — detection,

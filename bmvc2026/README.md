@@ -153,7 +153,7 @@ Expected download time: Zenodo served ~0.1–0.5 MB/s per single stream (measure
 The data policy (VisualGeometryToolkitEval `data_policy_violations`): D1 no machine paths in
 code or launchers; D2 nothing writes under `data_root()`;
 D3 output directories are keyed (Eval's `keyed_cell_dir`:
-`<dataset>/<matcher>/<problem>/bmvc2026/<stage>-<run_key>`; caches
+`<layout…>/bmvc2026/<stage>-<run_key>`, the configs' `[experiment] layout`; caches
 `<prefix>_<run_key>`).
 `test/paper_project_tests.jl` checks it (VisualGeometryToolkitEval PaperProjects).
 
