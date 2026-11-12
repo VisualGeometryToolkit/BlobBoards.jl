@@ -27,8 +27,8 @@ camera `camera_name` as its sensor, each detected target's pose `target:<id>
 → camera_optical`, mm) and `out_dir/telemetry.jsonl` (one `{image, t,
 elapsed_time_ms}` per image). Frames are indexed by the image's position in
 the sorted listing of `image_dir`. An export's `undist_K` must be `K` (the
-camera of record's, canonical frame) in OpenCV's pixel frame to float32
-precision — the camera it says it used; `size_mm` is dropped (a target's size
+camera of record's in OpenCV's pixel frame, VisualGeometryToolkitIO's
+`opencv_parameters`) to float32 precision — the camera it says it used; `size_mm` is dropped (a target's size
 is its definition's). Rotations read back within 1e-6 (an export's float32
 matrix is projected onto SO(3) by the quaternion encoding); translations
 exactly. Returns the path of `target_poses.json`.
@@ -52,8 +52,7 @@ function export_target_poses(
         t, img = index[stem]
         String(d.image) == img || error("$(export_dir)/$(f): names image $(d.image), the subset has $(img)")
         Ku = SMatrix{3, 3, Float64}(reduce(hcat, [Float64.(row) for row in d.undist_K])')
-        D = Ku - Kc
-        (abs(D[1, 3] + 0.5) < 1.0e-3 && abs(D[2, 3] + 0.5) < 1.0e-3 && maximum(abs, D[:, 1:2]) < 1.0e-3) ||
+        maximum(abs, Ku - Kc) < 1.0e-3 ||
             error("$(export_dir)/$(f): undist_K $(Ku) is not the camera of record's K $(Kc) in OpenCV's pixel frame")
         frames[t] = Dict(
             Symbol(String(p.board_id)) => EuclideanMap(

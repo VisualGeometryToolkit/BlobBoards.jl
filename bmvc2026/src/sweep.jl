@@ -116,7 +116,7 @@ function sweep_context(;
     store = VgtkIO.load(Dict{Symbol, BoundedCamera}, camera_json)
     length(store) == 1 || error("$(camera_json): a sweep runs on one camera; the store holds $(sort!(collect(keys(store))))")
     camera_name, bounded = only(store)
-    bcamera = bounded isa BoundedCamera ? bounded : bounded.value                       # the find_boards pose arm's camera
+    bcamera = VgtkCore.value_of(bounded)                       # the find_boards pose arm's camera
     camera = VgtkCore.model(bcamera)        # raw K + OpenCV-model lens
     cam_pinhole = CameraModel(camera.intrinsics, Pinhole())  # undistorted-frame camera
     network = DescriptorNetwork(network_path)
@@ -329,14 +329,13 @@ end
 # after the unit's frame loop (2026-08-11), so its presence genuinely means the
 # run finished. The frame cap is not checked here: it is the config's
 # `[experiment] limit`, a stated value in the run key, so a capped run is
-# another directory, never mistaken for the full one. `run_complete` WARNS on a
-# commit mismatch with the record rather than invalidating: code is not keyed,
-# it is restorable (`tag!` records the commit and dirty patch).
-_complete(unit::SweepUnit) = run_complete(unit.poses; sidecar = TARGET_POSES_FILE)
+# another directory, never mistaken for the full one. Code is not keyed: a unit
+# whose recorded code trees changed is not complete (`run_complete` runs it
+# again, naming the changed trees).
 
 function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_provenance, force, telemetry)
     isempty(units) && return nothing
-    all(u -> !force && _complete(u), units) && return nothing
+    all(u -> !force && run_complete(u.poses; sidecar = TARGET_POSES_FILE), units) && return nothing
     _warmup(ctx, first(units))
 
     for unit in units
@@ -347,7 +346,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
         # The unit path is keyed on the config, so a changed config is a NEW
         # directory and there is nothing to clear; an existing complete
         # directory is a cache hit, exactly like `produce_or_load`.
-        if !force && _complete(unit)
+        if !force && run_complete(unit.poses; sidecar = TARGET_POSES_FILE)
             println("=== '$(unit.label)' already produced -> $(unit.poses)  (skipping; force = true to redo)")
             continue
         end
