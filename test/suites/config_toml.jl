@@ -409,7 +409,7 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
         _det(resp) = (; metadata = (; response = resp))
 
         @testset "loader defaults ARE the struct defaults (one authority)" begin
-            # The loader supplies only PRESENT keys (_present_kwargs); an absent key
+            # The loader supplies only PRESENT keys (Core's present_kwargs); an absent key
             # must resolve to the struct's @kwdef default. The restated-literal
             # pattern this pins against drifted once (geometry min_inliers,
             # 2026-08-11): the structs moved and the loader fallbacks did not.

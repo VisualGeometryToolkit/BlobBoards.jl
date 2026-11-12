@@ -30,7 +30,7 @@ using TOML: TOML
 # -----------------------------------------------------------------------------
 
 # ONE default authority: `configs/default.toml`. Loaders supply only the keys the
-# TOML actually states (`_present_kwargs`); an absent key falls through to the
+# TOML actually states (`present_kwargs`); an absent key falls through to the
 # struct's @kwdef default — which READS that same file (src/config_defaults.jl).
 # So a run config that sets some keys inherits the rest from the defaults file,
 # not from a parallel set of literals.
@@ -54,9 +54,6 @@ import VisualGeometryToolkitCore: toml_key, toml_skip_fields, toml_field
 # (one of its CONTRACT_GENERICS): BlobBoards adds the methods of its configs.
 import VisualGeometryToolkitEstimation: config_dict
 
-_present_kwargs(d::AbstractDict, spec::Pair{String}...; fallback = nothing) =
-    present_kwargs(d, spec...; fallback)
-
 # Absent inner NMS keys inherit configs/default.toml's `[find_boards.detect]
 # nms` table when it configures the SAME strategy (the ONE default authority —
 # `nms = { type = "ellipse" }` with no `cutoff` must load the file's cutoff,
@@ -65,7 +62,7 @@ _present_kwargs(d::AbstractDict, spec::Pair{String}...; fallback = nothing) =
 # only authority (documented at the structs).
 function _nms_kwargs(d, type::AbstractString, spec::Pair{String}...)
     fd = _dflt("detect", "nms")
-    return _present_kwargs(d, spec...; fallback = fd["type"] == type ? fd : nothing)
+    return present_kwargs(d, spec...; fallback = fd["type"] == type ? fd : nothing)
 end
 
 const NMS_TAGS = TagRegistry(
@@ -142,7 +139,7 @@ function _detect_from_toml(d)
     # each bundle, and derived per run (see _board_settings). Asserting it here
     # could only agree — or disagree and silently filter away every blob.
     _check_run_keys(d, _allowed_keys(DetectConfig), "find_boards.detect")
-    kw = _present_kwargs(
+    kw = present_kwargs(
         d,
         "peak_threshold" => Float64,
         "edge_threshold" => Float64,
@@ -174,7 +171,7 @@ function _adapt_from_toml(d)
     # keeps the extent anchored to the print.
     _check_run_keys(d, _allowed_keys(AdaptConfig), "find_boards.adapt")
     return AdaptConfig(;
-        _present_kwargs(
+        present_kwargs(
             d,
             "min_intensity" => Float64,
             "scan_padding" => Float64,
@@ -223,7 +220,7 @@ function _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size)
         @warn "geometry type = \"radial_homography\" ignores the `camera` keyword"
     return RadialHomographyGeometry(
         image_size;
-        _present_kwargs(
+        present_kwargs(
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
@@ -249,7 +246,7 @@ function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
     _check_run_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
     camera === nothing || @warn "geometry type = \"homography\" ignores the `camera` keyword"
     return HomographyGeometry(;
-        _present_kwargs(
+        present_kwargs(
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
@@ -267,7 +264,7 @@ function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
         )
     )
     return PoseGeometry(
-        camera; _present_kwargs(
+        camera; present_kwargs(
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
@@ -412,7 +409,7 @@ FindBoardsConfig(table::AbstractDict; camera = nothing, image_size = nothing) =
 function _track_from_toml(d::AbstractDict)
     _check_run_keys(d, _allowed_keys(TrackConfig), "find_boards.track")
     return TrackConfig(;
-        _present_kwargs(
+        present_kwargs(
             d, "iou_threshold" => Float64, "support_fraction" => Float64,
             "patience" => Int, "keyframe_every" => Int
         )...
@@ -448,9 +445,9 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
         ),
         max_detections = haskey(fb, "max_detections") ?
             _max_detections(fb["max_detections"]) : _dflt_max_detections(),
-        # Scalar knobs via _present_kwargs: an absent key falls through to the
+        # Scalar knobs via present_kwargs: an absent key falls through to the
         # struct's @kwdef default (the ONE default authority — see above).
-        _present_kwargs(
+        present_kwargs(
             fb,
             "min_similarity" => Float64,
             "verify_similarity" => Float64,
