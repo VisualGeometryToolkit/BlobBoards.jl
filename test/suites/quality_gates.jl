@@ -22,6 +22,11 @@ VgtkCore.test_quality_gates(
     persistent_tasks = false,
     tag_rules = :report, tag_tables = :report, config_tags = :report,
     stack_dependencies = :report, public_names = :report, contract_generics = :report,
+    # third_party_public stays :report. Its accepted findings, each with its reason:
+    # - explicit imports: KernelAbstractions' `@context` (src/adapt_ka.jl) is not declared public there, but it is
+    #   KernelAbstractions' API for the kernel context that Core's `tree_sum!(@context, smem, tid, nt)` takes, the
+    #   stack's one workgroup sum (Core's numerics/ka_reduce.jl imports it the same way). Accepted 2026-11-12.
+    # - qualified accesses: KernelAbstractions' `@atomic` and `zeros`, Base internals (as before).
 )
 
 # The extension points BlobBoards declares: the generics CaliBlobs extends (its `GeometryConfig` arm and its run
