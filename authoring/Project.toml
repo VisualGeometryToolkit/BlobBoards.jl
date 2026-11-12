@@ -24,7 +24,7 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 [sources]
 BlobBoards = { path = ".." }
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
-VisualGeometryToolkitCore = {path = "/home/jpr/src/vgtk-pin-01e54733/VisualGeometryToolkitCore"}
+VisualGeometryToolkitCore = {path = "/home/jpr/src/vgtk-pin-1079f0c1/VisualGeometryToolkitCore"}
 
 [compat]
 CUDA = "5.11.0"
