@@ -74,9 +74,9 @@
             BBE.save_hand_eye(file, he)
             # every pose of the record is Uncertain: X in the transforms file, each Y_m in the mount
             d = JSON.parse(read(file, String))
-            @test d.schema == "vgio/transforms/v3" && only(d.transforms).from == "body:camera_rig" && haskey(only(d.transforms), :covariance)
+            @test d.schema == "vgio/transforms/v4" && only(d.transforms).from == "body:camera_rig" && haskey(only(d.transforms), :covariance)
             m = JSON.parse(read(joinpath(dir, "hand_eye_bb_board_rig.json"), String))
-            @test m.schema == "vgio/rig/v6" && m.frame == "body:board_rig" && all(t -> haskey(t.pose, :covariance), m.targets)
+            @test m.schema == "vgio/rig/v9" && m.frame == "body:board_rig" && all(t -> haskey(t.pose, :covariance), m.targets)
             @test all(t -> t.target.type == "planar" && t.target.reference == t.id, m.targets)   # pose-only boards, named by id
             X, mount = BBE.load_hand_eye(file)
             @test X isa Uncertain && geom(X) isa EuclideanMap{3, Float64, <:Any, <:Any, BodyFrame{:camera_rig}, ViewFrame{:optical}}
