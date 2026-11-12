@@ -107,3 +107,12 @@ end
         @test f in ("make_adapted_panels.jl", "make_bmvc2026_intro.jl", "make_pipeline_panels.jl")
     end
 end
+
+# The runner bootstrap is VisualGeometryToolkitEval's, GENERATED from its one template
+# (Reproduce.write_reproduce_script(repo_root; julia_project = "bmvc2026")): the
+# checked-in copy is exactly it, never a hand-edited one.
+@testitem "bmvc2026 runner bootstrap is Eval's generated one" begin
+    using DrWatson: projectdir
+    using VisualGeometryToolkitEval.Reproduce: reproduce_script
+    @test read(projectdir("scripts", "reproduce", "reproduce.sh"), String) == reproduce_script(; julia_project = "bmvc2026")
+end
