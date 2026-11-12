@@ -20,11 +20,11 @@ using DrWatson
 @quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 
 include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
-using .BlobBoardsEval: pose_results, eval_sources, load_config
+using .BlobBoardsEval: pose_results, eval_sources, load_config, SYSTEMS
 using DataFrames
 using Statistics
 
-const SYSTEMS = [("blob", "BlobBoards"), ("april", "AprilTag"), ("aruco", "ArUco")]
+# The series: BlobBoardsEval's SYSTEMS (src/error_table.jl); `(key, label)` its first two fields.
 
 # The collected results frame (DrWatson collect_results), not a CSV root:
 # `level` is a column, so the unoccluded set is a filter.

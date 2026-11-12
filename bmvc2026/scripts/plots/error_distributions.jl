@@ -36,7 +36,7 @@ using DrWatson
 @quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 
 include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
-using .BlobBoardsEval: pose_results, figure_config, write_figure_records, figure_numbers, eval_sources, poses_dir
+using .BlobBoardsEval: SYSTEMS, pose_results, figure_config, write_figure_records, figure_numbers, eval_sources, poses_dir
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
 using VisualGeometryToolkitEval.Render: station_cells   # the floorplan fan's cells
@@ -46,12 +46,7 @@ using DrWatson: plotsdir
 using DataFrames
 using Statistics
 
-# Same series order/colors as absolute_pose.jl — one system, one color.
-const SYSTEMS = [
-    (key = "blob", label = "BlobBoards", color = "#0072B2"),
-    (key = "april", label = "AprilTag", color = "#E69F00"),
-    (key = "aruco", label = "ArUco", color = "#009E73"),
-]
+# Series order/colors: BlobBoardsEval's SYSTEMS (src/error_table.jl) — one system, one color.
 
 # One cell of the collected frame: the observations for one marker system at
 # one occlusion level ("none" = the unoccluded set). Was

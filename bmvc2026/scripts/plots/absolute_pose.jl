@@ -22,19 +22,13 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
 end
-using .BlobBoardsEval: pose_results, eval_sources, load_config
+using .BlobBoardsEval: pose_results, eval_sources, load_config, SYSTEMS
 using CairoMakie
 using DrWatson: plotsdir
 using DataFrames
 using Statistics
 
-# Fixed series order and colors (validated categorical palette; the same
-# system keeps the same color in every figure).
-const SYSTEMS = [
-    (key = "blob", label = "BlobBoards", color = "#0072B2"),
-    (key = "april", label = "AprilTag", color = "#E69F00"),
-    (key = "aruco", label = "ArUco", color = "#009E73"),
-]
+# Fixed series order and colors: BlobBoardsEval's SYSTEMS (src/error_table.jl).
 
 # One cell of the collected frame: the observations for one marker system at
 # one occlusion level. Replaces `CSV.read(joinpath(csv_root, key * ".csv"))` —

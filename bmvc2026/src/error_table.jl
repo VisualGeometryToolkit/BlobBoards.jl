@@ -27,6 +27,15 @@ const BOARD_TYPES = (
     (name = "bb", abbr = "bb", system = "blob"),
 )
 
+# The figures' series, one per `system` above: fixed order, label and colour
+# (a validated categorical palette; the same system keeps the same colour in
+# every figure and table).
+const SYSTEMS = [
+    (key = "blob", label = "BlobBoards", color = "#0072B2"),
+    (key = "april", label = "AprilTag", color = "#E69F00"),
+    (key = "aruco", label = "ArUco", color = "#009E73"),
+]
+
 # The board-definition subdirectory (`<inputs>/boards/<dir>`) of a marker
 # system, by its image-subset abbreviation.
 const BOARDS_DIRS = Dict("apr" => "apriltags", "uco" => "aruco", "bb" => "blobboards")
