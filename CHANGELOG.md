@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased (the VisualGeometryToolkit 0.9 stack)
+## 0.6.0 (2026-11-12)
 
-On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1 as
-the 0.9 branch states them), with the 0.9 port of LocalOptimizationDoneRight.
-Breaking (the next release is a minor bump, 0.6.0):
+On the VisualGeometryToolkit 0.9 stack, from General: VisualGeometryToolkitCore, IO and
+Estimation 0.9, Features 0.7 (bmvc2026 also Eval 0.7), with LocalOptimizationDoneRight 0.6
+(its 0.9 port). Breaking:
 
 - **The pose arm takes a `BoundedCamera`** (the stack's rule: pixel operations
   take a BoundedCamera). `PoseGeometry(camera)`, `FindBoardsConfig(path; camera)`,
