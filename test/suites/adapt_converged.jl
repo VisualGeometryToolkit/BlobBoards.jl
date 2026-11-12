@@ -1,6 +1,6 @@
 # The adaptation IRLS records, per blob, how it ended (the owner's §14 rulings
 # for BlobBoards, 2026-11-11), in Core's termination record:
-#   converged at rtol             ReturnCode.Success        StopRule ParameterChange
+#   converged at rtol             ReturnCode.Success        StopRule IncrementSize
 #   capped at max_irls_iter       ReturnCode.MaxIters       StopRule IterationCap
 #   step refused by the shape gate ReturnCode.Failure        StopRule ShapeGate
 #     (refused at the first step from the seed: ReturnCode.InitialFailure)
@@ -38,7 +38,7 @@ end
     @test length(dets) >= 15
     RC = VisualGeometryToolkitCore.ReturnCode
     retcodes = (RC.Success, RC.MaxIters, RC.Failure, RC.InitialFailure)
-    rules = Dict(RC.Success => VisualGeometryToolkitCore.ParameterChange, RC.MaxIters => VisualGeometryToolkitCore.IterationCap,
+    rules = Dict(RC.Success => VisualGeometryToolkitCore.IncrementSize, RC.MaxIters => VisualGeometryToolkitCore.IterationCap,
                  RC.Failure => VisualGeometryToolkitCore.ShapeGate, RC.InitialFailure => VisualGeometryToolkitCore.ShapeGate)
 
     function consistent(frames)

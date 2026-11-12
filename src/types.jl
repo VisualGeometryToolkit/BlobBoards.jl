@@ -26,7 +26,7 @@ Type alias for a `Detection` with an `EllipticFrame` and metadata containing:
     convergence is `successful_retcode(det.retcode)`, §14, not a field of its own), `MaxIters` (capped at
     `max_irls_iter`: unconverged), `Failure` (the shape gate refused a step:
     rejected), `InitialFailure` (it refused the first step from the seed);
-  - `stop_rule::StopRule` — `ParameterChange`, `IterationCap` or `ShapeGate`;
+  - `stop_rule::StopRule` — `IncrementSize` (the IRLS step below `rtol`, Estimation's `irls_termination`), `IterationCap` or `ShapeGate`;
   - `rejection::Symbol` — why the shape gate refused: `:not_peak` (the fitted
     paraboloid is not concave) or `:aspect_ratio` (beyond `max_aspect_ratio`);
     `:none` otherwise.

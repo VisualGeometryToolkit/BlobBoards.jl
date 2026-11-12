@@ -88,11 +88,12 @@ end
 # The clamped bilinear sample, the device-safe lgamma/digamma/trigamma series
 # and the in-register 6×6 LU are VisualGeometryToolkitCore's since 0.21.1
 # (hoisted verbatim from here — same op sequences), and so is the one upload
-# to a device (`ka_upload`). Core's workgroup `tree_sum!` is not called: a
-# barrier inside a helper does not run on KA's CPU backend, so the kernels
-# spell their reductions inline (see "The per-blob kernels").
+# to a device (`ka_upload`). The workgroup SUMS are Core's `tree_sum!` (a
+# barrier inside a helper does not run on KA's CPU backend, but the CPU group is
+# one work item, for which it returns at once); the two MAX reductions stay
+# inline (see "The per-blob kernels").
 using VisualGeometryToolkitCore: bilinear_sample_clamped, lgamma_lanczos, digamma_stirling,
-    trigamma_stirling, lu_solve!, ka_upload, on_device
+    trigamma_stirling, lu_solve!, ka_upload, on_device, tree_sum!
 # The E-step is Core's Student-t + uniform mixture, built in the kernel's float
 # type with the kernels' lgamma (one per blob per iteration: ν and ŝ² change per
 # blob); the apply-time shape gate is Core's closed-form 2×2 peak and aspect test.
@@ -100,8 +101,9 @@ using VisualGeometryToolkitCore: StudentTMixture, inlier_posterior, posterior_we
 # The ν M-step is Core's: a point's Q-derivative terms and the safeguarded Newton
 # update from the reduced sums (Newton only where Q is concave).
 using VisualGeometryToolkitCore: nu_point_terms, next_nu_from_sums
-# The sweep's per-partition score is VisualGeometryToolkitCore's one formula.
-using VisualGeometryToolkitCore: IGPrior, partition_score
+# The sweep is VisualGeometryToolkitCore's one prefix sweep (its per-partition score,
+# `partition_score`, inside), log Γ from Core's table.
+using VisualGeometryToolkitCore: IGPrior, prefix_sweep, log_gamma_table
 const _JEFFREYS = IGPrior()
 
 
@@ -359,17 +361,6 @@ end
 @inline _blob_mixture(::Type{Ta}, nu, s_hat_sq, outlier_halfwidth, blob, lgamma_f) where {Ta} =
     StudentTMixture{Ta}(nu[blob], max(s_hat_sq[blob], Ta(1.0e-30)), log(Ta(2.0) * outlier_halfwidth[blob]), 1; lgamma = lgamma_f)
 
-# The sweep's score of a partition is VisualGeometryToolkitCore's one per-partition
-# formula, `partition_score` (device-callable), at the Jeffreys prior (IG at
-# α₀ = β₀ = 0): S = lgamma(j/2) − (j/2)·log 2π − (j/2)·log(RSS/2) − outlier_cost.
-# The kernel supplies lgamma(j/2) — the backend's lgamma, its two closed forms at
-# j = 1, 2 — and floors the RSS, as the score's callers do.
-@inline function _half_dof_lgamma(jdof::Integer, ::Type{Ta}, lgamma_f::F) where {Ta, F}
-    jdof == 1 && return Ta(0.5) * log(Ta(3.141592653589793))
-    jdof == 2 && return zero(Ta)
-    return lgamma_f(Ta(jdof) / Ta(2.0))
-end
-
 # The ν-Newton step's special functions at ν (the digammas Core's
 # `nu_point_terms` reads, the trigammas its `next_nu_from_sums` reads).
 @inline function _nu_terms(ν::Ta) where {Ta}
@@ -427,10 +418,11 @@ end
 end
 
 # Per-blob bitonic sort of r² in shared memory → outlier_halfwidth = √median(r²) →
-# marginal posterior sweep (RSDR's `partition_score` at the Jeffreys prior) → ν, ŝ².
+# the stack's one prefix sweep (Core's device-callable `prefix_sweep`, at the
+# Jeffreys prior, log Γ from `lg_table` = Core's `log_gamma_table`) → ν, ŝ².
 @kernel inbounds = true unsafe_indices = true function _sort_sweep_ka!(
         nu, s_hat_sq, outlier_halfwidth, @Const(r2), @Const(np),
-        @Const(cnt), @Const(valid), @Const(offsets), lgamma_f
+        @Const(cnt), @Const(valid), @Const(offsets), @Const(lg_table)
     )
     @uniform nt = Int32(@groupsize()[1])
     @uniform Ta = eltype(nu)
@@ -479,25 +471,8 @@ end
         m = Int32(np[blob]) + Int32(1)
         log_two_outlier_halfwidth = log(Ta(2.0) * blob_outlier_halfwidth)
 
-        RSS = zero(Ta)
-        best_S = Ta(-1.0e30)
-        best_k = m + Int32(1)
-
-        kk = Int32(1)
-        while kk <= n
-            RSS += smem[kk]
-            if kk > m
-                S = partition_score(
-                    _JEFFREYS, _half_dof_lgamma(kk - m, Ta, lgamma_f), Ta(kk - m) / Ta(2.0),
-                    max(RSS, Ta(1.0e-30)), Ta(n - kk) * log_two_outlier_halfwidth
-                )
-                if S > best_S
-                    best_S = S
-                    best_k = kk
-                end
-            end
-            kk += Int32(1)
-        end
+        _, k_best = prefix_sweep(Ta, smem, 0, n, lg_table, m, 1, _JEFFREYS, log_two_outlier_halfwidth, nothing, nothing)
+        best_k = max(Int32(k_best), m + Int32(1))   # no partition above -Inf (n <= m): the smallest model, as before
 
         ν = max(Ta(best_k - m), Ta(2.0))
         RSS_k = zero(Ta)
@@ -580,14 +555,7 @@ end
     for kk in 1:27
         smem[tid] = acc[kk]
         @synchronize()
-        @uniform s = Int32(256)
-        while s > Int32(1)
-            @uniform s = s >> Int32(1)
-            if tid <= s && tid + s <= nt
-                smem[tid] += smem[tid + s]
-            end
-            @synchronize()
-        end
+        tree_sum!(@context, smem, tid, nt)
         if tid == 1 && valid[blob] && converged[blob] == Int32(0)
             m = Int(np[blob])
             if kk <= 21
@@ -624,14 +592,19 @@ const _ADAPT_ASPECT_RATIO = Int32(3)
 const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_ASPECT_RATIO => :aspect_ratio)
 
 # The outcome record of one blob, in VisualGeometryToolkitCore's termination
-# vocabulary (§14): converged → ReturnCode.Success / ParameterChange (rtol on
-# the relative parameter step); capped → MaxIters / IterationCap; refused by
-# the shape gate → Failure / ShapeGate, or InitialFailure when the very first
-# step from the seed was refused; `rejection` names the gate that refused.
+# vocabulary (§14). Converged (rtol on the relative parameter step) and capped
+# are the reweighted fits' one record, VisualGeometryToolkitEstimation's
+# `irls_termination`: Success / IncrementSize and MaxIters / IterationCap. A
+# singular solve only invalidates its blob (no frame), so its record is not used.
+# Refused by the shape gate is BlobBoards' own (no stack form): Failure /
+# ShapeGate, or InitialFailure when the very first step from the seed was
+# refused; `rejection` names the gate that refused.
 function _blob_outcome(state::Int32, initial::Bool)
     RC = VgtkCore.ReturnCode
-    state == _ADAPT_CONVERGED && return (; retcode = RC.Success, stop_rule = VgtkCore.ParameterChange, rejection = :none)
-    state == Int32(0) && return (; retcode = RC.MaxIters, stop_rule = VgtkCore.IterationCap, rejection = :none)
+    if state == _ADAPT_CONVERGED || state == Int32(0)    # converged, or capped at max_irls_iter
+        retcode, stop_rule = VgtkEstimation.irls_termination(state == _ADAPT_CONVERGED, false)
+        return (; retcode, stop_rule, rejection = :none)
+    end
     return (; retcode = initial ? RC.InitialFailure : RC.Failure, stop_rule = VgtkCore.ShapeGate, rejection = _REJECTION[state])
 end
 
@@ -723,15 +696,8 @@ end
     smem_a[tid] = local_wr2
     smem_b[tid] = local_w
     @synchronize()
-    @uniform s = Int32(256)
-    while s > Int32(1)
-        @uniform s = s >> Int32(1)
-        if tid <= s && tid + s <= nt
-            smem_a[tid] += smem_a[tid + s]
-            smem_b[tid] += smem_b[tid + s]
-        end
-        @synchronize()
-    end
+    tree_sum!(@context, smem_a, tid, nt)
+    tree_sum!(@context, smem_b, tid, nt)
     if tid == 1
         live = valid[blob] && converged[blob] == Int32(0)
         live && (s_hat_sq[blob] = max(smem_a[1] / max(smem_b[1], Ta(1.0e-30)), Ta(1.0e-30)))
@@ -766,16 +732,9 @@ end
         smem_b[tid] = local_d2Q
         smem_c[tid] = local_w
         @synchronize()
-        @uniform s = Int32(256)
-        while s > Int32(1)
-            @uniform s = s >> Int32(1)
-            if tid <= s && tid + s <= nt
-                smem_a[tid] += smem_a[tid + s]
-                smem_b[tid] += smem_b[tid + s]
-                smem_c[tid] += smem_c[tid + s]
-            end
-            @synchronize()
-        end
+        tree_sum!(@context, smem_a, tid, nt)
+        tree_sum!(@context, smem_b, tid, nt)
+        tree_sum!(@context, smem_c, tid, nt)
         if tid == 1
             ν = nu[blob]
             _, _, ψ1_half_νp1, ψ1_half_ν = _nu_terms(ν)
@@ -947,7 +906,7 @@ function _adapt_ka(
     )
     _sort_sweep_ka!(device, gs)(
         d_nu, d_s_hat_sq, d_ohw, d_r2, d_np, d_cnt, d_valid_live, d_offsets,
-        lgamma_f; ndrange = gs * N
+        on_device(device, Ta.(log_gamma_table(Int(_SORT_PADDED), 1; alpha0 = 0.0))); ndrange = gs * N
     )
     _soft_weights_ka!(device, gs)(
         d_w, d_pin, d_r2, d_A, d_theta, d_nu, d_s_hat_sq, d_ohw,
