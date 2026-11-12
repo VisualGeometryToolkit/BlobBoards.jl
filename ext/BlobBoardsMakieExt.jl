@@ -31,7 +31,7 @@ using Colors: Colors
 using StaticArrays: SMatrix
 using FlexUnits: Quantity
 using GeometryBasics: Point2, Point2f, Point3, Rect
-using VisualGeometryToolkitCore: EllipticFrame, Ellipse
+using VisualGeometryToolkitCore: EllipticFrame, Ellipse, ustrip, mm
 using CoordinateTransformations: PerspectiveMap
 
 include("makie/board_overlay_recipe.jl")
@@ -393,7 +393,7 @@ function _board_proj(camera::VgtkCore.BoundedCamera, pose; lens::Bool = true)
     # plane homography below, for an image that has already been undistorted
     # (the trace viewer's `detect_img`).
     lens && return CameraBoardProj(VgtkCore.PosedCamera(camera_model, pose))
-    pose_mm = VgtkCore.has_units(pose) ? VgtkCore.ustrip(VgtkCore.mm, pose) : pose
+    pose_mm = VgtkCore.has_units(pose) ? ustrip(mm, pose) : pose
     return PerspectiveMap() ∘ HomographyMap(VgtkCore.PosedCamera(VgtkCore.pinhole(camera_model), pose_mm))
 end
 _board_proj(::Nothing, H; lens::Bool = true) = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H))
