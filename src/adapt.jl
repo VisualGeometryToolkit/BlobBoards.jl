@@ -133,8 +133,8 @@ count_unconverged(frames::AbstractVector) = count(f -> f.retcode == VgtkCore.Ret
     count_rejected(frames) -> Int
     count_rejected(frames, rejection::Symbol) -> Int
 
-The number of adapted frames whose IRLS step the shape gate refused
-(`retcode = ReturnCode.Failure` or `InitialFailure`, `stop_rule = ShapeGate`); with `rejection`, only those
+The number of adapted frames whose IRLS step the shape gate refused. Those are
+`retcode = ReturnCode.Failure` or `InitialFailure`, `stop_rule = ShapeGate`; with `rejection`, only those
 refused for that reason, `:not_peak` or `:aspect_ratio`. See [`adapt`](@ref).
 """
 count_rejected(frames::AbstractVector) = count(f -> f.stop_rule == VgtkCore.ShapeGate, frames)

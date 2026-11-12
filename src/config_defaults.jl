@@ -118,7 +118,7 @@ const _OPTIMIZATION_STRATEGY_TAGS = merge(VgtkEstimation.OPTIMIZATION_STRATEGY_T
     geometry_local_optimization_strategy(d, class::Symbol) -> AbstractOptimizationStrategy
 
 The RANSAC local-optimization strategy a `[find_boards.geometry]`
-`local_optimization_strategy` table `d` names, read by VisualGeometryToolkitEstimation's
+`local_optimization_strategy` table `d` names. It is read by VisualGeometryToolkitEstimation's
 loader over its strategies and LocalOptimizationDoneRight's (`class` is the
 arm's pipeline class: `:homography`, `:absolute_pose`, `:radial_homography`, …).
 The one reader for every geometry arm's TOML, downstream arms' included.

@@ -489,8 +489,8 @@ _fit_endpoints(::BoundedCamera, scored) = planar_lift(scored)
 """
     board_endpoints(scored) -> correspondences
 
-A scored board → image correspondence set as a 2D fit's endpoints: the board
-centroids `exact` (board points are known, not measured: VisualGeometryToolkitCore
+A scored board → image correspondence set as a 2D fit's endpoints. The board
+centroids are `exact` (board points are known, not measured: VisualGeometryToolkitCore
 conventions/measurement-noise.md), the image centroids plain (unit isotropic
 pixel noise); the attribute columns ride along. The endpoints of the
 homography arms' fits, and of a downstream arm's (CaliBlobs' radial camera).
@@ -554,7 +554,7 @@ _new_rtree() = SpatialIndexing.RTree{Float64, 2}(Int, Nothing; leaf_capacity = 2
 """
     detection_rtree(detections; skip = nothing) -> SpatialIndexing.RTree
 
-An R-tree over the detections, indexed by position `j`: over their centroids
+An R-tree over the detections, indexed by position `j`. It indexes their centroids
 (`detections` a vector of points: point rects, the warm track's radius queries)
 or over their ellipses (`detections` a vector of `Ellipse`s at a board's
 rendered boundary: each ellipse's bounding box). The ellipse form is the
@@ -1871,8 +1871,8 @@ fit_rng(seed::Integer, uid::AbstractString) =
 """
     board_fit_keywords(config::FindBoardsConfig, uid, bundle) -> NamedTuple
 
-One board's fit keywords, as `find_boards`' engine builds them (less its
-per-thread workspace): the arm's `outlier_halfwidth` and `local_optimization_strategy`,
+One board's fit keywords, as `find_boards`' engine builds them. They are (less its
+per-thread workspace) the arm's `outlier_halfwidth` and `local_optimization_strategy`,
 the RANSAC `config`, the board's world `extent` and its own seeded stream
 (`rng = fit_rng(config.ransac_seed, uid)`). The serial oracle builds them here,
 and so does a downstream arm (CaliBlobs'), so their fits stay comparable with
