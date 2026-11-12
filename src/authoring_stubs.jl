@@ -279,7 +279,9 @@ board(args...; kwargs...) = _makie_recipe(board, args, kwargs)
 # precompilation. So the recipe's functions are the extension's own, and these
 # forward to them — or name the install line when no Makie backend is loaded.
 function _makie_recipe(f, args, kwargs)
+    require_extension(@__MODULE__, :BlobBoardsMakieExt) do
+        ErrorException(_missing_extension_message(f, :BlobBoardsMakieExt))
+    end
     ext = Base.get_extension(@__MODULE__, :BlobBoardsMakieExt)
-    ext === nothing && error(_missing_extension_message(f, :BlobBoardsMakieExt))
     return Base.invokelatest(getproperty(ext, nameof(f)), args...; kwargs...)
 end

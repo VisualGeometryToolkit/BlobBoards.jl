@@ -46,24 +46,11 @@ const EXTENSION_INSTALL = (
 # The root Project.toml and the GPU workspace members carry the same pin.
 const CUDA_RUNTIME_PIN = "using CUDA; CUDA.set_runtime_version!(v\"12.9\")"
 
-_extension_loaded(extension::Symbol) = Base.get_extension(@__MODULE__, extension) !== nothing
-
 # The message of a call to an extension's function without the extension.
 function _missing_extension_message(f, extension::Symbol)
     e = EXTENSION_INSTALL[extension]
     return "BlobBoards.$(nameof(f)) needs $(e.what), and this session has not loaded it. " *
         "Install once with\n\n    $(e.install)\n\nand load with `$(e.load)`."
-end
-
-# The fallback method of a function whose methods live in `extension`: without
-# the extension, an error naming the install line; with it loaded, the
-# MethodError the call would have raised (the arguments fit no method of the
-# extension).
-function _require_extension(f, extension::Symbol, args)
-    # The caller's world age: a call compiled before the extension loaded keeps
-    # Julia's "method too new" hint.
-    _extension_loaded(extension) && throw(MethodError(f, args, Base.tls_world_age()))
-    return error(_missing_extension_message(f, extension))
 end
 
 """
@@ -88,6 +75,12 @@ const EXTENSION_FUNCTIONS = (
     (LuxDescriptorNetwork, :BlobBoardsLuxExt), (train_descriptor, :BlobBoardsTrainingExt),
 )
 
+# Each fallback is VisualGeometryToolkitCore's `require_extension`: without the
+# extension, the error naming the install line; with it loaded, the MethodError the
+# call would have raised (the arguments fit no method of the extension), at the
+# caller's world age.
 for (f, extension) in EXTENSION_FUNCTIONS
-    @eval $(nameof(f))(args...; kwargs...) = _require_extension($f, $(QuoteNode(extension)), args)
+    @eval $(nameof(f))(args...; kwargs...) = require_extension($f, args, @__MODULE__, $(QuoteNode(extension))) do
+        ErrorException(_missing_extension_message($f, $(QuoteNode(extension))))
+    end
 end

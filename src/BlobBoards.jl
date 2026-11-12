@@ -96,6 +96,7 @@ using VisualGeometryToolkitCore:
     PlanarTarget                  # a board as a target model (board_target, pipeline.jl)
 
 using VisualGeometryToolkitCore: Size2, parse_unit, strip_or_bare, unit_string, base_quantity
+using VisualGeometryToolkitCore: require_extension   # the stack's one package-extension check (extensions.jl)
 
 # Image processing and visualization
 using Colors: Colors, Gray

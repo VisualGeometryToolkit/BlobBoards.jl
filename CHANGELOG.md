@@ -2,7 +2,7 @@
 
 ## 0.6.0 (2026-11-12)
 
-On the VisualGeometryToolkit 0.9 stack, from General: VisualGeometryToolkitCore, IO and
+On the VisualGeometryToolkit 0.9 stack, from General: VisualGeometryToolkitCore 0.9.3, IO and
 Estimation 0.9, Features 0.8 (bmvc2026 also Eval 0.7), with LocalOptimizationDoneRight 0.6
 (its 0.9 port). Breaking:
 
@@ -85,6 +85,10 @@ Estimation 0.9, Features 0.8 (bmvc2026 also Eval 0.7), with LocalOptimizationDon
   every fit builds the scorer from its table through VisualGeometryToolkitEstimation's
   `scoring_from_toml` (`outlier_halfwidth` the one number it states, the priors the
   stack's configuration: Jeffreys and flat, as before). The scores are unchanged.
+- The fallback of every function whose methods live in a package extension is
+  VisualGeometryToolkitCore's `require_extension` (Core 0.9.3; BlobBoards' private copy is
+  deleted): the same install-line error without the extension, the same `MethodError`
+  with it loaded.
 - The docstring gates are VisualGeometryToolkitCore's `test_docs`; the suite runs
   Core's `check_duplication` (its open findings listed, each an item of
   `.release/duplication-checklist.md`).

@@ -1518,7 +1518,7 @@ function train_descriptor end
 # profile. Best-effort: a rendering failure never aborts a track build, it just
 # degrades to the terminal chart. Used by the build drivers below.
 function _emit_view_angle_profile(path, stats; title, edges = VIEW_ANGLE_EDGES)
-    if !isempty(stats) && _extension_loaded(:BlobBoardsMakieExt)
+    if !isempty(stats) && Base.get_extension(@__MODULE__, :BlobBoardsMakieExt) !== nothing
         try
             # `save_view_angle_figure`'s method lives in BlobBoardsMakieExt,
             # loaded after this was compiled: `invokelatest` reaches it.
