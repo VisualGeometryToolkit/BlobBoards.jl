@@ -51,8 +51,6 @@ const SYSTEMS = [
 
 _meta(stem) = JSON.parse(read(joinpath(CALIB, "hand_eye_$(stem).json"), String)).provenance   # vgio/transforms/v3
 
-rad2deg_(x) = x * 180 / pi
-
 function main()
     rows = map(SYSTEMS) do (disp, stem, pfx)
         m = _meta(stem)
@@ -61,7 +59,7 @@ function main()
          recovered = Int(m.n_frames_recovered),
          markers = Int(m.n_markers),
          resid_mm = Float64(m.sigma_trans_mm),
-         resid_deg = rad2deg_(Float64(m.sigma_rot_rad)))
+         resid_deg = rad2deg(Float64(m.sigma_rot_rad)))
     end
 
     # ---- table -------------------------------------------------------------------

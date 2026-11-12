@@ -35,6 +35,7 @@ if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval
+using Main.BlobBoardsEval: _stem   # an image file's stem (src/error_table.jl)
 
 const EVAL, _ = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
 const SRC = eval_sources(EVAL)
@@ -45,7 +46,6 @@ const SRC = eval_sources(EVAL)
 results_dir = hand_eye_dir(SRC)
 mkpath(results_dir)
 
-_stem(f) = splitext(basename(f))[1]
 
 println("sources: $(SRC.keys)")
 for bt in BlobBoardsEval.BOARD_TYPES

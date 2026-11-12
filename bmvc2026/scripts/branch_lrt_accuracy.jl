@@ -37,7 +37,7 @@ using DrWatson
 
 include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval
-using .BlobBoardsEval: rig_sequence, load_detected_poses, eval_sources, load_config, poses_dir
+using .BlobBoardsEval: rig_sequence, load_detected_poses, eval_sources, load_config, poses_dir, _stem
 using VisualGeometryToolkitCore: pose, ids
 using JSON
 using LinearAlgebra
@@ -50,7 +50,6 @@ import VisualGeometryToolkitEval
 SRC = eval_sources(load_config("figures/evaluation.toml"))
 logpath = VisualGeometryToolkitEval.cli_option(ARGS, "branch-log")   # required: a sweep's branch telemetry (jsonl)
 
-_stem(f) = splitext(basename(f))[1]
 # Rotations.jl's rotation_angle of the relative rotation, not a local
 # guarded-trace copy: the invariance criterion (now VisualGeometryToolkitEval rigid_invariance_errors) already retired one such hand-roll, and
 # a third spelling of the same formula is a third place for the clamp to drift.
@@ -105,8 +104,8 @@ for r in records
 end
 println("$(length(rows)) joined, $(unmatched[]) unmatched/dropped")
 
-# logistic approximation of the normal CDF (max err < 1%) — avoids a dep
-Φ(x) = 1 / (1 + exp(-1.702 * x))
+# the normal CDF: VisualGeometryToolkitCore's `normcdf_as` (|error| < 1.5e-7)
+const Φ = VisualGeometryToolkitCore.normcdf_as
 
 println("\nP(correct) by discriminability d:")
 edges = [0.0, 1.0, 3.0, 5.0, 10.0, 30.0, Inf]

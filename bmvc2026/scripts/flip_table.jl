@@ -34,8 +34,8 @@ using DrWatson
 
 include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval
-using .BlobBoardsEval: rig_sequence, load_detected_poses, pose_error_table, hand_eye,
-    detected_marker_sizes, static_recovery_accepted, figure_config, write_figure_records, eval_sources, poses_dir
+using .BlobBoardsEval: rig_sequence, load_detected_poses, hand_eye, evaluate_dataset,
+    figure_config, write_figure_records, eval_sources, poses_dir
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
 using DrWatson: plotsdir, projectdir
@@ -48,27 +48,14 @@ const flip_deg = Float64(DRV["flip_deg"])
 const base_set = String(DRV["flip_base"])
 
 
-# Per-system census. `series` names the detections censused (a series of the
-# sources); the rig join, the board definitions and the hand-eye calibration
-# are `name`'s, so BlobBoards is censused twice (with and without the branch
-# decision) against the very same calibration and rig join.
+# Per-system census: `evaluate_dataset`'s table of the series `series` (the
+# detections censused), with the hand-eye fit of `name`'s calibration pinned,
+# so BlobBoards is censused twice (with and without the branch decision)
+# against the very same calibration and rig join.
 function census(name, abbr; series = name)
-    frames = rig_sequence(SRC.mocap, abbr)
-    detected = load_detected_poses(poses_dir(SRC, series))
-
-    marker_sizes = detected_marker_sizes(SRC.inputs, abbr, load_detected_poses(poses_dir(SRC, name)))
-
-    # The calibration rig sequence carries the static-camera recovery (the
-    # camera-rig trajectory's `recovered` frames), the same frames the pose
-    # results use — one producer, so the two cannot disagree about it.
-    static_recovered = static_recovery_accepted(SRC.mocap, "calibration_" * abbr)
-    static_recovered || @warn "static-camera recovery was refused for calibration_$abbr; tracked frames only"
-    calib_frames = rig_sequence(SRC.mocap, "calibration_" * abbr)
-    calib_detected = load_detected_poses(poses_dir(SRC, name; calibration = true))
-
-    # The ONE hand-eye authority, the same artifact the pose results resolve.
-    he = hand_eye(SRC, calib_frames, calib_detected; subset = "calibration_" * abbr)
-    df = pose_error_table(frames, detected, he.X, he.targets; marker_sizes)
+    calib = "calibration_" * abbr
+    he = hand_eye(SRC, rig_sequence(SRC.mocap, calib), load_detected_poses(poses_dir(SRC, name; calibration = true)); subset = calib)
+    df = evaluate_dataset(SRC; board_types = ((; name = series, abbr, system = series),), hand_eye_fit = he)[series].table
     return map((1000, 2000, 3000)) do spot
         d = df[df.rig_distances_bin .== spot, :]
         a = abs.(collect(skipmissing(d.abs_error_angles_deg)))

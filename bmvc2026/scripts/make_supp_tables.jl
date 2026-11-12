@@ -42,14 +42,14 @@ import TOML
 using Statistics: median
 using Printf: @sprintf
 using BlobBoards: FindBoardsConfig, config_dict
-using VisualGeometryToolkitCore: BoundedCamera, parse_unit, ustrip, mm, dpi
+using VisualGeometryToolkitCore: BoundedCamera, ustrip, mm, dpi
 import VisualGeometryToolkitIO
 import VisualGeometryToolkitFeatures
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir
+using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir, _quantity   # a board JSON's `{value, unit}` field as a quantity
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
 
@@ -57,9 +57,6 @@ const CFG, CFG_PATH = figure_config("supp_tables"; default = projectdir("configs
 const BOARDS_DIR = input_path(CFG, "boards")
 const CAMERA_JSON = input_path(CFG, "camera")
 const RUN_CONFIG = joinpath(sweep_dir(CFG["runs"]["bb"]), "poses", "bb", "_config.toml")
-# A board JSON's `{value, unit}` field as a quantity, its unit read through
-# VisualGeometryToolkitCore's one guarded parse; lengths come out with `ustrip(mm, …)`.
-_quantity(x) = Float64(x.value) * parse_unit(String(x.unit))
 
 # A number macro of this driver (VisualGeometryToolkitEval's one writer), its body as typeset here.
 _macro(nums, name, value) = add_number!(nums, name, string(value))
