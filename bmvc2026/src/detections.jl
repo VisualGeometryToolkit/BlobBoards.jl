@@ -57,7 +57,10 @@ function export_target_poses(
         frames[t] = Dict(
             Symbol(String(p.board_id)) => EuclideanMap(
                 RotMatrix{3, Float64}(SMatrix{3, 3, Float64}(reduce(hcat, [Float64.(row) for row in p.rot_mat])')),
-                SVector{3, Float64}(p.trans) .* mm; check = false,   # the export's `trans` is millimetres; a file takes lengths as quantities
+                # the export's `trans` is millimetres, read the way a file length is read (VgtkIO's decimal-exact
+                # read_length): `x .* mm` rounds the binary value, and 425 of the 260527 baselines' 1245
+                # translations then moved by an ulp through save/load (the exact read-back check below)
+                VgtkIO.read_length.(SVector{3, Float64}(p.trans), mm); check = false,
             ) for p in d.poses
         )
         names[t] = img

@@ -114,3 +114,29 @@
         end
     end
 end
+
+# The baselines' export → target_poses.json: every translation reads back EXACTLY. The export's millimetres are
+# read the way a file length is read (VisualGeometryToolkitIO's decimal-exact `read_length`); built as `x .* mm` a
+# third of float32-derived values moved by an ulp through save/load and the exact read-back check refused the run.
+@testitem "export_target_poses: translations read back exactly" setup = [BBEval] begin
+    using .BBEval.BlobBoardsEval: export_target_poses
+    import JSON
+    using Random: Xoshiro, randn
+    mktempdir() do dir
+        images, exports = mkpath(joinpath(dir, "images")), mkpath(joinpath(dir, "exports"))
+        K = [1000.0 0.0 640.0; 0.0 1000.0 480.0; 0.0 0.0 1.0]
+        rng = Xoshiro(20261112)
+        for i in 1:20
+            stem = "IMG" * lpad(i, 4, '0')
+            touch(joinpath(images, stem * ".jpg"))
+            poses = [Dict("board_id" => lpad(j, 3, '0'), "rot_mat" => [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                          "trans" => Float64.(Float32.(1000 .* randn(rng, 3))), "size_mm" => 100.0) for j in 1:3]
+            open(joinpath(exports, stem * ".json"), "w") do io
+                JSON.json(io, Dict("image" => stem * ".jpg", "board_type" => "apriltag", "undist_K" => [K[r, :] for r in 1:3],
+                                   "elapsed_time_ms" => 1.0, "poses" => poses))
+            end
+        end
+        # the exact read-back check runs inside: an ulp anywhere is an error
+        @test isfile(export_target_poses(exports, images, joinpath(dir, "out"); camera_name = "cam", K = K))
+    end
+end
