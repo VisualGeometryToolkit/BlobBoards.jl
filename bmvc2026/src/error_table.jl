@@ -27,13 +27,14 @@ const BOARD_TYPES = (
     (name = "bb", abbr = "bb", system = "blob"),
 )
 
-# The figures' series, one per `system` above: fixed order, label and colour
+# The figures' series, one per `system` above: fixed order, label and colour (its
+# hex, and the name the pgfplots panels define it under through Eval's `color_defs`)
 # (a validated categorical palette; the same system keeps the same colour in
 # every figure and table).
 const SYSTEMS = [
-    (key = "blob", label = "BlobBoards", color = "#0072B2"),
-    (key = "april", label = "AprilTag", color = "#E69F00"),
-    (key = "aruco", label = "ArUco", color = "#009E73"),
+    (key = "blob", label = "BlobBoards", color = "#0072B2", pgf = "bbBlue"),
+    (key = "april", label = "AprilTag", color = "#E69F00", pgf = "bbOrange"),
+    (key = "aruco", label = "ArUco", color = "#009E73", pgf = "bbGreen"),
 ]
 
 # The board-definition subdirectory (`<inputs>/boards/<dir>`) of a marker
