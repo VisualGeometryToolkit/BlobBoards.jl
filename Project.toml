@@ -4,7 +4,6 @@ version = "0.5.1"
 authors = ["James Pritts <jbpritts@gmail.com>"]
 
 [deps]
-Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
@@ -28,7 +27,6 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LocalOptimizationDoneRight = "87a2e6a3-7afc-471f-bd1b-aa3740a29cd9"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 ONNXRunTime = "e034b28e-924e-41b2-b98f-d2bbeb830c6a"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PNGFiles = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
 Poppler_jll = "9c32591e-4766-534b-9725-b71a8799265b"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
@@ -69,18 +67,17 @@ BlobBoardsTrainingExt = ["Lux", "Optimisers", "Enzyme", "Reactant", "NNlib", "Te
 
 [sources]
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
-VisualGeometryToolkitCore = {path = "/home/jpr/src/vgtk-pin-4770458a/VisualGeometryToolkitCore"}
+VisualGeometryToolkitCore = {path = "/home/jpr/src/vgtk-pin-9c74e264/VisualGeometryToolkitCore"}
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
-VisualGeometryToolkitIO = {path = "/home/jpr/src/vgtk-pin-4770458a/VisualGeometryToolkitIO"}
+VisualGeometryToolkitIO = {path = "/home/jpr/src/vgtk-pin-9c74e264/VisualGeometryToolkitIO"}
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
-VisualGeometryToolkitEstimation = {path = "/home/jpr/src/vgtk-pin-4770458a/VisualGeometryToolkitEstimation"}
+VisualGeometryToolkitEstimation = {path = "/home/jpr/src/vgtk-pin-9c74e264/VisualGeometryToolkitEstimation"}
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
-VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-pin-4770458a/VisualGeometryToolkitFeatures"}
+VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-pin-9c74e264/VisualGeometryToolkitFeatures"}
 # TEMPORARY: its 0.9 port (on the unregistered 0.9 stack) is not registered yet; replace by its released version from the registry before any push or registration
 LocalOptimizationDoneRight = {path = "/home/jpr/src/lodr-pin-7d022d1"}
 
 [compat]
-Artifacts = "1"
 Base64 = "1"
 Colors = "0.13.3"
 ConstructionBase = "1.6"
@@ -111,14 +108,13 @@ Makie = "0.24.16"
 NNlib = "0.9.45"
 ONNXRunTime = "2"
 Optimisers = "0.4.9"
-Pkg = "1"
 PNGFiles = "0.4.5"
 Poppler_jll = "25.10.0"
 Preferences = "1.6"
 PythonCall = "0.9.35"
 Random = "1"
 Reactant = "0.2.240"
-VisualGeometryToolkitEstimation = "0.8"
+VisualGeometryToolkitEstimation = "0.9"
 Rotations = "1.7"
 Scratch = "1.3"
 # The fork-only queries come from VisualGeometryToolkitCore.SpatialQueries; the
@@ -131,7 +127,7 @@ TOML = "1"
 TensorBoardLogger = "0.1"
 VideoIO = "1.10"
 VisualGeometryToolkitCore = "0.9"
-VisualGeometryToolkitFeatures = "0.6.1"
+VisualGeometryToolkitFeatures = "0.7"
 VisualGeometryToolkitIO = "0.9"
 Zlib_jll = "1"
 Zygote = "0.7"
