@@ -38,7 +38,7 @@ Breaking (the next release is a minor bump, 0.6.0):
   `(; id, retcode, stop_rule, rejection)`, in
   VisualGeometryToolkitCore's termination record (`retcode::ReturnCode.T`,
   `stop_rule::StopRule`; a blob's convergence is `successful_retcode(retcode)`,
-  §14, not a field of its own): converged at `rtol` (`Success`, `ParameterChange`),
+  §14, not a field of its own): converged at `rtol` (`Success`, `IncrementSize`: VisualGeometryToolkitEstimation's `irls_termination`, the reweighted fits' one record),
   capped at `max_irls_iter` (`MaxIters`, `IterationCap`: unconverged), or
   rejected by the shape gate (`Failure`, or `InitialFailure` at the first step
   from the seed; `ShapeGate`; `rejection` is `:not_peak` or `:aspect_ratio`). Capped and

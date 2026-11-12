@@ -122,13 +122,10 @@ const _RENAMED_RUN_KEYS = Dict(
     ("find_boards.geometry", "local_optimization") => "local_optimization_strategy",
 )
 
-function _check_run_keys(d, allowed, section)
-    for k in keys(d)
-        new = get(_RENAMED_RUN_KEYS, (section, k), nothing)
-        new === nothing || throw(ArgumentError("[$section] `$k` was renamed `$new` (no alias)"))
-    end
-    return check_keys(d, allowed, section; retired = _RETIRED_RUN_KEYS)
-end
+# BlobBoards' run tables, checked by Core's `check_keys` with BlobBoards' own
+# retired and renamed keys (Core refuses a renamed key by name, no alias).
+_check_run_keys(d, allowed, section) =
+    check_keys(d, allowed, section; retired = _RETIRED_RUN_KEYS, renamed = _RENAMED_RUN_KEYS)
 
 # -----------------------------------------------------------------------------
 # Section readers
@@ -631,11 +628,15 @@ function _resolve_model(model::AbstractDict)
         ArgumentError("[descriptor] model table is missing \"artifact\"")
     )
     name = String(model["artifact"])
-    dir = _artifact_dir(name) do toml
-        "[descriptor] model artifact \"$name\" is not in the package " *
-            "catalog ($toml); published networks: " *
-            "$(sort!(collect(String.(keys(TOML.parsefile(toml))))))"
-    end
+    toml = _artifacts_toml()
+    catalog = TOML.parsefile(toml)
+    haskey(catalog, name) || throw(
+        ArgumentError(
+            "[descriptor] model artifact \"$name\" is not in the package " *
+                "catalog ($toml); published networks: $(sort!(collect(String.(keys(catalog)))))"
+        )
+    )
+    dir = VgtkCore.install_artifact(name, toml)   # Core's one install of a published artifact
     onnx = filter(f -> endswith(f, ".onnx"), readdir(dir))
     length(onnx) == 1 || error(
         "descriptor artifact \"$name\" must hold exactly one .onnx file; " *
@@ -657,8 +658,9 @@ pipeline examples run entirely on these: a fresh `] add BlobBoards` needs
 no dataset, no `data_dir`, no configuration.
 """
 function example_data(name::Symbol)
-    entry = get(_EXAMPLE_ARTIFACTS, name, "")
-    return _artifact_dir(_ -> "unknown example artifact $(repr(name)); expected one of :boards, :still, :video", entry)
+    haskey(_EXAMPLE_ARTIFACTS, name) ||
+        throw(ArgumentError("unknown example artifact $(repr(name)); expected one of :boards, :still, :video"))
+    return VgtkCore.install_artifact(_EXAMPLE_ARTIFACTS[name], _artifacts_toml())   # Core's one install
 end
 # The catalog entry of each example (Artifacts.toml is add-only: a changed
 # example is a new entry, and this map moves to it): the boards as
@@ -666,18 +668,6 @@ end
 const _EXAMPLE_ARTIFACTS = Dict(
     :boards => "bb_example_boards_v5", :still => "bb_example_still_v4", :video => "bb_example_video_v4",
 )
-
-# ONE catalog lookup for every artifact the package names (descriptor networks,
-# example data): hash by name, refuse an unknown entry with the caller's
-# message, install lazily — entries download on first use, verified against the
-# pinned sha256, into the shared artifact store — and return its directory.
-function _artifact_dir(missing_msg, entry::AbstractString)
-    toml = _artifacts_toml()
-    h = Artifacts.artifact_hash(entry, toml)
-    h === nothing && throw(ArgumentError(missing_msg(toml)))
-    Artifacts.artifact_exists(h) || Pkg.Artifacts.ensure_artifact_installed(entry, toml)
-    return Artifacts.artifact_path(h)
-end
 
 descriptor_network_path(path::AbstractString) = descriptor_network_path(read_run_config(path))
 descriptor_network_path() = descriptor_network_path(default_config_path())

@@ -205,7 +205,7 @@ records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)):
 
 | `retcode` | `stop_rule` | The blob |
 |---|---|---|
-| `:Success` | `:ParameterChange` | converged: the step fell below `rtol` |
+| `:Success` | `:IncrementSize` | converged: the step fell below `rtol` |
 | `:MaxIters` | `:IterationCap` | unconverged: capped at `max_irls_iter` (default 100) |
 | `:Failure` | `:ShapeGate` | rejected: the shape gate refused a step, and the blob keeps its previous iterate |
 | `:InitialFailure` | `:ShapeGate` | rejected at the first step from its seed |
