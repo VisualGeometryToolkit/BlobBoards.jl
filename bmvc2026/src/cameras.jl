@@ -10,7 +10,6 @@
 # scripts/import_cameras.jl ports each ONCE into the native vgio/cameras/v3
 # camera of record through `upstream_camera`; nothing else reads the shape.
 
-import SHA
 using VisualGeometryToolkitIO: opencv_lens
 using VisualGeometryToolkitCore: CameraModel, BoundedCamera, Attributed, Size2
 
@@ -24,18 +23,14 @@ _flag_names(flags::Integer, names::AbstractDict) = join(
 
 The upstream export of one `[[cameras]]` entry of configs/import_cameras.toml
 (`cfg`): its `[inputs.<input>]`, a data_root()-relative path, resolved through
-`input_path`. An absolute (machine) path is refused.
+Eval's `input_path` (its tier's root; its stated sha256 checked). An absolute
+(machine) path is refused.
 """
 function upstream_source(cfg::AbstractDict, entry::AbstractDict)
     s = String(cfg["inputs"][entry["input"]]["path"])
     isabspath(s) && error("import_cameras: input $(entry["input"]) path $(repr(s)) is a machine path; give it relative to data_root()")
     return input_path(cfg, String(entry["input"]))
 end
-
-# The sha256 of a file: the export is refused unless it is the one its
-# [inputs.<id>] states. (VisualGeometryToolkitEval verifies a declared input
-# sha256 once its runner does; until then this one check is the conversion's.)
-_sha256(path) = bytes2hex(open(SHA.sha256, path))
 
 """
     upstream_camera(cfg, entry) -> (name, camera::Attributed{BoundedCamera}, facts)
@@ -48,10 +43,8 @@ from the export's own facts.
 """
 function upstream_camera(cfg::AbstractDict, entry::AbstractDict)
     UP = cfg["upstream"]
-    src = upstream_source(cfg, entry)
-    sha = _sha256(src)
-    want = cfg["inputs"][entry["input"]]["sha256"]
-    sha == want || error("$(src): sha256 $(sha), the config of record states $(want)")
+    src = upstream_source(cfg, entry)   # Eval's input_path: refused unless its sha256 is the config's
+    sha = String(cfg["inputs"][entry["input"]]["sha256"])
     d = JSON.parse(read(src, String))
     d.model == "pinhole_radtan" || error("$(src): model $(d.model), expected pinhole_radtan")
     M = d.camera_matrix

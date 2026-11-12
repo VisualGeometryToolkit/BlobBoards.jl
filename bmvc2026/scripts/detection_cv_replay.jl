@@ -33,7 +33,6 @@ Usage:
 using DrWatson
 @quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 using TOML: TOML
-using SHA: sha256
 using Random: Xoshiro
 using Statistics: quantile
 import VisualGeometryToolkitEval
@@ -110,7 +109,7 @@ function replay()
     a = (1 - unc["interval"]) / 2
     ns = String.(collect(names))
     interval = Dict{String,Any}(n => quantile([b[Symbol(n)] for b in boot], [a, 1 - a]) for n in ns)
-    sha(p) = bytes2hex(open(sha256, joinpath(results_root(), p)))
+    sha(p) = VisualGeometryToolkitEval.file_sha256(joinpath(results_root(), p))
     mkpath(OUTDIR)
     save_coarse_fine_artifact(OP.detection_cv_artifact(OUTDIR), SPEC, rec;
         unit = QueryUnit(), code = (VisualGeometryToolkitCore,), frames = src["frames"], pairs = src["pairs"],
@@ -120,10 +119,10 @@ function replay()
     sel = deployed_setting(OP.detection_cv_artifact(OUTDIR); context = "joint detection CV (replay)")
     open(joinpath(OUTDIR, "_config.toml"), "w") do io
         println(io, "# EFFECTIVE configuration of this run. Source: bmvc2026/configs/detection_cv.toml")
-        TOML.print(io, VgtkEval.Tuning.resolve_tuning!(deepcopy(OP.detection_cv_config(CFG))); sorted = true)
+        TOML.print(io, VgtkEval.Tuning.resolve_tuning!(deepcopy(CFG)); sorted = true)
     end
     write_provenance(OUTDIR, Dict{String,Any}(
-            "run_key" => VgtkEval.Experiments.run_key(OP.detection_cv_config(CFG)),
+            "run_key" => OP.detection_cv_key(CFG),
             "config" => merge(_repo(REPO), Dict{String,Any}("path" => "bmvc2026/configs/detection_cv.toml")),
             "code" => Dict{String,Any}("BlobBoards" => _repo(REPO),
                                        "VisualGeometryToolkitEval" => _repo(VisualGeometryToolkitEval),

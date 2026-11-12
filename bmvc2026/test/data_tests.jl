@@ -53,7 +53,8 @@ end
         mkpath(dirname(net)); write(net, "not a network")
         mkpath(joinpath(data, "absolute_pose_experiments", "260527"))
         withenv("VGTK_DATA_ROOT" => data, "VGTK_RESULTS_ROOT" => results) do
-            @test network_path(rc) == net
+            # Eval's input_path checks the stated sha256: another content is refused
+            @test_throws ArgumentError network_path(rc)
             src = eval_sources(load_config("figures/evaluation.toml"))
             under(p, root) = startswith(abspath(p), abspath(root) * "/")
             @test under(src.inputs, data)
@@ -164,7 +165,7 @@ end
     mktempdir() do tmp
         withenv("VGTK_RESULTS_ROOT" => mkpath(joinpath(tmp, "results"))) do
             none = joinpath(tmp, "nothing-here")
-            layout = Dict{String, Any}("dataset" => "260527", "matcher" => "marker_systems", "problem" => "absolute_pose")
+            layout = Dict{String, Any}("dataset" => "260527", "layout" => ["260527", "evaluation"])
             src = Sources(layout, "260527", none, none, Dict(bt.name => PoseRun(none, none, bt.name) for bt in BOARD_TYPES),
                 Dict("records" => "r", "baselines" => "b", "bb" => "k", "occlusion" => "o", "bb_noflip" => "n"))
             # nothing cached: the cells are evaluated, and the evaluation reads detections that are not there

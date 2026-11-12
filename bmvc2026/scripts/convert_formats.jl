@@ -54,7 +54,8 @@ using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix, rotation_angle
 using LinearAlgebra: norm
 using Statistics: mean, median
-import JSON, SHA, TOML
+import JSON, TOML
+import VisualGeometryToolkitEval
 
 const CFG, CFG_PATH = figure_config("convert_formats"; default = projectdir("configs", "convert_formats.toml"))
 const KEY = run_key(CFG)
@@ -65,7 +66,7 @@ const RUN_ROOT = dirname(OUT_ROOT)                                       # the k
 const MANIFEST = joinpath(RUN_ROOT, "_manifest.jsonl")
 const REPORT = Dict{String, Any}()
 
-_sha(path) = bytes2hex(open(SHA.sha256, path))
+const _sha = VisualGeometryToolkitEval.file_sha256   # the stack's one file hash (streamed, cached)
 _read(path) = JSON.parse(read(path, String); allownan = true)
 _rel(path, root) = relpath(path, root)
 
