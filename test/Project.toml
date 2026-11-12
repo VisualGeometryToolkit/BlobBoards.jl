@@ -42,7 +42,7 @@ VisualGeometryToolkitEstimation = {path = "/home/jpr/src/vgtk-pin-01e54733/Visua
 # TEMPORARY: the 0.9 stack is not registered yet; replace by [compat] 0.9 from the registry before any push or registration
 VisualGeometryToolkitFeatures = {path = "/home/jpr/src/vgtk-pin-01e54733/VisualGeometryToolkitFeatures"}
 # TEMPORARY: its 0.9 port (on the unregistered 0.9 stack) is not registered yet; replace by its released version from the registry before any push or registration
-LocalOptimizationDoneRight = {path = "/home/jpr/src/lodr-pin-3bab682"}
+LocalOptimizationDoneRight = {path = "/home/jpr/src/lodr-pin-613e235"}
 
 [compat]
 Accessors = "0.1.45"
