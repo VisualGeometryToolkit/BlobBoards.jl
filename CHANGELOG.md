@@ -89,6 +89,14 @@ Estimation 0.9, Features 0.7 (bmvc2026 also Eval 0.7), with LocalOptimizationDon
   Core's `check_duplication` (its open findings listed, each an item of
   `.release/duplication-checklist.md`).
 
+Known issue (bmvc2026, not the package): `bmvc2026/scripts/make_param_variations.jl`
+does not run on this release. It builds each panel's `PatternConfig` from a v1
+`pattern_config` table through `JSON.parse(…, PatternConfig)`, which BlobBoards no
+longer reads (a v1 table's `max_diameter_fraction` is converted by the board-file
+migration only). The fix (a public v1 pattern-config reader, or each panel's
+`max_scale` stated in configs/figures/param_variations.toml) is for the next release;
+the paper's `blob_variations_squared` panels are the tracked ones meanwhile.
+
 ## 0.5.1 (2026-11-09)
 
 On the VisualGeometryToolkit 0.8 stack, from General: VisualGeometryToolkitCore, IO and
