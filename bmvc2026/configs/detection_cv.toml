@@ -78,6 +78,7 @@ provenance = "the 260521 captures (f/9.0), the validation side of the registered
 tier = "unpublished"
 path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
 provenance = "the 260521 camera (scripts/import_cameras.jl's port of calibrate_pinhole)"
+# UNVERIFIED: three differing copies; primary copy not located
 
 [inputs.boards]
 # The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids
