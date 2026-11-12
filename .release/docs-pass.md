@@ -1,4 +1,7 @@
-docs-pass: 153f622cecaf858863f56b83a23e07785aa3b81a
+docs-pass: 89b260e98443c8b833d328a36312a8a30335eb86
+
+Re-pointed to 89b260e98443c8b833d328a36312a8a30335eb86: the change since 153f622 is [compat] LocalOptimizationDoneRight 0.6 (Project.toml, test/Project.toml);
+no docstring, docs page, README or source moved.
 
 Recorded on 153f622cecaf858863f56b83a23e07785aa3b81a: the only change since the docs build on 3bc37ac (below) is the CHANGELOG's known-issue note
 (bmvc2026's make_param_variations.jl); no docstring, docs page, README or source moved.
