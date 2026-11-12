@@ -182,3 +182,41 @@ end
         end
     end
 end
+
+# A non-default tier of the ArtifactView installs on READ: a fresh view (no
+# VGTK_DATA_ROOT, no fallback) has only the default tiers, and Eval's
+# input_path of pipeline_panels' inputs installs bb_pipeline_figure (≈5.4 MiB)
+# and verifies their stated sha256. Network: without it, a recorded skip.
+@testitem "a view tier installs on read (bb_pipeline_figure)" tags = [:data] setup = [BBEval] begin
+    using DrWatson: projectdir
+    import TOML, Pkg
+    const B = BBEval.BlobBoardsEval
+    const E = B.VgtkEval.Experiments
+    cfg = TOML.parsefile(projectdir("configs", "figures", "pipeline_panels.toml"))
+    # the project's binding, restored after the item (later items on this worker read it)
+    b = E._BINDING
+    saved = (b.root, b.resolve_links, b.data_fallback, b.artifacts, b.create_results)
+    mktempdir() do scratch
+        withenv("VGTK_DATA_ROOT" => nothing) do
+            E.set_project_root!(scratch; artifacts = E.ArtifactView(projectdir("Artifacts.toml");
+                dir = joinpath(scratch, "data", "exp_raw"), mount = B._tier_mount, default = B._DEFAULT_TIERS))
+            try
+                paths = try
+                    [E.input_path(cfg, id) for id in ("image", "camera")]
+                catch e
+                    @info "the tier could not be fetched here ($(sprint(showerror, e))): install-on-read SKIPPED"
+                    nothing
+                end
+                if paths === nothing
+                    @test_skip false
+                else
+                    @test all(isfile, paths)
+                    @test all(id -> haskey(cfg["inputs"][id], "sha256"), ("image", "camera"))   # verified by input_path
+                end
+            finally
+                E.set_project_root!(saved[1]; resolve_links = saved[2], data_fallback = saved[3], artifacts = saved[4],
+                    create_results = saved[5])
+            end
+        end
+    end
+end

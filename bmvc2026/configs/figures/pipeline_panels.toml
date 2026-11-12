@@ -35,6 +35,7 @@ sha256 = "991f54f9b2be15a65d6b75173474dfe769f284175709f52ab642a2d8f9868e99"
 tier = "bb_pipeline_figure"
 path = "blobboard_training/images/dataset_sonyfx3_tamron20mm_f8_cameras.json"
 provenance = "OpenCV calibration of the Sony FX3 + Tamron 20 mm f/8 session"
+sha256 = "fd1e156b74e62f0c6f9e7e88d6f768f6c9fb781acab64676b050505d7d372ac5"   # the bound tier (record 1.3.0, vgio/cameras/v4) as installed on read
 
 [inputs.boards]
 tier = "bb_assets"
