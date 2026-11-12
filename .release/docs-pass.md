@@ -1,4 +1,14 @@
-docs-pass: adcba1347fd6ad360b7e1138efaec4e39e2339a1
+docs-pass: bee3b43ea4e41c2f35b6e6096db866c2d626d5e3
+
+Re-pointed to bee3b43: the change since adcba13 is the require_extension hoist (owner ruling, 2026-11-12):
+BlobBoards' private `_require_extension` and `_extension_loaded` are deleted, the EXTENSION_FUNCTIONS fallbacks and
+the board/board! forwarder call VisualGeometryToolkitCore's public `require_extension` (Core 0.9.3) with BlobBoards'
+own message, [compat] Core "0.9.3" in every member that states it, and the CHANGELOG's stack line and entry. Checked:
+no public name added or removed; EXTENSION_FUNCTIONS' docstring and the extensions.jl/api.jl comments still say what
+the fallbacks do (the same install-line ErrorException, the same MethodError when loaded); no docs page or README
+mentions the deleted helpers; the README CPU row's missing-extension assertions are unchanged. Suite on the 0.9.3 work
+tree (temporary [sources], branch bb-leg-060-tmp093, Slurm 10457): duplication clean, docs/readme/naming/quality items
+pass; the one README row that adds VisualGeometryToolkitCore from the registry waits for Core 0.9.3's registration.
 
 Re-pointed to adcba1347fd6ad360b7e1138efaec4e39e2339a1: the change since 89b260e is VisualGeometryToolkitFeatures 0.8 (csponds imported from
 VisualGeometryToolkitCore in src/pipeline.jl, [compat] Features "0.8", the CHANGELOG's stack line); no docstring,
