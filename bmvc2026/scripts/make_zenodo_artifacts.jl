@@ -251,9 +251,8 @@ if TIER == "inputs"
         for c in cams["cameras"]
             c["session"] == session || continue
             push!(files, joinpath(cam_run, session, "calibration", c["output"]) => joinpath(session, "calibration", c["output"]))
-            inp = cams["inputs"][c["input"]]
-            src = joinpath(dirname(DS_ROOT), inp["path"])
-            bytes2hex(open(sha256, src)) == inp["sha256"] || error("$(src): sha256 differs from the config of record")
+            # Eval's input_path under the source copy: refused unless its sha256 is the config's
+            src = VisualGeometryToolkitEval.Experiments.input_path(cams, c["input"]; root = dirname(DS_ROOT))
             push!(files, src => joinpath("provenance", "calibration", session, basename(src)))
         end
     end
