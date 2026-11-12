@@ -213,7 +213,7 @@ end
 # (VisualGeometryToolkitCore conventions/persisted-geometry.md): `save_hand_eye(file,
 # he)` of a fit always writes `Uncertain` poses.
 
-using VisualGeometryToolkitCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame
+using VisualGeometryToolkitCore: Uncertain, CovMat, geom, BodyFrame, CameraFrame, skew, propagate
 
 """
     save_hand_eye(file, he; provenance = (;)) -> (file, mount)
@@ -239,10 +239,9 @@ The covariance of `inv(Y)` given that of `Y`, both over `[δω; δt]` in the
 """
 function inv_pose_covariance(Y, Σ::AbstractMatrix)
     R, t = SMatrix{3, 3, Float64}(Y.R), SVector{3, Float64}(Y.t)
-    tx = SMatrix{3, 3, Float64}(0, t[3], -t[2], -t[3], 0, t[1], t[2], -t[1], 0)
     Z = zero(SMatrix{3, 3, Float64})
-    J = [-R' Z; -R' * tx -R']
-    S = J * SMatrix{6, 6, Float64, 36}(Σ) * J'
+    J = [-R' Z; -R' * skew(t) -R']
+    S = propagate(J, SMatrix{6, 6, Float64, 36}(Σ))
     return SMatrix{6, 6, Float64, 36}((S + S') / 2)
 end
 
