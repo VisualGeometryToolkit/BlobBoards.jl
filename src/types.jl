@@ -22,8 +22,8 @@ using VisualGeometryToolkitFeatures: Detection
 Type alias for a `Detection` with an `EllipticFrame` and metadata containing:
 - `id::Int` — index into the original detection vector
 - the blob's adaptation outcome (VisualGeometryToolkitCore's termination record):
-  - `converged::Bool` — the IRLS met `rtol`;
-  - `retcode::ReturnCode.T` — `Success` (converged), `MaxIters` (capped at
+  - `retcode::ReturnCode.T` — `Success` (converged at `rtol`: the blob's
+    convergence is `successful_retcode(det.retcode)`, §14, not a field of its own), `MaxIters` (capped at
     `max_irls_iter`: unconverged), `Failure` (the shape gate refused a step:
     rejected), `InitialFailure` (it refused the first step from the seed);
   - `stop_rule::StopRule` — `ParameterChange`, `IterationCap` or `ShapeGate`;
@@ -38,7 +38,7 @@ Access fields via property forwarding: `det.center`, `det.id`, `det.retcode`.
 """
 const BlobDetection{T} = Detection{
     EllipticFrame{T},
-    @NamedTuple{id::Int, converged::Bool, retcode::VgtkCore.ReturnCode.T, stop_rule::VgtkCore.StopRule, rejection::Symbol},
+    @NamedTuple{id::Int, retcode::VgtkCore.ReturnCode.T, stop_rule::VgtkCore.StopRule, rejection::Symbol},
 }
 
 # =============================================================================
