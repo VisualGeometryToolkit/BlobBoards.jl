@@ -18,7 +18,7 @@ using BlobBoards: build_annotations   # advanced API (unexported)
 using CUDA, cuDNN
 
 import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
+using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
 using Logging, Dates
 import VisualGeometryToolkitEval
 using Infiltrator
@@ -192,7 +192,7 @@ n_vid_frames = QUICK_TEST ? 5 : 30
 @info "=== Annotation ==="
 @info "Annotate videos..."
 for (videos, calib_file) in videos_calibrated
-    video_camera = isnothing(calib_file) ? nothing : VgtkIO.load(CameraModel, calib_file)
+    video_camera = isnothing(calib_file) ? nothing : VgtkIO.load(BoundedCamera, calib_file)
     build_annotations(
         board_feature_dict, descriptor_network, videos;
         common_kw..., n_frames = n_vid_frames, config = _config_for(video_camera)
@@ -201,7 +201,7 @@ end
 
 @info "Annotate images..."
 for (images, calib_file) in images_calibrated
-    image_camera = isnothing(calib_file) ? nothing : VgtkIO.load(CameraModel, calib_file)
+    image_camera = isnothing(calib_file) ? nothing : VgtkIO.load(BoundedCamera, calib_file)
     build_annotations(
         board_feature_dict, descriptor_network, images;
         common_kw..., config = _config_for(image_camera)

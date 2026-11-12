@@ -6,6 +6,14 @@ On VisualGeometryToolkitCore and IO 0.9 (Estimation 0.8, Features and Eval 0.6.1
 the 0.9 branch states them), with the 0.9 port of LocalOptimizationDoneRight.
 Breaking (the next release is a minor bump, 0.6.0):
 
+- **The pose arm takes a `BoundedCamera`** (the stack's rule: pixel operations
+  take a BoundedCamera). `PoseGeometry(camera)`, `FindBoardsConfig(path; camera)`,
+  `board_quad`, `trace_pipeline` and the Makie overlays take a `BoundedCamera`;
+  a bare `CameraModel` is refused with an `ArgumentError` naming
+  `BoundedCamera(camera, Size2(width, height))` and
+  `VisualGeometryToolkitIO.load(BoundedCamera, path)` (a camera store records
+  the extent). The estimators are handed the model; nothing else moves.
+
 - **The geometry's strategy is `local_optimization_strategy`** (the stack's 0.9
   rename: a `find_*` takes `local_optimization_strategy`, a `refine_*` and a
   `fit_*` take `optimization_strategy`). The `[find_boards.geometry]` key, the

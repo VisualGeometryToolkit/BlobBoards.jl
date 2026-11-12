@@ -77,7 +77,7 @@ using LinearAlgebra: det, norm, eigvals, Symmetric
 using Statistics: mean
 using CoordinateTransformations: PerspectiveMap
 using VisualGeometryToolkitCore: VisualGeometryToolkitCore, imshow, ellipses!, HomographyMap, feature_frame,
-    centroid, ustrip, targets, sources, EllipticFrame, CameraModel, Pinhole
+    centroid, ustrip, targets, sources, EllipticFrame, CameraModel, BoundedCamera, Pinhole, intrinsics
 import VisualGeometryToolkitIO
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
@@ -151,8 +151,8 @@ pin!(ax, lims) = (limits!(ax, lims[1], lims[2], lims[4], lims[3]); ax)
 
 function main()
     device = CUDABackend()
-    camera = VgtkIO.load(CameraModel, CAMERA_JSON)
-    cam_pinhole = CameraModel(camera.intrinsics, Pinhole())
+    camera = VgtkIO.load(BoundedCamera, CAMERA_JSON)   # pixel operations take a BoundedCamera
+    cam_pinhole = CameraModel(intrinsics(camera), Pinhole())
     # Detection, adaptation, matching and verification: the run config of
     # record of the evaluation, BY REFERENCE (the figure and the evaluation
     # cannot diverge); only the camera is the figure's.

@@ -69,7 +69,7 @@ board_bundles = Dict(
 @info "gallery" boards = length(board_features)
 
 cam_bounded = VgtkIO.load(BoundedCamera, CAMERA_JSON)
-cam = model(cam_bounded)
+cam = cam_bounded   # pixel operations take a BoundedCamera
 
 # Sanity: intrinsics are resolution-specific. A mismatch here means the pose
 # variant runs with the wrong K — track it down before believing any pose.

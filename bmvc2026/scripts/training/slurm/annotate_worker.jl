@@ -57,7 +57,7 @@ function _process_source(
         nothing
     else
         get!(s.camera_cache, camera_path) do;
-            VgtkIO.load(CameraModel, camera_path)
+            VgtkIO.load(BoundedCamera, camera_path)
         end
     end
     # Camera lives in config.geometry — PoseGeometry(camera) for calibrated

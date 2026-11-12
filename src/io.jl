@@ -7,8 +7,8 @@ using Poppler_jll: pdftocairo
 # retired v1/v2 files were migrated once, 2026-10). Read them with
 #
 #     import VisualGeometryToolkitIO as VgtkIO
-#     cam = VgtkIO.load(CameraModel, path)                 # single-camera store
-#     cam = VgtkIO.load(CameraModel, path; name = "…")     # multi-camera store
+#     cam = VgtkIO.load(BoundedCamera, path)               # single-camera store
+#     cam = VgtkIO.load(BoundedCamera, path; name = "…")   # multi-camera store
 #
 # A second reader here would be a second authority over the same bytes;
 # VgtkIO owns serialization.

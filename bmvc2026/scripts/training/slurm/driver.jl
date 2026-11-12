@@ -32,7 +32,7 @@ using Distributed
 using ClusterManagers
 
 import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
+using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
 
 # ── Master-side config ────────────────────────────────────────────────
 const SOURCES_FILE = ARGS[1]

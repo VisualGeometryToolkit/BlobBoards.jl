@@ -16,9 +16,12 @@ import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel, CameraCalibrationMat, Lens, Perspective, Additive, Radial, Tangential, WelschShape
 using StaticArrays: SMatrix
 
-const _CAM = CameraModel(
-    CameraCalibrationMat(SMatrix{3, 3, Float64}(2461.4, 0, 0, 0, 2460.6, 0, 2139.7, 1399.8, 1));
-    lens = Lens(Perspective(), Additive(Radial((-0.157, 0.046)), Tangential(-3.5e-4, 8.4e-4))), pixel_frame = :opencv
+const _CAM = VisualGeometryToolkitCore.BoundedCamera(
+    CameraModel(
+        CameraCalibrationMat(SMatrix{3, 3, Float64}(2461.4, 0, 0, 0, 2460.6, 0, 2139.7, 1399.8, 1));
+        lens = Lens(Perspective(), Additive(Radial((-0.157, 0.046)), Tangential(-3.5e-4, 8.4e-4))), pixel_frame = :opencv
+    ),
+    VisualGeometryToolkitCore.Size2(4280, 2800),
 )
 
 _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)

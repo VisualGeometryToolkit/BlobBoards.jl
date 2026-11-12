@@ -18,7 +18,7 @@ using GLMakie
 using VideoIO
 
 import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
+using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
 
 # =============================================================================
 # Setup — load gallery, boards, descriptor model
@@ -84,7 +84,7 @@ uid_to_path = Dict(
 # =============================================================================
 video_path = joinpath(root, "videos/iphone_till/26-04-23 15-36-18 2200.mov")
 video_camera = VgtkIO.load(
-    CameraModel,
+    BoundedCamera,
     joinpath(root, "videos", "apple-iphone-13-mini-till_f1.6-1x-video-fullhd.json")
 )
 

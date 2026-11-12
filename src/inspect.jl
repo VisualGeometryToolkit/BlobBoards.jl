@@ -100,8 +100,8 @@ the FIRST arm of `adapt_arms` — and that same config is what the trace records
 """
 function trace_pipeline(
         # Typed so a call in the retired `(img, cam)` order is a MethodError.
-        # Qualified: `CameraModel` is imported by pipeline.jl, after this file.
-        cam::Union{Nothing, VgtkCore.CameraModel}, img::AbstractMatrix;
+        # Qualified: `BoundedCamera` is imported by pipeline.jl, after this file.
+        cam::Union{Nothing, VgtkCore.BoundedCamera}, img::AbstractMatrix;
         detect_config::DetectConfig = DetectConfig(),
         cutoff::Real = DEFAULT_CUTOFF,
         device = default_device(),

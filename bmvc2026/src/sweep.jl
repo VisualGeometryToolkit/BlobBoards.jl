@@ -120,7 +120,8 @@ function sweep_context(;
     store = VgtkIO.load(Dict{Symbol, BoundedCamera}, camera_json)
     length(store) == 1 || error("$(camera_json): a sweep runs on one camera; the store holds $(sort!(collect(keys(store))))")
     camera_name, bounded = only(store)
-    camera = VgtkCore.model(bounded isa BoundedCamera ? bounded : bounded.value)        # raw K + OpenCV-model lens
+    bcamera = bounded isa BoundedCamera ? bounded : bounded.value                       # the find_boards pose arm's camera
+    camera = VgtkCore.model(bcamera)        # raw K + OpenCV-model lens
     cam_pinhole = CameraModel(camera.intrinsics, Pinhole())  # undistorted-frame camera
     network = DescriptorNetwork(network_path)
     gallery = BoardGallery(gallery_path, network)
@@ -144,7 +145,7 @@ function sweep_context(;
 
     # The camera is supplied separately because it is DATA (a calibration), not
     # configuration; every other knob comes from [find_boards] in config_path.
-    config = FindBoardsConfig(config_path; camera)
+    config = FindBoardsConfig(config_path; camera = bcamera)   # pixel operations take a BoundedCamera
 
     gpu_index = BlobBoards.GalleryIndex(device, board_features)
 

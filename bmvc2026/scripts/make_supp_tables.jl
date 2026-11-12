@@ -42,7 +42,7 @@ import TOML
 using Statistics: median
 using Printf: @sprintf
 using BlobBoards: FindBoardsConfig, config_dict
-using VisualGeometryToolkitCore: CameraModel, parse_unit, ustrip, mm, dpi
+using VisualGeometryToolkitCore: BoundedCamera, parse_unit, ustrip, mm, dpi
 import VisualGeometryToolkitIO
 import VisualGeometryToolkitFeatures
 
@@ -124,7 +124,7 @@ _run_find_boards() = TOML.parsefile(RUN_CONFIG)["find_boards"]
 
 function _camera()
     # the session's camera of record (calibration/<camera>.json, vgio/cameras/v3)
-    return VgtkIO.load(CameraModel, camera_of_record(DATASET))
+    return VgtkIO.load(BoundedCamera, camera_of_record(DATASET))
 end
 
 # 1e-6 → "10^{-6}", as the table prints a tolerance.

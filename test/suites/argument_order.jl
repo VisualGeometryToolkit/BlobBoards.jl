@@ -22,13 +22,13 @@
 # =============================================================================
 
 using StaticArrays: SMatrix
-using VisualGeometryToolkitCore: CameraModel, LogicalIntrinsics, CameraCalibrationMat, Pinhole, EllipticFrame, Point2, px
+using VisualGeometryToolkitCore: CameraModel, LogicalIntrinsics, CameraCalibrationMat, Pinhole, EllipticFrame, Point2, BoundedCamera, Size2, px
 
 @testset "retired argument orders bind no method" begin
     img = zeros(Float32, 16, 16)
     gallery = Dict{String, Any}()
     net = "descriptor.onnx"                      # a path is a valid network argument
-    cam = CameraModel(LogicalIntrinsics(CameraCalibrationMat(900.0 * px, [8.0px, 8.0px])), Pinhole())
+    cam = BoundedCamera(CameraModel(LogicalIntrinsics(CameraCalibrationMat(900.0 * px, [8.0px, 8.0px])), Pinhole()), Size2(16, 16))
     frames = [EllipticFrame(Point2(8.0, 8.0), 2.0)]
     discs = [BlobBoards.Disc(8.0, 8.0, 2.0)]
     H = SMatrix{3, 3, Float64}(1, 0, 0, 0, 1, 0, 0, 0, 1)

@@ -44,7 +44,7 @@ using CUDA          # triggers GPU extensions (CPU works too — see DEVICE)
 import cuDNN        # ONNXRunTime :cuda execution provider
 using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
     HomographyMap, HomographyMat, RadialHomography, radial_transfer,
-    PosedCamera, CameraModel, Pinhole, undistort, division_bounded,
+    PosedCamera, CameraModel, BoundedCamera, Pinhole, undistort, division_bounded, intrinsics, model, with_model,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 import VisualGeometryToolkitIO as VgtkIO   # the vgio/cameras camera stores
@@ -77,8 +77,8 @@ _transfer_pt(m::RadialHomography, ::Nothing, p) =
     something(radial_transfer(m, p), Point2(NaN, NaN))
 _transfer_pt(H, ::Nothing, p) =
     (PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H)))(p)
-_transfer_pt(pose, cam::CameraModel, p) =
-    (PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(HomographyMat(PosedCamera(cam, pose)))))(p)
+_transfer_pt(pose, cam::BoundedCamera, p) =
+    (PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(HomographyMat(PosedCamera(model(cam), pose)))))(p)
 
 function plot_results(img, results, board_bundles, cam, label; n = min(10, length(results)))
     top = results[1:n]
@@ -102,7 +102,7 @@ end
 # =============================================================================
 
 img = Gray.(load_image(image_path))
-cam = VgtkIO.load(CameraModel, camera_json)
+cam = VgtkIO.load(BoundedCamera, camera_json)   # pixel operations take a BoundedCamera
 
 # The descriptor's default constructor DEMANDS the CUDA execution provider
 # (silent CPU fallback misreports throughput ~34x). On a CPU device, opt
@@ -163,7 +163,7 @@ for (label, geometry) in (
     if !isempty(accepted)
         # Calibrated poses live in undistorted-image coordinates.
         disp_img = calibrated ? undistort(cam, img) : img
-        cam_quad = calibrated ? CameraModel(cam.intrinsics, Pinhole()) : nothing
+        cam_quad = calibrated ? with_model(cam, CameraModel(intrinsics(cam), Pinhole())) : nothing
         global screen = plot_results(disp_img, accepted, board_bundles, cam_quad, label)
     end
 end

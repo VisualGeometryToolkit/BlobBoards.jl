@@ -53,7 +53,7 @@ import cuDNN
 using CUDA: CUDABackend
 import VisualGeometryToolkitIO
 import VisualGeometryToolkitCore
-using VisualGeometryToolkitCore: CameraModel
+using VisualGeometryToolkitCore: BoundedCamera
 using Accessors: @set
 using Colors: Gray
 using FileIO: load as load_image
@@ -105,7 +105,7 @@ end
 function run_cv()
     image_dir, frames = validation_frames(SPEC.scheme.cross_validation)
     root = data_root()
-    camera = VgtkIO.load(CameraModel, joinpath(root, INP["camera"]))
+    camera = VgtkIO.load(BoundedCamera, joinpath(root, INP["camera"]))
     run_config = projectdir("configs", INP["run_config"])
     base = FindBoardsConfig(run_config; camera)
     # the run config names the network data_root()-relative (the bb_assets tier mounts models/ at the root)

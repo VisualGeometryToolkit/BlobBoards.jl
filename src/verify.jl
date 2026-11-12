@@ -63,8 +63,8 @@ retired `(camera, bundle, model)` order is a MethodError.
 """
 board_quad(::Nothing, H, bundle::BoardBundle) =
     (PerspectiveMap() ∘ HomographyMap(H))(Rect(bundle, :world))
-board_quad(camera_model::CameraModel, model, bundle::BoardBundle) =
-    project(PosedCamera(camera_model, model), Rect(bundle, :world))
+board_quad(camera::BoundedCamera, model, bundle::BoardBundle) =
+    project(PosedCamera(VgtkCore.model(camera), model), Rect(bundle, :world))
 
 # Radial arm: the model is NOT a collineation — the distortion curves the
 # board's edges — so sample the rectangle boundary (as the calibrated path

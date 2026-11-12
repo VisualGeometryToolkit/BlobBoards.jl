@@ -12,7 +12,7 @@
 
 using VisualGeometryToolkitCore:
     centroid, feature_frame,
-    Extrinsics3, CameraModel, AbstractIntrinsics, Pinhole, AbstractLensModel,
+    Extrinsics3, CameraModel, BoundedCamera, AbstractIntrinsics, Pinhole, AbstractLensModel,
     undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
     sources, Attributed, withattrs, planar_lift, lift, exact   # #21 correspondence layer; `exact`: the board side of a 2D fit
@@ -415,7 +415,8 @@ const _DESCRIBE_CHUNK = 16_384
 _describe_patches(model, cube) = describe(model, _host_patches(cube))
 
 # =============================================================================
-# Dispatch on camera: nothing → homography, CameraModel → P3P,
+# Dispatch on camera: nothing → homography, BoundedCamera → P3P (pixel operations take a
+# BoundedCamera; the estimators, which take a CameraModel, get `model(camera)`),
 # RadialHomographyGeometry → radially distorted homography. No separate
 # context type: the geometry ITSELF rides the camera slot — it already
 # carries the one datum the estimator needs (`image_size`) — so its
@@ -425,7 +426,7 @@ _describe_patches(model, cube) = describe(model, _host_patches(cube))
 # RVG's own find_* defaults are Welsch-HQ). find_boards threads it through
 # `fit_kw`; the keyword default re-reads the file for a bare `find_board`.
 _default_lo(::Nothing) = _dflt_local_optimization_strategy(:homography)
-_default_lo(::CameraModel) = _dflt_local_optimization_strategy(:absolute_pose)
+_default_lo(::BoundedCamera) = _dflt_local_optimization_strategy(:absolute_pose)
 # The scorer of every fit and refine: the Student-t + uniform marginal at the
 # arm's outlier half-width (`P` the arm's problem type). Its table states the
 # half-width and nothing else: the scale and label priors are the stack's
@@ -447,10 +448,10 @@ _find_model(
     pt_csponds; scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
 )
 _find_model(
-    cam::CameraModel, pt_csponds; local_optimization_strategy = _default_lo(cam),
+    cam::BoundedCamera, pt_csponds; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_absolute_pose(
-    cam, pt_csponds; scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
+    VgtkCore.model(cam), pt_csponds; scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
 # Seeded warm local-optimization refine (no second RANSAC) for the guided final
@@ -477,10 +478,10 @@ _refine(
     scoring = _scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
 )
 _refine(
-    cam::CameraModel, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
+    cam::BoundedCamera, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
-    (extent === nothing ? AbsolutePoseProblem(cam, pt_csponds) : BoundedProblem(AbsolutePoseProblem(cam, pt_csponds), extent)), θ₀;
+    (extent === nothing ? AbsolutePoseProblem(VgtkCore.model(cam), pt_csponds) : BoundedProblem(AbsolutePoseProblem(VgtkCore.model(cam), pt_csponds), extent)), θ₀;
     scoring = _scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
@@ -491,7 +492,7 @@ _refine(
 # known, not measured, so the H residual is the transfer error in image pixels —
 # as a plain (unit isotropic) point in board mm it was scored in board mm.
 _fit_endpoints(::Nothing, scored) = board_endpoints(scored)
-_fit_endpoints(::CameraModel, scored) = planar_lift(scored)
+_fit_endpoints(::BoundedCamera, scored) = planar_lift(scored)
 """
     board_endpoints(scored) -> correspondences
 
@@ -524,7 +525,7 @@ using KernelAbstractions: KernelAbstractions
 using LinearAlgebra: dot
 
 _undistort_detect(::KA.Backend, img, ::Nothing) = img
-_undistort_detect(::KA.Backend, img, ::CameraModel{<:AbstractIntrinsics, <:Pinhole}) = img
+_undistort_detect(::KA.Backend, img, ::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, <:Pinhole}}) = img
 
 # Host UInt8 view of an image: N0f8 storage reinterprets, anything else
 # quantizes through Gray{N0f8} — the same coercion VGF's `_asift_input`
@@ -538,7 +539,7 @@ using VisualGeometryToolkitFeatures: gray_u8
 # identity method above.
 function _undistort_detect(
         dev::KA.Backend, img,
-        cam::CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}
+        cam::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}}
     )
     H, W = size(img)
     raw = gray_u8(img)
@@ -547,7 +548,7 @@ function _undistort_detect(
     d_out = KernelAbstractions.allocate(dev, UInt8, H, W)   # kernel writes every pixel
     # u8→u8: VGC's kernel samples the 8-bit source bilinearly in the 0–255
     # domain (linear ops commute with the scale) and stores saturating UInt8.
-    undistort!(d_out, Float32, cam, d_u8)
+    undistort!(d_out, Float32, VgtkCore.model(cam), d_u8)   # Core forwards `undistort`, not the in-place kernel
     return Array(d_out)
 end
 
@@ -626,10 +627,10 @@ plane homography exactly, the lens's affinity at the transferred centre),
 and the name stays for continuity with the two radial arms, which also forward
 their MODEL through.
 """
-_model_to_homography(pose::Extrinsics3, cam::CameraModel{<:AbstractIntrinsics, Pinhole}) =
-    HomographyMap(PosedCamera(cam, pose))
-_model_to_homography(pose::Extrinsics3, cam::CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}) =
-    PosedCamera(cam, pose)
+_model_to_homography(pose::Extrinsics3, cam::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, Pinhole}}) =
+    HomographyMap(PosedCamera(VgtkCore.model(cam), pose))
+_model_to_homography(pose::Extrinsics3, cam::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}}) =
+    PosedCamera(VgtkCore.model(cam), pose)
 # Untyped on purpose: RadialHomographyGeometry is defined further down this
 # file, and a signature naming it here would not precompile.
 _model_to_homography(::Extrinsics3, cam) = throw(
@@ -1309,7 +1310,7 @@ the IRLS weights ride `scored` as its `weights` attribute column.
 """
 function find_board(
         # Typed so a call in the retired order (`image_features, board_features,
-        # camera`) is a MethodError: `camera` is `nothing`, a `CameraModel` or a
+        # camera`) is a MethodError: `camera` is `nothing`, a `BoundedCamera` or a
         # radial geometry, never a vector. (The camera slot stays untyped —
         # the geometry types are defined further down this file.)
         camera, board_features::AbstractVector, image_features::AbstractVector;
@@ -1359,7 +1360,7 @@ function find_board(
     # RANSAC winner, refine the reflection with the same seeded LO, select by
     # the post-LO likelihood ratio. The guided stage downstream is
     # branch-agnostic — it polishes whichever basin wins here.
-    if resolve_pose_ambiguity && camera isa CameraModel
+    if resolve_pose_ambiguity && camera isa BoundedCamera
         res = _resolve_pose_ambiguity(
             camera, scored, pt_csponds, res;
             outlier_halfwidth = get(fit_kw, :outlier_halfwidth, 5.0), local_optimization_strategy,
@@ -1643,8 +1644,11 @@ end
 """
     PoseGeometry(camera; outlier_halfwidth=5.0, min_inliers=6, local_optimization_strategy=StudentTUniform())
 
-Calibrated P3P estimator config. Holds the `camera` (a `CameraModel` carrying
-the lens/distortion model used to undistort the image). The camera lives here
+Calibrated P3P estimator config. Holds the `camera`, a `BoundedCamera` (its model carries
+the lens/distortion used to undistort the image; its bound is the image extent): pixel
+operations take a BoundedCamera, the stack's rule. A bare `CameraModel` is refused, naming
+`BoundedCamera(camera, Size2(width, height))` and `VisualGeometryToolkitIO.load(BoundedCamera, path)`
+(a camera store records the extent). The camera lives here
 — not as a separate `find_boards` argument — so calibrated-ness is encoded in
 one place and illegal camera/geometry mismatches are unrepresentable.
 
@@ -1694,8 +1698,14 @@ const _UNDISTORTION_POLICIES = (:none, :global)
 # [find_boards.geometry] table is homography-scoped by its own header, so
 # there is no file entry for it to read. Named as an exception in
 # config_defaults.jl.
+PoseGeometry(camera::CameraModel; kw...) = throw(
+    ArgumentError(
+        "PoseGeometry takes a BoundedCamera (pixel operations take a BoundedCamera): " *
+            "BoundedCamera(camera, Size2(width, height)), or VisualGeometryToolkitIO.load(BoundedCamera, path)"
+    )
+)
 function PoseGeometry(
-        camera; outlier_halfwidth::Float64 = 5.0, min_inliers::Int = 6,
+        camera::BoundedCamera; outlier_halfwidth::Float64 = 5.0, min_inliers::Int = 6,
         resolve_pose_ambiguity::Bool = false,
         local_optimization_strategy = _dflt_local_optimization_strategy(:absolute_pose),
         undistortion::Symbol = :none,
@@ -1783,7 +1793,8 @@ _camera(g::RadialHomographyGeometry) = g
 # re-match spurious overlapping boards.
 _estimation_camera(::Nothing) = nothing
 _estimation_camera(::HomographyGeometry) = nothing
-_estimation_camera(g::PoseGeometry) = g.undistortion === :global ? pinhole(g.camera) : g.camera
+_estimation_camera(g::PoseGeometry) =
+    g.undistortion === :global ? VgtkCore.with_model(g.camera, pinhole(VgtkCore.model(g.camera))) : g.camera
 # Radial arms: the geometry itself is the token — it must SURVIVE this call:
 # the engine hands the one `cam` both to `find_board` (estimator dispatch)
 # and to `board_quad` (projection). Collapsing it to `nothing` silently
@@ -2624,7 +2635,7 @@ end
 # (`outlier_halfwidth`, `local_optimization_strategy`: the geometry's).
 _fit_workspace_builder(::Nothing, a, lo) =
     n -> VgtkEstimation.RansacWorkspace(HomographyProblem{Float64}, n, _scoring(HomographyProblem{Float64}, a), lo)
-_fit_workspace_builder(::CameraModel, a, lo) =
+_fit_workspace_builder(::BoundedCamera, a, lo) =
     n -> VgtkEstimation.RansacWorkspace(AbsolutePoseProblem, n, _scoring(AbsolutePoseProblem, a), lo)
 # Radial arm: no pooled workspace yet (it would need K=5 /
 # RadialHomography-shaped buffers) — RVG sizes fresh ones per fit.

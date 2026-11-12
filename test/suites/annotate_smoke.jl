@@ -21,7 +21,7 @@ import VideoIO
 import VisualGeometryToolkitIO
 using FileIO: load as load_image
 
-using VisualGeometryToolkitCore: CameraModel, EllipticFrame, Point2, Size2
+using VisualGeometryToolkitCore: CameraModel, BoundedCamera, EllipticFrame, Point2, Size2
 import VisualGeometryToolkitFeatures   # tilt-schedule guard reaches tilt_schedule(:imas25)
 
 # =============================================================================
@@ -164,7 +164,7 @@ end
 
 # Cameras are vgio/cameras/v4 stores (the example artifacts ship them that
 # way); the store owns the reader.
-_load_camera(path) = VgtkIO.load(CameraModel, path)
+_load_camera(path) = VgtkIO.load(BoundedCamera, path)   # pixel operations take a BoundedCamera
 
 function _setup_gallery()
     model = DescriptorNetwork(_MODEL_PATH)

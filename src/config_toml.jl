@@ -263,7 +263,7 @@ function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
     camera === nothing && throw(
         ArgumentError(
             "[find_boards.geometry] type = \"pose\" needs a camera: " *
-                "FindBoardsConfig(path; camera = VisualGeometryToolkitIO.load(CameraModel, ...))"
+                "FindBoardsConfig(path; camera = VisualGeometryToolkitIO.load(BoundedCamera, ...))"
         )
     )
     return PoseGeometry(

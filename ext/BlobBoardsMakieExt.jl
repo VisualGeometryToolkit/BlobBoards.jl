@@ -61,7 +61,7 @@ _n_inliers(t) = (sc = _scored_of(t)) === nothing ? 0 : count(VgtkCore.is_map_inl
 
 
 function board_overlay!(
-        ax::Makie.Axis, camera::Union{Nothing, VgtkCore.CameraModel},
+        ax::Makie.Axis, camera::Union{Nothing, VgtkCore.BoundedCamera},
         results, board_bundles::AbstractDict;
         colors = :auto, labels = true, outline_width = 3.0, blob_width = 1.5,
         show_frame = false, lens::Bool = true,
@@ -159,7 +159,7 @@ board_panel!(figpos, camera, img::AbstractMatrix, result, bundle; show_frame = t
 # overlay. Shared by plot_boards and the trace viewer's _registered_panels!
 # (character-identical twins that had drifted on ncols/show_frame).
 function _board_panel!(
-        figpos, camera::Union{Nothing, VgtkCore.CameraModel}, img::AbstractMatrix,
+        figpos, camera::Union{Nothing, VgtkCore.BoundedCamera}, img::AbstractMatrix,
         uid, model, quality, weights, bundle; show_frame = true, lens::Bool = true,
     )
     n_inl = count(VgtkCore.is_map_inlier, weights)
@@ -185,7 +185,7 @@ function plot_boards(
         # on last. Typed so a call in either retired order —
         # `(img, results, board_bundles, camera)` or
         # `(camera, img, results, board_bundles)` — is a MethodError.
-        camera::Union{Nothing, VgtkCore.CameraModel},
+        camera::Union{Nothing, VgtkCore.BoundedCamera},
         results::AbstractVector, board_bundles::AbstractDict, img::AbstractMatrix;
         n = min(10, length(results)),
         # `lens = true` (the default) draws through the FULL camera, for a RAW
@@ -235,7 +235,7 @@ function plot_board_poses(
         # last. Typed so a call in either retired order —
         # `(img, poses, board_bundles, camera)` or
         # `(camera, img, poses, board_bundles)` — is a MethodError.
-        camera::Union{Nothing, VgtkCore.CameraModel},
+        camera::Union{Nothing, VgtkCore.BoundedCamera},
         poses, board_bundles::AbstractDict, img::AbstractMatrix;
         detections = nothing, detection_color = :cyan,
         detection_cutoff = DEFAULT_CUTOFF,
@@ -263,7 +263,7 @@ end
 _labelled(e) = e isa Pair ? (String(e.first), e.second) : (String(e[1]), e[2])
 
 function plot_comparison(
-        camera::Union{Nothing, VgtkCore.CameraModel},
+        camera::Union{Nothing, VgtkCore.BoundedCamera},
         labelled, board_bundles::AbstractDict, img::AbstractMatrix;
         colors = :auto, labels = false, show_inliers = true,
         inlier_color = :cyan, inlier_cutoff = DEFAULT_CUTOFF, panel_size = 700,
@@ -387,7 +387,8 @@ end
 # documented sixth spelling): plotting receives quantity-carrying poses that
 # the pipeline path never sees, and this defensive strip is the contract
 # difference (2026-09 audit).
-function _board_proj(camera_model::VgtkCore.CameraModel, pose; lens::Bool = true)
+function _board_proj(camera::VgtkCore.BoundedCamera, pose; lens::Bool = true)
+    camera_model = VgtkCore.model(camera)   # the projection is the model's; the bound is the image extent
     # `lens = true` (the default): the FULL camera, raw pixels — what a board
     # overlaid on a captured frame needs. `lens = false` keeps the pinhole
     # plane homography below, for an image that has already been undistorted
@@ -433,7 +434,7 @@ end
 _board_proj(::Nothing, m::VgtkCore.RadialHomography; lens::Bool = true) = RadialBoardProj(m)
 
 # The CALIBRATED camera and the board's pose — the board as the lens actually
-# images it, in RAW pixels. `_board_proj(::CameraModel, pose)` above is the
+# images it, in RAW pixels. `_board_proj(::BoundedCamera, pose)` above is the
 # PINHOLE plane homography, which is right only on an undistorted image; on a
 # raw frame a wide lens puts the outline tens of pixels off (72 px measured on
 # board "336"). Under a distorting lens a rect edge is not a line and a circle

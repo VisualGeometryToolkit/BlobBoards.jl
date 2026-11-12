@@ -26,7 +26,7 @@ using SlurmClusterManager
 using CUDA, cuDNN
 
 import VisualGeometryToolkitIO   # canonical vgio/cameras/v3 camera stores
-using VisualGeometryToolkitCore: CameraModel   # dispatch token for VisualGeometryToolkitIO.load
+using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
 
 # ── Master-side config ────────────────────────────────────────────────
 const SOURCES_FILE = ENV["BB_SOURCES_FILE"]

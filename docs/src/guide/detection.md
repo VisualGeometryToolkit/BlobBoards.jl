@@ -41,7 +41,7 @@ using CUDA, cuDNN                      # the GPU path (leave out for the CPU)
 using BlobBoards
 using FileIO, Colors                   # image loading
 import VisualGeometryToolkitIO as VgtkIO
-using VisualGeometryToolkitCore: CameraModel, is_map_inlier
+using VisualGeometryToolkitCore: BoundedCamera, is_map_inlier
 
 boards_dir = BlobBoards.example_data(:boards)
 still = BlobBoards.example_data(:still)
@@ -108,11 +108,11 @@ choice selects the estimator:
 | `config.geometry` | Needs | `model` in each result |
 |---|---|---|
 | [`HomographyGeometry`](@ref)`()` (default) | nothing | homography: board `:world` plane (mm, z = 0) → image pixels |
-| [`PoseGeometry`](@ref)`(camera)` | a calibrated `CameraModel` | board → camera pose: `model.R`, `model.t` (mm) |
+| [`PoseGeometry`](@ref)`(camera)` | a calibrated `BoundedCamera` (the model and its image extent) | board → camera pose: `model.R`, `model.t` (mm) |
 | [`RadialHomographyGeometry`](@ref)`((width, height))` | the image size | homography plus a one-parameter division-model distortion, for an unknown camera whose lens bends lines |
 
 ```julia
-camera = VgtkIO.load(CameraModel, joinpath(still, "cameras.json"))
+camera = VgtkIO.load(BoundedCamera, joinpath(still, "cameras.json"))
 config = FindBoardsConfig(geometry = PoseGeometry(camera))
 posed = find_boards(board_features, network, img; board_bundles, config)
 

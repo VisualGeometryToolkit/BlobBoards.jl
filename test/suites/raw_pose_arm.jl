@@ -12,15 +12,19 @@ using Rotations: RotMatrix, RotXYZ, rotation_angle
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
     EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, PosedCamera, HomographyMap,
-    centroid, shape_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points
-using VisualGeometryToolkitEstimation: AbsolutePoseProblem, scoring_from_toml
+    centroid, shape_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points,
+    BoundedCamera, Size2, Rect, SplineLens, estimate
+using VisualGeometryToolkitEstimation: AbsolutePoseProblem, scoring_from_toml, fit_camera
 using LocalOptimizationDoneRight: HQ, tuning_constant
 using VisualGeometryToolkitCore: WelschShape
 using BlobBoards: PoseGeometry, HomographyGeometry, RadialHomographyGeometry, _estimation_camera,
     _model_to_homography, _guided_transfer, _undistort_detect, _camera, _project_blob_centers
 
-const _CAM = CameraModel(LogicalIntrinsics(CameraCalibrationMat(950.0px, [2120.0px, 1416.0px])), Division(-0.3, -0.08))
-const _PIN = pinhole(_CAM)
+# Pixel operations take a BoundedCamera (the stack's rule): the pose arm's camera is
+# the model bounded by its image; the estimators and posing take the model.
+const _MODEL = CameraModel(LogicalIntrinsics(CameraCalibrationMat(950.0px, [2120.0px, 1416.0px])), Division(-0.3, -0.08))
+const _CAM = BoundedCamera(_MODEL, Size2(4240, 2832))
+const _PIN = VisualGeometryToolkitCore.with_model(_CAM, pinhole(_MODEL))
 const _POSE = EuclideanMap(RotMatrix(RotXYZ(0.35, -0.35, 0.2)), Vec3{Float64}(850.0, 250.0, 350.0))   # far off-axis: the board reaches the rim
 
 @testset "PoseGeometry.undistortion" begin
@@ -53,18 +57,18 @@ end
     # the conic is transferred, not the point: a projective map does not carry
     # a centre to the transferred conic's centre (second order — 4e-3 px here),
     # and the conic centre is what the imaged blob actually has
-    exact = SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(60.0, -40.0, 0.0)))
+    exact = SVector{2, Float64}(project(PosedCamera(_MODEL, _POSE), Point3{Float64}(60.0, -40.0, 0.0)))
     @test isapprox(SVector{2, Float64}(ep.center), exact; atol = 0.05)
     Σi = inv(SMatrix{2, 2, Float64}(shape_matrix(ep)))
     worst = maximum(boundary_points(wreg, 48)) do p
-        q = SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(p[1], p[2], 0.0)))
+        q = SVector{2, Float64}(project(PosedCamera(_MODEL, _POSE), Point3{Float64}(p[1], p[2], 0.0)))
         d = q - SVector{2, Float64}(ep.center)
         abs(sqrt(d' * Σi * d) - 1.0)
     end
     @test worst < 0.02
     # a board behind the camera transfers nothing
     behind = _model_to_homography(pose, _CAM)
-    @test _guided_transfer(PosedCamera(_CAM, EuclideanMap(RotMatrix{3, Float64}(one(SMatrix{3, 3, Float64})), Vec3{Float64}(0.0, 0.0, -500.0))), wreg) === nothing
+    @test _guided_transfer(PosedCamera(_MODEL, EuclideanMap(RotMatrix{3, Float64}(one(SMatrix{3, 3, Float64})), Vec3{Float64}(0.0, 0.0, -500.0))), wreg) === nothing
 end
 
 @testset "the pose fit itself: raw pixels through the lens, rim included" begin
@@ -83,7 +87,7 @@ end
     # threshold with least squares on the inliers): the Student-t + uniform
     # marginal at a 5 px half-width and the cross-validated Welsch-HQ lift.
     est = BlobBoards.VisualGeometryToolkitEstimation.find_absolute_pose(
-        _CAM, src .=> dst; rng = MersenneTwister(1),
+        _MODEL, src .=> dst; rng = MersenneTwister(1),
         scoring = scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => 5.0); problem = AbsolutePoseProblem),
         local_optimization_strategy = HQ{WelschShape}(; efficiency_constant = tuning_constant(:absolute_pose, "welsch").efficiency_constant)
     )
@@ -93,6 +97,33 @@ end
         @test norm(est.estimate.t - _POSE.t) < 1.0
         @test count(VisualGeometryToolkitCore.inlier_mask(est) .& (radius .> 1100)) == count(radius .> 1100)   # the rim is kept
     end
+end
+
+@testset "the pose arm takes a BoundedCamera (a parametric lens and a spline); a bare CameraModel is refused" begin
+    rng = MersenneTwister(6)
+    src = Point3{Float64}[]; dst = Point2{Float64}[]
+    inner = Rect(320.0, 216.0, 3600.0, 2400.0)          # where the spline below is fitted
+    for X in -160.0:20.0:160.0, Y in -120.0:20.0:120.0
+        u = project(_CAM, _POSE.R * SVector(X, Y, 0.0) + _POSE.t)   # Core forwards project from the BoundedCamera
+        (all(isfinite, u) && Point2{Float64}(u[1], u[2]) ∈ inner) || continue
+        push!(src, Point3{Float64}(X, Y, 0.0))
+        push!(dst, Point2{Float64}(u[1] + 0.3randn(rng), u[2] + 0.3randn(rng)))
+    end
+    @test length(src) >= 30
+    spline = BoundedCamera(estimate(fit_camera(SplineLens, _CAM, inner; tolerance = 1.0e-2)), Size2(4240, 2832))
+    for cam in (_CAM, spline)
+        res = BlobBoards._find_model(cam, src .=> dst; rng = MersenneTwister(1))   # the pose arm's fit, as find_boards runs it
+        @test VisualGeometryToolkitCore.found_model(res)
+        VisualGeometryToolkitCore.found_model(res) || continue
+        @test rad2deg(rotation_angle(RotMatrix{3}(res.estimate.R' * _POSE.R))) < 0.1
+        @test norm(res.estimate.t - _POSE.t) < 2.0
+    end
+    @test hasmethod(BlobBoards.board_quad, Tuple{BoundedCamera, Any, BlobBoards.BoardBundle})
+    @test !hasmethod(BlobBoards.board_quad, Tuple{CameraModel, Any, BlobBoards.BoardBundle})
+    # The old call: a bare model is refused, naming the bounded camera.
+    err = try PoseGeometry(_MODEL); nothing catch e; e end
+    @test err isa ArgumentError && occursin("BoundedCamera(camera, Size2(width, height))", sprint(showerror, err))
+    @test PoseGeometry(spline).camera === spline
 end
 
 # track_boards' bookkeeping projects every blob centre through the transfer
@@ -106,7 +137,7 @@ end
     @test through_cam isa Vector{Point2{Float64}} && length(through_cam) == length(wd)
     for (p, d) in zip(through_cam, wd)
         c = centroid(d)
-        @test SVector{2, Float64}(p) ≈ SVector{2, Float64}(project(PosedCamera(_CAM, _POSE), Point3{Float64}(c[1], c[2], 0.0)))
+        @test SVector{2, Float64}(p) ≈ SVector{2, Float64}(project(PosedCamera(_MODEL, _POSE), Point3{Float64}(c[1], c[2], 0.0)))
     end
     # a pinhole camera: the PosedCamera method agrees with the homography method
     via_H = _project_blob_centers(_model_to_homography(pose, _PIN), wd)

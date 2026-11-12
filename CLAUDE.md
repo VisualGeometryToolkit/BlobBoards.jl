@@ -454,7 +454,7 @@ Consequences:
 ambiguity.** An untyped argument lets a call in the retired order bind with
 every value in the wrong slot, so type a slot with the narrowest type every
 caller satisfies (`AbstractDict` for a gallery, `AbstractMatrix` for an image,
-`AbstractVector` for detections and frames, `CameraModel` for a camera, `Set`
+`AbstractVector` for detections and frames, `BoundedCamera` for a camera, `Set`
 for a mutated uid set) and check no ambiguity appears among same-named
 methods. When every argument is a string, check what each must be before any
 work and throw an `ArgumentError` naming the order (the descriptor model is a
