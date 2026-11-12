@@ -198,7 +198,9 @@ end
     saved = (b.root, b.resolve_links, b.data_fallback, b.artifacts, b.create_results)
     mktempdir() do scratch
         withenv("VGTK_DATA_ROOT" => nothing) do
-            E.set_project_root!(scratch; artifacts = E.ArtifactView(projectdir("Artifacts.toml");
+            # the project's own root (its data catalog, configs/data_artifacts.toml, decides which tiers the view
+            # installs, Eval's view gate); only the view itself is in the scratch directory
+            E.set_project_root!(projectdir(); artifacts = E.ArtifactView(projectdir("Artifacts.toml");
                 dir = joinpath(scratch, "data", "exp_raw"), mount = B._tier_mount, default = B._DEFAULT_TIERS))
             try
                 paths = try
