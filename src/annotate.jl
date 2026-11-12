@@ -955,7 +955,7 @@ function build_annotations(
         # (e.g. iphone_till) leak ~500 MB/frame of GPU tensors otherwise.
         # Runs even on failure path so a partial allocation doesn't poison the next iter.
         GC.gc(false)
-        reclaim_pool!(device)                      # no-op on CPU; CUDA.reclaim() via BlobBoardsCUDAExt
+        VgtkCore.reclaim_device!(device)           # no-op on CPU; CUDA.reclaim() via Core's CUDA extension
     end
 
     n_skipped > 0 && @info "Skipped $n_skipped already-processed sources"

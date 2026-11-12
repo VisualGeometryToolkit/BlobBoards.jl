@@ -53,11 +53,6 @@ using CoordinateTransformations: PerspectiveMap, transform_deriv   # a homograph
 # scripts that need the ONNX `:cuda` EP load it themselves.
 
 
-# Return the backend's cached pool memory to the driver. No-op for every backend
-# except CUDA, where BlobBoardsCUDAExt maps it to `CUDA.reclaim()`. Typed `::Any`
-# rather than `::KA.Backend` because callers still supply VGF's `CudaBackend()`.
-reclaim_pool!(::Any) = nothing
-
 # ONNX execution provider matching a compute backend. Without this a CPU run
 # still asks for the `:cuda` EP, and `DescriptorNetwork` answers with a
 # "CUDA execution provider unavailable" warning before falling back to `:cpu`
@@ -823,7 +818,7 @@ function build_tracks_for_sequences(
             # image pyramid on the next frame — otherwise a growing CUDA pool
             # eventually OOMs `vksift_jl_init_ex` on large stills.
             GC.gc()
-            reclaim_pool!(backend)
+            VgtkCore.reclaim_device!(backend)
         end
         printstyled(
             "All media processed in $(round(time() - t_start; digits = 1))s → $output_path\n";

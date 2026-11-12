@@ -107,14 +107,4 @@ BlobBoards._describe_patches(model::BlobBoards.DescriptorNetwork, cube::CuArray{
     model.session.execution_provider === :cuda ? _describe_device(model, cube) :
     BlobBoards.describe(model, BlobBoards._host_patches(cube))
 
-# =============================================================================
-# Training-pipeline backend hooks (src/training.jl)
-# =============================================================================
-#
-# training.jl lives in the core module and must not `using CUDA`; its hooks
-# get their CUDA methods here. The device resolver is set in this file's single
-# `__init__` (above).
-
-BlobBoards.reclaim_pool!(::CUDABackend) = CUDA.reclaim()
-
 end # module BlobBoardsCUDAExt
