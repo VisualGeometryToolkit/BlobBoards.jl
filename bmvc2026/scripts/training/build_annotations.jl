@@ -28,7 +28,7 @@ using DrWatson
 @quickactivate  # activates bmvc2026 from this file's location (DrWatson layout)
 
 using BlobBoards
-using BlobBoards: build_annotations   # advanced API (unexported)
+using BlobBoards: build_annotations, walk_media   # advanced API (unexported); the one media predicate
 using CUDA, cuDNN
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load (pixel operations take a BoundedCamera)
@@ -62,19 +62,17 @@ function Logging.handle_message(logger::TimestampLogger, level, message, _module
     return
 end
 
-const _IMG_EXTS = (".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp")
-const _VID_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv")
-_has_ext(p, exts) = lowercase(splitext(p)[2]) in exts
-
-# Every immediate subdirectory D of `kind_dir`: its files of `exts` (sorted,
-# the first `max_sources` when that is positive) and its camera, the sibling
-# D.json when it exists.
-function _discover(kind_dir::AbstractString, exts, max_sources::Integer)
+# Every immediate subdirectory D of `kind_dir`: its own media files (BlobBoards'
+# `walk_media` of each file directly in D, videos or stills: its one media
+# predicate; a nested directory such as iphone_till/not_working is not walked),
+# sorted, the first `max_sources` when that is positive, and its camera, the
+# sibling D.json when it exists.
+function _discover(kind_dir::AbstractString, videos::Bool, max_sources::Integer)
     out = Tuple{Vector{String}, Union{String, Nothing}}[]
     isdir(kind_dir) || return out
     for entry in sort(readdir(kind_dir; join = true))
         isdir(entry) || continue
-        files = sort!(filter(f -> _has_ext(f, exts), readdir(entry; join = true)))
+        files = sort!(reduce(vcat, (walk_media(f; videos, images = !videos) for f in readdir(entry; join = true) if isfile(f)); init = String[]))
         max_sources > 0 && (files = first(files, max_sources))
         isempty(files) && continue
         push!(out, (files, isfile(entry * ".json") ? entry * ".json" : nothing))
@@ -109,8 +107,8 @@ function main()
     @info "$(length(board_paths)) boards loaded"
 
     max_sources = Int(ANN["max_sources"])
-    videos = _discover(input_path(CFG, "videos"), _VID_EXTS, max_sources)
-    images = _discover(input_path(CFG, "images"), _IMG_EXTS, max_sources)
+    videos = _discover(input_path(CFG, "videos"), true, max_sources)
+    images = _discover(input_path(CFG, "images"), false, max_sources)
     @info "$(sum(length(f) for (f, _) in videos; init = 0)) videos in $(length(videos)) dirs, " *
         "$(sum(length(f) for (f, _) in images; init = 0)) images in $(length(images)) dirs"
 
