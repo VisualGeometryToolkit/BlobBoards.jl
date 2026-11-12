@@ -45,7 +45,7 @@
 # =============================================================================
 
 using KernelAbstractions: @kernel, @Const, @index, @groupsize,
-    @localmem, @private, @synchronize, @uniform
+    @localmem, @private, @synchronize, @uniform, @context   # @context: the kernel context Core's tree_sum! takes
 
 # The per-blob scan samples a canonical (2·31 + 1)² = 3969-point grid, which
 # is what `_SORT_PADDED` (the next power of two) sizes the sweep's bitonic
