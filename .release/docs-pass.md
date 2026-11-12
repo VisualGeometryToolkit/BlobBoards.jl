@@ -1,4 +1,7 @@
-docs-pass: 3bc37acc229276deb3b9d3e0d83a91dbd8656d34
+docs-pass: 153f622cecaf858863f56b83a23e07785aa3b81a
+
+Recorded on 153f622cecaf858863f56b83a23e07785aa3b81a: the only change since the docs build on 3bc37ac (below) is the CHANGELOG's known-issue note
+(bmvc2026's make_param_variations.jl); no docstring, docs page, README or source moved.
 
 BlobBoards 0.6.0 (the VisualGeometryToolkit 0.9 stack). Release tree: paper-09-bb, which carries every blobboards-09
 change. Builds on the 0.9 docs pass (docs-09-bb, 2957f24/c4ca56a/26367aa: Blob outcomes, local_optimization_strategy,
