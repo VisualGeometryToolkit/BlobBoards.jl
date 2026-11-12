@@ -10,6 +10,7 @@ generator = "adapted_panels"
 tier = "bb_absolute_pose_inputs"
 path = "absolute_pose_experiments/teaser/testit.jpg"
 provenance = "a teaser photo by the authors"
+sha256 = "0333e1d8b5bf2114000817170a1b6f5976eb944f8b4259069c61457d56df9b79"
 
 [inputs.boards]
 tier = "bb_assets"

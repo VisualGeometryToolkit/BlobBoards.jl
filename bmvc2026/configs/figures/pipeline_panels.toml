@@ -28,6 +28,7 @@ path = ""                                # "" = a tempdir() cache; a CACHE (rebu
 tier = "bb_pipeline_figure"
 path = "blobboard_training/images/dataset_sonyfx3_tamron20mm_f8/DSC02800.JPG"
 provenance = "a descriptor-training still, by the authors"
+sha256 = "991f54f9b2be15a65d6b75173474dfe769f284175709f52ab642a2d8f9868e99"
 
 [inputs.camera]
 # the session's camera (vgio/cameras/v4, from its OpenCV calibration); the panels show the image undistorted with it

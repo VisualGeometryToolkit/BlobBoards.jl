@@ -11,6 +11,7 @@ bb = "bmvc2026_260527.toml"    # configs/-relative: the run config of record who
 tier = "bb_absolute_pose_inputs"
 path = "absolute_pose_experiments/teaser/DSC04596.png"
 provenance = "the teaser photo (a montage of the boards), by the authors"
+sha256 = "cb06293c599f3965479584a9e7c240bf83645acf679b00812e903efc86826ba5"
 
 [inputs.boards]
 tier = "bb_assets"
