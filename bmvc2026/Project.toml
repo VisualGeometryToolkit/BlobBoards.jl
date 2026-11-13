@@ -39,12 +39,12 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 BlobBoards = {path = ".."}
 
 [compat]
-JSON = "1"
+JSON = "1.13"
 julia = "1.13"
 ReTestItems = "1.35"
 VisualGeometryToolkitEstimation = "0.10"
-VisualGeometryToolkitEval = "0.7"
-VisualGeometryToolkitFeatures = "0.8"
+VisualGeometryToolkitEval = "0.7.1"
+VisualGeometryToolkitFeatures = "0.8.2"
 
 [extras]
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
