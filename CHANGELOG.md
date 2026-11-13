@@ -29,6 +29,12 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
 - **`find_boards`' `max_detections` is `detect_blobs`' cap** (Features' `spread_strongest`: about that many of the
   strongest, spread over the image, applied per polarity group), not the top-N by |response|. With a finite cap
   (the default is unbounded) the kept detections, and so the boards found and `build_tracks`' training data, change.
+- **Board files are `blobboards/board/v7.0`, pattern files `blobboards/pattern/v5.0`** (VisualGeometryToolkitIO 0.10's
+  envelope): the record states no `units` block of its own; the file's `units` object (the world length, `dpi`, on a
+  point grid the length role `pattern` in pt), `generator` (IO and BlobBoards, with their versions) and `conventions`
+  are written by IO's `write_record`. Every earlier board and pattern file (v1–v6, v1–v4) still loads, through its
+  version step, with its stored identity; `VisualGeometryToolkitIO.vgio_migrate` rewrites one. No board's uid or QR
+  code moves (`IDENTITY_SCHEMA` stays `blobboards/board/v4`).
 - **One TIFF codec in the stack** (owner ruling): a `Tiff` board output and `rasterize_pdf`'s page go through
   VisualGeometryToolkitIO's `write_tiff` / `read_tiff` (libtiff; byte-identical board TIFFs). BlobBoards' own copy is
   deleted, with its public `BlobBoards.write_tiff` (call `VisualGeometryToolkitIO.write_tiff`) and the `Libtiff_jll`
