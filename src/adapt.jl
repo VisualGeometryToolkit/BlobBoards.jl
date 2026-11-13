@@ -84,6 +84,9 @@ shapes being refined, so they lead. Both are typed, so a call in the retired
 Uses a unified IRLS loop with Student-t posterior weights.
 The solve step is the Student-t/uniform mixture: WLS in log-space with f²
 correction and the sort-and-sweep posterior partition. It is not configurable.
+The model follows the blob's sample count: 20 or more fit the anisotropic
+paraboloid (6 parameters), 10 to 19 the isotropic one (4 parameters: a round
+blob, `C = c·I`), and a blob of fewer than 10 is dropped.
 
 Accepts `Vector{Detection}` (from `detect_blobs`) or `Vector{Disc}` (ground truth).
 
