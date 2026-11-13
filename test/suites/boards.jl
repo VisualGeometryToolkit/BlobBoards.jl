@@ -708,27 +708,23 @@ end
     @test_throws ArgumentError AE._glyph_code(font, '\U1F600')       # no glyph: refused, not a missing-glyph box
 end
 
-# The board TIFFs are byte for byte what BlobBoards' own libtiff writer wrote (0.6.2) before the stack's one codec took
-# them over (VisualGeometryToolkitIO's `write_tiff`, the io095 port): the four boards io095's identity check recorded.
-# The TIFF's Software tag names the writing BlobBoards version, the only bytes that move with a release; the pin
-# reads it as 0.6.2's (a version string of the same length: the tag's offsets are unchanged).
-const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF)
-    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "4964f3e9bb6e0e6c70f13810566d63ec1e1cc772c416c0b2ee15b83caf138bc9"),
-    ("A5", (1mm, 6mm), 0x77, 300dpi, "37653627a38944358e932c0e3fcf7c841558e17de326ff9b22f13c36bf8d014a"),
-    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "500d725695168b4aff284f955a1455a2aebbf00841d4465d2120edebcf476894"),
-    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "26b94e39fe1feda0d10e57afc35dab8596d8f3b8f846e36b1f234565821fb2f3"),
+# The board TIFFs, pinned byte for byte, of the four boards io095's identity check used. VisualGeometryToolkitIO's
+# `write_tiff` (the stack's one TIFF codec, the io095 port) writes exactly what BlobBoards' own libtiff writer wrote:
+# checked 2026-11-13 on these four boards at 0.7.0 (BlobBoards' writer on w10-bb-tmp 8177304 against IO's on dfe28d5,
+# equal bytes). The sheet prints the package version in its footer and the TIFF's Software tag names it, so these pins
+# are a version's: re-pin at each version bump (0.6.2's differ from 0.7.0's in those two places only).
+const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF at BlobBoards 0.7.0)
+    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "2b93ba8c903ed22e1378f71d26b616152c3ba44fab9162276f8c3c9d991ec2f4"),
+    ("A5", (1mm, 6mm), 0x77, 300dpi, "a5c763afb2c2943ff99aece98638d98311ee972d4a1c9e2a248f9b64b5e3a4ae"),
+    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "86c3877e7e5d35e9dcb94c6646e591c3efb8448772747672cf16afc6aa19de70"),
+    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "693ed179d33398166381d85a4eb206ebd1a80a5317f25f5ac74230e3f2a4d338"),
 ]
-@testset "board TIFFs: byte for byte BlobBoards 0.6.2's (the TIFF codec hoisted into IO)" begin
-    now = "BlobBoards.jl $(pkgversion(BlobBoards))"
-    @test length(now) == length("BlobBoards.jl 0.6.2")
+@testset "board TIFFs: byte pins (IO's write_tiff, BlobBoards' bytes)" begin
+    @test pkgversion(BlobBoards) == v"0.7.0"   # the pins are this version's (see above)
     for (sz, bs, seed, d, digest) in _TIFF_GOLDEN
         mktempdir() do dir
             blob_board(sz; blob_sizes = bs, seed, dir, output = Tiff(d; icc_profile = :linear))
-            bytes = read(only(filter(endswith(".tiff"), readdir(dir; join = true))))
-            at = findfirst(Vector{UInt8}(now), bytes)
-            @test at !== nothing
-            at === nothing || (bytes[at] = Vector{UInt8}("BlobBoards.jl 0.6.2"))
-            @test sha256_hex(bytes) == digest
+            @test sha256_hex(read(only(filter(endswith(".tiff"), readdir(dir; join = true))))) == digest
         end
     end
 end
