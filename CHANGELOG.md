@@ -42,6 +42,10 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
   refused), `image_points` — where it was one entry per frame with `keys`; `write_native_calibration` writes the
   OpenCV export and converts it with IO's `convert_opencv_calibration` (the current camera store and poses);
   `opencv_lens_record` is deleted (IO's `opencv_lens`); `calibrate_opencv` and `save_matlab` take one target's views.
+- **Annotation and run-configuration hashes move** (`config_hash`, `canonical_config_json`, the bmvc2026 run keys):
+  they are the SHA-256 of VisualGeometryToolkitIO's canonical JSON, whose numbers are RFC 8785's in IO 0.10
+  (`1.0e-6` is written `0.000001`), the stack's one deliberate re-id. The configuration trees are unchanged; board
+  identities do not move.
 - **One TIFF codec in the stack** (owner ruling): a `Tiff` board output and `rasterize_pdf`'s page go through
   VisualGeometryToolkitIO's `write_tiff` / `read_tiff` (libtiff; byte-identical board TIFFs). BlobBoards' own copy is
   deleted, with its public `BlobBoards.write_tiff` (call `VisualGeometryToolkitIO.write_tiff`) and the `Libtiff_jll`

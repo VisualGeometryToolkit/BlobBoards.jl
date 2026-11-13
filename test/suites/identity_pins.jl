@@ -11,8 +11,10 @@
 # v4 (2026-11-06, VisualGeometryToolkitIO's writer), which is why `hash_config`
 # of every board below is the same string it was, and the stored
 # `hashes.config` of every migrated file is untouched. A printed board's uid
-# must never move. The FILE BYTES are pinned too; the pins are those of the
-# current (v6 / v4) writer, IO's `write_record`. The v5 / v3 writer (a
+# must never move, nor for board v7.0 / pattern v5.0 (2026-11-13, IO 0.10's
+# envelope). The FILE BYTES are pinned too, less the `generator` (the writing
+# packages' versions, `_pinned`); the pins are those of the current (v7.0 / v5.0)
+# writer, IO's `write_record`. The v5 / v3 writer (a
 # JSON3.pretty clone) is gone; its files are the tracked fixtures, pinned by
 # their sha256 and read through their version step to the value they always
 # held. The migration of a retired file and of its tracked v5 successor give the
@@ -27,7 +29,7 @@ using VisualGeometryToolkitCore: Disc, Point2, px, mm, dpi, pt, inch, ustrip
 _sha(bytes) = bytes2hex(sha256(bytes))
 # A file's bytes less its `generator` (the IO and BlobBoards versions that wrote it, which move every release):
 # what a byte pin holds.
-_pinned(bytes) = replace(String(bytes), r"\n    \"generator\": \{.*?\n    \},"s => "")
+_pinned(bytes) = replace(String(copy(bytes)), r"\n    \"generator\": \{.*?\n    \},"s => "")
 _onlyext(dir, ext) = only(filter(endswith(ext), readdir(dir; join = true)))
 
 # Two parsed records are the same record: the same keys (the schema aside), every
@@ -46,14 +48,26 @@ _same_record(a, b) = isequal(a, b)
 const _FIXTURES = joinpath(@__DIR__, "..", "fixtures", "v3_render")
 
 # The pattern bundle of serialization.jl's golden config, as `save_json` writes
-# it (pattern v4: JSON.jl's printing — a Float64 keeps its `.0`, an integral
-# pixel count is an integer).
+# it less its `generator` (pattern v5.0: IO 0.10's envelope; JSON.jl's printing — a
+# Float64 keeps its `.0`, an integral pixel count is an integer).
 const PINNED_PATTERN_JSON = """
 {
-    "schema": "blobboards/pattern/v4",
+    "schema": "blobboards/pattern/v5.0",
     "units": {
-        "world": "mm",
-        "density": "dpi"
+        "length": "mm",
+        "time": "s",
+        "angle": "rad",
+        "pixel": "colmap",
+        "density": "dpi",
+        "radiance": "relative",
+        "length_roles": {}
+    },
+    "conventions": {
+        "rotation_encoding": "quaternion_wxyz_hamilton",
+        "transform_convention": "x_to = R * x_from + t",
+        "matrix_layout": "rows",
+        "grid_layout": "row_major",
+        "index_base": 1
     },
     "pattern_config": {
         "pattern_resolution": {
@@ -168,7 +182,7 @@ const PINNED_PATTERN_V3_JSON = """
             @test _sha(BlobBoards.canonical_config_json(b.preamble)) == "80388c6c81978b0923d85f0a9e95aa2e7c94eff600d09bea40ceaf8e50fc1e4b"
             @test BlobBoards.board_code(b.preamble) ==
                 "BB4/148MM/210MM/10MM/10MM/10MM/10MM/0MM/10MM/5MM/10MM/5MM/1234/2.83464566929/18.1415/3/5000/1.2/2/D/DA6009BB"
-            @test _sha(_pinned(read(_onlyext(dir, ".json")))) == "PIN_A5"
+            @test _sha(_pinned(read(_onlyext(dir, ".json")))) == "e6760fb39d52f82d2b7678eaf7dc65df295730a010ecbc2d655568384c9b7537"
             @test basename(BlobBoards._render_cache_dir(hash_config(b.preamble), true)) == "da6009bb31d28be9_05984910"
             # write → read → write is byte-identical: the lift paths (margin, ruler_width, corner_size, layout_grid,
             # the blob columns) lose nothing
@@ -197,7 +211,7 @@ const PINNED_PATTERN_V3_JSON = """
         mktempdir() do dir
             blob_board("A5"; blob_sizes = (5.0mm, 0.2short_side), seed = 0x77, dir, output = BlobBoards.Png(150dpi), id_label = true)
             json = read(_onlyext(dir, ".json"))
-            @test _sha(_pinned(json)) == "PIN_PNG"
+            @test _sha(_pinned(json)) == "7e36d78899345c78525dfe99b9230112939f55edcdf6cf8dbe09c0f1d4d2c639"
             @test occursin("cd5a5372d3c7c38f4b2a3724759421f44d354027b127b9a5623543dc37ec4017", String(json))
         end
     end
@@ -205,9 +219,9 @@ const PINNED_PATTERN_V3_JSON = """
     @testset "stored pixel-grid boards: identity, re-save and rebuild bytes (board v7.0)" begin
         for (name, h, resave) in (
                 ("odd300", "0ed26d0d3b982d10064a872e75e1dfb5215ef91cac71633083a2da5c6ddadc39",
-                    "PIN_ODD300"),
+                    "e488f70acce15c63978b8d4835f9c90f82cd51ff26fb15095c2a464483a7cf80"),
                 ("framed600", "b01c46b2f66b6507175cd68e077f8445cfc538ea550e05101f1e4d062f353768",
-                    "PIN_FRAMED600"),
+                    "452b56dc8d43707e39ad90875841893baae5daeea63da7d36ba79b6e421d568d"),
             )
             v3, _, stored = BlobBoards.load_bundle(joinpath(_FIXTURES, name * ".json"))
             @test stored == h
@@ -220,7 +234,7 @@ const PINNED_PATTERN_V3_JSON = """
         end
         mktempdir() do dir
             BlobBoards.rebuild_board(joinpath(_FIXTURES, "odd300.json"); dir)
-            @test _sha(_pinned(read(_onlyext(dir, ".json")))) == "PIN_REBUILD"
+            @test _sha(_pinned(read(_onlyext(dir, ".json")))) == "3e9d12ec9cd09abba42ba74be3680005effc5fae9e30e9160df3ee51060a120e"
         end
     end
 
@@ -432,11 +446,13 @@ const PINNED_PATTERN_V3_JSON = """
         @test hero.preamble.board_config.layout_grid == 0.01                        # a number in the `pattern` role (pt)
     end
 
+    # Re-pinned 2026-11-13 for VisualGeometryToolkitIO 0.10's canonical JSON (RFC 8785 numbers: 1.0e-6 is written
+    # 0.000001), the stack's one deliberate re-id; the trees are unchanged (checked against 0.6.2's text).
     @testset "annotation and run-config hashes" begin
         @test BlobBoards.config_hash(;
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
-        ) == "6a7042b4465849fa8a65fbec19c8e370fdd904b81ff8032d432cb0ef99558ef7"
+        ) == "beae63bcd83efb6e1983a85db1f4af538115fb17d0fad5cefd7aae2cefd71162"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "d9661b5bd67cbab9246d376f8b0160bccfa01269d7e77072c70b462db97cdb65"
+            "2fe33da39ad147966ea25292f5280ad6d1b7613b45f37a0d14abafe3dbd147fa"
     end
 end
