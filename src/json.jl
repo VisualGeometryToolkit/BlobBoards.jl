@@ -222,14 +222,16 @@ const _ParsedObject = JSON.Object{String, Any}
 # A JSON object built in code, in the form a lift reads: the pairs given, or a
 # dictionary or NamedTuple with every nested one converted (a version step's
 # tree is plain `Dict`s, which have no property access).
-function _object(kv::Pair...)
+_object(kv::Pair...) = _object_of(kv)
+# The object of an iterable of key => value pairs (no splat of a data-length collection).
+function _object_of(kv)
     o = _ParsedObject()
     for (k, v) in kv
         o[String(k)] = v
     end
     return o
 end
-_object(x) = _object((String(k) => _as_record(v) for (k, v) in pairs(x))...)
+_object(x) = _object_of(String(k) => _as_record(v) for (k, v) in pairs(x))
 _as_record(x::Union{AbstractDict, NamedTuple}) = _object(x)
 _as_record(x::AbstractVector) = Any[_as_record(v) for v in x]
 _as_record(x) = x

@@ -815,12 +815,16 @@ function load_annotations(path::AbstractString)
     end
 
     patches = isempty(patch_chunks) ?
-        Array{Float32}(undef, P, P, 2, 0) : cat(patch_chunks...; dims = 4)
+        Array{Float32}(undef, P, P, 2, 0) : _cat4(patch_chunks)
     confusers = isempty(confuser_chunks) ?
-        Array{Float32}(undef, P, P, 2, 0) : cat(confuser_chunks...; dims = 4)
+        Array{Float32}(undef, P, P, 2, 0) : _cat4(confuser_chunks)
 
     return (; board_uids, blob_ids, patches, confusers)
 end
+
+# (P, P, 2, Nᵢ) chunks concatenated along the patch axis: one allocation through
+# `reduce(hcat, …)` over their columns (no splat of the chunk list).
+_cat4(chunks) = reshape(reduce(hcat, [reshape(c, :, size(c, 4)) for c in chunks]), size(first(chunks), 1), size(first(chunks), 2), size(first(chunks), 3), :)
 
 # Promote a 3-D (P, P, N) intensity tensor to 4-D (P, P, 2, N) by stacking
 # an all-1s mask channel. Forward 4-D tensors unchanged.

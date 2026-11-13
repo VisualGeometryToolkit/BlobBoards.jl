@@ -322,7 +322,7 @@ function _print_master(;
             "/Title $(_pdf_string(title)) /Creator $(_pdf_string(creator)) /Producer $(_pdf_string(creator)) " *
                 "/CreationDate ($info_date) /ModDate ($info_date) /Trapped /False"
         ),
-        font_objects...,
     ]
+    append!(objects, font_objects)   # the font's objects follow (numbered from info + 1)
     return _pdf_file(objects; root = catalog, info, version = "1.6")
 end

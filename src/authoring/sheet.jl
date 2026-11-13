@@ -91,10 +91,8 @@ function _ruler_ticks(
 
     # along the band, across it → the cell's x, y (swapped for a vertical ruler)
     tick(p, lo, hi) = orientation === vruler ? (lo, p, hi, p) : (p, lo, p, hi)
-    return NTuple{4, Float64}[
-        (tick(p, majorymin, majorymax) for p in major_positions)...,
-        (tick(p, minorymin, minorymax) for p in minor_positions)...,
-    ]
+    return vcat(NTuple{4, Float64}[tick(p, majorymin, majorymax) for p in major_positions],
+                NTuple{4, Float64}[tick(p, minorymin, minorymax) for p in minor_positions])
 end
 
 function _ruler_ops(io::IO, ox::Real, oy::Real, ticks)

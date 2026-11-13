@@ -357,7 +357,7 @@ function inspect_pipeline(trace::PipelineTrace; region = nothing)
     if BlobBoards._has_attr(trace, :registration)
         append!(axes, _registered_panels!(fig, trace, 1 + length(trace.arms)))
     end
-    Makie.linkaxes!(axes...)
+    Makie.linkaxes!(axes)   # Makie's collection form (no splat of a panel count)
     # Pin every axis to the IMAGE extent. Without this the linked limits grow to
     # the union of all plotted content — a reprojected board rect or a match
     # line reaching outside the frame drags every panel off the image.
@@ -656,12 +656,12 @@ function _paint_track_panels!(axes, label, trace::TrackTrace, i::Int)
 end
 
 function _track_triptych!(fig, trace::TrackTrace)
-    axes = [
+    axes = Makie.Axis[
         Makie.Axis(fig[1, c]; yreversed = true, aspect = Makie.DataAspect())
             for c in 1:length(_TRACK_PANELS)
     ]
     label = Makie.Label(fig[0, 1:length(_TRACK_PANELS)], ""; font = :bold)
-    Makie.linkaxes!(axes...)
+    Makie.linkaxes!(axes)   # Makie's collection form (no splat of a panel count)
     return axes, label
 end
 

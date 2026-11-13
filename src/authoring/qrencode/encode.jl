@@ -125,7 +125,7 @@ function encodedata(message::AbstractString, ::Numeric)::BitArray{1}
     end
 
     binchunks = map(toBin, chunks)
-    return vcat(binchunks...)
+    return reduce(vcat, binchunks; init = falses(0))
 end
 
 function encodedata(message::AbstractString, ::Alphanumeric)::BitArray{1}
@@ -139,21 +139,21 @@ function encodedata(message::AbstractString, ::Alphanumeric)::BitArray{1}
 
     binchunks2 = map(toBin, chunks2)
     if iseven(l)
-        vcat(binchunks2...)
+        reduce(vcat, binchunks2; init = falses(0))
     else
-        vcat(binchunks2..., int2bitarray(alphanumeric[last(message)]; pad=6))
+        vcat(reduce(vcat, binchunks2; init = falses(0)), int2bitarray(alphanumeric[last(message)]; pad=6))
     end
 end
 
 function encodedata(message::AbstractString, ::Byte)::BitArray{1}
-    vcat(int2bitarray.(UInt8.(collect(message)))...)
+    reduce(vcat, int2bitarray.(UInt8.(collect(message))); init = falses(0))
 end
 function encodedata(message::AbstractString, ::UTF8)::BitArray{1}
-    vcat(int2bitarray.(codeunits(message))...)
+    reduce(vcat, int2bitarray.(codeunits(message)); init = falses(0))
 end
 
 function encodedata(message::AbstractString, ::Kanji)::BitArray{1}
-    vcat([int2bitarray(kanji[i]; pad=13) for i in message]...)
+    reduce(vcat, [int2bitarray(kanji[i]; pad=13) for i in message]; init = falses(0))
 end
 
 """
@@ -251,7 +251,7 @@ function interleave( blocks::AbstractVector
     end
     
     ## Extra padding
-    bits = vcat(int2bitarray.(bytes; pad=8)...)
+    bits = reduce(vcat, int2bitarray.(bytes; pad=8); init = falses(0))
     msgbits = vcat(bits, falses(remainderbits[version]))
 
     return msgbits

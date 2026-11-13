@@ -698,7 +698,7 @@ _python_pixel_frame(convention::AbstractString) = VgtkIO.pixel_frame_from_name(c
 # `run_dir`'s correspondences in `convention`, exported to `out` (IO's `export/correspondences/v2`).
 function _correspondences_python(run_dir::AbstractString, convention::AbstractString, out::AbstractString)
     obs = VgtkIO.load(VgtkCore.TargetObservations, joinpath(run_dir, "observations.json"))
-    rigs = sort!(filter(f -> startswith(basename(f), "targets_") && endswith(f, ".json"), readdir(run_dir; join = true)))
+    rigs = sort!(String[f for f in readdir(run_dir; join = true) if startswith(basename(f), "targets_") && endswith(f, ".json")])
     isempty(rigs) && throw(ArgumentError("$(run_dir): no targets_*.json beside its observations"))
     VgtkIO.with_caller(() -> VgtkIO.save_correspondences(_python_pixel_frame(convention), out, obs, rigs...), BlobBoards)
     return String(out)

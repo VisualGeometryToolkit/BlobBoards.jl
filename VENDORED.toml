@@ -10,7 +10,9 @@
 # UnicodePlots), files flattened into one directory under the module name
 # QREncode (QREncode.jl replaces src/QRCoders.jl), qrcode.jl holds the two
 # `qrcode` methods of src/export.jl verbatim, and types.jl drops
-# `Base.show(io, ::QRCode)`. Encoding code unchanged: matrices are identical.
+# `Base.show(io, ::QRCode)`. encode.jl's bit concatenations are `reduce(vcat, chunks; init = falses(0))` instead of
+# `vcat(chunks...)` (the stack's check_splat: no splat of a data-length collection), the same bits. Encoding otherwise
+# unchanged: matrices are identical.
 [[vendored]]
 path = "src/authoring/qrencode"
 upstream = "https://github.com/JuliaImages/QRCoders.jl (v1.4.5)"

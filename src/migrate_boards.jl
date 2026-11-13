@@ -155,7 +155,7 @@ function _legacy_pattern_from_points(x, bc::BoardConfig)
     d = _object(x)
     d["pattern_resolution"] = if res === nothing
         p = _board_pattern_points(bc)
-        _object((k => _object("value" => ustrip(px, q), "unit" => "px") for (k, q) in (("width", p.width), ("height", p.height)))...)
+        _object_of(k => _object("value" => ustrip(px, q), "unit" => "px") for (k, q) in (("width", p.width), ("height", p.height)))
     else
         _object("width" => stored(res.width), "height" => stored(res.height))
     end

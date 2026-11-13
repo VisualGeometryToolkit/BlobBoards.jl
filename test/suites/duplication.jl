@@ -24,3 +24,8 @@ foreach(v -> _key(v) in OPEN || println(stderr, v), found)
 @test keys_found ⊆ OPEN
 @test isempty(setdiff(OPEN, keys_found)) || isempty(get(ENV, "VGTK_STACK_PATHS", ""))   # file/similar need the stack paths
 @test isempty(found)
+
+# No call splats a collection whose length is data (VisualGeometryToolkitCore's `check_splat`, every method of the
+# package and its loaded extensions inferred at its own signature); the reasoned exceptions are DUPLICATION.toml's
+# `[[splat]]` entries.
+VgtkCore.test_splat(BlobBoards)

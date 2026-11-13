@@ -692,8 +692,8 @@ end
 # the grid their edges cut the plane into.
 function _union_area(rects::Vector{Rect2{Float64}})
     isempty(rects) && return 0.0
-    xs = sort!(unique!(vcat([[origin(r)[1], origin(r)[1] + widths(r)[1]] for r in rects]...)))
-    ys = sort!(unique!(vcat([[origin(r)[2], origin(r)[2] + widths(r)[2]] for r in rects]...)))
+    xs = sort!(unique!(reduce(vcat, [[origin(r)[1], origin(r)[1] + widths(r)[1]] for r in rects])))
+    ys = sort!(unique!(reduce(vcat, [[origin(r)[2], origin(r)[2] + widths(r)[2]] for r in rects])))
     a = 0.0
     for i in 1:(length(xs) - 1), j in 1:(length(ys) - 1)
         cx, cy = (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2
