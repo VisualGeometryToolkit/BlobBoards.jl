@@ -25,7 +25,7 @@ closes it; an open item says what it waits for. The release leg refuses while an
 ## Open, each waiting for its owner
 
 - [x] ONNX Runtime runs outside Features' arena accounting (`describe`'s `model.session(…)`, the CUDA extension's
-  `CAPI.Run`; `reserve_workspace!`) → Features' `onnx_run` (feat09 35c5abf7; review BB#3; NEXT_SHA)
+  `CAPI.Run`; `reserve_workspace!`) → Features' `onnx_run` (feat09 35c5abf7; review BB#3; d243ced)
 - [x] `_iou_below` (src/pipeline.jl), a generic IoU bound → Core's `iou_below` beside `iou` (core10 0bcd5559; BB calls it, 06c3d5c;
   verified once the shared snapshot carries core10 ≥ 0bcd5559)
 - [x] `test/suites/readme.jl` `page_julia` / `install_lines` (⇔ CaliBlobs') → Core's `page_examples` / `install_lines` (core10 0bcd5559; 06c3d5c)
