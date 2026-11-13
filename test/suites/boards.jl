@@ -66,6 +66,13 @@ function print_master_blobs(b, pdf)
     return (length(b.blobs), length(mats), count(!isnothing, found), radius)
 end
 
+# A bundle's file text as `save_json` writes it (IO 0.10's envelope — its `units` object included — is the
+# writer's, so an in-memory lowering is not a file).
+_file_text(b) = mktempdir() do d
+    BlobBoards.save_json(joinpath(d, "b.json"), b)
+    read(joinpath(d, "b.json"), String)
+end
+
 @testset "Board Generation" begin
     @testset "Frame styles" begin
         @testset "Ruler frame (default)" begin
@@ -177,7 +184,7 @@ end
                 @test !in(:blank, kinds)
                 # stored and coded, and rebuilt from either (the bundle's code needs no placement)
                 @test hash_config(BlobBoards.parse_board_code(BlobBoards.board_code(b))) == BlobBoards._bundle_identity(b)
-                back = JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.BoardBundle, JSON.parse(JSON.json(b; style = BlobBoards._FILE_STYLE)))
+                back = JSON.lift(BlobBoards._FILE_STYLE, BlobBoards.BoardBundle, JSON.parse(_file_text(b)))
                 @test hash_config(back.preamble) == hash_config(b.preamble) && back.preamble.board_config.corner_size == bc.corner_size
             end
             # corner cells and band are sized apart: a 6 mm band runs between 14 mm cells
@@ -189,7 +196,7 @@ end
             @test grid_mm(m[:top].h) ≈ 6 atol = 0.01
             @test m[:top].x == m[:qr].w                          # the band starts where the cell ends
             # a v4 board records its corner cells; its pattern size is the board's, not recorded
-            obj = JSON.parse(JSON.json(b; style = BlobBoards._FILE_STYLE); dicttype = Dict{String, Any})
+            obj = JSON.parse(_file_text(b); dicttype = Dict{String, Any})
             @test haskey(obj["preamble"]["board_config"], "corner_size")
             @test !haskey(obj["preamble"]["pattern_config"], "pattern_resolution")
             # a keyword the style draws nothing with is refused, not stored in the identity
@@ -339,7 +346,7 @@ end
         end
         @test isempty(readdir(root))                          # every rejection came before writing
         bundle = blob_board("A5"; kw...)                       # in memory: no output keyword, no file
-        json = JSON.json(bundle; style = BlobBoards._FILE_STYLE)
+        json = _file_text(bundle)
         @test_throws ArgumentError BlobBoards.rebuild_board(json; output = Png(400dpi))      # no dir
         @test_throws ArgumentError BlobBoards.rebuild_board(json; dir = root, format = "png")
         @test_throws ArgumentError BlobBoards.rebuild_board(json; dir = root, frame_style = :none)   # a rebuild takes the output only
