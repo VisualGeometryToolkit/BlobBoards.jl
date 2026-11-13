@@ -161,3 +161,8 @@ Each item names the contract step it waits for.
 
 The final run on the package is in the port report (`/home/jpr/logs/dgx-agent/cascade-09-BlobBoards.md`); every
 finding left is tied to an open item above.
+
+## 0.6.1 (on VisualGeometryToolkitEstimation 0.10)
+
+Nothing to delete: the release widens one compat entry; the stack duplication audit lists no item for BlobBoards at
+this release (its open items: none). `check_duplication` runs in the suite.

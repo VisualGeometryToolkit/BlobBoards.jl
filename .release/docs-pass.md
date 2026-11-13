@@ -1,4 +1,16 @@
-docs-pass: bee3b43ea4e41c2f35b6e6096db866c2d626d5e3
+docs-pass: 9cd89f9
+
+# 0.6.1 docs pass (julia-docs-pass) — on VisualGeometryToolkitEstimation 0.10
+
+BlobBoards 0.6.1 is a patch: `[compat]` VisualGeometryToolkitEstimation "0.10" in every member that declares it, and the
+CHANGELOG section. No public name added, removed or re-signatured.
+- API diff since the last release: none.
+- stale mentions: nothing here names the SplineLens image-space refine Estimation 0.10.0 retired (its free route,
+  `penalty`, the GCV and window metadata): checked by grep over src, docs, README and the paper projects.
+- README / install lines: unchanged (no version is named); the README rows resolve the registry and pass once
+  Estimation 0.10.0 is registered.
+
+---
 
 Re-pointed to bee3b43: the change since adcba13 is the require_extension hoist (owner ruling, 2026-11-12):
 BlobBoards' private `_require_extension` and `_extension_loaded` are deleted, the EXTENSION_FUNCTIONS fallbacks and
