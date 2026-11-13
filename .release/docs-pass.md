@@ -1,3 +1,25 @@
+docs-pass: 17ce292
+landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; it shows 0.7.0 once main's Docs job deploys it)
+
+# 0.7.0 docs pass at the release (julia-docs-pass), resolved from General alone
+
+The release tree: w10-bb a225dad (the wave work, gated green as w10-bb-tmp 3b2730df on up-v13) with GitHub main 0.6.3 merged
+(2d2f25b: its CHANGELOG section kept below 0.7.0; its adapt fix already on the wave branch, src/adapt_ka.jl:391 `_solved_theta`,
+:552, :639, :872, test/suites/adapt_converged.jl:102), no temporary [sources] (only the members' own path to the repository),
+bmvc2026's reproduce.sh regenerated with the registered Eval 0.8.0's generator (d9232ed), the CHANGELOG dated (458ad2a), the
+standing toml_field [[similar]] entry restored in DUPLICATION.toml (be86fc5, owner ruling), and the registry resolve's floor
+raise (17ce292). Resolved from General alone (job 15277): Core 0.10.0, IO 0.10.0, Features 0.9.0, Estimation 0.11.1,
+Eval 0.8.0, LocalOptimizationDoneRight 0.7.0 (registered). floor_compat --raise: Estimation "0.11.1" (package, test,
+bmvc2026); --latest: 0.
+[x] API diff, docstrings, guides: as in the wave pass below; the 0.6.3 docs (adapt's model by sample count, detection.md
+    "Blob outcomes") are the wave's text, unchanged by the merge.
+[x] README / install lines: no other registry and no "until registered" note; the README rows resolve the install lines
+    from the registry in the release gate (the known pre-registration failures of every -tmp gate).
+[x] CHANGELOG: 0.7.0 dated and naming the Estimation 0.11.1 floor; 0.6.3 below it.
+[x] Docs build: docs/make.jl (strict) in the release gate.
+
+---
+
 docs-pass: 856802a
 landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.6.3 change is in the detection guide, which the next Docs deploy publishes)
 
