@@ -1,16 +1,3 @@
-# Companion environment: the checkout, dev'd, with the packages it can use but
-# not load from its own project env (Julia never loads a package's own
-# weakdeps there: `julia --project=. -e 'using CairoMakie'` is an ArgumentError).
-#
-# Board authoring (`blob_board`, `rebuild_board`, `render_board`, PDF/TIFF/PNG)
-# is part of BlobBoards since 2026-10-14 and needs nothing from here. This env
-# is for:
-#   - PythonCall: BlobBoardsPythonExt, the Python wrappers (python/blobboards
-#     activates this env);
-#   - CairoMakie: BlobBoardsMakieExt's plots (board overlays, inspection);
-#   - Revise, for interactive work.
-#
-#   julia --project=authoring
 [deps]
 BlobBoards = "93a5632c-6c4c-4c98-b3b2-221d1d9ee9e0"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -21,14 +8,15 @@ Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
-[sources]
-BlobBoards = { path = ".." }
+[sources.BlobBoards]
+path = ".."
 
 [compat]
+BlobBoards = "0.6"
 CUDA = "5.11.0"
 CUDA_Runtime_jll = "0.21"
 CairoMakie = "0.15"
-PythonCall = "=0.9.35"   # = the pixi lock's juliacall: the two must be the same release, or PythonCall does not start
+PythonCall = "=0.9.35"
 cuDNN = "1.4.7"
 julia = "1.12"
 
