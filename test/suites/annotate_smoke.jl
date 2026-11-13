@@ -92,34 +92,22 @@ _all_present(paths...) = all(p !== nothing && ispath(p) for p in paths)
     end
 end
 
-@testset "descriptor arena is reserved at construction" begin
+@testset "descriptor runs are counted in the detector's device budget" begin
     if !_all_present(_MODEL_PATH) || !CUDA.functional()
-        @info "Skipping arena reservation — model or CUDA unavailable"
+        @info "Skipping the arena accounting — model or CUDA unavailable"
     else
-        GC.gc(); CUDA.reclaim()
-        before = CUDA.free_memory()
         net = DescriptorNetwork(_MODEL_PATH)
-        after_construct = CUDA.free_memory()
-
         if net.session.execution_provider !== :cuda
-            @info "ONNX CPU execution provider — no device arena to reserve"
+            @info "ONNX CPU execution provider — no device arena to count"
         else
-            # ORT's `gpu_mem_limit` is a CAP, not a reservation. Without the
-            # warm-up in `reserve_workspace!`, constructing a session claims
-            # only weights (~20 MiB measured) and the arena does not grow until
-            # the first `describe` — by which time VGF's `_chunk_warps` has
-            # already budgeted 80% of "free" memory believing the arena was
-            # accounted for. Construction must move the needle by the whole
-            # working set (~526 MiB at max_batch=64 on this network).
-            @test before - after_construct > 100 * 2^20
-
-            # ...and having reserved, real inference must not grow it further.
-            # That is precisely what makes `device_free_bytes` truthful for the
-            # two elastic consumers. 4x max_batch exercises the chunked path.
+            # Every run goes through Features' `onnx_run`, which charges the arena's growth to the session, so the
+            # room the ASIFT plans leave for it (cap − held) shrinks by what the runs claimed (until 0.7.0 the runs
+            # bypassed it and a warm-up, `reserve_workspace!`, tried to make free memory truthful instead).
+            Feat = BlobBoards.VisualGeometryToolkitFeatures
+            room_before = Feat._onnx_cuda_reserve()
             P = BlobBoards.patch_size(net)
-            BlobBoards.describe(net, [zeros(Float32, P, P) for _ in 1:(4 * net.max_batch)])
-            GC.gc(); CUDA.reclaim()
-            @test after_construct - CUDA.free_memory() < 32 * 2^20
+            BlobBoards.describe(net, [zeros(Float32, P, P) for _ in 1:(4 * net.max_batch)])   # 4x max_batch: the chunked path
+            @test Feat._onnx_cuda_reserve() < room_before
         end
     end
 end

@@ -13,11 +13,11 @@ Four things it demonstrates, each of which was measured rather than guessed:
    peers. ASIFT's pyramids and the stacked matcher both size themselves against
    free memory at the moment they run, so they adapt to whatever is left. The
    ONNX descriptor arena does not: it is fixed at construction and never
-   shrinks. Being the only inelastic consumer, it must claim its memory before
-   the elastic ones measure — `DescriptorNetwork` does that itself (see
-   `reserve_workspace!`; ~526 MiB at the default `max_batch = 64`, per the
-   measured `arena_MiB = 14 + 8 * max_batch` in src/descriptor.jl), but only
-   when you construct it before the detector runs, as below.
+   shrinks. Its session is VisualGeometryToolkitFeatures' `onnx_session`, and
+   every run goes through Features' `onnx_run`, so the detector's plans leave
+   the room the arena may still take (its cap, ~526 MiB of working set at the
+   default `max_batch = 64`, less what it already holds); construct it before
+   the detector runs, as below, so the first plan already counts it.
 
 1. STAGE THE GALLERY ONCE. `BlobBoards.GalleryIndex` is independent of frame
    size and of medium, so building it per call re-uploads the whole descriptor

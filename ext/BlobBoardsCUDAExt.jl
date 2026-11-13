@@ -60,9 +60,10 @@ function _ort_device_tensor(api::_OCAPI.OrtApi, meminfo, d::CuArray{Float32}, sh
     return _OCAPI.into_julia(_OCAPI.OrtValue, api, p_ptr, status, [d, meminfo, shapevec])
 end
 
-# The batch comes from `model.max_batch` — it sizes the arena this network
-# reserved at construction (BlobBoards.reserve_workspace!), so it cannot be a
-# per-call keyword without invalidating that reservation.
+# The batch comes from `model.max_batch` — it sizes the cap of this network's
+# arena (set at construction), so it is not a per-call keyword. Every run goes
+# through Features' `onnx_run`, which charges the arena's growth to the ASIFT
+# detector's device budget.
 #
 # max_batch=64: the first 64-channel conv layer's activation is
 # batch×64×64×64×4B per extend request. The ORT arena must coexist with the
@@ -92,10 +93,9 @@ function _describe_device(model, d_patches::CuArray{Float32, 3})
         )
         CUDA.synchronize()   # our stream must finish before ORT's touches it
         t = _ort_device_tensor(api, meminfo, d_chunk, (n, 1, P, P))
-        outs = _OCAPI.Run(
-            api, sess.session, nothing,
-            sess.input_names, [t], sess.output_names
-        )
+        outs = BlobBoards.onnx_run(sess) do
+            _OCAPI.Run(api, sess.session, nothing, sess.input_names, [t], sess.output_names)
+        end
         _OCAPI.GetTensorMutableData(api, outs[1])
     end
 end

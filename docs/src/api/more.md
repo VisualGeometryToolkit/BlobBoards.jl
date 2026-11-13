@@ -59,7 +59,6 @@ AbstractDescriptorNetwork
 LuxDescriptorNetwork
 BlobBoards.network_hash
 BlobBoards.patch_size
-BlobBoards.reserve_workspace!
 descriptor_network_path
 DEFAULT_CUTOFF
 BlobBoards.DEFAULT_OUTER_EXTENT

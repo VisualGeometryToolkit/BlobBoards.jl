@@ -4,7 +4,7 @@
 
 import ONNXRunTime
 # the one ONNX Runtime session of the stack (provider resolution, the sm_100-capable CUDA build)
-using VisualGeometryToolkitFeatures: onnx_session
+using VisualGeometryToolkitFeatures: onnx_session, onnx_run
 
 # =============================================================================
 # Abstract interface
@@ -18,38 +18,9 @@ Abstract type for descriptor models. Subtypes must implement:
 - `network_hash(model) -> String` (unique identifier for cache invalidation)
 - `patch_size(model) -> Int` (the input resolution the network requires)
 
-Batching is a property OF THE MODEL, not of the call — see `reserve_workspace!`.
+Batching is a property OF THE MODEL, not of the call (`max_batch` sizes its CUDA arena).
 """
 abstract type AbstractDescriptorNetwork end
-
-"""
-    reserve_workspace!(model) -> nothing
-
-Realize whatever device memory `model` will need at steady state, NOW.
-
-BlobBoards' three GPU consumers are not peers. ASIFT's pyramids
-(`_chunk_warps`) and the stacked matcher (`_gallery_chunks`) both size
-themselves against `device_free_bytes` at the moment they run, so they adapt to
-whatever is left. A descriptor session's arena does not: it is set once, grows
-in power-of-two extents, and never shrinks. It is the only inelastic consumer,
-and therefore the only one that can FAIL rather than adapt — so it must be
-claimed first and the elastic budgets sized against the remainder.
-
-`VisualGeometryToolkitFeatures`' `_PYRAMID_BUDGET` already assumes exactly this
-("the descriptor session's arena is already allocated before the plan is
-built, so it is excluded from free"). That assumption was FALSE until this
-function existed: ONNXRuntime's `gpu_mem_limit` is a CAP, not a reservation, so
-constructing a session claimed ~20 MiB and the arena did not grow until the
-first `describe` — which happens long after the plan is built. Measured
-2026-08-13 on a 24 GB card: session construction moved `CUDA.free_memory` by
-0.02 GiB against a 3 GiB limit.
-
-The default is a NO-OP, which is correct for every backend that allocates from
-CUDA.jl's pool (the Lux backend) or from the host (the CPU execution provider).
-Those share the pool the elastic consumers already measure, so there is nothing
-separate to reserve.
-"""
-reserve_workspace!(::AbstractDescriptorNetwork) = nothing
 
 (m::AbstractDescriptorNetwork)(patches) = describe(m, patches)
 
@@ -110,9 +81,8 @@ via ONNXRunTime.
 - `DescriptorNetwork(path::AbstractString)` — load from ONNX file
 
 `max_batch` is a FIELD rather than a `describe` keyword because it fixes the
-size of the CUDA arena this network reserves (`reserve_workspace!`). A
-reservation made for one batch size that a later call could exceed would not be
-a reservation at all.
+size of the CUDA arena this network's session is capped at (`_arena_cap`); a cap
+made for one batch size that a later call could exceed would be no cap at all.
 """
 struct DescriptorNetwork <: AbstractDescriptorNetwork
     session::ONNXRunTime.InferenceSession
@@ -132,7 +102,8 @@ end
 #
 # exact to the megabyte at batch 32/64/128/256. This is a GUARD, not a
 # forecast: the slope is a property of one graph's activations, and the actual
-# claim is made by `reserve_workspace!` running the network. 4x headroom covers
+# claim is made by the network's runs, each through Features' `onnx_run`, which
+charges the arena's growth to the detector's device budget. 4x headroom covers
 # a graph up to four times heavier per patch without the cap ever binding.
 #
 # The cap binding is not hypothetical — at the previous fixed 3 GiB, batch 384
@@ -146,42 +117,12 @@ end
 # put the ceiling (4096 MiB) BELOW the predicted need (4110 MiB) and would have
 # reintroduced the very OOM this replaced. A cap costs nothing when unused —
 # `gpu_mem_limit` is lazy, so an oversized ceiling is never allocated — while a
-# cap below the working set is fatal. Err high; `reserve_workspace!` makes the
-# real claim, and an unreasonable `max_batch` now fails at construction on an
-# empty card rather than mid-run against a loaded one.
+# cap below the working set is fatal. Err high; the runs make the real claim,
+# counted by Features' `onnx_run` in the detector's budget.
 function _arena_cap(max_batch::Integer)
     max_batch <= 0 && return 3 << 30      # uncapped batch: keep the old ceiling
     need_mib = 14 + 8 * Int(max_batch)
     return max(512, 4 * need_mib) * (1 << 20)
-end
-
-"""
-    reserve_workspace!(model::DescriptorNetwork) -> nothing
-
-Grow the ORT CUDA arena to its steady-state size by running one forward evaluation at
-`model.max_batch`. Since the arena never shrinks, that one evaluation converts a lazy
-cap into a genuine reservation that `device_free_bytes` can see.
-
-No-op on the CPU execution provider (no device arena) and when `max_batch <= 0`
-(the batch is unbounded, so there is no steady state to reserve for — that mode
-opts out of the guarantee).
-"""
-function reserve_workspace!(model::DescriptorNetwork)
-    model.session.execution_provider === :cuda || return nothing
-    model.max_batch > 0 || return nothing
-    P = model.patch_size
-    # THREE evaluations, not one. Measured 2026-09-07 on a B200 (CUDA 12.9 runtime):
-    # construction + one evaluation claimed 530 MiB, and the NEXT call at the very same
-    # batch shape grew the arena by exactly 256 MiB once more, after which every
-    # call (64, 256, 512 patches) was flat. One evaluation is therefore not the steady
-    # state on that driver stack, and the arena test asserted that it was. The
-    # extra evaluations cost two 64-patch forwards; the reservation they buy is what
-    # makes `device_free_bytes` truthful for VGF's `_chunk_warps`.
-    warm = [zeros(Float32, P, P) for _ in 1:model.max_batch]
-    for _ in 1:3
-        describe(model, warm)
-    end
-    return nothing
 end
 
 # -----------------------------------------------------------------------------
@@ -296,8 +237,7 @@ function DescriptorNetwork(
         #
         # Features' error names why the CUDA provider is unavailable (no device
         # visible, a CUDA 12 runtime or cuDNN missing from the environment, …); a
-        # full card at session creation fails here too (the arena is reserved
-        # below, while the card is empty).
+        # full card at session creation fails here too.
         #
         # Opt out deliberately: `execution_provider = :cpu` for a CUDA-less
         # host, or `allow_cpu_fallback = true` to keep the old behaviour.
@@ -310,7 +250,7 @@ function DescriptorNetwork(
                     "misreport pipeline throughput.\n" *
                     "Fix: the reason below; install BlobBoards' CUDA extension once with " *
                     "`$(EXTENSION_INSTALL.BlobBoardsCUDAExt.install)` and pin the CUDA 12 runtime with `$(CUDA_RUNTIME_PIN)` " *
-                    "(then restart Julia); or free the GPU if the arena reservation failed.\n" *
+                    "(then restart Julia); or free the GPU if the session's creation failed for memory.\n" *
                     "Opt out: DescriptorNetwork(path; execution_provider = :cpu) " *
                     "or DescriptorNetwork(path; allow_cpu_fallback = true).\n" *
                     "Underlying error: $(sprint(showerror, err))"
@@ -324,9 +264,6 @@ function DescriptorNetwork(
         String(first(session.output_names)), h,
         _patch_size_from_graph(session, path), Int(max_batch)
     )
-    # Claim the arena HERE, while the card is still empty — every other GPU
-    # consumer in the pipeline sizes itself against what is left.
-    reserve_workspace!(net)
     return net
 end
 
@@ -342,8 +279,8 @@ Run ONNX descriptor model on patches in batched mode.
 Returns an `N × D` descriptor matrix (L2-normalized by the model).
 
 The per-call batch is `model.max_batch`, set at construction — it is not a
-call-site keyword, because it also fixes the arena this network reserved (see
-`reserve_workspace!`). Measured on 3247 real 64×64 patches (RTX 4090,
+call-site keyword, because it also fixes the cap of this network's CUDA arena
+(`_arena_cap`). Measured on 3247 real 64×64 patches (RTX 4090,
 log-polar s96 network, 3 GiB arena cap), µs/patch by `max_batch`:
 
     32 → 61.7   64 → 63.1   128 → 76.8   256 → 91.7   512 → 442.4   0 → 472.0
@@ -371,7 +308,7 @@ function describe(model::DescriptorNetwork, patches)
         for i in 1:n
             buf[i, 1, :, :] .= Float32.(patches[offset + i])
         end
-        model.session(Dict(model.input_name => buf))[model.output_name]
+        onnx_run(model.session, Dict(model.input_name => buf))[model.output_name]   # its arena growth counted (Features)
     end
 end
 

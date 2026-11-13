@@ -139,7 +139,7 @@ public BoardObservation                      # one board in one frame: track_boa
 public GalleryIndex                        # the staged board gallery; the type of every `gpu_index` keyword
 public board_palette                       # one stable color per board id (sorted) — every overlay uses it
 public board_quad, radial_outline            # model → image board outline (verify.jl); the Makie overlay consumes them
-public network_hash, patch_size, reserve_workspace!
+public network_hash, patch_size
 public plot_boards               # grid of find_boards results (BlobBoardsMakieExt)
 public plot_board_poses          # saved-pose overlay on one axis (BlobBoardsMakieExt)
 public board_overlay!, inliers!, board_panel!   # the composable painters the wrappers are built from

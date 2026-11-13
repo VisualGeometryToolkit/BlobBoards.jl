@@ -46,6 +46,10 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
   they are the SHA-256 of VisualGeometryToolkitIO's canonical JSON, whose numbers are RFC 8785's in IO 0.10
   (`1.0e-6` is written `0.000001`), the stack's one deliberate re-id. The configuration trees are unchanged; board
   identities do not move.
+- **`reserve_workspace!` is deleted** (no alias). A descriptor network's ONNX runs (`describe`, and the CUDA extension's
+  device-tensor runs) go through VisualGeometryToolkitFeatures' `onnx_run`, which charges the session's arena growth to
+  the ASIFT detector's device budget; the warm-up that tried to make free memory truthful instead is gone. Until now
+  the runs bypassed Features' accounting, so the detector's plans could be sized too large by what the arena grew.
 - **One TIFF codec in the stack** (owner ruling): a `Tiff` board output and `rasterize_pdf`'s page go through
   VisualGeometryToolkitIO's `write_tiff` / `read_tiff` (libtiff; byte-identical board TIFFs). BlobBoards' own copy is
   deleted, with its public `BlobBoards.write_tiff` (call `VisualGeometryToolkitIO.write_tiff`) and the `Libtiff_jll`
