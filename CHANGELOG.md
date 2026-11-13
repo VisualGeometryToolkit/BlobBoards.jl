@@ -63,7 +63,7 @@ Not breaking:
 - No call splats a collection whose length is data (Core's `check_splat`, now in the suite): the QR encoder's bit
   concatenations, the print master's object list, the ruler ticks, the frame-mark union, the annotation patch chunks and
   the JSON object builder take their collections whole (`reduce(vcat, …)`, `reduce(hcat, …)`, `append!`, an iterable
-  form); Makie's `linkaxes!` gets its axis vector. One reasoned exception: IO's varargs-only `save_correspondences`.
+  form); Makie's `linkaxes!` gets its axis vector.
 
 - For a driver's config built on BlobBoards' (CaliBlobs' `CalibrationConfig`): `write_config(path, config; extra)` takes any
   config with a `config_dict` (the header names its type); `radial_geometry_from_toml(G, tag, d; camera, image_size)` reads a
