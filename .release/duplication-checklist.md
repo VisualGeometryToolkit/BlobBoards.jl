@@ -172,3 +172,11 @@ this release (its open items: none). `check_duplication` runs in the suite.
 A compat-only patch: no source, test or paper code is added, so nothing new can duplicate the stack.
 
 - [x] 0.6.2: no new duplicate (the diff since the registered release adds no code; `check_duplication(BlobBoards)` re-runs in the fresh-clone gate of this commit)
+
+## 0.6.3 (review BB#1)
+
+- [x] the isotropic paraboloid's 6-parameter form, written by hand in the kernels (θ₅ = 0, θ₆ = θ₄) → Core's
+  `Paraboloid3D{T,4}` (C = c·I) read through `coeffs(Paraboloid3D{T,6}(p))` (`_solved_theta`, baa55b7). Considered and
+  kept: the isotropic design column dx² + dy² (the accumulate's, one line; Core has no paraboloid design-matrix builder),
+  and `_shape_gate_state` (already Core's `is_peak`/`is_valid_shape`).
+

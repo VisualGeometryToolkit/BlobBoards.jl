@@ -1,5 +1,19 @@
-docs-pass: 6d9daee
-landing: blobboards/blobboards.github.io f58630c (no hand edit: the site is the Docs workflow's build of docs/src, which says Julia 1.13 from this commit on; it shows 1.13 once main's Docs job deploys it)
+docs-pass: 56ddb9f
+landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.6.3 change is in the detection guide, which the next Docs deploy publishes)
+
+# 0.6.3 docs pass (julia-docs-pass) — Julia 1.13
+
+BlobBoards 0.6.3 is a patch (review BB#1): a blob of 10–19 samples fits the isotropic paraboloid instead of being
+refused at its seed.
+- API diff since 0.6.2: none (no public name added, removed or re-signatured; `_solved_theta` is internal).
+- Docstrings: `adapt` now states how the model follows the sample count (6 parameters from 20 samples, the isotropic
+  4 from 10 to 19, fewer dropped); `count_rejected`/`BlobDetection` unchanged and still true.
+- Guides: docs/src/guide/detection.md "Blob outcomes" states the same; README and landing: nothing about the
+  adaptation model (no change).
+- CHANGELOG: the 0.6.3 section names the result change; 0.6.2's header dated.
+- Docs build and the `docs`/`readme` items: run by the fresh-clone gate on Julia 1.13.3 against the registered stack.
+
+---
 
 # 0.6.2 docs pass (julia-docs-pass) — Julia 1.13
 
