@@ -1,4 +1,22 @@
-docs-pass: a0077e0
+docs-pass: 856802a
+landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.6.3 change is in the detection guide, which the next Docs deploy publishes)
+
+# 0.6.3 docs pass (julia-docs-pass) — Julia 1.13
+
+BlobBoards 0.6.3 is a patch (review BB#1): a blob of 10–19 samples fits the isotropic paraboloid instead of being
+refused at its seed.
+- API diff since 0.6.2: none (no public name added, removed or re-signatured; `_solved_theta` is internal).
+- Docstrings: `adapt` now states how the model follows the sample count (6 parameters from 20 samples, the isotropic
+  4 from 10 to 19, fewer dropped); `count_rejected`/`BlobDetection` unchanged and still true.
+- Guides: docs/src/guide/detection.md "Blob outcomes" states the same; README and landing: nothing about the
+  adaptation model (no change).
+- CHANGELOG: the 0.6.3 section names the result change; 0.6.2's header dated.
+- Docs build and the `docs`/`readme` items: run by the fresh-clone gate on Julia 1.13.3 against the registered stack.
+- Re-recorded after the compat floors were raised to Core 0.9.6, IO 0.9.4, Features 0.8.3, Estimation 0.10.2, Eval 0.7.3
+  (Project.toml [compat] and the CHANGELOG only; the README/guide install lines name no version: no docs change).
+- Re-recorded after DUPLICATION.toml gained six `[[similar]]` entries and the duplication test the owner's 0.6.3 exception (the quality allow-list and its test only; no docs change).
+
+---
 
 # 0.7.0 docs pass (julia-docs-pass) — the wave-10 stack
 

@@ -81,7 +81,27 @@ Not breaking:
   `Pkg.test(; test_args = […])`), and sizes its worker pool from `RETESTITEMS_NWORKERS` /
   `RETESTITEMS_NWORKER_THREADS` when set.
 
-## 0.6.2 (unreleased)
+## 0.6.3 (unreleased)
+
+A patch: no API change. One result change, in `adapt` (review BB#1):
+
+- **A blob of 10 to 19 samples is fitted, not refused.** Such a blob fits the isotropic paraboloid
+  `z = a₀ + bᵀx + c·|x|²` (4 parameters, VisualGeometryToolkitCore's `Paraboloid3D{T,4}`: `C = c·I`); 20 or more
+  samples fit the anisotropic one, as before. Since 0.6.0 the 4-parameter solve used the anisotropic model's column
+  `dx²` and left `θ₅`, `θ₆` at zero, so the shape gate judged the singular `C = [θ₄ 0; 0 0]` and refused every such
+  blob at its seed: `retcode = InitialFailure`, `rejection = :not_peak`, the frame the detection's seed (before 0.6.0
+  the same seed frame was counted as converged). Now the solve's fourth column is `dx² + dy²`, the gate judges
+  `C = c·I`, and the blob keeps its fit. **Result change**: those blobs (small, faint or edge-clipped) return their
+  fitted centre and scale, with `retcode = Success` (or `MaxIters`) unless the fit itself is not a peak, so
+  `count_rejected(frames, :not_peak)` counts fewer blobs; blobs of 20 or more samples are unchanged, bit for bit. A
+  round fit is the model of record for so few samples: an elongated blob of 10 to 19 samples is returned round (its
+  aspect ratio 1), as the model has always intended.
+- The unreachable 2-parameter branch is deleted (its threshold equalled the isotropic one: a blob of fewer than 10
+  samples is dropped, as before).
+- Compat floors raised to the versions the release's gated environment resolves (latest only), in the package and every
+  workspace member: VisualGeometryToolkitCore 0.9.6, IO 0.9.4, Features 0.8.3, Estimation 0.10.2, Eval 0.7.3.
+
+## 0.6.2 (2026-11-13)
 
 A patch: requires Julia 1.13 (`julia = "1.13"` in the `[compat]` of the package and of every
 workspace member: test, docs, gpu, examples, authoring and bmvc2026). CI runs Julia 1.13 only. No API change.
