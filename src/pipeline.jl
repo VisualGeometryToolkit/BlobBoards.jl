@@ -2764,14 +2764,12 @@ function _find_boards_serial(
         detc = [centroid(d) for d in feat_pool]
         Di = descriptor_matrix(feat_pool)
         claimed = falses(length(feat_pool))
-        # The detections' ellipses at each board cutoff, and per round the
-        # guided search's overlap index over them (claimed detections skipped).
         # The detections' ellipses at each board cutoff and the guided search's
         # overlap index over them, built once per phase; the round's claims are
         # its `skip` mask (claimed detections are never candidates).
-        det_ells_at = Dict{Float64, Vector}()
-        ells_at(c) = get!(() -> [Ellipse(region(feature_frame(f), c)) for f in feat_pool], det_ells_at, c)
-        rts = Dict{Float64, Any}()
+        det_ells_at = Dict{Float64, Vector{Ellipse{Float64}}}()
+        ells_at(c) = get!(() -> Ellipse{Float64}[Ellipse(region(feature_frame(f), c)) for f in feat_pool], det_ells_at, c)
+        rts = Dict{Float64, typeof(_new_rtree())}()
         rt_at(c) = get!(() -> detection_rtree(ells_at(c)), rts, c)
         while !isempty(gallery)
             cands = Tuple[]
