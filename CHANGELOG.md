@@ -29,6 +29,10 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
 - **`find_boards`' `max_detections` is `detect_blobs`' cap** (Features' `spread_strongest`: about that many of the
   strongest, spread over the image, applied per polarity group), not the top-N by |response|. With a finite cap
   (the default is unbounded) the kept detections, and so the boards found and `build_tracks`' training data, change.
+- **One TIFF codec in the stack** (owner ruling): a `Tiff` board output and `rasterize_pdf`'s page go through
+  VisualGeometryToolkitIO's `write_tiff` / `read_tiff` (libtiff; byte-identical board TIFFs). BlobBoards' own copy is
+  deleted, with its public `BlobBoards.write_tiff` (call `VisualGeometryToolkitIO.write_tiff`) and the `Libtiff_jll`
+  dependency.
 - bmvc2026: the motion-capture markers are written as `TargetObservations{WorldFrame}` (IO's `observations` kind;
   `TargetPoints3D` and `vgio/target_points3d` are retired by Core 0.10 and IO 0.10); its config of record's
   `formats = "io-0.10"`, so the run key moves and the records are regenerated.

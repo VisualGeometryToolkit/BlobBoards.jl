@@ -209,34 +209,7 @@ function rasterize_pdf(pdf_path::AbstractString, render_dpi::Integer)
     return mktempdir() do dir
         stem = joinpath(dir, "page")
         run(`$(pdftocairo()) -tiff -tiffcompression none -gray -r $render_dpi -singlefile $pdf_path $stem`)
-        _read_grey_tiff(stem * ".tif")
-    end
-end
-
-# An 8-bit grey TIFF, as `pdftocairo -gray` writes it, read with libtiff (the
-# reference reader; a FileIO backend need not be installed) row by row.
-function _read_grey_tiff(path::AbstractString)
-    tif = @ccall libtiff.TIFFOpen(path::Cstring, "r"::Cstring)::Ptr{Cvoid}
-    tif == C_NULL && error("rasterize_pdf: libtiff could not open $path")
-    return try
-        field(tag, ::Type{T}) where {T} = (v = Ref{T}(0); @ccall(libtiff.TIFFGetField(tif::Ptr{Cvoid}, tag::UInt32; v::Ptr{T})::Cint) == 1 || error("rasterize_pdf: $path lacks TIFF tag $tag"); v[])
-        width, height = Int(field(UInt32(256), UInt32)), Int(field(UInt32(257), UInt32))
-        bits, samples, photometric = field(UInt32(258), UInt16), field(UInt32(277), UInt16), field(UInt32(262), UInt16)
-        (bits == 8 && samples == 1 && photometric in (0, 1)) ||
-            error("rasterize_pdf: expected an 8-bit grey page, got $bits bits × $samples samples (photometric $photometric)")
-        row = Vector{UInt8}(undef, @ccall libtiff.TIFFScanlineSize(tif::Ptr{Cvoid})::Int)
-        img = Matrix{Gray{N0f8}}(undef, height, width)
-        for r in 1:height
-            @ccall(libtiff.TIFFReadScanline(tif::Ptr{Cvoid}, row::Ptr{UInt8}, (r - 1)::UInt32, 0::UInt16)::Cint) == 1 ||
-                error("rasterize_pdf: libtiff could not read row $r of $path")
-            for c in 1:width
-                v = reinterpret(N0f8, row[c])
-                img[r, c] = Gray(photometric == 0 ? one(N0f8) - v : v)       # 0: min-is-white
-            end
-        end
-        img
-    finally
-        @ccall libtiff.TIFFClose(tif::Ptr{Cvoid})::Cvoid
+        Gray.(reinterpret(N0f8, VgtkIO.read_tiff(UInt8, stem * ".tif")))   # the stack's one TIFF reader (a min-is-white page inverted)
     end
 end
 

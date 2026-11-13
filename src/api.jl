@@ -151,7 +151,6 @@ public load_annotations, load_correspondence_sets, plot_annotations, summarize_a
 public load                                # VisualGeometryToolkitIO's `load`; BlobBoards' method reads a bundle + image: `load(BoardBundle, path)`
 public load_bundle
 public rasterize_pdf                       # a PDF page as pixels (pdftocairo): how every raster of a board is made
-public write_tiff                          # the TIFF writer (libtiff, LZW) behind a `Tiff` output
 public canonical_config_json               # the byte string identities are minted from
 public AbstractBundle, PatternBundle, BoardBundle, BoardPreamble
 public PRINT_SIZES

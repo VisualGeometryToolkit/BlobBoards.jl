@@ -15,8 +15,8 @@ module Authoring
 using FreeTypeAbstraction: FreeTypeAbstraction, FTFont
 using FreeType: FT_Get_Postscript_Name
 using Zlib_jll: libz
-using Libtiff_jll: libtiff
 using Dates: Dates
+import VisualGeometryToolkitIO as VgtkIO   # the stack's one TIFF codec (`write_tiff`)
 
 using ..BlobBoards
 using ..BlobBoards: BoardPreamble, BoardConfig, BoardBundle, BoardOutput,
@@ -28,7 +28,7 @@ using ..BlobBoards: BoardPreamble, BoardConfig, BoardBundle, BoardOutput,
     hruler, vruler, uid_from_hash,
     # the outputs a board is written as (board_output.jl)
     Pdf, Tiff, Png
-import ..BlobBoards: blob_board, render_board, rebuild_board, write_tiff, save_canvas_texture
+import ..BlobBoards: blob_board, render_board, rebuild_board, save_canvas_texture
 using VisualGeometryToolkitCore: filter_kwargs, px, validate_dir
 using FlexUnits: Quantity, dimension
 using GeometryBasics: GeometryBasics
@@ -51,6 +51,5 @@ include("sheet.jl")
 include("vector_blobs.jl")
 include("board.jl")
 include("io_save.jl")
-include("tiff.jl")
 
 end # module Authoring

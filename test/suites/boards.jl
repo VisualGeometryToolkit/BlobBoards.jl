@@ -701,18 +701,17 @@ end
     @test_throws ArgumentError AE._glyph_code(font, '\U1F600')       # no glyph: refused, not a missing-glyph box
 end
 
-@testset "TIFF output: the vector sheet converted, LZW, density and ICC tags" begin
+# A TIFF read back through the stack's one TIFF codec (VisualGeometryToolkitIO's; its own tests check every tag
+# `write_tiff`'s keywords write: LZW, the horizontal predictor, the density, the ICC profile).
+_read_board_tiff(dir) = BlobBoards.Gray.(reinterpret(BlobBoards.N0f8, VgtkIO.read_tiff(UInt8, only(filter(endswith(".tiff"), readdir(dir; join = true))))))
+
+@testset "TIFF output: the vector sheet converted, through IO's TIFF codec" begin
     mktempdir() do dir
         bundle = blob_board(
             "A5"; board_size = BlobBoards.Size2(width = 80mm, height = 80mm), corner_size = 0mm, ruler_width = 0mm,
             blob_sizes = (1mm, 6mm), seed = 0x77, dir, output = Tiff(300dpi)
         )
-        img = TiffImages.load(only(filter(endswith(".tiff"), readdir(dir; join = true))))
-        ifd = first(img.ifds)
-        @test ifd[TiffImages.COMPRESSION].data == 5                     # LZW
-        @test ifd[TiffImages.PREDICTOR].data == 2                       # horizontal
-        @test ifd[TiffImages.XRESOLUTION].data == 300 && ifd[TiffImages.RESOLUTIONUNIT].data == 2
-        @test !isempty(ifd[TiffImages.ICCPROFILE].data)
+        img = _read_board_tiff(dir)
         # the whole page on Poppler's grid at the density: rounded up to whole pixels
         c = BlobBoards.BoardLayout(bundle.preamble.board_config).canvas_size
         @test size(img) == ceil.(Int, ustrip.(px, (c.height, c.width)) .* (300 / 7200) .- 1e-6)
@@ -1027,10 +1026,11 @@ end
         rec = JSON.parse(read(onlyjson(d("icc_pdf")), String)).render.icc_profile
         @test rec.name == "my-grey.icc" && rec.sha256 == sha256_hex(read(icc))
         blob_board("A5"; kw..., dir = d("icc_tiff"), output = Tiff(100dpi; icc_profile = icc))
+        icc_bytes = read(icc)
         rm(icc)
         BlobBoards.rebuild_board(read(onlyjson(d("icc_pdf")), String); dir = d("icc_re"))            # rebuilt with the recorded profile
         @test occursin("/OutputCondition (my-grey)", String(read(onlypdf(d("icc_re")))))
-        @test !isempty(first(TiffImages.load(only(filter(endswith(".tiff"), readdir(d("icc_tiff"); join = true)))).ifds)[TiffImages.ICCPROFILE].data)
+        @test findfirst(icc_bytes, read(only(filter(endswith(".tiff"), readdir(d("icc_tiff"); join = true))))) !== nothing   # the profile embedded
         # a light board with the sampled function: the table is inverted, and the sheet agrees with the sampler
         b = blob_board("A5"; kw..., blob_sizes = (1.6mm, 0.2short_side), polarity = :light, id_label = false,
             dir = d("light_sampled"), output = Pdf(shading_function = :sampled))
@@ -1052,7 +1052,7 @@ end
         # a v3 board as a TIFF, at its own density
         v3, _, h3 = BlobBoards.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
         BlobBoards.render_board(v3; output = Tiff(300dpi), dir = d("v3_tiff"), config_hash = h3)
-        @test size(TiffImages.load(only(filter(endswith(".tiff"), readdir(d("v3_tiff"); join = true))))) == (909, 1192)
+        @test size(_read_board_tiff(d("v3_tiff"))) == (909, 1192)
         # the preamble and JSON forms take the output group only, and say where a retired keyword went
         for f in (kws -> blob_board(bp.preamble; kws...), kws -> BlobBoards.rebuild_board(read(onlyjson(d("pdf")), String); kws...))
             err = try; f((; dir = d("x"), format = "png")); nothing; catch e; e; end

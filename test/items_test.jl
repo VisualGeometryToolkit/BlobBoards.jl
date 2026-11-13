@@ -182,7 +182,6 @@ end
 end
 
 @testitem "boards" begin
-    using TiffImages: TiffImages          # reads the TIFF back (test-only)
     using JSON
     import VisualGeometryToolkitIO as VgtkIO
     using VisualGeometryToolkitCore: mm, dpi, px, inch, ustrip, uconvert, intersects, sha256_hex
@@ -191,7 +190,6 @@ end
 
 @testitem "board design resolver" begin
     using CairoMakie                      # BlobBoardsAuthoringExt: `blob_board`
-    using Libtiff_jll                     # BlobBoardsTiffExt: `format = "tiff"`
     include("suites/design_resolver.jl")
 end
 

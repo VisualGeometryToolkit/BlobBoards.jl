@@ -253,16 +253,6 @@ follows [`render_board`](@ref)'s rules. Implemented in `BlobBoards.Authoring`.
 function save_canvas_texture end
 
 """
-    write_tiff(path, grey::AbstractMatrix{UInt8}, density, icc::Vector{UInt8}) -> path
-
-Write an 8-bit grey image (a board's sheet, converted) as an LZW-compressed TIFF (horizontal
-predictor) with `density` in its resolution tags (pixels per inch) and `icc`
-embedded. `grey` is (rows, columns), first row on top. Implemented in
-`BlobBoards.Authoring` (src/authoring/tiff.jl, libtiff).
-"""
-function write_tiff end
-
-"""
     board!(ax, proj, rect, blobs; cutoff)
 
 Project a board's world rect + blobs into an image axis. Requires a Makie

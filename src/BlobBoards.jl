@@ -111,7 +111,6 @@ using Preferences: @load_preference
 using Base64: base64encode, base64decode   # an ICC profile embedded in a sidecar
 using FileIO: FileIO
 using PNGFiles: PNGFiles      # a board's and a pattern's PNGs, read and written without a FileIO backend lookup
-using Libtiff_jll: libtiff    # the PDF rasterizer's page (and a `Tiff` output)
 
 using Rotations: Rotations
 using CoordinateTransformations: CoordinateTransformations,

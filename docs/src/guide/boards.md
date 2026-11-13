@@ -11,7 +11,7 @@ that list.
 
 Board authoring is part of BlobBoards: `using BlobBoards` is all it needs. The
 package writes the PDF print master itself (no Cairo, no Ghostscript), and its
-TIFF and PNG conversions with Poppler and libtiff, which it brings along.
+TIFF and PNG conversions with Poppler and the stack's TIFF codec (VisualGeometryToolkitIO's, libtiff), which it brings along.
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'           # once, in a checkout

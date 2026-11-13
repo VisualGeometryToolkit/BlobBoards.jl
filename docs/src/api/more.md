@@ -111,7 +111,6 @@ board_target
 BlobBoards.hruler
 BlobBoards.vruler
 BlobBoards.rasterize_pdf
-BlobBoards.write_tiff
 ```
 
 ## Traces

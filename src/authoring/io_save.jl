@@ -93,11 +93,17 @@ _raster_size(units, grid, dpi_val) =
 
 # TIFF: the converted sheet, 8-bit grey, with the density in the resolution
 # tags (so the print shop's software sizes it exactly) and the ICC profile
-# embedded; LZW-compressed by libtiff (`write_tiff`, tiff.jl).
+# embedded; LZW-compressed with the horizontal predictor by the stack's one TIFF
+# codec, VisualGeometryToolkitIO's `write_tiff` (libtiff).
 function _write_output(o::Tiff, path, sheet::Sheet, bundle::BoardBundle; title)
     grey = _sheet_raster(sheet, bundle, o.density; title)
     icc = read(first(_icc_profile(o.icc_profile)))
-    return _write_whole(temp -> write_tiff(temp, reinterpret(UInt8, grey), ustrip(dpi, o.density), icc), path)
+    return _write_whole(
+        temp -> VgtkIO.write_tiff(
+            temp, reinterpret(UInt8, grey); compression = :lzw, predictor = :horizontal, rows_per_strip = 64,
+            density = o.density, software = "BlobBoards.jl $(pkgversion(BlobBoards))", icc
+        ), path
+    )
 end
 
 # PNG, for digital use: the converted sheet as single-channel grey with linear
