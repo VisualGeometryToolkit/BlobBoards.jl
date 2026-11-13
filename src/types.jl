@@ -1105,7 +1105,7 @@ end
 _declares_pattern_role(x) = haskey(VgtkIO.VgioStyle(x).contract.lengths, :pattern)
 
 # The style a bundle's file is written with, whose `units` object (the envelope's,
-# VisualGeometryToolkitIO 0.10) declares the world length `unit` (`_file_length_unit`,
+# VisualGeometryToolkitIO 0.10) declares the world length `unit` (`_exact_length_unit`,
 # json.jl), the density (dpi) and, on a point grid, the length role `pattern` (pt).
 _bundle_roles(::PixelGrid) = (;)
 _bundle_roles(::PointGrid) = (pattern = pt,)

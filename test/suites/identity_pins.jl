@@ -407,11 +407,11 @@ const PINNED_PATTERN_V3_JSON = """
         misses = 0
         for v in 0:0.01:200, u in (mm, inch)      # millimetre- and inch-built lengths
             q = BlobBoards.base_quantity(v * u)
-            w = BlobBoards._file_length_unit((q,))
+            w = BlobBoards._exact_length_unit((q,))
             misses += BlobBoards.@with(BlobBoards._FILE_UNITS => (w, dpi), BlobBoards._file_quantity(BlobBoards._file_number(q; unit = w), :length)) !== q
         end
         @test misses == 0
-        @test all(v -> BlobBoards._file_length_unit((BlobBoards.base_quantity(v * mm),)) == mm, 0:0.01:200)   # every mm-built length stays mm
+        @test all(v -> BlobBoards._exact_length_unit((BlobBoards.base_quantity(v * mm),)) == mm, 0:0.01:200)   # every mm-built length stays mm
         # boards built in inches, or mixing inches and millimetres: saved and loaded to the very same values, the
         # values they were built with (a 0.33 inch margin is 0.33 inch), under the unit the file declares
         sq(v) = BlobBoards.Size2(width = v, height = v)

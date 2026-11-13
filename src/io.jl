@@ -140,7 +140,7 @@ end
 # `nothing` hash (an old record read that stored none) leaves `hashes` out, as that record had it.
 #
 # The file declares its world `unit`: by default the first in which every length of the bundle and its render
-# block reads back bit for bit (`_file_length_unit`, json.jl); a migration keeps the unit of the file it migrates,
+# block reads back bit for bit (`_exact_length_unit`, json.jl); a migration keeps the unit of the file it migrates,
 # whose numbers it carries.
 #
 # Returns the record (`tree`, no `units`: the envelope's) and the `style` it is written with, whose units object
@@ -161,7 +161,7 @@ function _bundle_length_unit(bundle::AbstractBundle, render)
     p = _LengthProbe()
     bundle isa BoardBundle && JSON.lower(p, bundle.preamble)
     _lower_render(p, render)
-    return _file_length_unit(p.lengths)
+    return _exact_length_unit(p.lengths)
 end
 
 

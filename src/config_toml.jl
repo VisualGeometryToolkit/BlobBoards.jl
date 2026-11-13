@@ -47,7 +47,7 @@ using TOML: TOML
 # fieldnames-derived table walk with its per-type hooks, the dotted default
 # lookup and the sorted writer. What stays here is BlobBoards': the retired-key
 # set, the tag registries and the hook methods for its own types.
-using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table,
+using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table, read_table,
     allowed_keys, write_toml, TagRegistry, tag_of
 import VisualGeometryToolkitCore: toml_key, toml_skip_fields, toml_field
 # A run configuration's TOML table is VisualGeometryToolkitEstimation's `config_dict`
@@ -418,12 +418,7 @@ FindBoardsConfig(table::AbstractDict; camera = nothing, image_size = nothing) =
 
 function _track_from_toml(d::AbstractDict)
     _check_run_keys(d, _allowed_keys(TrackConfig), "find_boards.track")
-    return TrackConfig(;
-        present_kwargs(
-            d, "iou_threshold" => Float64, "support_fraction" => Float64,
-            "patience" => Int, "keyframe_every" => Int
-        )...
-    )
+    return TrackConfig(; read_table(TrackConfig, d)...)   # Core's reader: each present key in its field's type
 end
 
 function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size = nothing)

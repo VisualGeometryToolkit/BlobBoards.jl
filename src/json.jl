@@ -41,7 +41,7 @@
 # 486 inch-built values, in inches 1785 millimetre-built ones; IO's codec misses
 # 4498 millimetre- and 1737 inch-built ones). So a board file declares, as its
 # `world`, the first of millimetres, inches and metres in which EVERY length it
-# holds (a PDF's bleed included) reads back bit for bit (`_file_length_unit`):
+# holds (a PDF's bleed included) reads back bit for bit (`_exact_length_unit`):
 # millimetres for every board built in them (every stored and published board),
 # inches for one built in inches, metres — exact for any double — for one that
 # mixes values neither holds. Memory → file → memory is then exact for every
@@ -73,7 +73,7 @@ struct _IdentityStyle <: JSON.JSONStyle end
     _LengthProbe <: JSON.JSONStyle
 
 A style that lowers a value only to collect the lengths a file of it holds
-(`_file_length_unit`): exactly the quantities a file's lowering writes in its
+(`_exact_length_unit`): exactly the quantities a file's lowering writes in its
 `world` unit, gathered in `lengths`.
 """
 struct _LengthProbe <: JSON.JSONStyle
@@ -101,13 +101,13 @@ const _FILE_LENGTH_UNITS = (mm, inch, m)
 _holds_exactly(q::Quantity, u) = Float64(ustrip(u, q)) * u === q
 
 """
-    _file_length_unit(lengths) -> Units
+    _exact_length_unit(lengths) -> Units
 
 The world unit a file holding `lengths` declares: the first of mm, inch and m
 in which every one reads back bit for bit (see the header). Metres hold any
 length exactly.
 """
-function _file_length_unit(lengths)
+function _exact_length_unit(lengths)
     for u in _FILE_LENGTH_UNITS
         all(q -> _holds_exactly(q, u), lengths) && return u
     end
