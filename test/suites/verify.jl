@@ -19,7 +19,7 @@
         Di = Float32[1 0; 0 1; 1 0]      # image rows: e1, e2, e1
         scored = SA(
             (
-                weights = [1.0, 1.0, 0.0],   # third cspond is an outlier — never judged
+                weights = [1.0, 1.0, 0.0],   # third correspondence is an outlier — never judged
                 src_id = [1, 2, 2],
                 det_id = [1, 3, 2],
             )

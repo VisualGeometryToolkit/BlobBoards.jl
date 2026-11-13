@@ -493,26 +493,25 @@ untouched and read results back in pixels. BlobBoards builds no normalization.
 described as a normalization. The Python bindings state the pixel convention of
 everything they return.
 
-### Correspondence Nomenclature
+### Terminology: detection, correspondence, observation
 
-**A feature correspondence is a `cspond`** — one word, in identifiers,
-comments and docstrings alike. `pairs` is BANNED for them: it says nothing
-(a `(uid, model)` tuple, an `(R, t)` pose, `grid_size = [gw, gh]` and
-`Base.pairs` are all "pairs"), and it let the same object be called three
-different things across files.
+The stack's taxonomy (VisualGeometryToolkitCore 0.10; `check_naming` enforces
+it), as it lands here:
 
-| term | what it is |
-|------|------------|
-| `matches` | the RAW descriptor matches, BEFORE verification (VisualGeometryToolkitFeatures `match`) |
-| `csponds` | feature correspondences: the verified, scored, weighted set the estimators consume |
+| term | what it is here |
+|------|-----------------|
+| detection | a detector's output in one image, unassociated: `BlobDetection`, the adapted `EllipticFrame`s, `image_features` (with a descriptor, `DescribedFeature`) |
+| `matches` | the RAW descriptor matches, BEFORE verification (VisualGeometryToolkitFeatures `match`, `NNMatch`) |
+| `correspondences` | the board-disc ↔ detection pairings a fit scores: Core's columnar `Correspondences` (`ScoredCorrespondence` rows); an **inlier** is one the fit kept (`is_map_inlier` of its weight) |
+| observation | a detection associated with a board point (the target entity), as an estimator or a training record consumes it; a **track** is the observations of one board blob |
 
-The distinction is a real pipeline stage, so both names stay — but nothing
-else may name either of them.
-
-Singular is `cspond`. "pair" survives ONLY where the thing genuinely is an
-arbitrary 2-tuple and is not a correspondence — `(R, t)`, `grid_size`, a
-MetaGraphsNext edge label, `Base.pairs` — and as a VERB ("a false board's
-inliers pair blobs with unrelated detections").
+The words `cspond`, `measurement`, `keypoint` and `sighting` are retired from
+every identifier (Core's RETIRED_NAMES and R14 refuse them); "measured" is a
+provenance value only. `pairs` is not a name for correspondences either: it
+says nothing (a `(uid, model)` tuple, an `(R, t)` pose, `grid_size = [gw, gh]`
+and `Base.pairs` are all "pairs"). "pair" survives ONLY where the thing
+genuinely is an arbitrary 2-tuple — `(R, t)`, `grid_size`, `Base.pairs` — and
+as a VERB ("a false board's inliers pair blobs with unrelated detections").
 
 ## Git Commit Conventions
 

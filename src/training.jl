@@ -1668,10 +1668,7 @@ end
 # homography arm's model is and no other model is: a pose needs a camera this
 # driver does not carry, and a radial model (`RadialHomography`,
 # `RadialCamera`) is not a collineation of the image. Refuse those by name.
-# Until 2026-09-21 this was `forward(_model_to_homography(model, nothing))`,
-# which on a radial-arm detection died in a MethodError inside `forward` —
-# with `p_perspective = 0.5`, on half the frames (JET).
-_augmentation_homography(H::HomographyMat) = SMatrix{3, 3, Float64}(to_homogeneous(_model_to_homography(H, nothing)))
+_augmentation_homography(H::HomographyMat) = SMatrix{3, 3, Float64}(to_homogeneous(HomographyMap(H)))
 _augmentation_homography(m) = throw(
     ArgumentError(
         "the perspective augmentation needs a homography-arm detection (a plane " *
@@ -2004,7 +2001,7 @@ function build_absolute_tracks(
             # evaluated at the board centroid. One record per frame — every
             # observation below just references `frame_idx`.
             view_angle = _view_angle(H_wi, st.world_extent[1], st.world_extent[2])
-            csponds = symmetric_iou_match(
+            gt_matches = symmetric_iou_match(
                 H_wi, st.world_frames, extracted.frames;
                 cutoff = st.board_cutoff, iou_threshold,
                 frame_i_idx = 0, frame_j_idx = frame_idx,
@@ -2019,7 +2016,7 @@ function build_absolute_tracks(
             onboard = _onboard_mask(extracted.frames, H_wi, st.world_rect)
             st.frame_geom[frame_idx] = (;
                 H = H_wi, view_angle,
-                n_matched_gt = length(csponds),
+                n_matched_gt = length(gt_matches),
                 n_gt_in_image = _n_gt_in_image(
                     st.world_frames, H_wi,
                     st.world_extent[1],
@@ -2034,7 +2031,7 @@ function build_absolute_tracks(
             # board's correspondences (so a blob matched to another board in the
             # same frame is still a confuser here — preserves per-board semantics).
             tracked = Set{Int}()
-            for p in csponds
+            for p in gt_matches
                 t = st.tracks[Int32(p.idx_i)]
                 push!(t["patch"], extracted.patches[p.idx_j])
                 push!(
@@ -2056,7 +2053,7 @@ function build_absolute_tracks(
             println(
                 "  ($vid_name) frame $frame_idx [board $(first(uid, 8))]: " *
                     "$(count(sift_onboard)) sift / $(count(onboard)) adapted / " *
-                    "$(length(csponds)) matched on board " *
+                    "$(length(gt_matches)) matched on board " *
                     "($(length(extracted.frames)) adapted in frame) " *
                     "| quality=$(round(det.quality; digits = 4)) n_inliers=$(det.n_inliers)"
             )
@@ -2068,7 +2065,7 @@ function build_absolute_tracks(
             isnothing(overlays) || push!(
                 overlays,
                 (;
-                    st.world_frames, matched_ids = Set(p.idx_i for p in csponds),
+                    st.world_frames, matched_ids = Set(p.idx_i for p in gt_matches),
                     cutoff = st.board_cutoff, H_wi, st.world_rect,
                     color = overlay_colors[uid], onboard,
                 )

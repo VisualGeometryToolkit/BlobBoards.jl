@@ -66,9 +66,9 @@ for (uid, bf) in board_features
                    min_similarity = cfg.min_similarity, matches = match_dict[uid],
                    fit_kw = (; outlier_halfwidth = cfg.geometry.outlier_halfwidth))
     isnothing(r) && continue
-    model, quality, csponds = r
-    push!(results, (; uid, model, quality, csponds,
-                      n_inliers = count(is_map_inlier, csponds.weights)))
+    model, quality, scored = r
+    push!(results, (; uid, model, quality, scored,
+                      n_inliers = count(is_map_inlier, scored.weights)))
 end
 sort!(results; by = r -> -r.n_inliers)
 
@@ -86,9 +86,9 @@ for (i, r) in enumerate(top)
     bundle = board_bundles[r.uid]
     board!(ax, proj, Rect(bundle, :world), blobs(bundle, :world);
            cutoff = cutoff(bundle))
-    proj_pts = Point2f.(proj.(Point2.(centroid.(sources(r.csponds)))))
-    det_pts  = Point2f.(centroid.(targets(r.csponds)))
-    matches!(ax, proj_pts, det_pts; weights = r.csponds.weights)
+    proj_pts = Point2f.(proj.(Point2.(centroid.(sources(r.scored)))))
+    det_pts  = Point2f.(centroid.(targets(r.scored)))
+    matches!(ax, proj_pts, det_pts; weights = r.scored.weights)
 end
 
 screen = window!(fig, "Top $(length(top)) board candidates")

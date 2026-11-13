@@ -176,7 +176,7 @@ function save(pattern::AbstractMatrix, bundle::PatternBundle; dir, overwrite = f
     end
 
     # Save colorant array directly to preserve grayscale format
-    # Use file_gamma=1.0 for linear (non-gamma-corrected) output for measurement
+    # Use file_gamma=1.0 for linear (non-gamma-corrected) output for photometry
     PNGFiles.save(fig_path, pattern; file_gamma = 1.0)
     @info "Saved pattern" image = fig_path
 

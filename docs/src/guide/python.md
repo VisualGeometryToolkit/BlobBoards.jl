@@ -130,7 +130,7 @@ returns one dict per verified board:
 - `uid`
 - `model`: a 3×3 homography from the board's world plane (mm) to pixels, or
   `{"R", "t"}`, the board → camera pose, when `camera_json` is given
-- `quality`, `n_inliers`, `n_csponds`, `weights` (a NumPy array)
+- `quality`, `n_inliers`, `n_correspondences`, `weights` (a NumPy array)
 - `device` and `execution_provider`: where it ran, `"cuda"` or `"cpu"`
 
 The network, the gallery features (cached on disk at `gallery_path`) and the

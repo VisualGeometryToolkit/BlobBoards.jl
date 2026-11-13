@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+On the VisualGeometryToolkit wave-10 stack: VisualGeometryToolkitCore 0.10, IO 0.10, Features 0.9,
+Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. Breaking:
+
+- **The stack's terminology** (Core 0.10: detection, correspondence, observation; `check_naming` refuses the old
+  words). No alias for any old name:
+  - `load_cspond_sets` → `load_correspondence_sets`; it returns Features' `CorrespondenceSet` (was `CspondSet`):
+    per board blob, its reference patch and its observations in the camera images (a track).
+  - `find_boards`' fourth element is Core's `Correspondences` set (`ScoredCorrespondence` rows, was
+    `Csponds`/`ScoredCspond`); its content is unchanged.
+  - Python: a board's dictionary key `n_csponds` → `n_correspondences` (`find_boards`, `BlobBoards.find_boards`
+    through PythonCall); the `blobboards` Python package is 0.2.0.
+  - "measurement" is out of every name and of the prose (observation, or the experiment it meant); the
+    stack's observation-noise convention is `conventions/observation-noise.md`.
+- **A pose model projects through its posed camera** (`PosedCamera(model(camera), pose)`, Core's `plane_map`) on
+  both pose arms. Under `undistortion = :global` the guided association now applies the same cheirality test as
+  under `:none` (Core's `transfer_ellipse(::PosedCamera, _)`): a board blob behind the camera transfers nothing,
+  where the bare plane homography imaged it as a (spurious) ellipse. In front of the camera the transfer is
+  bit-identical.
+- bmvc2026: the motion-capture markers are written as `TargetObservations{WorldFrame}` (IO's `observations` kind;
+  `TargetPoints3D` and `vgio/target_points3d` are retired by Core 0.10 and IO 0.10).
+
 ## 0.6.2 (unreleased)
 
 A patch: requires Julia 1.13 (`julia = "1.13"` in the `[compat]` of the package and of every

@@ -582,7 +582,7 @@ end
 #   `"colmap"` ((0.5, 0.5), BlobBoards' own) or `"julia"` ((1, 1))
 #
 # Returns a list of dicts with keys `uid`, `model`, `quality`, `n_inliers`,
-# `n_csponds`, `weights` (numpy array). `model` is the 3×3 homography H mapping a
+# `n_correspondences`, `weights` (numpy array). `model` is the 3×3 homography H mapping a
 # point of the board's world plane — centred, y up, in MILLIMETRES — to a pixel
 # in `pixel_frame`'s convention; on the pose path (`camera_json`) it is a dict
 # with `R` (3×3) and `t` (3-vector, millimetres), the board → camera pose, which
@@ -651,7 +651,7 @@ function BlobBoards.find_boards_python(
                 "model" => model_py,
                 "quality" => Float64(q),
                 "n_inliers" => count(VgtkCore.is_map_inlier, w),
-                "n_csponds" => length(sc),
+                "n_correspondences" => length(sc),
                 "weights" => np.array(Float64.(w)),
                 "device" => dev_name,
                 "execution_provider" => provider,

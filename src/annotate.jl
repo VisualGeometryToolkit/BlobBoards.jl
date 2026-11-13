@@ -34,7 +34,7 @@ using GeometryBasics: GeometryBasics
 using VideoIO: VideoIO
 using JLD2: JLD2, jldopen, jldsave
 using JSON: JSON
-using VisualGeometryToolkitFeatures: CspondSet
+using VisualGeometryToolkitFeatures: CorrespondenceSet
 using VisualGeometryToolkitCore: bbox
 
 # =============================================================================
@@ -163,12 +163,12 @@ function annotate_blobs(
             push!(matched_ids, last(sc).id)
         end
 
-        # world → image through the ONE spelling (`_model_to_homography`,
+        # world → image through the ONE spelling (`_world_to_image`,
         # pipeline.jl). The radial arm hands back a guided TRANSFER, not a map,
         # and annotation has no wiring for it — refuse before dispatch.
         model isa VgtkCore.RadialHomography &&
             throw(ArgumentError("annotate_blobs: the radial arm is not wired into annotation"))
-        H = _model_to_homography(model, cam)
+        H = _world_to_image(model, cam)
 
         # Project each GT blob and collect visible ones
         world_discs = blobs(bundle, :world)
@@ -746,7 +746,7 @@ Returns `(; board_uids, blob_ids, patches, confusers)` — flat shape:
   detection side — see `_extract_reference_patches`).
 - `confusers` is a P×P×2×C array (detection patches, channel 2 = all-1s).
 
-Group by `(board_uid, blob_id)` to reconstruct CspondSets — `cs[1]` for each
+Group by `(board_uid, blob_id)` to reconstruct CorrespondenceSets — `cs[1]` for each
 key is the reference patch (always loaded first).
 """
 function load_annotations(path::AbstractString)
@@ -834,28 +834,28 @@ function _promote_to_2ch(A::AbstractArray{T, 3}, P::Int) where {T}
 end
 
 """
-    load_cspond_sets(path) -> Dict{Tuple{String,Int}, CspondSet}
+    load_correspondence_sets(path) -> Dict{Tuple{String,Int}, CorrespondenceSet}
 
 Load annotations from a directory or split JLD2 file, then group into
-CspondSets keyed by `(board_uid, blob_id)`. Each CspondSet contains all
+CorrespondenceSets keyed by `(board_uid, blob_id)`. Each CorrespondenceSet contains all
 observed patches of the same physical blob. `cs[1]` is the reference patch
 (from board PDF), `cs[2:end]` are camera observations.
 """
-function load_cspond_sets(path::AbstractString)
+function load_correspondence_sets(path::AbstractString)
     data = load_annotations(path)
     P = size(data.patches, 1)
     N = size(data.patches, 4)   # (P, P, 2, N)
 
-    sets = Dict{Tuple{String, Int}, CspondSet{Vector{Matrix{Gray{Float32}}}}}()
+    sets = Dict{Tuple{String, Int}, CorrespondenceSet{Vector{Matrix{Gray{Float32}}}}}()
     for i in 1:N
         key = (data.board_uids[i], data.blob_ids[i])
-        # CspondSets only carry the intensity channel — used for plotting,
+        # CorrespondenceSets only carry the intensity channel — used for plotting,
         # not feature extraction. Mask channel is dropped on this path.
         patch = Gray{Float32}.(@view data.patches[:, :, 1, i])
         if haskey(sets, key)
             push!(sets[key], patch)
         else
-            sets[key] = CspondSet([patch])
+            sets[key] = CorrespondenceSet([patch])
         end
     end
     return sets
@@ -1156,13 +1156,13 @@ end
 """
     plot_annotations(sets; max_blobs=20, max_obs=10) -> Figure
 
-Visualize CspondSets as a grid. Each row is one blob: first column is the
+Visualize CorrespondenceSets as a grid. Each row is one blob: first column is the
 reference patch (from board PDF), then a gap, then observation columns
 (from camera images). Rows sorted by number of observations (most first).
 
     plot_annotations(sets)                           # top 20 blobs
     plot_annotations(sets; max_blobs=5, max_obs=20)  # fewer blobs, more obs
-    plot_annotations(load_cspond_sets("annotations/"))   # directory of per-image JLD2s
+    plot_annotations(load_correspondence_sets("annotations/"))   # directory of per-image JLD2s
 
 Requires a Makie backend (BlobBoardsMakieExt).
 """

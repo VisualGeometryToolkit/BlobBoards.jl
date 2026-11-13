@@ -95,7 +95,7 @@ const UNITS = filter(u -> u.label in RUN.experiment["subsets"], ALL_UNITS)
 # is an OUTPUT path here and an INPUT path of branch_lrt_accuracy.jl — the same
 # name for both ends of the same file. --appearance-log: one JSON line per
 # gated candidate (appearance-threshold calibration). --phase2-log: one line
-# per frame with the phase-1/phase-2 acceptance counts — the measurement behind
+# per frame with the phase-1/phase-2 acceptance counts — the data behind
 # the keep-or-delete-phase-2 decision. Supplied TO find_boards per frame
 # (`with_tag`), never set on the package.
 _log_path(k) = (v = cli_option(ARGS, k, ""); isempty(v) ? nothing : abspath(v))

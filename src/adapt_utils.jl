@@ -41,7 +41,7 @@ const _MIN_POINTS_ISOTROPIC = 10
 const _MIN_POINTS_ANISOTROPIC = 20
 const _MIN_REGION_HALFWIDTH = 2
 
-# `saturation_bounds` — the pixel value range a measurement may trust — is
+# `saturation_bounds` — the pixel value range a detection may trust — is
 # VisualGeometryToolkitCore's since 0.21.1.
 using VisualGeometryToolkitCore: saturation_bounds
 

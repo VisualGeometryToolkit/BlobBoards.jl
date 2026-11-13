@@ -33,7 +33,7 @@ def main():
                         gallery_path="board_features.jld2")   # feature cache, created on first run
     for b in found:
         print(f"board {b['uid']}: quality={b['quality']:.1f} "
-              f"inliers={b['n_inliers']}/{b['n_csponds']} ({b['execution_provider']})")
+              f"inliers={b['n_inliers']}/{b['n_correspondences']} ({b['execution_provider']})")
 
     import matplotlib
     matplotlib.use("Agg")

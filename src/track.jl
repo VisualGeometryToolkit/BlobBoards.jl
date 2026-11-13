@@ -44,9 +44,9 @@
 using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, PosedCamera, transfer_ellipse,
     Extrinsics3, Ellipse, region, centroid, feature_frame,
     EllipticFrame, planar_lift,  # #21 lazy endpoint lifts
-    Point3   # the full-camera pose arm projects blob centres (`_project_blob_centers`)
+    plane_map   # the pose arms project blob centres through it (`_project_blob_centers`)
 
-# `_model_to_homography` is defined once in pipeline.jl (included earlier) and
+# `_world_to_image` is defined once in pipeline.jl (included earlier) and
 # shared by every world→image projection site.
 
 
@@ -269,7 +269,6 @@ function track_boards(
             src = discovery ? :detect : :init
             for (uid, model, quality, scored) in results
                 haskey(won, uid) && continue
-                H = _model_to_homography(model, cam_est)
                 won[uid] = BoardDetection(
                     uid, k, model, Float64(quality), count(is_map_inlier, scored.weights), src
                 )
@@ -278,7 +277,7 @@ function track_boards(
 
         # ---- 3. Track bookkeeping ----------------------------------------
         for (uid, det) in won
-            xs = _project_blob_centers(_model_to_homography(det.model, cam_est), world_discs[uid])
+            xs = _project_blob_centers(_world_to_image(det.model, cam_est), world_discs[uid])
             if haskey(tracks, uid)
                 tr = tracks[uid]
                 tr.xs_prev = tr.xs_curr
@@ -304,7 +303,7 @@ function track_boards(
                 _frame_entry(
                         uid, det, diags,
                         _project_board_ellipses(
-                            _model_to_homography(det.model, cam_est), world_discs[uid],
+                            _world_to_image(det.model, cam_est), world_discs[uid],
                             BlobBoards.cutoff(board_bundles[uid]),
                             size(adapt_img)
                         )
@@ -325,22 +324,15 @@ function track_boards(
     return history
 end
 
-function _project_blob_centers(H::HomographyMap, wdiscs)
-    P = PerspectiveMap() ∘ H     # euclidean image points (H alone is homogeneous)
+# Every blob centre through the board-plane → image point map of the transfer
+# `_world_to_image` hands back: the homography arm's map dehomogenised, and a
+# posed camera's Core `plane_map` (its pinhole twin's plane homography, then the
+# lens's `distortion_map` for a full camera under `undistortion = :none`).
+_plane_point_map(H::HomographyMap) = PerspectiveMap() ∘ H
+_plane_point_map(camera::PosedCamera) = plane_map(camera)
+function _project_blob_centers(transfer, wdiscs)
+    P = _plane_point_map(transfer)
     return [Point2{Float64}(P(centroid(d))...) for d in wdiscs]
-end
-# The pose arm under `undistortion = :none` keeps the FULL camera as its
-# estimation camera, for which no plane homography exists: `_model_to_homography`
-# hands back the `PosedCamera` itself, and the blob centres go through it — the z = 0
-# lift of each world disc's centre, projected through pose and lens.
-function _project_blob_centers(cam::PosedCamera, wdiscs)
-    return [
-        begin
-                c = centroid(d)
-                Point2{Float64}(project(cam, Point3{Float64}(c[1], c[2], 0.0))...)
-            end
-            for d in wdiscs
-    ]
 end
 
 # One warm bet: predict → associate (ellipse-overlap IoU, guided by the
@@ -377,12 +369,12 @@ function _warm_track_frame(
     idesc = image_features.descriptor
     cands = Tuple{Float32, Float64, Int, Int}[]   # (−sim, −iou, world_idx, det_idx)
     # Detection ellipses hoisted out of the association loops: one conversion
-    # per detection instead of one SVD per (predicted blob × candidate) cspond
+    # per detection instead of one SVD per (predicted blob × candidate) correspondence
     # inside the R-tree callback.
     det_ells = [Ellipse(region(feature_frame(f), board_cutoff)) for f in image_features]
     n_pred = 0
     for (wi, wd) in enumerate(wdiscs)
-        ell = transfer_ellipse(_model_to_homography(tr.last.model, cam_est), region(wd, board_cutoff))
+        ell = transfer_ellipse(_world_to_image(tr.last.model, cam_est), region(wd, board_cutoff))
         ell === nothing && continue
         # Visibility filter: only blobs the detector COULD return count as
         # predictions — in-bounds centers and a detectable projected scale.
@@ -454,7 +446,7 @@ function _warm_track_frame(
     # on a ~95%-pure set it terminates in a handful of trials, sampling
     # in the lexicographic association order. Same estimator path as discovery.
     matches = NNMatch[NNMatch(wi, di, sims[k], 0.0f0) for (k, (wi, di)) in enumerate(assoc)]
-    scored = csponds(wdiscs, image_features, matches)
+    scored = correspondences(wdiscs, image_features, matches)
     pt = _fit_endpoints(camera, scored)
     # Rank scores REPLACE the :score column here — the warm-track prior is
     # the lexicographic association order, not the descriptor similarity (the
@@ -491,7 +483,7 @@ function _warm_track_frame(
     #
     # NB it is a NO-OP whenever `verify_similarity <= min_similarity`, which
     # includes the shipped configs (both 0.6 since the 2026-08-14
-    # calibration): warm association already refuses any cspond below
+    # calibration): warm association already refuses any correspondence below
     # `min_similarity` (see the `sim >= min_similarity` gate above), so every
     # inlier here is descriptor-certified by construction. That is the honest
     # difference from discovery, where `guided_search` is descriptor-BLIND and

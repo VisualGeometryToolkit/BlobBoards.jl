@@ -89,8 +89,8 @@ end
 
 # Detection path: 1-channel grayscale patches. Stack uniform-1 mask into ch 2.
 # Batched to avoid GPU OOM on large detection sets. The ONNX path dropped its
-# cap to 64 on measurement (see `BlobBoards.describe`); this backend has not
-# been re-measured, so it keeps 128. Supply `max_batch=0` to disable.
+# cap to 64 on a timing (see `BlobBoards.describe`); this backend has not
+# been re-timed, so it keeps 128. Supply `max_batch=0` to disable.
 function describe(
         model::LuxDescriptorNetworkImpl,
         patches::AbstractVector{<:AbstractMatrix};

@@ -5,7 +5,7 @@
 # The 260527 calibration_bb session lost camera-rig tracking for 37 of 41
 # captures (setup error, fixed mid-session) while the hand-held BOARD rig
 # tracked throughout. The camera sat on a tripod: when its pose is provably
-# constant, the missing measurement is recoverable by substitution — which
+# constant, the missing observation is recoverable by substitution — which
 # took the hand-eye calibration from 4 usable frames (yaw ⊕ t unobservable,
 # 7/21/36 mm range-proportional bias) to 41 (2.8/4.2/6.7 mm; 2026-08-06).
 #

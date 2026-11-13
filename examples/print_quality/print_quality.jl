@@ -25,7 +25,7 @@
 #   julia --project=examples examples/print_quality/print_quality.jl generate DIR
 #       the A4 test board: discs 0.4–12 mm (16 sizes, ~13 500 blobs), made for 1200 dpi
 #   julia --project=examples examples/print_quality/print_quality.jl selfcheck BOARD.json [DPI]
-#       the measurement's floor: a perfect render of the PDF at DPI (default 600)
+#       the experiment's floor: a perfect render of the PDF at DPI (default 600)
 #   julia --project=examples examples/print_quality/print_quality.jl evaluate BOARD.json SCAN.tif [DPI]
 #       a scan of the printed board (DPI default 1200; grey, 8-bit or more, every
 #       automatic correction and descreen off, lossless — not JPEG, not a

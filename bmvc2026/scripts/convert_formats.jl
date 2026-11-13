@@ -12,7 +12,7 @@ Reads data_root()/absolute_pose_experiments/<session>/poses/motion_tracker
 poses/motion_tracker/ (src/runs.jl `records_dir`), the run key that of the
 config of record (configs/convert_formats.toml):
 
-  <subset>/markers.json               vgio/target_points3d/v1 (the 14 markers)
+  <subset>/markers.json               vgio/observations (the 14 markers, 3D target-point observations)
   <subset>/board_rig.json             vgio/trajectory/v3, body:board_rig → world
   <subset>/camera_rig.json            vgio/trajectory/v3, body:camera_rig → world
                                       (+ the static-camera recovery of camera-untracked
@@ -45,7 +45,7 @@ include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the 
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
-    PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetPoints3D, ids, with_unit, mm, ustrip
+    PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetObservations, correspondences, ids, with_unit, mm, ustrip
 using Rotations: QuatRotation, params
 using VisualGeometryToolkitEval.Experiments: run_key, write_run_records, run_complete
 import VisualGeometryToolkitCore
@@ -205,16 +205,16 @@ function convert_mocap(session)
         images = Dict(fr.t => fr.image for fr in s.frames)
         times = Dict(fr.t => fr.time for fr in s.frames)
 
-        # the markers: the sensor's measurements, the source of every trajectory
+        # the markers: the tracker's observations of each body's constellation, the source of every trajectory
+        seen(b, fr) = [(j, fr.markers[i]) for (j, i) in enumerate(b.markers) if fr.markers[i] !== nothing]
         obs = Dict(
-            fr.t => [
-                (target = b.id, index = j, xyz = fr.markers[i])
-                    for b in BODIES for (j, i) in enumerate(b.markers) if fr.markers[i] !== nothing
-            ] for fr in s.frames
+            fr.t => Dict(
+                b.id => correspondences(first.(js), last.(js)) for b in BODIES for js in (seen(b, fr),) if !isempty(js)
+            ) for fr in s.frames
         )
         mfile = joinpath(odir, "markers.json")
         VgtkIO.save(
-            mfile, with_unit(TargetPoints3D{WorldFrame}(obs; sensors = MOCAP["sensor"], images, times, time_origin = origin), mm);
+            mfile, with_unit(TargetObservations{WorldFrame}(obs; sensors = MOCAP["sensor"], images, times, time_origin = origin), mm);
             provenance = (
                 source = joinpath("poses", "motion_tracker", sub), n_files = length(s.files), run_key = KEY,
                 source_format = "vendor per-frame export {poses: [board rig, camera rig] (rot_mat column-major, trans mm), makers: 14×3 (mm)}",
@@ -338,7 +338,7 @@ end
 # conversion writes, and the type each reads back as.
 const KIND_TYPES = Dict(
     "cameras" => Dict{Symbol, BoundedCamera}, "transforms" => Vector{EuclideanMap}, "rig" => Rig,
-    "trajectory" => Trajectory, "target_poses" => TargetPoses, "target_points3d" => TargetPoints3D,
+    "trajectory" => Trajectory, "target_poses" => TargetPoses, "observations" => TargetObservations,
 )
 _same(a, b) = a == b
 _same(a::Rig, b::Rig) = typeof(a) == typeof(b) && ids(a) == ids(b) && all(id -> a[id] == b[id], ids(a))

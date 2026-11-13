@@ -19,7 +19,7 @@ branch decision (identical detections, identical correspondences, identical
 calibration): the `flip_base` series (the no-disambiguation sweep,
 configs/bmvc2026_260527_noflip.toml: the RANSAC winner) and `bb` (reflect the
 winner, refine both branches with the same seeded LO on the same
-measurements, keep the higher likelihood). The delta isolates the method.
+observations, keep the higher likelihood). The delta isolates the method.
 Both are read from their keyed runs (evaluation.toml `[runs]`, src/runs.jl).
 
 Writes plotsdir()/flip_table.tex

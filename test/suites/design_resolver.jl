@@ -3,7 +3,7 @@
 # A stored target rig (VisualGeometryToolkitIO rig/v6) names a board by reference
 # and carries the board it is printed on; BlobBoards resolves the reference to the
 # board's blob centres in its world frame, in the bundle's blob order — the order
-# a measurement's point index names.
+# an observation's point index names.
 # =============================================================================
 using Test
 using StaticArrays: SVector

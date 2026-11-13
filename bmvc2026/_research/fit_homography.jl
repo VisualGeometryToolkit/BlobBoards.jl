@@ -29,16 +29,16 @@ using Infiltrator
 # Load correspondences
 # =============================================================================
 
-cspond_path = joinpath(@__DIR__, "..", "test", "data", "correspondences.jld2")
+correspondence_path = joinpath(@__DIR__, "..", "test", "data", "correspondences.jld2")
 
-src_pts, tgt_pts = jldopen(cspond_path, "r") do f
+src_pts, tgt_pts = jldopen(correspondence_path, "r") do f
     # Stored as StructVector{SVector{2,Float64}} in both fields
     collect(f["source"]), collect(f["target"])
 end
 
 @assert length(src_pts) == length(tgt_pts)
 n = length(src_pts)
-println("Loaded $n correspondences from $(basename(cspond_path))")
+println("Loaded $n correspondences from $(basename(correspondence_path))")
 
 # =============================================================================
 # Fit homography

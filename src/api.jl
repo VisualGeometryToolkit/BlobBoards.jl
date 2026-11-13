@@ -6,7 +6,7 @@
 #
 #   GENERATION:  blob_board / blob_pattern  →  bundle JSON + printable output
 #   DETECTION:   find_boards               →  per-board (uid, model, quality,
-#                                              csponds)  # weights in csponds.weights
+#                                              correspondences)  # weights in correspondences.weights
 #
 # Everything else — the pipeline stages (detect_blobs, adapt, canonicalize,
 # describe), verification internals, annotation/training tooling, and ruler
@@ -146,7 +146,7 @@ public plot_comparison           # labelled result sets side by side on a shared
 public plot_tracks, replay       # TrackTrace viewers (BlobBoardsMakieExt)
 # Annotation / training-data tooling
 public annotate_blobs, build_annotations, split_training_data
-public load_annotations, load_cspond_sets, plot_annotations, summarize_annotations
+public load_annotations, load_correspondence_sets, plot_annotations, summarize_annotations
 # Bundle I/O internals
 public load                                # VisualGeometryToolkitIO's `load`; BlobBoards' method reads a bundle + image: `load(BoardBundle, path)`
 public load_bundle

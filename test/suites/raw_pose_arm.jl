@@ -18,7 +18,7 @@ using VisualGeometryToolkitEstimation: AbsolutePoseProblem, scoring_from_toml, f
 using LocalOptimizationDoneRight: HQ, tuning_constant
 using VisualGeometryToolkitCore: WelschShape
 using BlobBoards: PoseGeometry, HomographyGeometry, RadialHomographyGeometry, _estimation_camera,
-    _model_to_homography, _guided_transfer, _undistort_detect, _camera, _project_blob_centers
+    _world_to_image, _guided_transfer, _undistort_detect, _camera, _project_blob_centers
 
 # Pixel operations take a BoundedCamera (the stack's rule): the pose arm's camera is
 # the model bounded by its image; the estimators and posing take the model.
@@ -45,11 +45,16 @@ end
     @test _undistort_detect(BlobBoards.default_device(), img, PoseGeometry(_CAM)) === img
 end
 
-@testset "the transfer object: a homography under :global, the camera under :none" begin
+@testset "the transfer object: the posed camera, whose plane map is Core's plane_map" begin
     pose = Extrinsics3(_POSE.R, _POSE.t)
-    @test _model_to_homography(pose, _PIN) isa HomographyMap                          # exact plane map
-    @test _model_to_homography(pose, _CAM) isa PosedCamera                                 # no homography exists through a lens
-    cam = _model_to_homography(pose, _CAM)
+    @test _world_to_image(pose, _PIN) isa PosedCamera                                  # :global — the pinhole twin, posed
+    @test _world_to_image(pose, _CAM) isa PosedCamera                                  # :none — the full camera, posed
+    @test_throws ArgumentError _world_to_image(pose, nothing)                          # a pose needs a BoundedCamera
+    # under :global the pinhole twin's conic transfer is the plane homography's, exactly
+    wpin = Circle(Point2(60.0, -40.0), 2.5)
+    @test _guided_transfer(_world_to_image(pose, _PIN), wpin)[1] ==
+        transfer_ellipse(HomographyMap(PosedCamera(pinhole(_MODEL), pose)), wpin)
+    cam = _world_to_image(pose, _CAM)
     # the guided transfer compares in the RAW image and searches with the same ellipse
     wreg = Circle(Point2(60.0, -40.0), 2.5)
     ep, es = _guided_transfer(cam, wreg)
@@ -67,7 +72,6 @@ end
     end
     @test worst < 0.02
     # a board behind the camera transfers nothing
-    behind = _model_to_homography(pose, _CAM)
     @test _guided_transfer(PosedCamera(_MODEL, EuclideanMap(RotMatrix{3, Float64}(one(SMatrix{3, 3, Float64})), Vec3{Float64}(0.0, 0.0, -500.0))), wreg) === nothing
 end
 
@@ -134,21 +138,21 @@ end
 end
 
 # track_boards' bookkeeping projects every blob centre through the transfer
-# `_model_to_homography` hands back — the `PosedCamera` itself on the full-camera
-# pose arm. Through a pinhole that is the plane homography's projection; through
-# the lens, the camera's own projection of the z = 0 lift.
+# `_world_to_image` hands back — the posed camera's Core `plane_map`. Through a
+# pinhole that is the plane homography's projection; through the lens, the
+# camera's own projection of the z = 0 lift.
 @testset "blob centres through the full camera (track_boards, :none)" begin
     pose = Extrinsics3(_POSE.R, _POSE.t)
     wd = [EllipticFrame(Point2(x, y), 2.0) for x in -60.0:30.0:60.0 for y in -40.0:40.0:40.0]
-    through_cam = _project_blob_centers(_model_to_homography(pose, _CAM), wd)
+    through_cam = _project_blob_centers(_world_to_image(pose, _CAM), wd)
     @test through_cam isa Vector{Point2{Float64}} && length(through_cam) == length(wd)
     for (p, d) in zip(through_cam, wd)
         c = centroid(d)
         @test SVector{2, Float64}(p) ≈ SVector{2, Float64}(project(PosedCamera(_MODEL, _POSE), Point3{Float64}(c[1], c[2], 0.0)))
     end
-    # a pinhole camera: the PosedCamera method agrees with the homography method
-    via_H = _project_blob_centers(_model_to_homography(pose, _PIN), wd)
-    via_cam = _project_blob_centers(PosedCamera(pinhole(_MODEL), _POSE), wd)   # a PosedCamera poses the model; the bound stays outside
+    # a pinhole camera: the posed camera's plane map agrees with the bare plane homography's
+    via_cam = _project_blob_centers(_world_to_image(pose, _PIN), wd)
+    via_H = _project_blob_centers(HomographyMap(PosedCamera(pinhole(_MODEL), _POSE)), wd)
     @test all(SVector{2, Float64}(a) ≈ SVector{2, Float64}(b) for (a, b) in zip(via_H, via_cam))
 end
 

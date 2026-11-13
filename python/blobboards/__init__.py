@@ -17,7 +17,7 @@ Examples
 (300, 400)
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from dataclasses import dataclass
 from typing import Optional
@@ -1330,7 +1330,7 @@ def find_boards(board_paths, model_path, img, *, gallery_path,
     -------
     list[dict]
         One dict per verified board: `uid`, `model`, `quality`, `n_inliers`,
-        `n_csponds`, `weights` (np.ndarray), `device` ("cuda" or "cpu") and
+        `n_correspondences`, `weights` (np.ndarray), `device` ("cuda" or "cpu") and
         `execution_provider` (the network's ONNX Runtime provider, "cuda" or
         "cpu"). `model` is the 3×3 homography H
         from the board's world plane — centred, y up, in millimetres — to

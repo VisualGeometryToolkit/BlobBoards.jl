@@ -139,7 +139,7 @@ BlobBoards.image_path
 BlobBoards.config_hash
 BlobBoards.build_annotations
 BlobBoards.load_annotations
-BlobBoards.load_cspond_sets
+BlobBoards.load_correspondence_sets
 BlobBoards.split_training_data
 BlobBoards.summarize_annotations
 BlobBoards.collect_media

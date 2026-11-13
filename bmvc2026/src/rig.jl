@@ -9,8 +9,8 @@
 # tracker did not see is absent; a pose substituted rather than measured is
 # flagged `recovered` (the static-camera recovery of the calibration subsets,
 # recovery.jl, with its evidence in the file's provenance). Those files are
-# DERIVED from the tracker's raw marker measurements
-# (poses/motion_tracker/<subset>/markers.json, `vgio/target_points3d/v1`)
+# DERIVED from the tracker's raw marker observations
+# (poses/motion_tracker/<subset>/markers.json, `vgio/observations`)
 # by the tracker vendor's solver, and scripts/convert_formats.jl wrote them
 # from the vendor's per-frame export, which stays the source of record.
 #

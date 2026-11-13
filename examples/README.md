@@ -15,7 +15,7 @@ Minimal demos of the two supported workflows:
 ## Print quality
 - `print_quality/print_quality.jl` — how faithfully a printer reproduces the
   blob profile, per blob size, from a scan of a printed test board: `generate`
-  the A4 test board (discs 0.4–12 mm), `selfcheck` the measurement's floor on a
+  the A4 test board (discs 0.4–12 mm), `selfcheck` the experiment's floor on a
   perfect render, `evaluate` a scan (finds the board with `find_boards`, maps
   the known blobs onto the scan, fits out the tone curve; requires CUDA)
 

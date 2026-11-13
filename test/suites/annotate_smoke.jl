@@ -5,7 +5,7 @@ using BlobBoards
 using BlobBoards: annotate_blobs, canonicalize, FindBoardsConfig,
     DescriptorNetwork, BoardGallery, load_bundle, uid_from_hash,
     DEFAULT_CUTOFF,
-    plot_boards, plot_board_poses, plot_tracks, plot_annotations, load_cspond_sets
+    plot_boards, plot_board_poses, plot_tracks, plot_annotations, load_correspondence_sets
 using CairoMakie: CairoMakie   # the Makie viewers render headless here
 using Colors: Gray
 using CUDA: CUDA, CUDABackend
@@ -313,7 +313,7 @@ end
                 )
                 @test 1 <= length(frame_files) <= _N_FRAMES
                 # the annotation viewer, on the directory just written
-                sets = load_cspond_sets(outdir)
+                sets = load_correspondence_sets(outdir)
                 @test !isempty(sets)
                 @test plot_annotations(sets; max_blobs = 3, max_obs = 2) isa CairoMakie.Makie.Figure
             finally

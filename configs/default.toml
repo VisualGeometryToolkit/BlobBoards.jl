@@ -50,7 +50,7 @@
 #
 # Tune it on data held out from the poses it will be scored on.
 #
-# MEASURED — a derivation or a measurement backs the value; re-measure, do not
+# MEASURED — a derivation or an experiment backs the value; re-measure, do not
 # sweep. The detector's tuned thresholds, `[find_boards] min_similarity` (a
 # property of the descriptor network).
 #

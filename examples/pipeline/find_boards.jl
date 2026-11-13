@@ -81,16 +81,16 @@ function plot_results(img, results, board_bundles, cam, label; n = min(10, lengt
     top = results[1:n]
     ncols = min(5, n); nrows = cld(n, ncols)
     fig = Makie.Figure(size = (ncols * 500, nrows * 500))
-    for (i, (uid, model, quality, csponds)) in enumerate(top)
+    for (i, (uid, model, quality, scored)) in enumerate(top)
         r, c = fldmod1(i, ncols)
-        n_inl = count(is_map_inlier, csponds.weights)
+        n_inl = count(is_map_inlier, scored.weights)
         ax, _ = imshow(fig[r, c], img; title = "$uid  q=$(round(quality; digits = 1))  n=$n_inl")
         proj = PerspectiveMap() ∘ HomographyMap(_to_homography(model, cam))
         bundle = board_bundles[uid]
         board!(ax, proj, Rect(bundle, :world), blobs(bundle, :world); cutoff = cutoff(bundle))
-        proj_pts = Point2f.(proj.(Point2.(centroid.(sources(csponds)))))
-        det_pts = Point2f.(centroid.(targets(csponds)))
-        matches!(ax, proj_pts, det_pts; weights = csponds.weights)
+        proj_pts = Point2f.(proj.(Point2.(centroid.(sources(scored)))))
+        det_pts = Point2f.(centroid.(targets(scored)))
+        matches!(ax, proj_pts, det_pts; weights = scored.weights)
     end
     # window!(fig, title) creates the titled GLMakie screen AND displays the
     # figure — it is the whole display step; do not display() again on top.
@@ -144,8 +144,8 @@ for (label, geometry) in (
     calibrated = geometry isa PoseGeometry
 
     println("\n== $label ==  $(length(accepted)) verified board(s):")
-    for (uid, model, quality, csponds) in accepted
-        n_inl = count(is_map_inlier, csponds.weights)
+    for (uid, model, quality, scored) in accepted
+        n_inl = count(is_map_inlier, scored.weights)
         extra = calibrated ? "  t=$(round.(model.t; digits = 1))" : ""
         println("  $uid  inliers=$n_inl$extra")
     end

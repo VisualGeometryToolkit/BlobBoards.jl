@@ -16,7 +16,7 @@ using VisualGeometryToolkitCore:
     undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
     sources, Attributed, withattrs, planar_lift, lift, exact,  # #21 correspondence layer; `exact`: the board side of a 2D fit
-    csponds                                                    # the columnar correspondence set (Core's; Features no longer re-exports it)
+    correspondences                                                    # the columnar correspondence set (Core's; Features no longer re-exports it)
 
 using VisualGeometryToolkitFeatures:
     MutualNN, KnnMatch, NNStrategy,
@@ -99,8 +99,8 @@ end
 # never restates its points. BlobBoards owns the design, so it resolves the
 # reference: the nominal points are the board's blob centres in its world
 # frame (`blobs(bundle, :world)`: centred on the board, y up, millimetres,
-# z = 0), in the bundle's blob order — the order a point index (1-based) of a
-# measurement names.
+# z = 0), in the bundle's blob order — the order a point index (1-based) of an
+# observation names.
 
 """
     board_points(bundle::BoardBundle) -> Vector{SVector{2}} of length quantities
@@ -110,7 +110,7 @@ A board design's nominal plane points.
 
 They are its blob centres in the board's world
 frame (centred, y up — the plane `z = 0` of `TargetFrame{uid}`), in the bundle's
-blob order, the order a measurement's point index refers to. A printed board is
+blob order, the order an observation's point index refers to. A printed board is
 physical, so each coordinate is a length quantity in the board's native unit,
 millimetres (`ustrip(mm, p)` for the plain numbers; [`blobs`](@ref)`(bundle, :world)`
 keeps the plain millimetres the pose solvers work in). `boards` is a directory of
@@ -436,16 +436,16 @@ _default_lo(::BoundedCamera) = _dflt_local_optimization_strategy(:absolute_pose)
 # geometry, falls back to that geometry's value.
 _dflt_outlier_halfwidth() = Float64(_dflt("geometry", "outlier_halfwidth"))
 _find_model(
-    cam::Nothing, pt_csponds; local_optimization_strategy = _default_lo(cam),
+    cam::Nothing, pt_correspondences; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_homography(
-    pt_csponds; scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
+    pt_correspondences; scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
 )
 _find_model(
-    cam::BoundedCamera, pt_csponds; local_optimization_strategy = _default_lo(cam),
+    cam::BoundedCamera, pt_correspondences; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
 ) = find_absolute_pose(
-    VgtkCore.model(cam), pt_csponds; scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
+    VgtkCore.model(cam), pt_correspondences; scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
 # Seeded warm local-optimization refine (no second RANSAC) for the guided final
@@ -465,24 +465,24 @@ _find_model(
 # which were this same `locally_optimize` on the same (bounded) problem, so the
 # switch moves no number.
 _refine(
-    cam::Nothing, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
+    cam::Nothing, pt_correspondences, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
-) = length(pt_csponds) < 4 ? nothing : locally_optimize(
-    with_extent(HomographyProblem(pt_csponds), extent), θ₀;
+) = length(pt_correspondences) < 4 ? nothing : locally_optimize(
+    with_extent(HomographyProblem(pt_correspondences), extent), θ₀;
     scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
 )
 _refine(
-    cam::BoundedCamera, pt_csponds, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
+    cam::BoundedCamera, pt_correspondences, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
     extent = nothing, workspace = nothing
 ) = locally_optimize(
-    with_extent(AbsolutePoseProblem(VgtkCore.model(cam), pt_csponds), extent), θ₀;
+    with_extent(AbsolutePoseProblem(VgtkCore.model(cam), pt_correspondences), extent), θ₀;
     scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
 # z=0-lifts them to world points. (The radial arm's method — 2D, like H —
 # lives below the GeometryConfig definitions.) The board side of a 2D fit is
-# `exact` (VisualGeometryToolkitCore conventions/measurement-noise.md): board points are
+# `exact` (VisualGeometryToolkitCore conventions/observation-noise.md): board points are
 # known, not measured, so the H residual is the transfer error in image pixels —
 # as a plain (unit isotropic) point in board mm it was scored in board mm.
 _fit_endpoints(::Nothing, scored) = board_endpoints(scored)
@@ -492,7 +492,7 @@ _fit_endpoints(::BoundedCamera, scored) = planar_lift(scored)
 
 A scored board → image correspondence set as a 2D fit's endpoints. The board
 centroids are `exact` (board points are known, not measured: VisualGeometryToolkitCore
-conventions/measurement-noise.md), the image centroids plain (unit isotropic
+conventions/observation-noise.md), the image centroids plain (unit isotropic
 pixel noise); the attribute columns ride along. The endpoints of the
 homography arms' fits, and of a downstream arm's (CaliBlobs' radial camera).
 """
@@ -599,41 +599,34 @@ _float_rect(r::SpatialIndexing.Rect) =
 # that its model is an unposed camera, which turned the old silent
 # StackOverflow on a wrong model into a static MethodError.
 """
-    _model_to_homography(model, cam) -> HomographyMap
+    _world_to_image(model, cam)
 
-The world→image map to project through, from an estimator result. Dispatches
-on the MODEL, which is the honest discriminator: an `Extrinsics3` is a metric
-board→camera pose that knows nothing about pixels and needs the intrinsics to
-reach the image, while a `HomographyMat` already IS the map and ignores `cam`.
+The board-plane → image transfer to project through, from an estimator result.
+Dispatches on the MODEL, the honest discriminator:
 
-Both branches are one VGC call — `HomographyMap(::PinholeCamera)` composes
-pose ∘ K on the z = 0 plane and returns it LABELED
-`TargetPlaneFrame → PixelFrame{:colmap}`. This exists so its call sites (the engine,
-`annotate.jl`) do not each spell it out.
-
-`cam` is the ESTIMATION camera (`_estimation_camera`): under `:global` the
-pinhole twin, whose plane homography is the exact map; under `:none` the
-full camera, for which no homography exists — the guided transfer is then
-the `PosedCamera` itself (`transfer_ellipse(::PosedCamera, _)`: the conic through the
-plane homography exactly, the lens's affinity at the transferred centre),
-and the name stays for continuity with the two radial arms, which also forward
-their MODEL through.
+- an `Extrinsics3` is a metric board → camera pose that needs the camera to
+  reach the image: the posed camera `PosedCamera(model(cam), pose)`, whose
+  plane map is Core's `plane_map` for every lens (the pinhole twin's plane
+  homography exactly, then the lens's `distortion_map`). Its centres go through
+  `plane_map(camera)` (`_project_blob_centers`) and its conics through Core's
+  `transfer_ellipse(::PosedCamera, _)` — `plane_map`'s stage-wise transfer
+  behind a cheirality test at the centre, which the bare composite cannot make
+  (a homography images a plane conic behind the camera as a perfectly good one).
+  `cam` is the ESTIMATION camera (`_estimation_camera`): the pinhole twin under
+  `:global`, the full camera under `:none`; `plane_map` dispatches between the
+  two forms, so no per-lens method is needed here;
+- a `HomographyMat` already IS the plane map: its `HomographyMap` (`cam` ignored);
+- the radial arm forwards its MODEL: the guided transfer needs (H, k, centre)
+  together — the conic goes through H exactly, only the undistortion is linearised.
 """
-_model_to_homography(pose::Extrinsics3, cam::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, Pinhole}}) =
-    HomographyMap(PosedCamera(VgtkCore.model(cam), pose))
-_model_to_homography(pose::Extrinsics3, cam::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, <:AbstractLensModel}}) =
-    PosedCamera(VgtkCore.model(cam), pose)
+_world_to_image(pose::Extrinsics3, cam::BoundedCamera) = PosedCamera(VgtkCore.model(cam), pose)
 # Untyped on purpose: RadialHomographyGeometry is defined further down this
 # file, and a signature naming it here would not precompile.
-_model_to_homography(::Extrinsics3, cam) = throw(
-    ArgumentError("a pose model needs a pinhole camera to project; got $(typeof(cam))")
+_world_to_image(::Extrinsics3, cam) = throw(
+    ArgumentError("a pose model needs a BoundedCamera to project; got $(typeof(cam))")
 )
-_model_to_homography(H::HomographyMat, _) = HomographyMap(H)
-# The radial arm forwards its MODEL rather than a bare homography: the
-# guided transfer needs (H, k, centre) together — the conic goes through H
-# exactly, only the undistortion is linearised. Named `_model_to_homography`
-# for continuity; what it really returns is the guided TRANSFER.
-_model_to_homography(m::VgtkCore.RadialHomography, _) = m
+_world_to_image(H::HomographyMat, _) = HomographyMap(H)
+_world_to_image(m::VgtkCore.RadialHomography, _) = m
 
 
 # =============================================================================
@@ -673,7 +666,7 @@ _model_to_homography(m::VgtkCore.RadialHomography, _) = m
 # entire world→pixel map would approximate the homography too, and that carries
 # the perspective foreshortening, which is the dominant shape effect on an
 # oblique board and is transferred exactly for free. And the Jacobian is
-# evaluated at the detection's own centre — a measurement — never at the
+# evaluated at the detection's own centre — the data — never at the
 # prediction, so model error never enters the shape estimate. Guided search
 # exists precisely because the current model is imperfect.
 
@@ -704,8 +697,13 @@ _model_to_homography(m::VgtkCore.RadialHomography, _) = m
 # Radial: compare in UNDISTORTED coordinates where the transfer is exact; search
 # with the conic carried into the distorted image by the distortion's local
 # affinity at its centre, so the detection index stays in distorted pixels.
-@inline function _guided_transfer(H::HomographyMap, wreg)
-    ep = transfer_ellipse(H, wreg)
+# A homography, or a posed camera (the pose arms: Core's
+# `transfer_ellipse(::PosedCamera, _)` — its `plane_map`, the plane homography
+# exactly and, for the full camera under `:none`, the lens's affinity at the
+# centre, behind a cheirality test): the transferred conic lives where the
+# detections are, so it is compared and searched there.
+@inline function _guided_transfer(T::Union{HomographyMap, PosedCamera}, wreg)
+    ep = transfer_ellipse(T, wreg)
     ep === nothing && return nothing
     return (ep, ep)
 end
@@ -716,17 +714,8 @@ end
     es === nothing && return nothing
     return (ep, es)
 end
-# Full camera (the :none policy): the transferred conic already lives in the
-# RAW image — the plane homography exactly, the lens's affinity at the
-# centre (VGC `transfer_ellipse(::PosedCamera, _)`) — so it is compared and
-# searched where the detections are.
-@inline function _guided_transfer(camera::PosedCamera, wreg)
-    ep = transfer_ellipse(camera, wreg)
-    ep === nothing && return nothing
-    return (ep, ep)
-end
 
-# The detection ellipse in the COMPARISON domain. Projective: as measured.
+# The detection ellipse in the COMPARISON domain. Projective: as detected.
 # Radial: carried into undistorted coordinates by the local affinity at its own
 # centre. One Jacobian per accepted candidate, not per detection per board.
 @inline _guided_detell(::HomographyMap, det_ells, j) = det_ells[j]
@@ -741,7 +730,7 @@ end
 
 Final-fit correspondence builder. Project every world blob of `bundle`'s
 pattern into the image through `H` (build it with
-`_model_to_homography`) and associate it by OVERLAP alone: its candidates are
+`_world_to_image`) and associate it by OVERLAP alone: its candidates are
 the detections whose ellipses' bounding boxes intersect the bounding box of the
 projected ellipse (an R-tree query; both ellipses at the blob's rendered
 boundary, `region(·, cutoff(bundle))`, the same convention `annotate_blobs` uses
@@ -753,7 +742,7 @@ The IoU gate is purely geometric — descriptors are not consulted. It is
 what rejects *confuser* boards: a wrong board can be smeared onto a
 detection cluster center-wise, but its blobs' projected scales and shapes
 won't agree with the adapted frames, so they fail the overlap check. Returns
-a world-disc ↔ detection `ScoredCspond` set for a posterior-weighted refit
+a world-disc ↔ detection `ScoredCorrespondence` set for a posterior-weighted refit
 via `_find_model` (one-to-one, best overlap first), recovering pattern blobs
 the descriptor matcher missed without admitting smears.
 
@@ -834,7 +823,7 @@ function guided_search(
     cands = _guided_candidates(rtree, H, wregions, det_ells, Float64(min_iou), on_read, skip)
     # The RANSAC inliers (`keep`) were certified by descriptors AND spatial
     # consensus — guided search may only ADD to them, never drop them. They
-    # claim their csponds first, unconditionally (no IoU gate); the IoU
+    # claim their correspondences first, unconditionally (no IoU gate); the IoU
     # candidates then fill in around them, best overlap first, one-to-one.
     used_d = falses(length(image_features)); used_w = falses(length(wdiscs))
     matches = NNMatch[]
@@ -849,9 +838,9 @@ function guided_search(
         # score by overlap (higher = better); ratio unused for geometric matches
         push!(matches, NNMatch(wi, di, Float32(v), 0.0f0))
     end
-    # Let the VGF intrinsic build the columnar ScoredCspond set — same path
+    # Let the VGF intrinsic build the columnar ScoredCorrespondence set — same path
     # `find_board` uses for descriptor matches, so the layout is identical.
-    # `det_id` (image-detection index of each cspond) rides along for the
+    # `det_id` (image-detection index of each correspondence) rides along for the
     # appearance gate, which needs the image side of every INLIER — including
     # the guided ones the descriptor matcher never produced.
     # `src_id` (board-blob index) rides along beside `det_id`. Together they
@@ -865,10 +854,10 @@ function guided_search(
     return _scored_with_ids(wdiscs, image_features, matches)
 end
 
-# Scored-cspond table with the `det_id`/`src_id` columns claim bookkeeping needs
+# Scored-correspondence table with the `det_id`/`src_id` columns claim bookkeeping needs
 # on BOTH return paths (`guided_search`, `find_board`): one spelling.
 _scored_with_ids(sources, image_features, matches) = withattrs(
-    csponds(sources, image_features, matches);
+    correspondences(sources, image_features, matches);
     det_id = Int[m.second for m in matches],
     src_id = Int[m.first for m in matches]
 )
@@ -1087,7 +1076,7 @@ state nothing recorded. Immutable: stamp the frame with [`with_tag`](@ref).
 - `phase2_log`: one row per `find_boards` call with the phase-1 / phase-2
   acceptance counts.
 - `refit_skip_log`: per commit, the upper bound on what a fit cache could
-  have skipped (see the measurement note above).
+  have skipped (see the note above).
 """
 struct Telemetry
     tag::String
@@ -1161,7 +1150,7 @@ function _log_branch_bail(
         path, (
             tag = telemetry.tag, bail = String(reason),
             sep_deg = sep_deg, inc_converged = inc_conv,
-            alt_converged = alt_conv, n_csponds = n,
+            alt_converged = alt_conv, n_correspondences = n,
         )
     )
 end
@@ -1169,7 +1158,7 @@ end
 # Reflect → refine → likelihood-ratio select. Returns the winning RansacEstimate
 # (possibly the alternative branch) — the caller's downstream is unchanged.
 function _resolve_pose_ambiguity(
-        camera, scored, pt_csponds, res;
+        camera, scored, pt_correspondences, res;
         outlier_halfwidth, local_optimization_strategy, extent, workspace, telemetry = nothing
     )
     bs = sources(scored)
@@ -1195,7 +1184,7 @@ function _resolve_pose_ambiguity(
     # RANSAC's quality against a refine's is a units error:
     # different scoring objects — measured to flip healthy boards.)
     inc = _refine(
-        camera, pt_csponds, res.estimate;
+        camera, pt_correspondences, res.estimate;
         outlier_halfwidth, local_optimization_strategy, extent, workspace
     )
     if isnothing(inc) || !VgtkCore.found_model(inc)
@@ -1210,7 +1199,7 @@ function _resolve_pose_ambiguity(
         )
         return res
     end
-    alt = _refine(camera, pt_csponds, θm; outlier_halfwidth, local_optimization_strategy, extent, workspace)
+    alt = _refine(camera, pt_correspondences, θm; outlier_halfwidth, local_optimization_strategy, extent, workspace)
     if isnothing(alt) || !VgtkCore.found_model(alt)
         _log_branch_bail(
             telemetry, :alt_not_converged; sep_deg = sep, inc_conv = true,
@@ -1247,8 +1236,8 @@ function _resolve_pose_ambiguity(
     blog = telemetry === nothing ? "" : telemetry.branch_log
     if !isempty(blog)
         # discriminability d: inter-branch distance gap over the noise floor
-        prob = VgtkEstimation.AbsolutePoseProblem(VgtkCore.model(camera), pt_csponds)   # the problem takes the model (BoundedCamera is the pixel bound)
-        n = length(pt_csponds)
+        prob = VgtkEstimation.AbsolutePoseProblem(VgtkCore.model(camera), pt_correspondences)   # the problem takes the model (BoundedCamera is the pixel bound)
+        n = length(pt_correspondences)
         rA = zeros(n); rB = zeros(n)
         mahalanobis_distances!(rA, prob, inc.estimate)
         mahalanobis_distances!(rB, prob, alt.estimate)
@@ -1297,7 +1286,7 @@ function find_board(
         min_similarity = _dflt("min_similarity"),
         # The ENGINE's guided-association overlap gate. 0.5, its tuned value —
         # This gate is what rejects confuser boards (see `guided_search`).
-        # Moving it is a tuned-parameter change and wants its own measurement.
+        # Moving it is a tuned-parameter change and wants its own experiment.
         min_iou = 0.5,
         dm = nothing,
         matches = nothing,
@@ -1321,7 +1310,7 @@ function find_board(
     length(matches) < 4 && return nothing
 
     # `det_id` column: see guided_search — claim bookkeeping needs the
-    # image-detection index of every cspond on BOTH return paths.
+    # image-detection index of every correspondence on BOTH return paths.
     scored = _scored_with_ids(board_features, image_features, matches)
 
     # Lazy endpoint lift (#21): homography path fits on centroids; pose path
@@ -1329,9 +1318,9 @@ function find_board(
     # ratio) attribute columns ride the lift, so RVG's problem constructors
     # pick up the PROSAC prior straight from the `:score` column — no
     # sidecar `scores` kwarg.
-    pt_csponds = _fit_endpoints(camera, scored)
+    pt_correspondences = _fit_endpoints(camera, scored)
 
-    res = _find_model(camera, pt_csponds; fit_kw...)
+    res = _find_model(camera, pt_correspondences; fit_kw...)
     (!isnothing(res) && VgtkCore.found_model(res)) || return nothing
     # The refines below use the SAME strategy the fit used.
     local_optimization_strategy = get(fit_kw, :local_optimization_strategy, _default_lo(camera))
@@ -1342,7 +1331,7 @@ function find_board(
     # branch-agnostic — it polishes whichever basin wins here.
     if resolve_pose_ambiguity && camera isa BoundedCamera
         res = _resolve_pose_ambiguity(
-            camera, scored, pt_csponds, res;
+            camera, scored, pt_correspondences, res;
             outlier_halfwidth = get(_dflt_outlier_halfwidth, fit_kw, :outlier_halfwidth), local_optimization_strategy,
             extent = get(fit_kw, :extent, nothing),
             workspace = refine_workspace, telemetry
@@ -1362,7 +1351,7 @@ function find_board(
         outlier_halfwidth = get(_dflt_outlier_halfwidth, fit_kw, :outlier_halfwidth)
         # RANSAC inliers are already certified (descriptor match + spatial
         # consensus): guided search keeps them unconditionally and only ADDS
-        # IoU-certified csponds — the union, per-board support can't shrink.
+        # IoU-certified correspondences — the union, per-board support can't shrink.
         w = res.weights
         keep = [m.value for (k, m) in enumerate(matches) if is_map_inlier(w[k])]
         # Compose the world->image map HERE, so guided_search receives one
@@ -1372,7 +1361,7 @@ function find_board(
         wd = @something guided_wdiscs blobs(bundle, :world)
         g_matches = NNMatch[]
         g_scored = guided_search(
-            _model_to_homography(res.estimate, camera), bundle, image_features;
+            _world_to_image(res.estimate, camera), bundle, image_features;
             min_iou, keep, rtree = guided_rtree, skip = guided_skip,
             det_ells = guided_det_ells, wdiscs = wd,
             wregions = guided_wregions, on_read = on_guided_read, matches_out = g_matches
@@ -1391,7 +1380,7 @@ function find_board(
                 # the descriptor matches the arm's own scorer rejected with the
                 # RANSAC's (all ≤ ½). Inliers are `is_map_inlier(weight)` on both return
                 # paths, so a consumer that reads inliers sees no difference;
-                # one that can re-judge a rejected cspond under another model
+                # one that can re-judge a rejected correspondence under another model
                 # has them.
                 rej = findall(!is_map_inlier, w)
                 full = withattrs(
@@ -1411,7 +1400,7 @@ function find_board(
     return (res.estimate, res.quality, full)
 end
 
-# NNMatch is used for the guided-search csponds below and rides the agenda's
+# NNMatch is used for the guided-search correspondences below and rides the agenda's
 # `resolved` field. The stacked gallery matcher that used to build these
 # dictionaries here now lives in VGF (`nn_match_stacked`).
 using VisualGeometryToolkitFeatures: NNMatch
@@ -1605,7 +1594,7 @@ since BB residuals come from adapt-refined sub-pixel detections.
 
 There is no `min_inlier_fraction` anymore. It gated on the fraction of the
 correspondence set with posterior weight above ½ (`is_map_inlier`) — a geometric proxy against
-dense low-quality match clouds (guided sets of 400+ csponds carrying 6
+dense low-quality match clouds (guided sets of 400+ correspondences carrying 6
 accidental inliers satisfy any absolute count). The mandatory appearance gate
 (`FindBoardsConfig.verify_similarity` / `min_appearance_support`, see
 verify.jl) rejects that attack directly and with total measured separation,
@@ -1748,7 +1737,7 @@ struct BoardDetection{M}
     # The arm's OWN estimate, and the only geometry stored: an `Extrinsics3`
     # pose (P3P + lifted LO), a `HomographyMat` or a `RadialHomography` — or
     # whatever model a caller's own arm estimates. Every map a consumer needs
-    # is derived from it (`_model_to_homography` for projection). Caching a
+    # is derived from it (`_world_to_image` for projection). Caching a
     # derived map beside the model lets the two disagree.
     model::M
     quality::Float64
@@ -1803,13 +1792,13 @@ board_quad(::RadialHomographyGeometry, m::VgtkCore.RadialHomography, bundle::Boa
 # Radially distorted homography: the one-sided division model (H, k), k free
 # per fit (RVG `find_radial_homography`; Wadenbäck et al., 3DV 2026).
 #
-# `pt_csponds` arrives from `_fit_endpoints` already in point form, so it is
+# `pt_correspondences` arrives from `_fit_endpoints` already in point form, so it is
 # not re-converted.
 _find_model(
-    g::RadialHomographyGeometry, pt_csponds; local_optimization_strategy = g.local_optimization_strategy,
+    g::RadialHomographyGeometry, pt_correspondences; local_optimization_strategy = g.local_optimization_strategy,
     outlier_halfwidth = g.outlier_halfwidth, kw...
 ) = find_radial_homography(
-    pt_csponds; center = distortion_center(g),
+    pt_correspondences; center = distortion_center(g),
     scoring = default_student_t_uniform_scoring(_RadialProblem5, outlier_halfwidth), local_optimization_strategy, kw...
 )
 
@@ -1828,17 +1817,17 @@ an `image_size`).
 """
 distortion_center(g) = VgtkCore.Point2{Float64}(g.image_size[1] / 2, g.image_size[2] / 2)
 
-_refine(g::RadialHomographyGeometry, pt_csponds, θ₀::HomographyMat; local_optimization_strategy = g.local_optimization_strategy, kw...) =
-    _refine(nothing, pt_csponds, θ₀; local_optimization_strategy, kw...)
+_refine(g::RadialHomographyGeometry, pt_correspondences, θ₀::HomographyMat; local_optimization_strategy = g.local_optimization_strategy, kw...) =
+    _refine(nothing, pt_correspondences, θ₀; local_optimization_strategy, kw...)
 # The radial homography is its own manifold (sl(3) ⊕ k) — polish it there, not
 # through a plain homography. The problem's distortion centre is the model's
 # own, which `_find_model` set to `distortion_center(g)`.
 _refine(
-    g::RadialHomographyGeometry, pt_csponds, θ₀::VgtkCore.RadialHomography;
+    g::RadialHomographyGeometry, pt_correspondences, θ₀::VgtkCore.RadialHomography;
     outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy,
     extent = nothing, workspace = nothing,
-) = length(pt_csponds) < 5 ? nothing : locally_optimize(
-    with_extent(RadialHomographyProblem(pt_csponds; center = VgtkCore.center(θ₀)), extent), θ₀;
+) = length(pt_correspondences) < 5 ? nothing : locally_optimize(
+    with_extent(RadialHomographyProblem(pt_correspondences; center = VgtkCore.center(θ₀)), extent), θ₀;
     scoring = default_student_t_uniform_scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization_strategy
 )
 
@@ -1947,7 +1936,7 @@ the gate while false boards never came near it (median 0.07–0.37):
              real boards.
   0.7 → 0.6  on the FULL corpus — the inter-slice 2–3 m frames the stride
              never sampled dip to median sims 0.66–0.71, so 0.7 gated 13
-             more real csponds (probe: support 0.30–0.47, deterministic).
+             more real correspondences (probe: support 0.30–0.47, deterministic).
 At the default support of 0.5 the gate is exactly a MEDIAN test, so the
 bar must sit under the real population's frontier median. NB appearance is
 structurally blind to POSE FLIPS (correct correspondences, mirrored
@@ -2578,7 +2567,7 @@ function find_boards(
     # accepted 7 boards over 24 frames — zero on easy frames, all 7 on the
     # distant stations, including the GT-verified real boards 952/6ad/575/2a0
     # that the appearance-gate calibration fought to keep. Deleting this phase
-    # loses real distant boards; see PHASE2_LOG for re-measurement.
+    # loses real distant boards; see PHASE2_LOG for the experiment to rerun.
     n_phase1 = length(all_accepted)
     _run_matching_phase!(
         gallery_pool, all_accepted, feat_pool;
@@ -3214,7 +3203,7 @@ function _claim_boards(
             # was tried (2026-08-16) and REVERTED: it rejected 109 boards on
             # the 260527 sweep and added none, dropping detection rate 76.5
             # -> 70.4 pp, including GT-verified real boards (952/6ad/575/2a0).
-            # Distant real boards get FEW matches and MANY guided csponds whose
+            # Distant real boards get FEW matches and MANY guided correspondences whose
             # sims sit at 0.66-0.71 against a 0.6 bar, so judged alone half
             # fall below and the board dies. The padding is not only masking
             # false boards, it is carrying real ones — and
@@ -3258,13 +3247,13 @@ function _claim_boards(
         end
 
         # ---- Commit the single best — inlier count, quality tie-break -------
-        # NOT raw quality alone: |q| grows with support size, so a 6-cspond
-        # junk fit (q ≈ −7) would outrank a real 110-cspond board (q ≈ −100)
+        # NOT raw quality alone: |q| grows with support size, so a 6-correspondence
+        # junk fit (q ≈ −7) would outrank a real 110-correspondence board (q ≈ −100)
         # and steal its features (measured: board 336 collapsed 93/110 →
         # 18/18 under a pure-q sort, 2026-07-28). And NOT agenda mass — mass
         # is pre-fit information; the fitted support is the honest priority.
         #
-        # NB no soft cspond suppression against previously-committed quads
+        # NB no soft correspondence suppression against previously-committed quads
         # here — that channel (transplanted from the deleted `spatial_verify`)
         # was provably dead once every input of a committed fit was
         # claim-cleaned; an assertion run recorded zero firings across ~38

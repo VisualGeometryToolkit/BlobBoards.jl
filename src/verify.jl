@@ -35,7 +35,7 @@
 #   fitted model, re-described those image patches, and thresholded the
 #   median cosine similarity. Removed 2026-08 as "not discriminative
 #   enough". That diagnosis was wrong: re-describing at reprojected
-#   positions is a different measurement from judging the correspondences
+#   positions is a different test from judging the correspondences
 #   the fit was actually built on (the numbers above).
 #
 # * `spatial_verify` — greedy winner-take-all suppression over FINISHED

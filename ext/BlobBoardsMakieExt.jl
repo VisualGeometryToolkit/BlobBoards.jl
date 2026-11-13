@@ -109,7 +109,7 @@ function board_overlay!(
     return ax
 end
 
-# HOIST CANDIDATE (VisualGeometryToolkitCore): `_inlier_frames` and the `Csponds`
+# HOIST CANDIDATE (VisualGeometryToolkitCore): `_inlier_frames` and the `Correspondences`
 # method below touch NO BlobBoards type — they are weights + targets + frame +
 # ellipses!, all of which VGC owns. They belong beside VGC's `matches!`, which
 # is already the correspondence painter. Only the result-set method is ours,
@@ -119,7 +119,7 @@ _inlier_frames(sc) =
     [VgtkCore.feature_frame(sc.targets[i]) for (i, w) in enumerate(sc.weights) if VgtkCore.is_map_inlier(w)]
 
 function inliers!(
-        ax::Makie.Axis, sc::VgtkCore.Csponds;
+        ax::Makie.Axis, sc::VgtkCore.Correspondences;
         cutoff = DEFAULT_CUTOFF, color = :cyan, kwargs...
     )
     ells = _inlier_frames(sc)
@@ -503,13 +503,13 @@ _project_pts(proj, pts) = [proj(Point2(p[1], p[2])) for p in pts]
 function _registered_panels!(fig, trace, row0; ncols = 4)
     reg = trace.registration
     out = Makie.Axis[]
-    for (i, (uid, model, quality, csponds)) in enumerate(reg.accepted)
+    for (i, (uid, model, quality, scored)) in enumerate(reg.accepted)
         r, c = fldmod1(i, ncols)
         # show_frame = false: the pose-axes overlay issues a nested `arrows2d!`
         # from inside the recipe's `plot!`; it adds nothing at frame scale.
         ax = _board_panel!(
             fig[row0 + r, c], reg.cam, trace.detect_img, uid, model, quality,
-            csponds.weights, reg.bundles[uid]; show_frame = false,
+            scored.weights, reg.bundles[uid]; show_frame = false,
             # `detect_img` is UNDISTORTED ("what the detector saw",
             # src/inspect.jl) and the trace's poses live in that frame, so the
             # pose reduces to the pinhole plane homography. Drawing through the
@@ -521,13 +521,13 @@ function _registered_panels!(fig, trace, row0; ncols = 4)
         # a quantity strips in its named unit.
         pp = Point2f.(
             _project_pts(
-                proj, map(c -> VgtkCore.strip_or_bare.(VgtkCore.mm, c), VgtkCore.centroid.(VgtkCore.sources(csponds)))
+                proj, map(c -> VgtkCore.strip_or_bare.(VgtkCore.mm, c), VgtkCore.centroid.(VgtkCore.sources(scored)))
             )
         )
         dp = Point2f.(
-            map(c -> VgtkCore.strip_or_bare.(VgtkCore.px, c), VgtkCore.centroid.(VgtkCore.targets(csponds)))
+            map(c -> VgtkCore.strip_or_bare.(VgtkCore.px, c), VgtkCore.centroid.(VgtkCore.targets(scored)))
         )
-        matches!(ax, pp, dp; weights = csponds.weights)
+        matches!(ax, pp, dp; weights = scored.weights)
         push!(out, ax)
     end
     return out

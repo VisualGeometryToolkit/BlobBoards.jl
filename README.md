@@ -69,8 +69,8 @@ bundles = Dict(scene.uid => scene.bundle)
 config   = FindBoardsConfig(geometry = HomographyGeometry())
 accepted = find_boards(boards, network, image; board_bundles = bundles, config)
 
-uid, H, quality, csponds = only(accepted)      # the board's uid, its board → image homography
-n_inliers = count(is_map_inlier, csponds.weights)
+uid, H, quality, scored = only(accepted)      # the board's uid, its board → image homography
+n_inliers = count(is_map_inlier, scored.weights)
 uid == scene.uid                               # true
 ```
 
