@@ -47,3 +47,24 @@ import KernelAbstractions as KA
         @test maximum(abs, nearest(adapted, colmap) - colmap) < 0.005  # after adaptation (measured ≤ 0.001)
     end
 end
+
+# ONE detection cap: find_boards' (applied per polarity group, `_describe_for_boards`)
+# is detect_blobs' — Features' `spread_strongest`, about `max_detections` of the
+# strongest SPREAD over the image, then ordered by response. Until 0.7.0 the board path
+# kept the top-N by |response| (a copy of Features' retired `strongest`), so on a frame
+# whose strong blobs crowd one side it kept none of the other side.
+@testset "one detection cap: find_boards' is detect_blobs'" begin
+    H, W = 240, 480
+    strong = [(40.0 + 40i, 40.0 + 40j) for i in 0:4 for j in 0:4]              # left half, contrast 0.8
+    weak = [(280.0 + 40i, 40.0 + 40j) for i in 0:4 for j in 0:4]               # right half, contrast 0.3
+    img = [Gray{Float32}(clamp(1.0 -
+                0.8 * sum(exp(-((c - x)^2 + (r - y)^2) / (2 * 3.0^2)) for (x, y) in strong) -
+                0.3 * sum(exp(-((c - x)^2 + (r - y)^2) / (2 * 3.0^2)) for (x, y) in weak), 0, 1))
+           for r in 1:H, c in 1:W]
+    dets = detect_blobs(img; device = KA.CPU())
+    N = 20                                                                    # < the 25 strong blobs: top-N by response is all left
+    @test length(dets) > N
+    capped = BlobBoards._cap_detections(dets, size(img), N; device = KA.CPU())
+    @test [centroid(d) for d in capped] == [centroid(d) for d in detect_blobs(img; max_detections = N, device = KA.CPU())]
+    @test any(d -> centroid(d)[1] > W / 2, capped)                             # the weak side is represented
+end

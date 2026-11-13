@@ -91,3 +91,34 @@ end
     @test BlobBoards._shape_refusal(-1.0, 0.0, -0.001, 10.0) == :aspect_ratio  # axis ratio √1000 ≈ 31.6 > 10
     @test BlobBoards._shape_refusal(-1.0, 0.0, -0.02, 10.0) == :none           # axis ratio √50 ≈ 7.1
 end
+
+# A blob with 10–19 usable samples is fitted by the ISOTROPIC model (one curvature,
+# θ₄ = θ₆, θ₅ = 0), not refused. The fixture: a dark Gaussian dip truncated at radius
+# rt on a flat ground, so only the samples inside rt are usable (f = bg − v > 0);
+# rt sweeps the count across the isotropic (10–19) and full (≥ 20) regimes. The dip is
+# an exact peak (log-quadratic), so every fit must succeed, centred on the truth.
+# Until 0.7.0 the 4-parameter path solved only θ₁…θ₄ against a gate that read
+# θ₅ = θ₆ = 0 (a singular C): every such blob came back :not_peak at its seed.
+@testset "adapt: a blob with 10–19 samples is fitted isotropically, not refused" begin
+    RC = VisualGeometryToolkitCore.ReturnCode
+    σ, a, bg = 1.5, 0.5, 0.9
+    cx, cy = 20.5, 20.5                         # the pixel centre of (21, 21) in the colmap convention
+    rng = MersenneTwister(3)
+    for rt in (1.9, 2.1, 2.3, 2.9, 3.2)         # 9, 13, 21, 25, 37 samples (integer offsets inside rt): 13 is the isotropic regime
+        img = fill(bg, 41, 41)
+        for i in 1:41, j in 1:41
+            r2 = (j - 0.5 - cx)^2 + (i - 0.5 - cy)^2
+            r2 < rt^2 && (img[i, j] = bg - a * exp(-r2 / (2σ^2)) + 1.0e-5 * randn(rng))
+        end
+        frames = BlobBoards.adapt([VisualGeometryToolkitCore.Disc(VisualGeometryToolkitCore.Point2(cx, cy), 3.0)], Gray.(img);
+            config = BlobBoards.AdaptConfig(), device = CPU())
+        rt < 2.0 && continue                     # 9 samples: below the isotropic minimum, the site is invalid
+        @test length(frames) == 1
+        isempty(frames) && continue
+        f = only(frames)
+        @test f.rejection === :none
+        @test f.retcode == RC.Success
+        c = VisualGeometryToolkitCore.centroid(VisualGeometryToolkitCore.feature_frame(f))
+        @test hypot(c[1] - cx, c[2] - cy) < 0.05
+    end
+end
