@@ -1192,12 +1192,12 @@ function _identity_lowering(x)
     throw(ArgumentError("cannot canonicalize $(typeof(x)): it has no JSON lowering"))
 end
 
-# The canonical encoding itself (sorted keys, bare integral floats, Ryu for the
-# rest, loud on non-finite numbers) is VisualGeometryToolkitIO's `canonical_json` since
-# 0.7.6; the LOWERING of a config into that tree (`_identity_lowering`) stays here with the
-# schema. Board identities are `sha256_hex` over exactly that string.
-using VisualGeometryToolkitIO: canonical_json
-using VisualGeometryToolkitCore: sha256_hex
+# The canonical encoding itself (sorted keys, RFC 8785 / JCS numbers: an integral
+# double bare, others shortest round-trip, loud on non-finite numbers) is the stack's
+# ONE `canonical_json`, VisualGeometryToolkitCore's (Core 0.10; IO's copy before); the
+# LOWERING of a config into that tree (`_identity_lowering`) stays here with the schema.
+# Board identities are `sha256_hex` over exactly that string.
+using VisualGeometryToolkitCore: canonical_json, sha256_hex
 
 """
     canonical_config_json(config) -> String
