@@ -5,8 +5,8 @@
 A patch: requires Julia 1.13 (`julia = "1.13"` in the `[compat]` of the package and of every
 workspace member: test, docs, gpu, examples, authoring and bmvc2026). CI runs Julia 1.13 only. No API change.
 
-- CI: the Downgrade workflow (the suite at the compat floors) runs on demand only: Resolver.jl, which it uses,
-  does not run on Julia 1.13 yet.
+- Compat floors raised to the versions the release's gated environment resolves (latest only), in the package and
+  every workspace member; the Downgrade workflow (the suite at the old floors) is deleted.
 
 ## 0.6.1 (2026-11-13)
 
