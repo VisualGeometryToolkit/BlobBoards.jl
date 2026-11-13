@@ -68,17 +68,15 @@ imported = Set(first(split(m[1], '.')) for m in eachmatch(r"^(?:from|import)\s+(
 @test imported == Set(["os", "tempfile", "matplotlib", "blobboards"])
 
 # One example, shown in the README, on the landing page and in the CPU row.
-page_julia(page) = [e.code for e in all_examples if e.page == page && e.lang == "julia"]
-readme_example = only(page_julia("README.md"))
-@test page_julia(joinpath("docs", "src", "index.md")) == [readme_example]
-@test readme_example in page_julia(joinpath("docs", "src", "guide", "install.md"))
+readme_example = only(VgtkCore.page_examples(all_examples, "README.md"))
+@test VgtkCore.page_examples(all_examples, joinpath("docs", "src", "index.md")) == [readme_example]
+@test readme_example in VgtkCore.page_examples(all_examples, joinpath("docs", "src", "guide", "install.md"))
 
 # The README's and the landing page's install line is the example's row; the
 # Getting started line is the authoring row's, which its examples use.
-install_lines(page) = [m[1] for m in eachmatch(r"^pkg> add (.+)$"m, read(joinpath(README_ROOT, page), String))]
-@test install_lines("README.md") == [join(VgtkCore.install_packages(readme_table["find boards on the CPU"]), " ")]
-@test install_lines(joinpath("docs", "src", "index.md")) == install_lines("README.md")
-@test install_lines(joinpath("docs", "src", "guide", "getting-started.md")) ==
+@test VgtkCore.install_lines(README_ROOT, "README.md") == [join(VgtkCore.install_packages(readme_table["find boards on the CPU"]), " ")]
+@test VgtkCore.install_lines(README_ROOT, joinpath("docs", "src", "index.md")) == VgtkCore.install_lines(README_ROOT, "README.md")
+@test VgtkCore.install_lines(README_ROOT, joinpath("docs", "src", "guide", "getting-started.md")) ==
     [join(VgtkCore.install_packages(readme_table["author boards (pattern, PDF, PNG)"]), " ")]
 
 # The clone row's members are the workspace's.

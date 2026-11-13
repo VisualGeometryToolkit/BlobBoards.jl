@@ -178,7 +178,7 @@ end
     @test !any(m -> :guided_detc in Base.kwarg_decl(m), methods(BlobBoards.find_board))
 end
 
-# The guided search's IoU prune (`_iou_below`) only skips pairs whose IoU is PROVEN below min_iou: on random
+# The guided search's IoU prune (Core's `iou_below`) only skips pairs whose IoU is PROVEN below min_iou: on random
 # ellipse pairs (any size, aspect, angle and offset, five thresholds) and on concentric similar ellipses whose IoU
 # sits at the threshold to 1e-9 (their IoU is the area ratio, so the bound is tight there), it never rejects a pair
 # whose exact IoU reaches the threshold. And the claim mask is the rebuilt index: candidates through one index with
@@ -194,7 +194,7 @@ end
     n_reach = n_pruned = n_wrong = 0
     for _ in 1:20_000, t in (0.1, 0.3, 0.5, 0.7, 0.9)
         e1, e2 = pair(rng)
-        v = VisualGeometryToolkitCore.iou(e1, e2); p = BlobBoards._iou_below(e1, e2, t)
+        v = VisualGeometryToolkitCore.iou(e1, e2); p = VisualGeometryToolkitCore.iou_below(e1, e2, t)
         n_reach += v >= t; n_pruned += p; n_wrong += p && v >= t
     end
     @test n_wrong == 0
@@ -203,7 +203,7 @@ end
         a = 1 + 10rand(rng); b = a * (0.2 + 0.8rand(rng)); t = 0.2 + 0.7rand(rng); th = pi * rand(rng)
         s = sqrt(t) * (1 + 1.0e-9 * randn(rng))
         e1 = Ellipse(Point2(5.0, 5.0), a, b, th); e2 = Ellipse(Point2(5.0, 5.0), s * a, s * b, th)
-        VisualGeometryToolkitCore.iou(e1, e2) >= t && @test !BlobBoards._iou_below(e1, e2, t)
+        VisualGeometryToolkitCore.iou(e1, e2) >= t && @test !VisualGeometryToolkitCore.iou_below(e1, e2, t)
     end
     # one index + the claim mask ≡ an index rebuilt without the claimed detections
     H = HomographyMap(VisualGeometryToolkitCore.HomographyMat(SMatrix{3, 3, Float64}(1, 0, 0, 0, 1, 0, 0, 0, 1)))

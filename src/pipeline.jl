@@ -34,7 +34,8 @@ using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_hom
     find_radial_homography, RadialHomographyProblem
 # The constraint-problem protocol is VisualGeometryToolkitCore's; RVG's problems add
 # methods to it.
-using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map, overlap_area
+using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map
+using VisualGeometryToolkitCore: iou_below   # the guided search's IoU prune (a proof that IoU < t)
 # Every fit scores with the Student-t + uniform marginal at the geometry's
 # `outlier_halfwidth`, stated explicitly: RVG's own default is MSAC at a
 # threshold. The scorer is VisualGeometryToolkitCore's, built by
@@ -879,7 +880,7 @@ _scored_with_ids(sources, image_features, matches) = withattrs(
 # exactly the candidate set of an index rebuilt without it.
 #
 # THE EXACT IoU IS PRUNED, NEVER THE CANDIDATE SET: a candidate whose IoU
-# provably cannot reach `min_iou` (`_iou_below`) skips the exact computation.
+# provably cannot reach `min_iou` (Core's `iou_below`) skips the exact computation.
 # It is still read (its dependency recorded) and it could never have been the
 # blob's association, so the outcome and the read set are what the exact IoU
 # of every candidate gives.
@@ -890,7 +891,7 @@ _scored_with_ids(sources, image_features, matches) = withattrs(
         skip === nothing || !skip[j] || return false
         on_read === nothing || on_read(Int32(j))
         de = _guided_detell(t, det_ells, j)
-        if de !== nothing && !_iou_below(ep, de, min_iou)
+        if de !== nothing && !iou_below(ep, de, min_iou)
             v = iou(ep, de)
             (v > bestv || (v == bestv && j < bestj)) && (bestv = v; bestj = j)
         end
@@ -898,34 +899,6 @@ _scored_with_ids(sources, image_features, matches) = withattrs(
     end
     bestj != 0 && bestv >= min_iou && push!(cands, (bestv, wi, bestj))
     return nothing
-end
-
-# `true` only when IoU(e1, e2) < t is PROVEN by a bound that needs no exact
-# intersection, so a pair whose IoU could reach `t` is never rejected. Three
-# upper bounds on IoU = |A∩B| / |A∪B|, each from |A∪B| ≥ max(|A|, |B|):
-#   1. area ratio: |A∩B| ≤ min(|A|, |B|), so IoU ≤ min/max of the areas (πab);
-#   2. disjoint circumscribed discs: each ellipse lies in the disc of radius its
-#      semi-major axis `a` about its centre, so a centre distance ≥ a₁ + a₂
-#      leaves the ellipses disjoint, IoU = 0;
-#   3. the discs' lens: A∩B lies in the intersection of those two discs, so
-#      |A∩B| ≤ lens(a₁, a₂, d) and IoU ≤ lens / max(|A|, |B|).
-# (2 is the lens's zero case, kept for its cost.) Each bound is compared with a
-# relative slack of 1e-6, far above the exact IoU's own rounding (Core's
-# analytic overlap area), so rounding cannot turn a reachable pair into a
-# pruned one.
-const _IOU_PRUNE_SLACK = 1.0e-6
-@inline function _iou_below(e1::Ellipse, e2::Ellipse, t::Float64)
-    t > 0 || return false
-    A1 = Float64(e1.a) * Float64(e1.b); A2 = Float64(e2.a) * Float64(e2.b)     # areas over π
-    Amax = max(A1, A2)
-    Amax > 0 || return false
-    tt = t * (1 - _IOU_PRUNE_SLACK)
-    min(A1, A2) < tt * Amax && return true                                        # 1
-    r1 = Float64(e1.a); r2 = Float64(e2.a)
-    d = hypot(Float64(e1.center[1]) - Float64(e2.center[1]), Float64(e1.center[2]) - Float64(e2.center[2]))
-    d >= (r1 + r2) * (1 + _IOU_PRUNE_SLACK) && return true                        # 2
-    lens = overlap_area(Circle(Point2{Float64}(e1.center), r1), Circle(Point2{Float64}(e2.center), r2))   # Core's disc lens
-    return lens < tt * pi * Amax                                                  # 3
 end
 
 # Function barrier for guided_search: `H` arrives concrete here, so the
