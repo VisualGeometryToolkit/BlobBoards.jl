@@ -718,8 +718,7 @@ end
 # The detection ellipse in the COMPARISON domain. Projective: as detected.
 # Radial: carried into undistorted coordinates by the local affinity at its own
 # centre. One Jacobian per accepted candidate, not per detection per board.
-@inline _guided_detell(::HomographyMap, det_ells, j) = det_ells[j]
-@inline _guided_detell(::PosedCamera, det_ells, j) = det_ells[j]
+@inline _guided_detell(::Union{HomographyMap, PosedCamera}, det_ells, j) = det_ells[j]
 @inline _guided_detell(m::VgtkCore.RadialHomography, det_ells, j) =
     _undistort_ellipse(m, det_ells[j])
 
@@ -763,24 +762,19 @@ It is not a bare point map because the work here is CONIC transfer, not
 point transfer — the IoU gate tests a blob's projected *shape*, so the map has
 to carry the conic, not just its centre.
 
-VGC's contravariant layer (`transforms/ct_contravariant.jl`) makes conics
-first-class under `CoordinateTransformations`, so `Translation` and
-`LinearMap` map ellipses too and this annotation is narrower than that
-protocol allows. It is deliberately not widened: `transfer_ellipse` — which
-is what this actually calls — is defined only for `HomographyMap{3}`, so a
-wider signature would promise something VGC does not currently back.
+The transfer is one of the three a model hands back (`_world_to_image`): a
+`HomographyMap` (the homography arm), a `PosedCamera` (the pose arms, any lens:
+Core's `transfer_ellipse(::PosedCamera, _)` — the plane homography of its pinhole
+twin exactly, then for a distorting lens its affinity at the transferred
+centre, behind a cheirality test), or a `RadialHomography` (the radial arm: the
+conic through H exactly, the undistortion linearised).
 
 `transfer_ellipse` rather than the bare `H(ellipse)` callable, because a
 projective map does NOT always send an ellipse to an ellipse: when the conic
 crosses the line at infinity the image is a hyperbola or parabola. The
 callable returns a conic matrix; `transfer_ellipse` classifies it and returns
-`nothing` for the degenerate cases, which `_guided_candidates` skips. Calling
-`H(e)` directly would drop that guard.
-
-The standing limit is geometric, not API: guided search assumes a planar
-board under a pinhole camera. For a fisheye or double-sphere lens the
-world→image map is not projective at all, and no conic transfer is exact —
-that case would need a local linearisation at each blob centre.
+`nothing` for the degenerate cases (and behind the camera), which
+`_guided_candidates` skips.
 """
 function guided_search(
         H::Union{HomographyMap, VgtkCore.RadialHomography, PosedCamera}, bundle, image_features;
@@ -1725,13 +1719,16 @@ RadialHomographyGeometry(
 )
 
 """
-    BoardDetection
+    BoardObservation
 
-Per-frame detection of a single board: estimated model (Extrinsics3 or HomographyMat),
-the world→image homography for ellipse transfer, and how the frame was won
-(`:detect`, `:init`, or `:track`).
+One board observed in one frame (a board associated with its detections and
+fitted: the observation; a board's `Vector{BoardObservation}` from
+[`track_boards`](@ref) is its track): its estimated model (`Extrinsics3`,
+`HomographyMat` or `RadialHomography`; every map is derived from it), its
+quality and inlier count, and how the frame was won (`:detect`, `:init` or
+`:track`).
 """
-struct BoardDetection{M}
+struct BoardObservation{M}
     board::String
     frame::Int
     # The arm's OWN estimate, and the only geometry stored: an `Extrinsics3`

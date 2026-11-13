@@ -79,7 +79,7 @@ read_run_config
 default_config_path
 data_dir
 BlobDetection
-BlobBoards.BoardDetection
+BlobBoards.BoardObservation
 BlobBoards.filter_blobs
 BlobBoards.find_board
 BlobBoards.board_fit_keywords

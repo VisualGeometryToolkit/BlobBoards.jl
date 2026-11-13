@@ -20,8 +20,27 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
   under `:none` (Core's `transfer_ellipse(::PosedCamera, _)`): a board blob behind the camera transfers nothing,
   where the bare plane homography imaged it as a (spurious) ellipse. In front of the camera the transfer is
   bit-identical.
+- **`BoardDetection` → `BoardObservation`** (no alias): one board observed in one frame, its fitted model with
+  quality and inlier count; `track_boards` returns each board's track, `Dict(uid => Vector{BoardObservation})`.
+- **`adapt` fits a blob with 10–19 usable samples isotropically** (one curvature, θ₄ = θ₆, θ₅ = 0) instead of refusing
+  it: the 4-parameter path solved θ₁…θ₄ against a shape gate that read θ₅ = θ₆ = 0, so every such blob came back
+  `:not_peak` at its seed (`InitialFailure`). Fewer than 10 samples stays invalid. Small, faint and clipped blobs are
+  now adapted; adapted frames and `count_rejected` move accordingly.
+- **`find_boards`' `max_detections` is `detect_blobs`' cap** (Features' `spread_strongest`: about that many of the
+  strongest, spread over the image, applied per polarity group), not the top-N by |response|. With a finite cap
+  (the default is unbounded) the kept detections, and so the boards found and `build_tracks`' training data, change.
 - bmvc2026: the motion-capture markers are written as `TargetObservations{WorldFrame}` (IO's `observations` kind;
-  `TargetPoints3D` and `vgio/target_points3d` are retired by Core 0.10 and IO 0.10).
+  `TargetPoints3D` and `vgio/target_points3d` are retired by Core 0.10 and IO 0.10); its config of record's
+  `formats = "io-0.10"`, so the run key moves and the records are regenerated.
+
+Not breaking:
+
+- CompatHelper runs on the root project only and no longer auto-merges: Pkg's writer deleted the workspace members'
+  comments (authoring/'s header and the PythonCall pin's reason, restored here). Every member's `BlobBoards` compat
+  is stated (`"0.7"`); test/'s CUDA compat is the root's (`"5.11.0"`; the workspace resolves by the root).
+- test/runtests.jl takes item-name patterns (`julia --project=test test/runtests.jl <regex>…`,
+  `Pkg.test(; test_args = […])`), and sizes its worker pool from `RETESTITEMS_NWORKERS` /
+  `RETESTITEMS_NWORKER_THREADS` when set.
 
 ## 0.6.2 (unreleased)
 

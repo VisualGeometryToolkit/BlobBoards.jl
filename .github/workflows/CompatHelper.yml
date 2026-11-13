@@ -37,19 +37,13 @@ jobs:
       - name: "Run CompatHelper"
         run: |
           import CompatHelper
-          CompatHelper.main(; subdirs = ["", "authoring", "bmvc2026", "docs", "examples", "gpu", "test"])
+          # The root project only: the workspace members' Project.tomls carry comments (authoring's PythonCall pin,
+          # the CUDA runtime pins) that Pkg's writer deletes, and their compat follows the root's at each release.
+          CompatHelper.main(; subdirs = [""])
         shell: julia --color=yes {0}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPATHELPER_PRIV: ${{ secrets.DOCUMENTER_KEY }}
-      # CompatHelper's own open PRs (opened by github-actions, branch compathelper/…) merge themselves once the CI jobs
-      # required on main (branch protection) succeed. Every other PR is untouched. Merging is not a release: the stack's
-      # cascade still bumps the version, narrows compat to the latest only, and registers.
-      - name: "Auto-merge CompatHelper's PRs once the required checks succeed"
-        run: |
-          for pr in $(gh pr list --repo "$GITHUB_REPOSITORY" --state open --author app/github-actions \
-                        --json number,headRefName --jq '.[] | select(.headRefName | startswith("compathelper/")) | .number'); do
-            gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --auto --squash || echo "PR #$pr: auto-merge not enabled"
-          done
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # NO auto-merge: CompatHelper rewrites Project.toml through Pkg's TOML writer, which deletes every comment
+      # (404cfc3 deleted authoring/'s header and the PythonCall pin's reason). Its PR is a notice; port the compat
+      # line by hand at the next release.

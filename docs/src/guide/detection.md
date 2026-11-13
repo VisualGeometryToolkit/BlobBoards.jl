@@ -238,7 +238,7 @@ or any sequence of grey frames:
 video = BlobBoards.example_data(:video)
 clip = joinpath(video, "blobboards_handheld.mov")
 tracks = track_boards(board_features, network, clip; board_bundles)
-# Dict(uid => Vector{BoardDetection}), one detection per frame the board was found in
+# Dict(uid => Vector{BoardObservation}): each board's track, one observation per frame it was found in
 ```
 
 Unrelated stills belong in `find_boards` with a vector of frames instead. That

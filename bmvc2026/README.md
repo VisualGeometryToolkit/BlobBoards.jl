@@ -234,7 +234,7 @@ RVG ≥ 0.14) and applied to the evaluation sweep. See
   baseline stage converts the baselines' per-image exports); the motion-capture
   records, written from the raw exports by `scripts/convert_formats.jl` (config
   of record `configs/convert_formats.toml`): the motion tracker's
-  `poses/motion_tracker/<subset>/markers.json` (vgio/target_points3d/v1, the
+  `poses/motion_tracker/<subset>/markers.json` (vgio/observations, the
   14 markers — the source observations), `board_rig.json`/`camera_rig.json`
   (vgio/trajectory/v3, the vendor's solve; recovered camera frames flagged)
   and `constellation_<body>.json` (vgio/rig/v6 of one PointTarget, estimated);

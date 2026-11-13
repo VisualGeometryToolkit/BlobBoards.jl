@@ -149,9 +149,9 @@ bundles = Dict(scene.uid => scene.bundle)
 config  = FindBoardsConfig(geometry = HomographyGeometry())
 
 tracks = track_boards(boards, network, clip; board_bundles = bundles, config)
-detections = tracks[scene.uid]                 # one BoardDetection per frame the board was found in
-[d.source for d in detections]                 # :detect on the first frame, then :track
-length(detections) == length(clip)             # true
+track = tracks[scene.uid]                      # one BoardObservation per frame the board was found in
+[o.source for o in track]                      # :detect on the first frame, then :track
+length(track) == length(clip)                  # true
 ```
 
 ## Plot or visualize

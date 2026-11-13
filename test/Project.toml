@@ -35,9 +35,10 @@ cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 BlobBoards = {path = ".."}
 
 [compat]
+BlobBoards = "0.7"
 Accessors = "0.1.45"
 Aqua = "0.8.18"
-CUDA = "5.11.0, 6"
+CUDA = "5.11.0"
 CUDA_Runtime_jll = "0.21"
 CairoMakie = "0.15.16"
 Colors = "0.13.3"

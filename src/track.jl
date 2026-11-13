@@ -58,7 +58,7 @@ using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, PosedCamera,
 # reads it without a union to split.
 mutable struct _BoardTrack{M}
     uid::String
-    last::BoardDetection{M}
+    last::BoardObservation{M}
     xs_curr::Vector{Point2{Float64}}
     xs_prev::Vector{Point2{Float64}}
     misses::Int
@@ -98,7 +98,7 @@ end
                  patience=config.track.patience,
                  keyframe_every=config.track.keyframe_every, device=default_device(),
                  gpu_index=nothing, on_frame=nothing)
-        -> Dict{String, Vector{BoardDetection}}
+        -> Dict{String, Vector{BoardObservation}}
 
 Track boards across a sequence of images: motion-guided association plus a
 per-frame RANSAC over the associated correspondences (see the file header
@@ -125,7 +125,7 @@ for the algorithm). Calibration (if any) lives in `config.geometry`.
   warns and tracking continues). Capture a replayable trace with
   `trace = TrackTrace(); track_boards(…; on_frame = f -> push!(trace, f))`.
 
-Returns `Dict{uid => Vector{BoardDetection}}`; each detection's `source`
+Returns `Dict{uid => Vector{BoardObservation}}`, each board's track; each observation's `source`
 records whether the frame was won by the `:track` association path, a
 targeted `:init`, or `:detect`.
 """
@@ -196,7 +196,7 @@ function track_boards(
     )
 
     tracks = Dict{String, _BoardTrack}()
-    history = Dict{String, Vector{BoardDetection}}()
+    history = Dict{String, Vector{BoardObservation}}()
     oh = config.geometry.outlier_halfwidth
 
     collect_diag = on_frame !== nothing
@@ -212,7 +212,7 @@ function track_boards(
         detc = [centroid(d) for d in image_features]
         det_rtree = detection_rtree(detc)
 
-        won = Dict{String, BoardDetection}()
+        won = Dict{String, BoardObservation}()
         diags = Dict{String, Tuple{Vector{NTuple{3, Float64}}, Vector{NTuple{5, Float64}}}}()
 
         # ---- 1. Warm bets for live tracks — strongest first, claim-guarded.
@@ -269,7 +269,7 @@ function track_boards(
             src = discovery ? :detect : :init
             for (uid, model, quality, scored) in results
                 haskey(won, uid) && continue
-                won[uid] = BoardDetection(
+                won[uid] = BoardObservation(
                     uid, k, model, Float64(quality), count(is_map_inlier, scored.weights), src
                 )
             end
@@ -287,7 +287,7 @@ function track_boards(
             else
                 tracks[uid] = _BoardTrack(uid, det, xs, Point2{Float64}[], 0)
             end
-            push!(get!(history, uid, BoardDetection[]), det)
+            push!(get!(history, uid, BoardObservation[]), det)
         end
         for (uid, tr) in tracks
             haskey(won, uid) || (tr.misses += 1)
@@ -337,7 +337,7 @@ end
 
 # One warm bet: predict → associate (ellipse-overlap IoU, guided by the
 # track's motion) → support gate → per-frame RANSAC on the associations →
-# verify. Returns a BoardDetection or `nothing` (bet failed — the caller
+# verify. Returns a BoardObservation or `nothing` (bet failed — the caller
 # adds the board to the frame's reinit set).
 function _warm_track_frame(
         tr::_BoardTrack, wdiscs, bundle, board_features,
@@ -373,8 +373,9 @@ function _warm_track_frame(
     # inside the R-tree callback.
     det_ells = [Ellipse(region(feature_frame(f), board_cutoff)) for f in image_features]
     n_pred = 0
+    transfer = _world_to_image(tr.last.model, cam_est)
     for (wi, wd) in enumerate(wdiscs)
-        ell = transfer_ellipse(_world_to_image(tr.last.model, cam_est), region(wd, board_cutoff))
+        ell = transfer_ellipse(transfer, region(wd, board_cutoff))
         ell === nothing && continue
         # Visibility filter: only blobs the detector COULD return count as
         # predictions — in-bounds centers and a detectable projected scale.
@@ -495,7 +496,7 @@ function _warm_track_frame(
     n_app >= config.min_appearance_support * nin || return (nothing, _finish_diag(diag))
 
     return (
-        BoardDetection(
+        BoardObservation(
             tr.uid, frame_idx, res.estimate, Float64(res.quality), nin, :track
         ),
         _finish_diag(diag),
@@ -543,7 +544,7 @@ function _project_board_ellipses(H, wdiscs, board_cutoff, imsize)
     return out
 end
 
-function _frame_entry(uid, det::BoardDetection, diags, proj)
+function _frame_entry(uid, det::BoardObservation, diags, proj)
     a, p = get(diags, uid, (NTuple{3, Float64}[], NTuple{5, Float64}[]))
     return BoardFrameEntry(uid, det.source, det.model, det.quality, det.n_inliers, a, p, proj)
 end

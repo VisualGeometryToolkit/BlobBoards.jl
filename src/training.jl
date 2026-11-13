@@ -1828,7 +1828,7 @@ function build_absolute_tracks(
     # Detect + track every board across the sampled frames. Capping detections
     # keeps the GPU descriptor-match GEMM (all boards × all detections) in memory
     # on high-resolution footage.
-    board_detections = track_boards(
+    board_tracks = track_boards(
         board_feature_dict, model, frames_all;
         board_bundles, device = backend,
         config = FindBoardsConfig(
@@ -1844,9 +1844,9 @@ function build_absolute_tracks(
     # is the only stage the cutoff reaches. The `min_inliers` gate is applied
     # here, before any extraction.
     frame_dets = Dict{Int, Vector{Tuple{String, Any}}}()
-    for (uid, dets) in board_detections
-        (isempty(dets) || !haskey(boards, uid)) && continue
-        for det in dets
+    for (uid, track) in board_tracks
+        (isempty(track) || !haskey(boards, uid)) && continue
+        for det in track
             if det.n_inliers < min_inliers
                 println(
                     "  ($vid_name) frame $(det.frame) [board $(first(uid, 8))]: " *
@@ -1952,7 +1952,7 @@ function build_absolute_tracks(
             prim_uid, prim_det = dets_here[pi]
             H_aug = perspective_augmentation(
                 Random.default_rng(),
-                # BoardDetection stores only the arm's MODEL; the projection is
+                # BoardObservation stores only the arm's MODEL; the projection is
                 # derived (`_augmentation_homography`), never cached beside it.
                 _augmentation_homography(prim_det.model),
                 board_state[prim_uid].world_extent;
