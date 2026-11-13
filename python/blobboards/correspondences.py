@@ -21,7 +21,6 @@ import tempfile
 
 import numpy as np
 
-CONVENTIONS = ("opencv", "colmap", "matlab", "julia")
 CAMERAS_MAJOR = "vgio/cameras/v6."
 
 
@@ -35,9 +34,8 @@ def _jl():
 def load_correspondences(run_dir, convention="opencv"):
     """Per (frame, target): ``t`` (the frame index), ``image``, ``sensor``, ``target``,
     ``object_points`` N×3 in millimetres (the target's own frame) and ``image_points`` N×2 in
-    ``convention`` — VisualGeometryToolkitIO's ``save_correspondences`` export of the run, read back."""
-    if convention not in CONVENTIONS:
-        raise ValueError(f"unknown pixel convention {convention!r}; one of {sorted(CONVENTIONS)}")
+    ``convention`` (a pixel-frame name VisualGeometryToolkitIO knows — ``opencv``, ``colmap``, ``julia`` — or
+    ``matlab``; any other is refused there) — IO's ``save_correspondences`` export of the run, read back."""
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, "correspondences.json")
         _jl().BlobBoards._correspondences_python(os.path.abspath(run_dir), convention, out)
@@ -82,6 +80,7 @@ def calibrate_opencv(run_dir, model="default", fix_aspect=False, min_points=6):
     if len(ts) > 1:
         raise ValueError(f"{run_dir}: the views see {len(ts)} targets {ts}; one calibration's poses are of one "
                          "target — calibrate on one target's views")
+    _require_planar(run_dir, frames, "cv2.calibrateCamera (without an intrinsic guess)")
     if model not in OPENCV_MODELS:
         raise ValueError(f"unknown model {model!r}; one of {sorted(OPENCV_MODELS)}")
     import cv2
@@ -105,17 +104,29 @@ def calibrate_opencv(run_dir, model="default", fix_aspect=False, min_points=6):
                       for f, rv, tv in zip(frames, rvecs, tvecs)]}
 
 
-def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenance=None):
+def _require_planar(run_dir, frames, who):
+    """A calibrated target's measured points may leave its plane (a height field); a planar calibrator takes z = 0 only."""
+    for f in frames:
+        z = np.abs(f["object_points"][:, 2]).max(initial=0.0)
+        if z > 0.0:
+            raise ValueError(f"{run_dir}: frame {f['t']} ({f['image']}), target {f['target']}: its points leave the target's "
+                             f"plane (|z| up to {z} mm, a calibrated surface); {who} takes planar points only")
+
+
+def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenance):
     """Write an OpenCV calibration natively: the OpenCV export ``<stem>.json`` (``fx fy cx cy``, the
     distortion coefficients by name, ``rms``, one ``{rvec, tvec}`` per posed image, ``tvec`` in
-    millimetres) and, through VisualGeometryToolkitIO's ``convert_opencv_calibration``, the
-    ``<stem>_cameras.json`` store (one camera named ``stem``, in the canonical COLMAP frame) and
-    ``<stem>_poses.json`` (``target:<target> → view:<image>``) beside it.
+    millimetres), converted by VisualGeometryToolkitIO's ``convert_opencv_calibration`` into
+    ``out_dir``: the ``<stem>_cameras.json`` store (one camera named ``stem``, in the canonical COLMAP
+    frame) and ``<stem>_poses.json`` (``target:<target> → view:<image>``). The export itself is a
+    staging file (nothing is left in ``out_dir`` when the conversion refuses).
 
     ``K`` and ``dist`` are OpenCV's, in OpenCV's pixel frame (top-left pixel centre at (0, 0)), ``dist``
     of 4, 5, 8, 12 or 14 entries. ``poses``: dicts with ``image``, ``target`` (one target for all) and
-    ``rvec``, ``tvec`` (millimetres). ``provenance["reprojection_error"]`` is the export's ``rms``.
-    Returns the two native paths; refuses to overwrite."""
+    ``rvec``, ``tvec`` (millimetres). ``provenance["reprojection_error"]`` (required) is the fit's rms in
+    pixels, which the camera store records. Returns the two native paths; refuses to overwrite."""
+    if "reprojection_error" not in provenance:
+        raise ValueError("write_native_calibration: provenance states the fit's `reprojection_error` (its rms, px)")
     w, h = int(image_size[0]), int(image_size[1])
     v = [float(x) for x in np.asarray(dist, dtype=np.float64).ravel()]
     if len(v) not in (4, 5, 8, 12, 14):
@@ -130,16 +141,15 @@ def write_native_calibration(out_dir, stem, K, dist, poses, image_size, provenan
         raise ValueError("write_native_calibration: an image is posed twice")
     export = {"fx": float(K[0][0]), "fy": float(K[1][1]), "cx": float(K[0][2]), "cy": float(K[1][2]),
               **dict(zip(OPENCV_COEFFICIENTS, v)),
-              "rms": float((provenance or {}).get("reprojection_error", 0.0)), "tvec_unit": "mm", "images": images,
+              "rms": float(provenance["reprojection_error"]), "tvec_unit": "mm", "images": images,
               "poses": [{"rvec": [float(x) for x in np.asarray(p["rvec"], dtype=np.float64).ravel()],
                          "tvec": [float(x) for x in np.asarray(p["tvec"], dtype=np.float64).ravel()]} for p in poses]}
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"{stem}.json")
-    if os.path.exists(path):
-        raise FileExistsError(f"{path} exists; refusing to overwrite it")
-    with open(path, "w") as f:
-        json.dump(export, f, indent=1)
-    cams, poses_path = _jl().BlobBoards._convert_opencv_python(os.path.abspath(path), images, w, h, targets[0])
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, f"{stem}.json")   # the converter names its files after the export's stem
+        with open(path, "w") as f:
+            json.dump(export, f, indent=1)
+        cams, poses_path = _jl().BlobBoards._convert_opencv_python(path, images, w, h, targets[0], os.path.abspath(out_dir))
     return str(cams), str(poses_path)
 
 
@@ -179,6 +189,7 @@ def save_matlab(run_dir, out_path):
     ts = sorted({f["target"] for f in frames})
     if len(ts) != 1:
         raise ValueError(f"{run_dir}: MATLAB takes one planar target; the views see {ts}")
+    _require_planar(run_dir, frames, "estimateCameraParameters (worldPoints M×2)")
     index = [{tuple(X): i for i, X in enumerate(f["object_points"].tolist())} for f in frames]
     common = set(index[0])
     for ix in index[1:]:

@@ -112,7 +112,7 @@ end
         end
         frames = BlobBoards.adapt([VisualGeometryToolkitCore.Disc(VisualGeometryToolkitCore.Point2(cx, cy), 3.0)], Gray.(img);
             config = BlobBoards.AdaptConfig(), device = CPU())
-        rt < 2.0 && continue                     # 9 samples: below the isotropic minimum, the site is invalid
+        rt < 2.0 && (@test isempty(frames); continue)   # 9 samples: below the isotropic minimum, the site is dropped
         @test length(frames) == 1
         isempty(frames) && continue
         f = only(frames)

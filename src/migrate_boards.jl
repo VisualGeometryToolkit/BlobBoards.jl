@@ -3,9 +3,12 @@
 # the retired `{value, unit}` quantity form
 # =============================================================================
 #
-# A board file is written in ONE format, `blobboards/board/v6` (a pattern
-# file, `blobboards/pattern/v4`): every quantity a number in the unit the
-# file's `units` block declares (types.jl, json.jl), in the vgio file shape.
+# A board file is written in ONE format, `blobboards/board/v7.0` (a pattern
+# file, `blobboards/pattern/v5.0`): every quantity a number in the unit the
+# file's `units` object declares (IO 0.10's envelope; types.jl, json.jl), in
+# the vgio file shape. A record of the retired units layout (board v5/v6,
+# pattern v3/v4) has its `units` read through IO's `migrate_units` first
+# (`_with_current_units`).
 # Every earlier schema is still READ — published boards keep their schemas (a
 # schema change must not force the published data to be uploaded again):
 # `load_bundle` runs the version step of its schema in memory
@@ -305,8 +308,8 @@ end
 # carries them. Nothing is written.
 function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
     (; old, stored, unit, render) = _legacy_record(_object(tree), from, "a $(from) record"; require_hash = false)
-    (; tree) = _bundle_file(old, stored, render; unit)
-    return merge(tree, (; units = _units_object(old, unit)))   # in memory the record carries the units its file would
+    (; tree, style) = _bundle_file(old, stored, render; unit)
+    return merge(tree, (; units = _units_object(style)))   # in memory the record carries the units its file would
 end
 
 # An earlier record's `units`, in the retired UnitContract layout (`{world, density, lengths}`), as the 0.10
@@ -318,12 +321,14 @@ function _with_current_units(obj::_ParsedObject)
     return o
 end
 
-# The units object a bundle's file in the world `unit` declares (`_bundle_style`'s), for a record a version step
-# builds in memory: the declaration in the layout IO's `migrate_units` reads.
-_units_object(b::AbstractBundle, unit) = VgtkIO.migrate_units((
-    world = unit_string(unit), density = unit_string(dpi),
-    lengths = map(unit_string, b isa BoardBundle ? _bundle_roles(b.preamble.board_config.layout_grid) : (;)),
-))
+# The units object the file written with `style` declares (`_bundle_style`'s), for a record a version step builds
+# in memory: the style's contract stated in the layout IO's `migrate_units` reads (IO has no public writer of a
+# style's units object short of writing the file).
+function _units_object(style::VgtkIO.VgioStyle)
+    c = style.contract
+    roles = Base.structdiff(c.lengths, NamedTuple{(:world,)})
+    return VgtkIO.migrate_units((world = unit_string(VgtkIO.role_unit(c)), density = unit_string(c.density), lengths = map(unit_string, roles)))
+end
 
 # (`after_write(dst)`: a test hook run on the written file before it is read back)
 function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString, after_write)
@@ -363,10 +368,11 @@ end
     VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, tree)
     VisualGeometryToolkitIO.migrate_schema(::Val{Symbol("blobboards/board/v5")}, src, dst)
 
-BlobBoards' migrations of its earlier schemas into `blobboards/board/v6` and
-`blobboards/pattern/v4`, by the contract of
-[`VisualGeometryToolkitIO.migrate_schema`], in its two forms: board v5 and
-pattern v3 (the current record, JSON3-printed: read with the current lift),
+BlobBoards' migrations of its earlier schemas into `blobboards/board/v7.0` and
+`blobboards/pattern/v5.0`, by the contract of
+[`VisualGeometryToolkitIO.migrate_schema`], in its two forms: board v6/v5 and
+pattern v4/v3 (the current body under the retired units layout: its units
+through IO's `migrate_units`, then read with the current lift),
 board v1 to v4 and pattern v1 and v2 (the retired `{value, unit}` form: read
 with the legacy lift). Either is written as the current writer writes it.
 

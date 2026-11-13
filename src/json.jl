@@ -19,8 +19,8 @@
 # A quantity in a board file, and in a board's identity
 # -----------------------------------------------------------------------------
 #
-# FILE (board/v6, pattern/v4): a quantity is a NUMBER in the unit the file's
-# `units` block declares — a length in the declared `world` unit, a density in
+# FILE (board/v7.0, pattern/v5.0): a quantity is a NUMBER in the unit the file's
+# `units` object declares — a length in the declared `length` unit, a density in
 # the declared `density` unit (dpi), a pixel count in pixels; the point-grid
 # board's own numbers (the σ range, the layout grid, the blobs) are plain
 # numbers in the declared `pattern` length role (pt). A pixel count or a

@@ -690,16 +690,10 @@ end
 # VisualGeometryToolkitIO's ONE export and converter — `save_correspondences` (the
 # references resolved into point arrays, the pixels moved into the calibrator's
 # frame) and `convert_opencv_calibration` (an OpenCV fit into the native camera
-# store and poses) — rather than restating them in Python. The pixel conventions
-# the Python side names: "opencv" (top-left pixel centre at (0, 0)), "colmap"
-# (0.5, 0.5), "matlab"/"julia" (1, 1).
-const _PYTHON_PIXEL_FRAMES = Dict("opencv" => PixelFrame{:opencv}, "colmap" => PixelFrame{:colmap},
-                                  "matlab" => PixelFrame{:julia}, "julia" => PixelFrame{:julia})
-function _python_pixel_frame(convention::AbstractString)
-    F = get(_PYTHON_PIXEL_FRAMES, String(convention), nothing)
-    F === nothing && throw(ArgumentError("unknown pixel convention $(repr(convention)); one of $(sort!(collect(keys(_PYTHON_PIXEL_FRAMES))))"))
-    return F
-end
+# store and poses) — rather than restating them in Python. A pixel convention the
+# Python side names is IO's pixel-frame name ("opencv": top-left pixel centre at
+# (0, 0), "colmap" (0.5, 0.5), "julia" (1, 1)), MATLAB's under its own name too.
+_python_pixel_frame(convention::AbstractString) = VgtkIO.pixel_frame_from_name(convention == "matlab" ? "julia" : String(convention))
 
 # `run_dir`'s correspondences in `convention`, exported to `out` (IO's `export/correspondences/v2`).
 function _correspondences_python(run_dir::AbstractString, convention::AbstractString, out::AbstractString)
@@ -710,10 +704,10 @@ function _correspondences_python(run_dir::AbstractString, convention::AbstractSt
     return String(out)
 end
 
-# An OpenCV export written by the Python side (`path`) converted to the native camera store and poses beside it.
-function _convert_opencv_python(path::AbstractString, images, width::Integer, height::Integer, target::AbstractString)
+# An OpenCV export written by the Python side (`path`) converted to the native camera store and poses in `out`.
+function _convert_opencv_python(path::AbstractString, images, width::Integer, height::Integer, target::AbstractString, out::AbstractString)
     r = VgtkIO.with_caller(BlobBoards) do
-        VgtkIO.convert_opencv_calibration(path; images = String.(collect(images)), image_size = (Int(width), Int(height)), target = String(target))
+        VgtkIO.convert_opencv_calibration(path; images = String.(collect(images)), image_size = (Int(width), Int(height)), target = String(target), out = String(out))
     end
     return (String(r.cameras), String(r.poses))
 end
