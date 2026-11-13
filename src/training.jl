@@ -1102,10 +1102,9 @@ function _project_quad(H_wi::AbstractMatrix, world_rect)
     return map(PerspectiveMap() ∘ HomographyMap(H_wi), corners)
 end
 
-# 2×2 shape factor of a frame primitive, unitless. World GT blobs are
-# isotropic `Disc`s (shape = radius·I); adapted detections are `EllipticFrame`s.
+# 2×2 shape factor of a frame primitive, unitless: Core's hoisted `shape_factor`
+# (a `Disc`'s is σ·I, an `EllipticFrame`'s its own) for world GT blobs and adapted detections alike.
 _overlay_shape(f) = SMatrix{2, 2, Float64}(ustrip.(shape_factor(f)))   # (audited) whole-frame strip: no target-unit form for a shape factor
-_overlay_shape(d::Disc) = (r = ustrip(VgtkCore.scale(d)); SMatrix{2, 2, Float64}(r, 0.0, 0.0, r))   # (audited) whole-Disc strip
 
 # Per-board overlay color, stable for a given board slot `k` across all frames.
 # Hues walk the circle by the golden angle starting at green (the single-board
