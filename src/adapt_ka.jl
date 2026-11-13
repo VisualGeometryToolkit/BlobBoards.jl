@@ -383,6 +383,14 @@ end
     return Int32(0)
 end
 
+# The quadratic part (θ₄, θ₅, θ₆) of the model a blob's IRLS solved, from its
+# parameter count `np`: the anisotropic model (6: the columns 1, dx, dy, dx²,
+# 2·dx·dy, dy²) solves all three; the isotropic one (4: a₀, bx, by, c over the
+# columns 1, dx, dy, dx² + dy², Core's `Paraboloid3D{T,4}`) is C = c·I.
+@inline _solved_quadratic(AtWz, blob, np) =
+    np == Int32(4) ? (AtWz[4, 1, blob], zero(eltype(AtWz)), AtWz[4, 1, blob]) :
+    (AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob])
+
 # The gate's verdict by name (host side, and the tests): `:none` (acceptable),
 # `:not_peak` or `:aspect_ratio`.
 _shape_refusal(θ4, θ5, θ6, max_aspect_ratio) =
@@ -527,6 +535,7 @@ end
         acc[kk] = zero(Ta)
     end
     n, base = _blob_span(cnt, valid, converged, offsets, blob)
+    iso = n > Int32(0) && np[blob] == Int32(4)
     i = Int32(tid)
     while i <= n
         gid = base + i
@@ -536,6 +545,7 @@ end
             wi = Ta(w[gid]) * fi * fi
             a1 = Ta(A[gid, 1]); a2 = Ta(A[gid, 2]); a3 = Ta(A[gid, 3])
             a4 = Ta(A[gid, 4]); a5 = Ta(A[gid, 5]); a6 = Ta(A[gid, 6])
+            iso && (a4 = a4 + a6)    # the isotropic model's column 4 is dx² + dy² (`_solved_quadratic`)
             acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
             acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
             acc[7] += wi * a2 * a2; acc[8] += wi * a2 * a3; acc[9] += wi * a2 * a4
@@ -622,7 +632,8 @@ end
             valid[blob] = false
         else
             m = np[blob]
-            refused = _shape_gate_state(AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob], max_aspect_ratio)
+            c4, c5, c6 = _solved_quadratic(AtWz, blob, m)
+            refused = _shape_gate_state(c4, c5, c6, max_aspect_ratio)
             if refused != Int32(0)
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
@@ -632,6 +643,10 @@ end
             else
                 for j in 1:Int(m)
                     theta[j, blob] = AtWz[j, 1, blob]
+                end
+                if m == Int32(4)    # the isotropic model in the 6-parameter layout: C = c·I
+                    theta[5, blob] = c5
+                    theta[6, blob] = c6
                 end
                 diff_sq = zero(Ta)
                 norm_sq = zero(Ta)
