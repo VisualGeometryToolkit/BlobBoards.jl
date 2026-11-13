@@ -18,8 +18,8 @@ VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
 VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
-[sources]
-BlobBoards = {path = ".."}
+[sources.BlobBoards]
+path = ".."
 
 [compat]
 CUDA = "5.11.0"
@@ -27,6 +27,7 @@ CUDA_Runtime_jll = "0.21"
 CairoMakie = "0.15"
 GLMakie = "0.13.9"
 VisualGeometryToolkitCore = "0.9.3"
+VisualGeometryToolkitEstimation = "0.10"
 cuDNN = "1.4.7"
 julia = "1.12"
 
