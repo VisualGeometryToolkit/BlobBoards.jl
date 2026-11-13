@@ -535,7 +535,7 @@ end
         acc[kk] = zero(Ta)
     end
     n, base = _blob_span(cnt, valid, converged, offsets, blob)
-    iso = n > Int32(0) && np[blob] == Int32(4)
+    iso = np[blob] == Int32(4)
     i = Int32(tid)
     while i <= n
         gid = base + i
