@@ -31,6 +31,7 @@ CUDA = "5.11.0"
 CUDA_Runtime_jll = "0.21"
 GLMakie = "0.13"
 VisualGeometryToolkitCore = "0.9.3"
+VisualGeometryToolkitIO = "0.9"
 cuDNN = "1.4.7"
 julia = "1.13"
 
