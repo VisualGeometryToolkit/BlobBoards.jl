@@ -17,6 +17,8 @@ A patch: no API change. One result change, in `adapt` (review BB#1):
   aspect ratio 1), as the model has always intended.
 - The unreachable 2-parameter branch is deleted (its threshold equalled the isotropic one: a blob of fewer than 10
   samples is dropped, as before).
+- Compat floors raised to the versions the release's gated environment resolves (latest only), in the package and every
+  workspace member: VisualGeometryToolkitCore 0.9.6, IO 0.9.4, Features 0.8.3, Estimation 0.10.2, Eval 0.7.3.
 
 ## 0.6.2 (2026-11-13)
 
