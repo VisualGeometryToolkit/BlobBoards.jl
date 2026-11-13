@@ -22,7 +22,7 @@ using VisualGeometryToolkitFeatures: gray_f32
                  max_detections=typemax(Int)) -> Vector{Detection}
 
 Detect blobs in an image via the KernelAbstractions ASIFT pipeline, then apply
-a BB-side response-rank cap.
+the detection cap (`max_detections`, Features' `spread_strongest`).
 
 Returns raw detections. Use `adapt` for shape fitting and `filter_blobs`
 for quality filtering.
@@ -62,7 +62,7 @@ function detect_blobs(
         img;
         config::DetectConfig = DetectConfig(),
         # BB-side post-detection knobs — these don't belong in DetectConfig
-        # because the detector backend doesn't consume them; the response-rank
+        # because the detector backend doesn't consume them; the detection
         # cap (max_detections) is applied to the Vector{Detection} returned by
         # `_detect`. Default `typemax(Int)` ⇒ no cap; supply a finite value to enable.
         max_detections::Int = typemax(Int),
@@ -74,12 +74,16 @@ function detect_blobs(
         # gets OOM-killed rather than erroring.
         device::KA.Backend = default_device(),
     )
-    detections = _detect(img, device; config)
-    # the cap is Feat's selection (about `max_detections` of the strongest,
-    # spread over the image: `spread_strongest`); the capped set is then ordered
-    # by response, as the detector's consumers read it
+    return _cap_detections(_detect(img, device; config), size(img), max_detections; device)
+end
+
+# The ONE detection cap (detect_blobs', and find_boards' per polarity group):
+# Features' selection, about `max_detections` of the strongest spread over the
+# image (`spread_strongest`); the capped set is then ordered by response, as the
+# detector's consumers read it.
+function _cap_detections(detections, image_size, max_detections::Integer; device::KA.Backend)
     length(detections) > max_detections || return detections
-    kept = spread_strongest(detections, size(img), max_detections; device)
+    kept = spread_strongest(detections, image_size, max_detections; device)
     return sort!(kept; by = d -> abs(d.response), rev = true)
 end
 

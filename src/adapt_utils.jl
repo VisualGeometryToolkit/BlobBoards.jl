@@ -36,7 +36,6 @@ using StaticArrays: SVector, SMatrix
 # Constants
 # =============================================================================
 
-const _MIN_POINTS_FIXED_CENTER = 10
 const _MIN_POINTS_ISOTROPIC = 10
 const _MIN_POINTS_ANISOTROPIC = 20
 const _MIN_REGION_HALFWIDTH = 2

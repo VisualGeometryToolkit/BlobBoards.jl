@@ -68,7 +68,7 @@ min_similarity = 0.6
 # separation stays total at 0.6.
 verify_similarity = 0.6
 min_appearance_support = 0.5
-max_detections = "unbounded"    # response-rank cap; applied per polarity subset
+max_detections = "unbounded"    # cap: about this many of the strongest, spread over the image (spread_strongest); applied per polarity subset
 # Base seed for the per-fit RANSAC streams (Xoshiro(seed XOR board uid)):
 # the fit stage is bit-reproducible given features. Sweep only to MEASURE
 # fit-stage RNG sensitivity — decisions were seed-stable on the 260527 A/B.

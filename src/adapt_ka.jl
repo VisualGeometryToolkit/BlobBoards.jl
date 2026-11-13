@@ -536,6 +536,8 @@ end
             wi = Ta(w[gid]) * fi * fi
             a1 = Ta(A[gid, 1]); a2 = Ta(A[gid, 2]); a3 = Ta(A[gid, 3])
             a4 = Ta(A[gid, 4]); a5 = Ta(A[gid, 5]); a6 = Ta(A[gid, 6])
+            # The isotropic model (np = 4): one curvature, θ₄ = θ₆ on dx² + dy².
+            np[blob] == Int32(4) && (a4 += a6)
             acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
             acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
             acc[7] += wi * a2 * a2; acc[8] += wi * a2 * a3; acc[9] += wi * a2 * a4
@@ -622,7 +624,11 @@ end
             valid[blob] = false
         else
             m = np[blob]
-            refused = _shape_gate_state(AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob], max_aspect_ratio)
+            # The quadratic part C of the step: the isotropic model's (np = 4) is θ₄·I.
+            iso = m == Int32(4)
+            θ5 = iso ? zero(Ta) : AtWz[5, 1, blob]
+            θ6 = iso ? AtWz[4, 1, blob] : AtWz[6, 1, blob]
+            refused = _shape_gate_state(AtWz[4, 1, blob], θ5, θ6, max_aspect_ratio)
             if refused != Int32(0)
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
@@ -632,6 +638,10 @@ end
             else
                 for j in 1:Int(m)
                     theta[j, blob] = AtWz[j, 1, blob]
+                end
+                if iso
+                    theta[5, blob] = θ5
+                    theta[6, blob] = θ6
                 end
                 diff_sq = zero(Ta)
                 norm_sq = zero(Ta)
@@ -854,11 +864,8 @@ function _adapt_ka(
     for i in 1:N
         valid[i] || continue
         n = Int(counts_h[i])
-        n < _MIN_POINTS_FIXED_CENTER && (valid[i] = false; continue)
-        np_vec[i] = Int32(
-            n < _MIN_POINTS_ISOTROPIC ? 2 :
-                n < _MIN_POINTS_ANISOTROPIC ? 4 : 6
-        )
+        n < _MIN_POINTS_ISOTROPIC && (valid[i] = false; continue)
+        np_vec[i] = Int32(n < _MIN_POINTS_ANISOTROPIC ? 4 : 6)   # isotropic (θ₄ = θ₆, θ₅ = 0) or the full quadratic
     end
     d_np = ka_upload(Int32, device, np_vec)
     d_valid_live = ka_upload(Bool, device, collect(valid))

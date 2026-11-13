@@ -1886,12 +1886,13 @@ Configuration for `find_boards` pipeline. The `geometry` field
 # Detection
 - `detect::DetectConfig = DetectConfig()`: Detection configuration (single
   source of truth for `detect_blobs` parameters across all backends).
-- `max_detections=typemax(Int)`: post-detection response-rank cap. On the
-  grouped image path it is applied PER POLARITY GROUP (after
-  `_polarity_subset`), so a mixed dark+light board set can process up to
-  2× this many detections in total — see `_detect_for_boards` for why the
-  shared detection stage must stay uncapped. Single-polarity sets (every
-  real set) behave exactly like a `detect_blobs(; max_detections=…)` cap.
+- `max_detections=typemax(Int)`: post-detection cap, `detect_blobs`' own
+  (about this many of the strongest, spread over the image: Features'
+  `spread_strongest`). On the grouped image path it is applied PER POLARITY
+  GROUP (after `_polarity_subset`), so a mixed dark+light board set can
+  process up to 2× this many detections in total — see `_detect_for_boards`
+  for why the shared detection stage must stay uncapped. Single-polarity sets
+  (every real set) keep exactly what `detect_blobs(; max_detections=…)` keeps.
 
 # Adaptation (blob fitting)
 - `adapt::AdaptConfig = AdaptConfig()`: Adaptation configuration
@@ -2132,16 +2133,6 @@ _polarity_subset(detections, ::Val{:dark}) =
 _polarity_subset(detections, ::Val{:light}) =
     filter(d -> d.metadata.response < 0, detections)
 
-# The BB-side response-rank cap, applied to the polarity subset rather than to
-# the shared unfiltered detection (see `_detect_for_boards`).
-function _cap_detections(detections, max_detections::Int)
-    length(detections) > max_detections || return detections
-    d = copy(detections)
-    sort!(d; by = x -> abs(x.metadata.response), rev = true)
-    resize!(d, max_detections)
-    return d
-end
-
 # The detection stage keeps the NARROWEST polarity that still serves every
 # board: one polarity if the set agrees (every real board set — so the
 # detector returns exactly what it returned before boards drove this), and
@@ -2190,8 +2181,8 @@ function _detect_for_boards(img, descriptor_network; config, device::KA.Backend)
     # it is given, and this detection is deliberately polarity-UNFILTERED, so
     # capping now would let light blobs evict dark ones (or vice versa) before
     # any board has claimed its own polarity. It is applied per group instead,
-    # after `_polarity_subset`, which preserves the original semantics exactly:
-    # top-N by |response| WITHIN the polarity the board actually wants.
+    # after `_polarity_subset`: the strongest spread over the image WITHIN the
+    # polarity the board actually wants.
     detections = detect_blobs(
         detect_img;
         config = config.detect, device
@@ -2199,7 +2190,7 @@ function _detect_for_boards(img, descriptor_network; config, device::KA.Backend)
     return (; model, detect_img, adapt_img, detections)
 end
 
-# The ONE image-side feature stage after detection: response-rank cap, printed-
+# The ONE image-side feature stage after detection: the detection cap, printed-
 # profile scale correction, adapt at the fixed filter boundary, describe at the
 # gallery's shared extent. `_find_boards_grouped` runs it once per polarity
 # group; `prepare_image_features` (annotate, track, sweeps) runs it once per
@@ -2208,7 +2199,9 @@ end
 # annotation and tracking matched query descriptors the gallery was never
 # sampled like.
 function _describe_for_boards(prep, dets, model, config, shared_cutoff, device::KA.Backend)
-    dets = _cap_detections(dets, config.max_detections)
+    # detect_blobs' cap (detect.jl), applied to the polarity subset, not to the
+    # shared unfiltered detection (see `_detect_for_boards`)
+    dets = _cap_detections(dets, size(prep.detect_img), config.max_detections; device)
     # Detected scales are short by the printed profile's `β(σ_c)` (see
     # `_scale_bias`). Undo it HERE, where the gallery's support cutoff is
     # known — the detector is board-agnostic and cannot know σ_c. Adapt
