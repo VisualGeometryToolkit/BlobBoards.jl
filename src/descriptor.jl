@@ -103,7 +103,7 @@ end
 # exact to the megabyte at batch 32/64/128/256. This is a GUARD, not a
 # forecast: the slope is a property of one graph's activations, and the actual
 # claim is made by the network's runs, each through Features' `onnx_run`, which
-charges the arena's growth to the detector's device budget. 4x headroom covers
+# charges the arena's growth to the detector's device budget. 4x headroom covers
 # a graph up to four times heavier per patch without the cap ever binding.
 #
 # The cap binding is not hypothetical — at the previous fixed 3 GiB, batch 384
