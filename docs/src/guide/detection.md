@@ -201,7 +201,10 @@ for example `HomographyGeometry(; local_optimization_strategy = …)`.
 ## Blob outcomes
 
 [`adapt`](@ref BlobBoards.adapt) fits each detected blob's elliptical frame with an IRLS, and
-records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)):
+records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)). A blob
+of 20 or more samples fits an anisotropic paraboloid; one of 10 to 19 samples
+(a small, faint or edge-clipped blob) a round one, and is judged on that fit;
+one of fewer than 10 is dropped.
 
 | `retcode` | `stop_rule` | The blob |
 |---|---|---|
