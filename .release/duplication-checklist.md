@@ -182,9 +182,10 @@ A compat-only patch: no source, test or paper code is added, so nothing new can 
 - [x] Core 0.9.5's check_duplication (its idiom cap counts this repository's definitions only) finds pairs in code 0.6.3 does
   not touch (identical at 0850b81). Six of them (seven findings: `similar_type` twice) are the same token shape over different
   concepts: `[[similar]]` entries with their one-line proofs in DUPLICATION.toml.
-- [ ] KNOWN for 0.6.3 (owner's decision pending), fixed in BlobBoards/CaliBlobs 0.7.0 and Core 0.10: the four real copies it finds:
+- [x] Owner-granted exception for THIS patch only (owner ruling 2026-11-13): the four real copies Core 0.9.5's check finds
+  are pre-existing in the released version (0.6.2), fixed in the wave (BB/CB 0.7, Core 0.10):
   `test/suites/readme.jl` `page_julia` and `install_lines` ⇔ CaliBlobs `test/readme_tests.jl` (the julia-docs-pass README-test
-  template, copied: hoist into Core beside the docs scans); `src/config_toml.jl` `_geometry_arm` ⇔ CaliBlobs
+  template, copied: hoisted into Core beside the docs scans); `src/config_toml.jl` `_geometry_arm` ⇔ CaliBlobs'
   `BlobBoards.geometry_from_toml` method and `_track_from_toml` ⇔ CaliBlobs `_calibrate_from_toml` (CaliBlobs restates
-  BlobBoards' TOML readers: CaliBlobs calls BlobBoards' one reader).
-
+  BlobBoards' TOML readers: CaliBlobs calls BlobBoards' one reader). The diff-scoped check (findings in code 0.6.3 changes
+  against 0.6.2) is 0: the fresh-clone gate's checks task prints it.
