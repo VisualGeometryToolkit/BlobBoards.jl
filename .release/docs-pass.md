@@ -1,4 +1,4 @@
-docs-pass: f4bd64b
+docs-pass: 856802a
 landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.6.3 change is in the detection guide, which the next Docs deploy publishes)
 
 # 0.6.3 docs pass (julia-docs-pass) — Julia 1.13
@@ -14,7 +14,7 @@ refused at its seed.
 - Docs build and the `docs`/`readme` items: run by the fresh-clone gate on Julia 1.13.3 against the registered stack.
 - Re-recorded after the compat floors were raised to Core 0.9.6, IO 0.9.4, Features 0.8.3, Estimation 0.10.2, Eval 0.7.3
   (Project.toml [compat] and the CHANGELOG only; the README/guide install lines name no version: no docs change).
-- Re-recorded after DUPLICATION.toml gained six `[[similar]]` entries (the quality allow-list only; no docs change).
+- Re-recorded after DUPLICATION.toml gained six `[[similar]]` entries and the duplication test the owner's 0.6.3 exception (the quality allow-list and its test only; no docs change).
 
 ---
 
