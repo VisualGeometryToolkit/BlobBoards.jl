@@ -383,13 +383,17 @@ end
     return Int32(0)
 end
 
-# The quadratic part (θ₄, θ₅, θ₆) of the model a blob's IRLS solved, from its
-# parameter count `np`: the anisotropic model (6: the columns 1, dx, dy, dx²,
-# 2·dx·dy, dy²) solves all three; the isotropic one (4: a₀, bx, by, c over the
-# columns 1, dx, dy, dx² + dy², Core's `Paraboloid3D{T,4}`) is C = c·I.
-@inline _solved_quadratic(AtWz, blob, np) =
-    np == Int32(4) ? (AtWz[4, 1, blob], zero(eltype(AtWz)), AtWz[4, 1, blob]) :
-    (AtWz[4, 1, blob], AtWz[5, 1, blob], AtWz[6, 1, blob])
+# The model a blob's IRLS solved, from its parameter count `np`, in the 6-parameter
+# layout [a₀, bx, by, Cxx, Cxy, Cyy] the kernels hold: the anisotropic model (6: the
+# columns 1, dx, dy, dx², 2·dx·dy, dy²) as solved; the isotropic one (4: a₀, bx, by, c
+# over the columns 1, dx, dy, dx² + dy²) is Core's `Paraboloid3D{T,4}` (C = c·I),
+# whose 6-parameter coefficients `coeffs` gives.
+@inline function _solved_theta(AtWz, blob, np)
+    T = eltype(AtWz)
+    np == Int32(4) || return SVector{6, T}(ntuple(j -> AtWz[j, 1, blob], Val(6)))
+    iso = Paraboloid3D(SVector{4, T}(ntuple(j -> AtWz[j, 1, blob], Val(4))))
+    return coeffs(Paraboloid3D{T, 6}(iso))
+end
 
 # The gate's verdict by name (host side, and the tests): `:none` (acceptable),
 # `:not_peak` or `:aspect_ratio`.
@@ -545,7 +549,7 @@ end
             wi = Ta(w[gid]) * fi * fi
             a1 = Ta(A[gid, 1]); a2 = Ta(A[gid, 2]); a3 = Ta(A[gid, 3])
             a4 = Ta(A[gid, 4]); a5 = Ta(A[gid, 5]); a6 = Ta(A[gid, 6])
-            iso && (a4 = a4 + a6)    # the isotropic model's column 4 is dx² + dy² (`_solved_quadratic`)
+            iso && (a4 = a4 + a6)    # the isotropic model's column 4 is dx² + dy² (`_solved_theta`)
             acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
             acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
             acc[7] += wi * a2 * a2; acc[8] += wi * a2 * a3; acc[9] += wi * a2 * a4
@@ -632,8 +636,8 @@ end
             valid[blob] = false
         else
             m = np[blob]
-            c4, c5, c6 = _solved_quadratic(AtWz, blob, m)
-            refused = _shape_gate_state(c4, c5, c6, max_aspect_ratio)
+            θ = _solved_theta(AtWz, blob, m)
+            refused = _shape_gate_state(θ[4], θ[5], θ[6], max_aspect_ratio)
             if refused != Int32(0)
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
@@ -641,12 +645,8 @@ end
                 # Stopped, NOT converged: the shape gate refused the step (why).
                 converged[blob] = refused
             else
-                for j in 1:Int(m)
-                    theta[j, blob] = AtWz[j, 1, blob]
-                end
-                if m == Int32(4)    # the isotropic model in the 6-parameter layout: C = c·I
-                    theta[5, blob] = c5
-                    theta[6, blob] = c6
+                for j in 1:6
+                    theta[j, blob] = θ[j]
                 end
                 diff_sq = zero(Ta)
                 norm_sq = zero(Ta)
@@ -870,7 +870,7 @@ function _adapt_ka(
         valid[i] || continue
         n = Int(counts_h[i])
         n < _MIN_POINTS_ISOTROPIC && (valid[i] = false; continue)
-        np_vec[i] = Int32(n < _MIN_POINTS_ANISOTROPIC ? 4 : 6)   # the isotropic model (`_solved_quadratic`) or the full one
+        np_vec[i] = Int32(n < _MIN_POINTS_ANISOTROPIC ? 4 : 6)   # the isotropic model (`_solved_theta`) or the full one
     end
     d_np = ka_upload(Int32, device, np_vec)
     d_valid_live = ka_upload(Bool, device, collect(valid))
