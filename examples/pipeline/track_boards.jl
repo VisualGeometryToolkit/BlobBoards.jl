@@ -89,9 +89,8 @@ for (label, geometry) in (
     )
     trace_dir = joinpath(TRACE_ROOT, "$(splitext(basename(VIDEO))[1])_$label.trace")
     isdir(trace_dir) && rm(trace_dir; recursive = true)
-    # :thumbs keeps quarter-res frame images in the bundle so the replay
-    # panels have pixels to draw on; :none records artifacts only.
-    trace = TrackTrace(keep_frames = :thumbs, dir = trace_dir, source = VIDEO)
+    # the bundle records artifacts only; a replay re-decodes the frames from VIDEO
+    trace = TrackTrace(dir = trace_dir, source = VIDEO)
 
     reader = VideoIO.openvideo(VIDEO)
     frames = (Gray.(f) for f in reader)

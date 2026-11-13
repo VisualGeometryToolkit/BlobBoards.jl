@@ -621,22 +621,16 @@ _record_title(rec::TrackFrameRecord) =
     "  |  $(round(1000 * (rec.t_extract + rec.t_estimate); digits = 0)) ms"
 
 # (Re)paint the triptych's axes for one record — shared by the static view
-# and the scrubber. Pixels resolve via the trace's `keep_frames` policy;
+# and the scrubber. Pixels are re-decoded from the trace's source video;
 # blank canvas when unavailable.
 function _paint_track_panels!(axes, label, trace::TrackTrace, i::Int)
     rec = trace.records[i]
     img = BlobBoards._trace_frame_image(trace, i)
-    # Recorded artifacts live in FULL-resolution pixel coordinates while a
-    # :thumbs trace stores the frame at 1:_THUMB_STRIDE:end — so the image is
-    # drawn stretched to the true frame extent, and the limits are pinned to
+    # The image is drawn at the full frame extent and the limits are pinned to
     # it: `empty!` + repaint would otherwise let autolimits refit the moving
     # content every frame, dragging all three linked axes around.
     extent = trace.frame_size
-    if iszero(extent.width) && img !== nothing
-        # pre-frame_size trace: exact only when the frame divides evenly
-        s = trace.keep_frames === :thumbs ? BlobBoards._THUMB_STRIDE : 1
-        extent = s * Size2(img)
-    end
+    iszero(extent.width) && img !== nothing && (extent = Size2(img))   # a trace written before frame_size
     for (ax, (name, paint!)) in zip(axes, _TRACK_PANELS)
         Makie.empty!(ax)
         if img !== nothing

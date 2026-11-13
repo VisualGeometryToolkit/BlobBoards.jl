@@ -18,18 +18,21 @@
 # append, random access, crash-tolerant):
 #
 #   x.trace/
-#   ├── trace.json       manifest (`blobboards/track_trace/v2`): source,
-#   │                    keep_frames, n_frames, frame indices, configuration
-#   ├── frames/000001.jld2   one TrackFrameRecord per frame
-#   └── images/000001.png    only for keep_frames ∈ (:thumbs, :full)
+#   ├── trace.json       manifest (`blobboards/track_trace/v3.0`): source,
+#   │                    n_frames, frame indices, configuration
+#   └── frames/000001.jld2   one TrackFrameRecord per frame
 #
-# The manifest is written in the vgio file shape (`VgtkIO.write_record`).
-# Version 1 (`"schema_version": 1`, no `schema`) held the same keys, printed by
-# BlobBoards' JSON3.pretty clone; it is read as it is. The frame records are a
-# diagnostic replay of Julia structs, kept in JLD2.
+# No decoded pixels are stored (the owner's "RAW + results only" rule): a
+# replay re-decodes each frame from the source video by its index. The
+# manifest is written in the vgio file shape (`VgtkIO.write_record`). Versions
+# 1 and 2 (v1: `"schema_version": 1`, no `schema`) held a `keep_frames` policy
+# beside the same keys and, for `:thumbs`/`:full`, PNGs of the decoded frames;
+# they are read as they are, the policy and the PNGs ignored (re-decoded).
+# The frame records are a diagnostic replay of Julia structs, kept in JLD2.
 # =============================================================================
 
-const _TRACE_SCHEMA = "blobboards/track_trace/v2"
+const _TRACE_SCHEMA = "blobboards/track_trace/v3.0"
+const _TRACE_READ = (_TRACE_SCHEMA, "blobboards/track_trace/v2", "blobboards/track_trace/v1")
 
 """
     BoardFrameEntry
@@ -55,8 +58,8 @@ end
 
 Everything needed to render (and debug) one tracked frame without re-running
 the pipeline: the per-board entries, the frame's detection ellipses, and
-stage timings. Frame PIXELS are governed by the trace's `keep_frames`
-policy, not stored here.
+stage timings. Frame PIXELS are not stored: a replay re-decodes them from the
+trace's source video.
 """
 struct TrackFrameRecord
     frame_idx::Int
@@ -91,21 +94,19 @@ end
 # field concrete. The `trace.json` manifest still writes `null` for an unset
 # field, so the on-disk format is unchanged and old traces load.
 """
-    TrackTrace(; keep_frames = :none, dir = nothing, source = nothing)
+    TrackTrace(; dir = nothing, source = nothing)
 
 Capture sink for `track_boards`: push the frames its `on_frame` callback
 receives, `track_boards(…; on_frame = f -> push!(trace, f))`. Records
 accumulate in memory; when `dir` is given each record is ALSO streamed to the
 trace bundle as it is produced (bounded memory on long videos, crash-tolerant).
 
-- `keep_frames`: `:none` (replay re-decodes pixels from `source`),
-  `:thumbs` (¼-scale PNGs), `:full` (full-resolution PNGs). Non-`:none`
-  policies require `dir`.
 - `source`: the video path (or `nothing` for in-memory frame sequences) —
-  recorded in the manifest so `:none` replays can re-decode.
+  recorded in the manifest, from which a replay re-decodes each frame's pixels.
+  No decoded frame is stored (the "RAW + results only" rule); an in-memory
+  sequence replays on a blank canvas.
 """
 mutable struct TrackTrace
-    keep_frames::Symbol
     dir::String
     source::String
     records::Vector{TrackFrameRecord}
@@ -122,24 +123,15 @@ mutable struct TrackTrace
     network_hash::String
     # Extent of the FULL-resolution frames, captured on the first append.
     # Recorded artifacts live in full-resolution pixel coordinates, so a
-    # renderer needs this to scale a :thumbs image and to pin axis limits —
-    # size-of-thumb × stride is only exact when the frame divides evenly.
+    # renderer needs this to pin axis limits.
     frame_size::Size2{Int}
     function TrackTrace(;
-            keep_frames::Symbol = :none,
             dir::Union{Nothing, AbstractString} = nothing,
             source::Union{Nothing, AbstractString} = nothing
         )
-        keep_frames in (:none, :thumbs, :full) ||
-            throw(ArgumentError("keep_frames must be :none, :thumbs or :full"))
-        keep_frames === :none || dir !== nothing ||
-            throw(ArgumentError("keep_frames = $keep_frames requires dir"))
-        if dir !== nothing
-            mkpath(joinpath(dir, "frames"))
-            keep_frames === :none || mkpath(joinpath(dir, "images"))
-        end
+        dir === nothing || mkpath(joinpath(dir, "frames"))
         return new(
-            keep_frames, dir === nothing ? "" : String(dir),
+            dir === nothing ? "" : String(dir),
             source === nothing ? "" : String(source), TrackFrameRecord[],
             Dict{String, Any}(), "", Size2(0, 0)
         )
@@ -150,14 +142,12 @@ Base.length(t::TrackTrace) = length(t.records)
 Base.getindex(t::TrackTrace, i::Int) = t.records[i]
 Base.iterate(t::TrackTrace, s...) = iterate(t.records, s...)
 
-const _THUMB_STRIDE = 4
-
 """
     push!(trace::TrackTrace, frame::TrackFrame) -> trace
 
 Record one `track_boards` frame: stamp the run's configuration of record, keep
-the record in memory and, when the trace has a `dir`, stream it (and its image,
-per `keep_frames`) to the bundle.
+the record in memory and, when the trace has a `dir`, stream it to the bundle
+(the frame's pixels set only the trace's frame size; they are not stored).
 """
 function Base.push!(trace::TrackTrace, frame::TrackFrame)
     trace.config = frame.config
@@ -166,7 +156,7 @@ function Base.push!(trace::TrackTrace, frame::TrackFrame)
     return trace
 end
 
-# Append a record: memory + optional streamed frame file + optional image.
+# Append a record: memory + optional streamed frame file.
 function _trace_append!(trace::TrackTrace, rec::TrackFrameRecord, img)
     push!(trace.records, rec)
     iszero(trace.frame_size.width) && img !== nothing &&
@@ -177,14 +167,6 @@ function _trace_append!(trace::TrackTrace, rec::TrackFrameRecord, img)
             _trace_frame_path(dir, rec.frame_idx);
             record = rec
         )
-        if trace.keep_frames !== :none && img !== nothing
-            out = trace.keep_frames === :thumbs ?
-                img[1:_THUMB_STRIDE:end, 1:_THUMB_STRIDE:end] : img
-            FileIO.save(
-                _trace_image_path(dir, rec.frame_idx),
-                _clamp_patch(out)
-            )
-        end
     end
     return nothing
 end
@@ -203,7 +185,6 @@ end
 
 # On-disk names of a trace bundle's per-frame files — five sites spelled them.
 _trace_frame_path(dir, idx) = joinpath(dir, "frames", string(lpad(Int(idx), 6, '0'), ".jld2"))
-_trace_image_path(dir, idx) = joinpath(dir, "images", string(lpad(Int(idx), 6, '0'), ".png"))
 # Clamp any float patch into the stored Gray{N0f8} range (also annotate.jl's).
 _clamp_patch(p) = Gray{N0f8}.(clamp.(Float32.(p), 0.0f0, 1.0f0))
 
@@ -225,7 +206,6 @@ function save_trace(dir::AbstractString, trace::TrackTrace)
     end
     manifest = (
         schema = _TRACE_SCHEMA,
-        keep_frames = String(trace.keep_frames),
         # `null` for an unset field, as before the sentinels landed
         source = isempty(trace.source) ? nothing : trace.source,
         config = isempty(trace.config) ? nothing : trace.config,
@@ -253,15 +233,10 @@ function _load_track_trace(dir::AbstractString)
     manifest = _read_record(joinpath(dir, "trace.json"))
     # v1 named its version `schema_version` (the same keys otherwise)
     schema = get(manifest, :schema, get(manifest, :schema_version, nothing) == 1 ? "blobboards/track_trace/v1" : nothing)
-    schema in (_TRACE_SCHEMA, "blobboards/track_trace/v1") ||
-        error("$(joinpath(dir, "trace.json")): not a track trace manifest this BlobBoards reads ($(_TRACE_SCHEMA), or v1); got $(repr(schema))")
-    keep = manifest["keep_frames"]::String
+    schema in _TRACE_READ ||
+        error("$(joinpath(dir, "trace.json")): not a track trace manifest this BlobBoards reads ($(join(_TRACE_READ, ", "))); got $(repr(schema))")
     src = manifest["source"]::Union{Nothing, String}
-    trace = TrackTrace(;
-        keep_frames = Symbol(keep),
-        dir = keep == "none" ? nothing : dir,
-        source = src
-    )
+    trace = TrackTrace(; source = src)   # a v1/v2 `keep_frames` and its PNGs are not read: frames re-decode from `source`
     trace.dir = String(dir)
     # Restore the configuration of record. `save_trace` writes these; without
     # reading them back the provenance survived only in memory, which defeats
@@ -288,18 +263,13 @@ end
 """
     _trace_frame_image(trace, i) -> Matrix{Gray} | nothing
 
-Pixels for the i-th record, per the `keep_frames` policy: stored PNG when
-kept, re-decoded from the source video for `:none` (exact — the manifest
-records the frame index), `nothing` when neither is available (viewers draw
-overlays on a blank canvas).
+Pixels for the i-th record, re-decoded from the source video (exact — the
+manifest records the frame index), `nothing` when the source is not available
+(viewers draw overlays on a blank canvas).
 """
 function _trace_frame_image(trace::TrackTrace, i::Int)
     rec = trace.records[i]
-    dir, src = trace.dir, trace.source
-    if trace.keep_frames !== :none && !isempty(dir)
-        p = _trace_image_path(dir, rec.frame_idx)
-        isfile(p) && return FileIO.load(p)
-    end
+    src = trace.source
     if !isempty(src) && isfile(src)
         v = VideoIO.openvideo(src)
         local img = nothing

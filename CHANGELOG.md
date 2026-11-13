@@ -50,6 +50,10 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
   device-tensor runs) go through VisualGeometryToolkitFeatures' `onnx_run`, which charges the session's arena growth to
   the ASIFT detector's device budget; the warm-up that tried to make free memory truthful instead is gone. Until now
   the runs bypassed Features' accounting, so the detector's plans could be sized too large by what the arena grew.
+- **A track trace stores no decoded frames** (the owner's "RAW + results only" rule): `TrackTrace`'s `keep_frames`
+  (`:thumbs` / `:full`, PNGs of decoded video frames in the bundle) is deleted; a replay always re-decodes each frame
+  from the source video by its index, as `:none` did. The manifest is `blobboards/track_trace/v3.0` (no
+  `keep_frames`); a v1 or v2 bundle still loads, its policy and any PNGs it kept ignored.
 - **One TIFF codec in the stack** (owner ruling): a `Tiff` board output and `rasterize_pdf`'s page go through
   VisualGeometryToolkitIO's `write_tiff` / `read_tiff` (libtiff; byte-identical board TIFFs). BlobBoards' own copy is
   deleted, with its public `BlobBoards.write_tiff` (call `VisualGeometryToolkitIO.write_tiff`) and the `Libtiff_jll`

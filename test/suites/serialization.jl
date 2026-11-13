@@ -182,12 +182,13 @@ const V0_FIXTURE = """
         @test hash_config(pb2.pattern_config) == hash_config(pb.pattern_config)
     end
 
-    @testset "track-trace manifest: v2 written, v1 read" begin
+    @testset "track-trace manifest: v3.0 written (no decoded frames), v2 and v1 read" begin
         mktempdir() do dir
             t = BlobBoards.TrackTrace(; source = "clip.mp4")
             BlobBoards.save_trace(joinpath(dir, "new.trace"), t)
             m = JSON.parse(read(joinpath(dir, "new.trace", "trace.json"), String))
-            @test m.schema == "blobboards/track_trace/v2" && !haskey(m, :schema_version) && m.n_frames == 0
+            @test m.schema == "blobboards/track_trace/v3.0" && !haskey(m, :schema_version) && m.n_frames == 0
+            @test !haskey(m, :keep_frames) && !isdir(joinpath(dir, "new.trace", "images"))   # RAW + results only
             @test BlobBoards.load_trace(joinpath(dir, "new.trace")).source == "clip.mp4"
             # a v1 manifest: the same keys, its version an integer
             old = mkpath(joinpath(dir, "old.trace"))
@@ -195,6 +196,10 @@ const V0_FIXTURE = """
                 "network_hash": null, "frame_size": {"width": 640, "height": 480}, "n_frames": 0, "frame_indices": []}""")
             t1 = BlobBoards.load_trace(old)
             @test t1.source == "clip.mp4" && t1.frame_size == BlobBoards.Size2(640, 480) && isempty(t1.records)
+            # a v2 manifest that kept PNGs: read, its policy ignored (frames re-decode from the source)
+            write(joinpath(old, "trace.json"), """{"schema": "blobboards/track_trace/v2", "keep_frames": "thumbs", "source": "clip.mp4",
+                "config": null, "network_hash": null, "frame_size": null, "n_frames": 0, "frame_indices": []}""")
+            @test BlobBoards.load_trace(old).source == "clip.mp4"
             write(joinpath(old, "trace.json"), """{"schema_version": 3, "keep_frames": "none"}""")
             @test_throws ErrorException BlobBoards.load_trace(old)
         end
