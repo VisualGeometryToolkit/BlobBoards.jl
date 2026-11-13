@@ -708,6 +708,31 @@ end
     @test_throws ArgumentError AE._glyph_code(font, '\U1F600')       # no glyph: refused, not a missing-glyph box
 end
 
+# The board TIFFs are byte for byte what BlobBoards' own libtiff writer wrote (0.6.2) before the stack's one codec took
+# them over (VisualGeometryToolkitIO's `write_tiff`, the io095 port): the four boards io095's identity check recorded.
+# The TIFF's Software tag names the writing BlobBoards version, the only bytes that move with a release; the pin
+# reads it as 0.6.2's (a version string of the same length: the tag's offsets are unchanged).
+const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF)
+    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "4964f3e9bb6e0e6c70f13810566d63ec1e1cc772c416c0b2ee15b83caf138bc9"),
+    ("A5", (1mm, 6mm), 0x77, 300dpi, "37653627a38944358e932c0e3fcf7c841558e17de326ff9b22f13c36bf8d014a"),
+    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "500d725695168b4aff284f955a1455a2aebbf00841d4465d2120edebcf476894"),
+    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "26b94e39fe1feda0d10e57afc35dab8596d8f3b8f846e36b1f234565821fb2f3"),
+]
+@testset "board TIFFs: byte for byte BlobBoards 0.6.2's (the TIFF codec hoisted into IO)" begin
+    now = "BlobBoards.jl $(pkgversion(BlobBoards))"
+    @test length(now) == length("BlobBoards.jl 0.6.2")
+    for (sz, bs, seed, d, digest) in _TIFF_GOLDEN
+        mktempdir() do dir
+            blob_board(sz; blob_sizes = bs, seed, dir, output = Tiff(d; icc_profile = :linear))
+            bytes = read(only(filter(endswith(".tiff"), readdir(dir; join = true))))
+            at = findfirst(Vector{UInt8}(now), bytes)
+            @test at !== nothing
+            at === nothing || (bytes[at] = Vector{UInt8}("BlobBoards.jl 0.6.2"))
+            @test sha256_hex(bytes) == digest
+        end
+    end
+end
+
 # A TIFF read back through the stack's one TIFF codec (VisualGeometryToolkitIO's; its own tests check every tag
 # `write_tiff`'s keywords write: LZW, the horizontal predictor, the density, the ICC profile).
 _read_board_tiff(dir) = BlobBoards.Gray.(reinterpret(BlobBoards.N0f8, VgtkIO.read_tiff(UInt8, only(filter(endswith(".tiff"), readdir(dir; join = true))))))
