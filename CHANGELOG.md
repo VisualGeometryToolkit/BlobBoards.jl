@@ -56,6 +56,11 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
 
 Not breaking:
 
+- For a driver's config built on BlobBoards' (CaliBlobs' `CalibrationConfig`): `write_config(path, config; extra)` takes any
+  config with a `config_dict` (the header names its type); `radial_geometry_from_toml(G, tag, d; camera, image_size)` reads a
+  radial arm's `[find_boards.geometry]` table (BlobBoards' `RadialHomographyGeometry` through it); `find_boards_table(path;
+  tables)` is the `[find_boards]` table of a run config file, the one door of every file loader.
+
 - CompatHelper runs on the root project only and no longer auto-merges: Pkg's writer deleted the workspace members'
   comments (authoring/'s header and the PythonCall pin's reason, restored here). Every member's `BlobBoards` compat
   is stated (`"0.7"`); test/'s CUDA compat is the root's (`"5.11.0"`; the workspace resolves by the root).

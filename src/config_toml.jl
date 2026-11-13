@@ -202,26 +202,34 @@ function _geometry_from_toml(d, camera, image_size = nothing)
     return _geometry_arm(GEOMETRY_TAGS[t], d, camera, image_size)
 end
 
-function _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size)
-    _check_run_keys(d, _allowed_keys(RadialHomographyGeometry, :type), "find_boards.geometry")
-    # The image size is data, like the pose arm's camera: the sensor extent
-    # that fixes the distortion centre (the image middle), and it differs
-    # per capture session — a value in the file would drift.
+_geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size) =
+    radial_geometry_from_toml(RadialHomographyGeometry, :radial_homography, d; camera, image_size)
+
+"""
+    radial_geometry_from_toml(G, tag::Symbol, d; camera = nothing, image_size) -> G
+
+A radial arm's geometry from its `[find_boards.geometry]` table `d` (`type = "<tag>"`):
+the table's keys checked against `G`'s fields, the image size REQUIRED (data, like the
+pose arm's camera: the sensor extent that fixes the distortion centre, which differs per
+capture session — a value in the file would drift), a `camera` ignored with a warning, and
+`G(image_size; outlier_halfwidth, min_inliers, local_optimization_strategy)` built from the
+keys present (the strategy table read by [`geometry_local_optimization_strategy`](@ref)
+for `tag`). BlobBoards' `RadialHomographyGeometry` reads through it, and so does a radial
+arm another package registers (its [`geometry_from_toml`](@ref) method is one call).
+"""
+function radial_geometry_from_toml(::Type{G}, tag::Symbol, d; camera = nothing, image_size) where {G}
+    _check_run_keys(d, _allowed_keys(G, :type), "find_boards.geometry")
     image_size === nothing && throw(
-        ArgumentError(
-            "[find_boards.geometry] type = \"radial_homography\" needs the image " *
-                "size: FindBoardsConfig(path; image_size = (width, height))"
-        )
+        ArgumentError("[find_boards.geometry] type = \"$(tag)\" needs the image size: `image_size = (width, height)` beside the config")
     )
-    camera === nothing ||
-        @warn "geometry type = \"radial_homography\" ignores the `camera` keyword"
-    return RadialHomographyGeometry(
+    camera === nothing || @warn "geometry type = \"$(tag)\" ignores the `camera` keyword"
+    return G(
         image_size;
         present_kwargs(
             d,
             "outlier_halfwidth" => Float64,
             "min_inliers" => Int,
-            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, :radial_homography)
+            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, tag)
         )...
     )
 end
@@ -379,17 +387,22 @@ max_trials = 10_000
 
 See also [`write_config`](@ref), [`read_run_config`](@ref).
 """
-function FindBoardsConfig(path::AbstractString; camera = nothing, image_size = nothing)
-    # ONE door: `read_run_config` owns the top-level surface AND the
-    # `[descriptor]` table's keys, so a typo'd table (`[descripter]`) or key
-    # (`[descriptor] modle`) fails here exactly as it does for a run config —
-    # sweeps load through this constructor directly. (Until the 2026-09-07 audit
-    # this duplicated the top-level check and skipped the [descriptor] one.)
-    rc = read_run_config(path)
-    haskey(rc.config_toml, "find_boards") || throw(
-        ArgumentError("$path has no [find_boards] table")
-    )
-    return _find_boards_from_toml(rc.find_boards; camera, image_size)
+FindBoardsConfig(path::AbstractString; camera = nothing, image_size = nothing) =
+    _find_boards_from_toml(find_boards_table(path); camera, image_size)
+
+"""
+    find_boards_table(path; tables = ()) -> AbstractDict
+
+The `[find_boards]` table of the run config at `path`, read by [`read_run_config`](@ref)
+(`tables`: the further top-level tables a driver's configs carry beside BlobBoards' own),
+an `ArgumentError` when the file has none. The ONE door of every file loader of a
+`[find_boards]` config — `FindBoardsConfig(path)`, and a driver's config built on it — so a
+typo'd table (`[descripter]`) or key (`[descriptor] modle`) fails exactly as it does for a run config.
+"""
+function find_boards_table(path::AbstractString; tables = ())
+    rc = read_run_config(path; tables)
+    haskey(rc.config_toml, "find_boards") || throw(ArgumentError("$path has no [find_boards] table"))
+    return rc.find_boards
 end
 
 """
@@ -524,28 +537,28 @@ config_dict(c::FindBoardsConfig) = toml_table(c)
 _allowed_keys(::Type{T}, extra::Symbol...) where {T} = allowed_keys(T, extra...)
 
 """
-    write_config(path, config::FindBoardsConfig; extra = Dict())
+    write_config(path, config; extra = Dict())
 
-Write `config` as a TOML file with a `[find_boards]` table, merging any
-`extra` top-level tables (`experiment`, `descriptor`, …). Round-trips through
-[`FindBoardsConfig(path)`](@ref) — which the test suite asserts — so a config
-recorded beside an artifact reproduces the run that made it.
+Write `config` — a [`FindBoardsConfig`](@ref), or any config with a [`config_dict`](@ref)
+method (a driver's config built on it) — as a TOML file with a `[find_boards]` table
+(`config_dict(config)`), merging any `extra` top-level tables (`experiment`, `descriptor`,
+…); the header names the config's type as its reloading constructor. A `FindBoardsConfig`
+round-trips through [`FindBoardsConfig(path)`](@ref) — which the test suite asserts — so a
+config recorded beside an artifact reproduces the run that made it.
 
 `max_detections = typemax(Int)` is emitted as the string `"unbounded"`, since
 TOML integers are 64-bit signed and the literal round-trips confusingly.
 """
-function write_config(
-        path::AbstractString, config::FindBoardsConfig;
-        extra::AbstractDict = Dict{String, Any}()
-    )
+function write_config(path::AbstractString, config; extra::AbstractDict = Dict{String, Any}())
     body = merge(
         Dict{String, Any}(string(k) => v for (k, v) in extra),
         Dict("find_boards" => config_dict(config))
     )
+    T = nameof(typeof(config))
     return write_toml(
         path, body;
-        header = "# Generated by BlobBoards.write_config — the configuration of record\n" *
-            "# for this run. Reload with FindBoardsConfig(path; camera=...)."
+        header = "# Generated by BlobBoards.write_config ($(parentmodule(typeof(config))).$(T)) — the configuration of record\n" *
+            "# for this run. Reload with $(T)(path; camera=..., image_size=...)."
     )
 end
 

@@ -70,6 +70,8 @@ BlobBoards.DEFAULT_OUTER_EXTENT
 ```@docs
 GeometryConfig
 BlobBoards.geometry_from_toml
+BlobBoards.radial_geometry_from_toml
+BlobBoards.find_boards_table
 BlobBoards.geometry_tag
 BlobBoards.CONTRACT_GENERICS
 BlobBoards.TrackConfig
