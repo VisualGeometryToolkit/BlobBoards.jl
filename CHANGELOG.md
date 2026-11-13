@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0 (2026-11-13)
 
 On the VisualGeometryToolkit wave-10 stack: VisualGeometryToolkitCore 0.10, IO 0.10, Features 0.9,
 Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. Breaking:
