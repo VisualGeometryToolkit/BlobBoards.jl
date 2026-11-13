@@ -274,8 +274,11 @@ Every board is saved as a print file plus a JSON sidecar, `blob_board_<uid>_<has
 
 ```
 {
-  "schema": "blobboards/board/v6",
-  "units":  { "world": "mm", "density": "dpi", "lengths": { "pattern": "pt" } },
+  "schema": "blobboards/board/v7.0",
+  "generator":   { "name": "VisualGeometryToolkitIO", "version": …, "caller": { "name": "BlobBoards", "version": … } },
+  "units":       { "length": "mm", "density": "dpi", "length_roles": { "pattern": "pt" },
+                   "time": "s", "angle": "rad", "pixel": "colmap", "radiance": "relative" },
+  "conventions": { …, "index_base": 1 },
   "preamble": {
     "board_config":   { canvas_size, margin, layout_grid: 0.01,
                         corner_size, ruler_width, frame_padding,
@@ -299,12 +302,14 @@ For a raster, `render` records `"format": "tiff"` or `"png"` and
 A custom ICC profile is recorded with its bytes — `{ "name": "press.icc",
 "sha256": …, "data": "<base64>" }` — so a rebuild needs no original file.
 
-Every quantity is a number in the unit the `units` block declares — the one
-quantity format every file of the stack uses (VisualGeometryToolkitIO's
-`UnitContract`): lengths in `world` (mm: the canvas, margin, ruler, corner,
-padding, tick spacing and width, a PDF's bleed), a density in `density`
-(dpi), and the point-grid board's own numbers in the length role `pattern`
-(pt: the σ range, the layout grid and the blob columns; a pixel-grid board's and a pattern's blobs are pixels). The `units` block is the file's only declaration of a unit.
+`generator`, `units` and `conventions` are VisualGeometryToolkitIO 0.10's
+envelope, written by its `write_record`, as every file of the stack has it.
+Every quantity is a number in the unit the `units` object declares: lengths in
+`length` (mm: the canvas, margin, ruler, corner, padding, tick spacing and
+width, a PDF's bleed), a density in `density` (dpi), and the point-grid board's
+own numbers in the length role `pattern` (pt: the σ range, the layout grid and
+the blob columns; a pixel-grid board's and a pattern's blobs are pixels). The
+`units` object is the file's only declaration of a unit.
 Pixel counts need no declaration: a pixel-grid board's `pattern_resolution`,
 `min_scale` and `max_scale` are pixels. A tick's `width` is its full drawn
 length across the frame band. Blob centres are 0.01 pt grid values, the very
@@ -314,9 +319,9 @@ A pixel-grid board (the former schema v3: `board_size`, `print_density`,
 `frame_width`, `frame_style`, a `pattern_config` with a `pattern_resolution`, a
 `pixel_type` and `raster_aligned`, blobs in `px`) is the same schema; its grid
 key (`print_density` or `layout_grid`) tells them apart. A pattern file is
-`blobboards/pattern/v4`, in the same format. Both are written in
+`blobboards/pattern/v5.0`, in the same format. Both are written in
 VisualGeometryToolkitIO's file shape (`write_record`); every earlier schema
-(board v1–v5, pattern v1–v3) is read, and `VisualGeometryToolkitIO.vgio_migrate`
+(board v1–v6, pattern v1–v4) is read, and `VisualGeometryToolkitIO.vgio_migrate`
 rewrites one in the current version, its uid kept.
 
 - **Identity** is `hashes.config`, the SHA-256 of the schema, the canonical
@@ -335,7 +340,7 @@ rewrites one in the current version, its uid kept.
 - **Older schemas migrate, they do not load.** Boards before v5 and patterns
   before v3 stored every quantity as a `{"value": …, "unit": …}` object. They are
   migrated once with VisualGeometryToolkitIO's `vgio_migrate(path)` (or
-  `bin/vgio_migrate.jl file|tree`), which reads the old file, writes the v5 file
+  `bin/vgio_migrate.jl file|tree`), which reads the old file, writes the current file
   through the writer, reads it back and compares every number bit for bit, and
   carries the stored `hashes.config` over — so the uid never moves. The
   migration reads every earlier schema: v1 files (with `max_diameter_fraction`:
