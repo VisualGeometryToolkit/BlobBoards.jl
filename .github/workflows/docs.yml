@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1.12'
+          version: '1.13'
       - name: Install docs dependencies
         run: |
           julia -e 'using Pkg; Pkg.Registry.add("General")'

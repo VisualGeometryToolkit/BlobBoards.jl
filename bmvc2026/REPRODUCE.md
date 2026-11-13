@@ -11,7 +11,7 @@ a generated macro file re-typed as a literal in the prose.
 
 ## Install
 
-Julia 1.12 (juliaup). The whole stack is registered in General; instantiate the
+Julia 1.13 (juliaup). The whole stack is registered in General; instantiate the
 project:
 
 ```bash

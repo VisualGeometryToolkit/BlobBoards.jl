@@ -70,7 +70,7 @@ none.
 
 ## Install
 
-BlobBoards requires Julia 1.12 or later.
+BlobBoards requires Julia 1.13 or later.
 
 The example below finds a board on the CPU:
 

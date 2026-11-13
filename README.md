@@ -15,7 +15,7 @@ GPU. It is the implementation of
 
 ## Installation
 
-BlobBoards requires Julia 1.12 or later.
+BlobBoards requires Julia 1.13 or later.
 
 The example below finds a board on the CPU, and imports one name from
 VisualGeometryToolkitCore, the stack package that owns it:

@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.6.1 (unreleased)
+## 0.6.2 (unreleased)
+
+A patch: requires Julia 1.13 (`julia = "1.13"` in the `[compat]` of the package and of every
+workspace member: test, docs, gpu, examples, authoring and bmvc2026). CI runs Julia 1.13 only. No API change.
+
+## 0.6.1 (2026-11-13)
 
 A patch: no API change, the same results. On VisualGeometryToolkitEstimation 0.10 (`[compat]`
 VisualGeometryToolkitEstimation "0.10" in the package, test and bmvc2026 environments). Estimation 0.10.0 retired the image-space refine of

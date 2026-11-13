@@ -4,7 +4,7 @@ This guide walks through the basics of generating blob patterns and calibration 
 
 ## Installation
 
-Julia 1.12+ is the only requirement; board authoring needs no external tools and no
+Julia 1.13+ is the only requirement; board authoring needs no external tools and no
 pixi (pixi is only for the [Python interface](python.md)). Everything comes
 from General.
 

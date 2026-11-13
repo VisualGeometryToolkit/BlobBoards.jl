@@ -65,7 +65,7 @@ VisualGeometryToolkitEstimation = "0.10"
 VisualGeometryToolkitFeatures = "0.8"
 VisualGeometryToolkitIO = "0.9"
 cuDNN = "1.4.7"
-julia = "1.12"
+julia = "1.13"
 
 [preferences.CUDA_Runtime_jll]
 version = "12.9"

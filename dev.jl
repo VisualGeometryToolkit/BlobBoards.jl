@@ -42,7 +42,7 @@ if length(ARGS) > 0
         # that). A separate target, not a suite gate: it re-runs the whole
         # suite. Ratchet: a file may only ever RISE above its recorded floor.
         # Coverage.jl comes from the shared env (never a package dep).
-        Pkg.activate("v1.12"; shared = true)
+        Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared = true)
         haskey(Pkg.project().dependencies, "Coverage") || Pkg.add("Coverage")
         Pkg.activate(@__DIR__)
         @eval using Coverage, TOML, Logging
@@ -81,7 +81,7 @@ if length(ARGS) > 0
         # that invalidates large upstream method trees is what a multi-minute
         # cold start is made of, and no other gate sees it. Count against the
         # recorded ceiling; lower the ceiling whenever you fix some.
-        Pkg.activate("v1.12"; shared = true)
+        Pkg.activate("v$(VERSION.major).$(VERSION.minor)"; shared = true)
         for dep in ("SnoopCompileCore", "SnoopCompile")
             haskey(Pkg.project().dependencies, dep) || Pkg.add(dep)
         end
@@ -100,9 +100,9 @@ if length(ARGS) > 0
 
     elseif cmd == "clean"
         println("Cleaning precompilation cache...")
-        rm(joinpath(homedir(), ".julia/compiled/v1.12/VisualGeometryToolkitCore"),
+        rm(joinpath(homedir(), ".julia/compiled/v$(VERSION.major).$(VERSION.minor)/VisualGeometryToolkitCore"),
            recursive=true, force=true)
-        rm(joinpath(homedir(), ".julia/compiled/v1.12/BlobBoards"),
+        rm(joinpath(homedir(), ".julia/compiled/v$(VERSION.major).$(VERSION.minor)/BlobBoards"),
            recursive=true, force=true)
         println("✓ Cache cleaned. Next load will trigger full recompilation.")
 

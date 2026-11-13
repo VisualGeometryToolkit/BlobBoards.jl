@@ -23,7 +23,7 @@ pixi run -e py python   # the `py` environment: Python, numpy, pint, juliacall, 
 
 **Requirements:**
 - Python 3.8+
-- Julia 1.12+ (juliacall uses it)
+- Julia 1.13+ (juliacall uses it)
 
 ```bash
 cd python

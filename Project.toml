@@ -120,7 +120,7 @@ VisualGeometryToolkitIO = "0.9"
 Zlib_jll = "1"
 Zygote = "0.7"
 cuDNN = "1.4.7"
-julia = "1.12"
+julia = "1.13"
 
 # CHECKED IN, unlike LocalPreferences.toml: ORT's CUDA provider requires a CUDA
 # runtime >= 12.8 (ONNXRunTime 2, onnxruntime 1.30) and < 13.0, and the machine default is 13.2. Every workspace

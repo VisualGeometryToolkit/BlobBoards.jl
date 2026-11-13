@@ -99,7 +99,7 @@ See the [Coordinates Guide](guide/coordinates.md) for detailed documentation.
 
 ## Installation
 
-Julia 1.12+ is the only requirement. [Install for your task](guide/install.md)
+Julia 1.13+ is the only requirement. [Install for your task](guide/install.md)
 gives the `pkg> add` line of each task (authoring, finding boards on the CPU or
 a GPU, tracking, plotting, training, Python, a clone) and a runnable example of
 each.

@@ -9,7 +9,7 @@ exactly the packages its task needs, and the example under it loads exactly
 those. Calling an extension's function without its packages raises an error
 that names the line to run.
 
-BlobBoards requires Julia 1.12 or later; it and every package below come from
+BlobBoards requires Julia 1.13 or later; it and every package below come from
 General.
 
 | Task | Install | Example |
