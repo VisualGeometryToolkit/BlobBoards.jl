@@ -13,9 +13,12 @@ using Test, ReTestItems, BlobBoards
 # which is the unnamed workspace member test/Project.toml, and fails to build a
 # test env for it.
 const NWORKERS = clamp(Sys.CPU_THREADS ÷ 4, 1, 6)
+# `Pkg.test(; test_args = [regex])` runs only the items whose name matches (and the
+# Python interface suite only when "python interface" does): one gate task per item.
+const SELECTED = isempty(ARGS) ? (_ -> true) : let r = Regex(only(ARGS)); name -> occursin(r, name) end
 
 runtests(
-    ti -> !(:gpu in ti.tags), BlobBoards;
+    ti -> SELECTED(ti.name) && !(:gpu in ti.tags), BlobBoards;
     nworkers = NWORKERS, nworker_threads = 4, testitem_timeout = 3600, report = false,
 )
 # The Python interface, serially in this process: PythonCall's initialisation
@@ -25,7 +28,8 @@ runtests(
 # suite is SKIPPED (a CPU CI runner without the pixi env), loudly, rather than
 # left to PythonCall's own conda bootstrap; `BB_TEST_SKIP_PYTHON=1` skips it too.
 const RUN_PYTHON = get(ENV, "BB_TEST_SKIP_PYTHON", "0") != "1" && haskey(ENV, "JULIA_PYTHONCALL_EXE")
-if RUN_PYTHON
+if !SELECTED("python interface")
+elseif RUN_PYTHON
     @testset "python interface" begin
         using JSON
         using VisualGeometryToolkitCore: mm, px, dpi
@@ -45,7 +49,7 @@ elseif !CUDA.functional()
     @warn "GPU test items SKIPPED: no functional CUDA device"
 else
     runtests(
-        ti -> :gpu in ti.tags, BlobBoards;
+        ti -> SELECTED(ti.name) && :gpu in ti.tags, BlobBoards;
         nworkers = 1, nworker_threads = 8, testitem_timeout = 3600, report = false,
     )
 end
