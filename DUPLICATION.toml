@@ -27,3 +27,8 @@ reason = "different concepts: BlobBoards' `board(args...)` is its Makie recipe t
 file = "src/training.jl"
 function = "_execution_provider"
 reason = "a provider choice, not a second computation: the training pipeline's ONNX session runs the same network on the provider that matches its compute backend (:cpu on KA.CPU, :cuda otherwise), so a CPU run does not ask for the CUDA provider; no kernel or arithmetic differs by backend"
+
+[[backend]]
+file = "src/adapt_ka.jl"
+function = "_adapt_groupsize"
+reason = "a launch-policy value, not a compute twin: the ONE adaptation kernel set runs on every backend with a workgroup per blob, 256 work items on a GPU and one on the CPU (the CPU group is one item, for which Core's tree_sum! returns at once); the size also sets each launch's ndrange (gs·N), so it is not only OnBackend's workgroupsize"
