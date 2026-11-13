@@ -26,9 +26,9 @@ closes it; an open item says what it waits for. The release leg refuses while an
 
 - [ ] ONNX Runtime runs outside Features' arena accounting (`describe`'s `model.session(…)`, the CUDA extension's
   `CAPI.Run`; `reserve_workspace!`): waits for Features' public `onnx_run` (handoffs.md "bb → feat09", review BB#3)
-- [x] `_iou_below` (src/pipeline.jl), a generic IoU bound → Core's `iou_below` beside `iou` (core10 0bcd5559; BB calls it, NEXT_SHA;
+- [x] `_iou_below` (src/pipeline.jl), a generic IoU bound → Core's `iou_below` beside `iou` (core10 0bcd5559; BB calls it, 06c3d5c;
   verified once the shared snapshot carries core10 ≥ 0bcd5559)
-- [x] `test/suites/readme.jl` `page_julia` / `install_lines` (⇔ CaliBlobs') → Core's `page_examples` / `install_lines` (core10 0bcd5559; NEXT_SHA)
+- [x] `test/suites/readme.jl` `page_julia` / `install_lines` (⇔ CaliBlobs') → Core's `page_examples` / `install_lines` (core10 0bcd5559; 06c3d5c)
 - [x] `_track_from_toml` ⇔ CaliBlobs' `_calibrate_from_toml` → Core's `read_table` (2766502); `_file_length_unit` (an IO name) → `_exact_length_unit` (2766502)
 
 ## check_duplication
