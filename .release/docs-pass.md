@@ -1,4 +1,4 @@
-docs-pass: 3c86344
+docs-pass: 4adfcf6
 landing: blobboards/blobboards.github.io f58630c (no hand edit: the site is the Docs workflow's build of docs/src, which says Julia 1.13 from this commit on; it shows 1.13 once main's Docs job deploys it)
 
 # 0.6.2 docs pass (julia-docs-pass) — Julia 1.13
@@ -11,6 +11,7 @@ Project.toml in the repository, the CI workflows on Julia 1.13 only, and the CHA
   Mentions of Julia 1.12 left in test comments record why a bound or a workaround was set (LLVM 18 vs 20 rounding,
   Julia 1.12's docstring rules, which 1.13 keeps); they are history, not instructions.
 - Re-recorded after the Downgrade workflow became on-demand only (CI and CHANGELOG only; no docs change).
+- Re-recorded after merging GitHub main (CompatHelper #114: VisualGeometryToolkitIO "0.9" in gpu/'s [compat]; no docs change).
 - Docs build: run by the fresh-clone gate on Julia 1.13.3 against the registered stack (General from GitHub).
 
 ---
