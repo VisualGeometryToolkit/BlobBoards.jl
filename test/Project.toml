@@ -31,8 +31,8 @@ VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
 VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
-[sources]
-BlobBoards = {path = ".."}
+[sources.BlobBoards]
+path = ".."
 
 [compat]
 Accessors = "0.1.45"
@@ -61,7 +61,7 @@ Test = "1"
 TiffImages = "0.11.9"
 VideoIO = "1.10"
 VisualGeometryToolkitCore = "0.9.3"
-VisualGeometryToolkitEstimation = "0.9"
+VisualGeometryToolkitEstimation = "0.9, 0.10"
 VisualGeometryToolkitFeatures = "0.8"
 VisualGeometryToolkitIO = "0.9"
 cuDNN = "1.4.7"
