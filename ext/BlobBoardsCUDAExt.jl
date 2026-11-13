@@ -93,7 +93,7 @@ function _describe_device(model, d_patches::CuArray{Float32, 3})
         )
         CUDA.synchronize()   # our stream must finish before ORT's touches it
         t = _ort_device_tensor(api, meminfo, d_chunk, (n, 1, P, P))
-        outs = BlobBoards.onnx_run(sess) do
+        outs = BlobBoards.VisualGeometryToolkitFeatures.onnx_run(sess) do
             _OCAPI.Run(api, sess.session, nothing, sess.input_names, [t], sess.output_names)
         end
         _OCAPI.GetTensorMutableData(api, outs[1])
