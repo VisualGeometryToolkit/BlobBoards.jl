@@ -42,10 +42,13 @@ CUDA = "5.11.0"
 # GPUCompiler ≤ 1.9 for the GPU tests under --depwarn=error: GPUCompiler 1.10 deprecated the 3-arg
 # `link_libraries!(job, mod, undefined_fns)` override (JuliaGPU/GPUCompiler.jl#784), and CUDA 5.11.0–5.11.1 still
 # define it; CUDA 5.11.2+ migrated to the 2-arg form but needs CUDA_Runtime_Discovery 2, which every cuDNN for
-# CUDA 5 (≤ 1.4.7, Discovery ≤ 1) excludes. Lift with the move to CUDA 6 + cuDNN 6, or a cuDNN 1.x on Discovery 2.
+# CUDA 5 (≤ 1.4.7, Discovery ≤ 1) excludes.
+# LIFT WHEN: the workspace moves to CUDA 6 + cuDNN 6, or CUDA 5.x ships the 2-arg override with a cuDNN that accepts
+# CUDA_Runtime_Discovery 2 — then delete this bound and the LLVM one below.
 GPUCompiler = "1.7.5 - 1.9"
 # …and LLVM.jl ≤ 9.8.0 with it: GPUCompiler ≤ 1.9 calls `lookup(jljit, name)` in its __init__, which LLVM.jl 9.8.1
 # deprecated (the JITDylib form), again an error under --depwarn=error. LLVM.jl 9.8.0 wraps Julia 1.13's LLVM 20.
+# LIFT WHEN: with the GPUCompiler bound above (the same condition).
 LLVM = "9.3.0 - 9.8.0"
 CUDA_Runtime_jll = "0.21"
 CairoMakie = "0.15.16"
