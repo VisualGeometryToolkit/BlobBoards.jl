@@ -27,3 +27,31 @@ reason = "different concepts: BlobBoards' `board(args...)` is its Makie recipe t
 file = "src/training.jl"
 function = "_execution_provider"
 reason = "a provider choice, not a second computation: the training pipeline's ONNX session runs the same network on the provider that matches its compute backend (:cpu on KA.CPU, :cuda otherwise), so a CPU run does not ask for the CUDA provider; no kernel or arithmetic differs by backend"
+
+# 0.6.3: the pairs Core 0.9.5's check_duplication finds once its idiom cap counts this repository's definitions only.
+# Each is the same token shape over different concepts (the one-line proof in its reason); the real copies it also
+# finds are listed in .release/duplication-checklist.md, to be hoisted in BlobBoards/CaliBlobs 0.7.0 and Core 0.10.
+
+[[similar]]
+functions = ["src/board_output.jl::_recorded_density", "VisualGeometryToolkitIO:src/assemble.jl::colmap_model"]
+reason = "different concepts in the same `x === nothing ? nothing : f(x)` shape: a raster output's density as its file number vs a lens's COLMAP model name; neither value is ever the other's"
+
+[[similar]]
+functions = ["src/pattern.jl::ShortSideFraction", "VisualGeometryToolkitCore:src/robust/posterior.jl::FixedPrior"]
+reason = "two one-field constructors checking a value in (0, 1): a blob-size fraction of the pattern's short side vs a mixture's fixed inlier prior; different quantities, different owners"
+
+[[similar]]
+functions = ["src/training.jl::_augmentation_homography", "VisualGeometryToolkitEstimation:src/fitting/_refine.jl::_refine_strategy"]
+reason = "two refusals with a remedy message (`throw(ArgumentError(...))` naming the argument's type): a non-homography detection in the perspective augmentation vs a non-Triggs strategy in a refine"
+
+[[similar]]
+functions = ["src/types.jl::StaticArrays.similar_type", "VisualGeometryToolkitCore:src/base/size2.jl::StaticArrays.similar_type"]
+reason = "the StaticArrays idiom, one method per FieldVector type so broadcasting keeps it: BlobBoards' RulerTick and Core's Size2 are different types; each method must be on its own type"
+
+[[similar]]
+functions = ["src/types.jl::BoardLayout", "VisualGeometryToolkitCore:src/robust/posterior.jl::StudentTMixture"]
+reason = "two convenience constructors forwarding a struct's fields: a board's layout from its BoardConfig vs a mixture from a posterior-weight state; unrelated types"
+
+[[similar]]
+functions = ["src/config_toml.jl::toml_field", "VisualGeometryToolkitCore:test/config_toml_tests.jl::VgtkCore.toml_field"]
+reason = "methods of Core's one TOML hook (`toml_field`, a CONTRACT_GENERICS extension point) on different types: FindBoardsConfig's `max_detections` here, a test fixture's struct in Core's tests; the hook's \"unbounded\" spelling is the contract's"

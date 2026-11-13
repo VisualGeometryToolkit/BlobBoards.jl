@@ -179,4 +179,12 @@ A compat-only patch: no source, test or paper code is added, so nothing new can 
   `Paraboloid3D{T,4}` (C = c·I) read through `coeffs(Paraboloid3D{T,6}(p))` (`_solved_theta`, baa55b7). Considered and
   kept: the isotropic design column dx² + dy² (the accumulate's, one line; Core has no paraboloid design-matrix builder),
   and `_shape_gate_state` (already Core's `is_peak`/`is_valid_shape`).
+- [x] Core 0.9.5's check_duplication (its idiom cap counts this repository's definitions only) finds pairs in code 0.6.3 does
+  not touch (identical at 0850b81). Six of them (seven findings: `similar_type` twice) are the same token shape over different
+  concepts: `[[similar]]` entries with their one-line proofs in DUPLICATION.toml.
+- [ ] KNOWN for 0.6.3 (owner's decision pending), fixed in BlobBoards/CaliBlobs 0.7.0 and Core 0.10: the four real copies it finds:
+  `test/suites/readme.jl` `page_julia` and `install_lines` ⇔ CaliBlobs `test/readme_tests.jl` (the julia-docs-pass README-test
+  template, copied: hoist into Core beside the docs scans); `src/config_toml.jl` `_geometry_arm` ⇔ CaliBlobs
+  `BlobBoards.geometry_from_toml` method and `_track_from_toml` ⇔ CaliBlobs `_calibrate_from_toml` (CaliBlobs restates
+  BlobBoards' TOML readers: CaliBlobs calls BlobBoards' one reader).
 
