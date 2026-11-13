@@ -13,6 +13,11 @@ using Test
 import VisualGeometryToolkitCore as VgtkCore
 
 const OPEN = Set([
+    # Owner-granted exception for 0.6.3 only (2026-11-13): pre-existing in 0.6.2, found once Core 0.9.5's idiom cap counts
+    # this repository's definitions only; fixed in the wave (BlobBoards/CaliBlobs 0.7, Core 0.10). Cross-repository pairs
+    # with CaliBlobs, so they are found only with the stack paths set.
+    "similar src/config_toml.jl",    # _geometry_arm, _track_from_toml ⇔ CaliBlobs' config.jl restatements
+    "similar test/suites/readme.jl", # page_julia, install_lines ⇔ CaliBlobs' copy of the README-test template
 ])
 
 _key(v) = v.check === :name ? "name $(v.text)" :
@@ -23,4 +28,4 @@ keys_found = Set(_key(v) for v in found)
 foreach(v -> _key(v) in OPEN || println(stderr, v), found)
 @test keys_found ⊆ OPEN
 @test isempty(setdiff(OPEN, keys_found)) || isempty(get(ENV, "VGTK_STACK_PATHS", ""))   # file/similar need the stack paths
-@test isempty(found)
+isempty(OPEN) && @test isempty(found)    # with open items, the two tests above hold the list exactly
