@@ -100,7 +100,7 @@ Preferences = "1.6"
 PythonCall = "0.9.35"
 Random = "1"
 Reactant = "0.2.240"
-VisualGeometryToolkitEstimation = "0.11"
+VisualGeometryToolkitEstimation = "0.11.1"
 Rotations = "1.7"
 Scratch = "1.3"
 # The fork-only queries come from VisualGeometryToolkitCore.SpatialQueries; the
