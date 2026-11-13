@@ -235,7 +235,7 @@ function save_trace(dir::AbstractString, trace::TrackTrace)
         n_frames = length(trace.records),
         frame_indices = [r.frame_idx for r in trace.records],
     )
-    VgtkIO.write_record(joinpath(dir, "trace.json"), manifest; style = _FILE_STYLE)
+    _write_record(joinpath(dir, "trace.json"), manifest; style = _FILE_STYLE)
     return dir
 end
 

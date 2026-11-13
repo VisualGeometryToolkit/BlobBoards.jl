@@ -278,6 +278,7 @@ end
 function _legacy_record(obj::_ParsedObject, from::AbstractString, where_::AbstractString; require_hash::Bool = true)
     get(obj, :schema, nothing) == from ||
         throw(ArgumentError("$(where_): declares schema $(repr(get(obj, :schema, nothing))), not $(from)"))
+    from in PRINTED_SCHEMAS && (obj = _with_current_units(obj))
     old = if from in PRINTED_SCHEMAS
         _lift_bundle(obj, where_)
     elseif haskey(obj, :preamble)
@@ -304,8 +305,25 @@ end
 # carries them. Nothing is written.
 function _migrate_bundle_record(tree::AbstractDict, from::AbstractString)
     (; old, stored, unit, render) = _legacy_record(_object(tree), from, "a $(from) record"; require_hash = false)
-    return _bundle_tree(old, stored, render; unit)
+    (; tree) = _bundle_file(old, stored, render; unit)
+    return merge(tree, (; units = _units_object(old, unit)))   # in memory the record carries the units its file would
 end
+
+# An earlier record's `units`, in the retired UnitContract layout (`{world, density, lengths}`), as the 0.10
+# units object (IO's `migrate_units`); a record without any (the {value, unit} schemas) as it is.
+function _with_current_units(obj::_ParsedObject)
+    haskey(obj, :units) || return obj
+    o = copy(obj)
+    o["units"] = _object(VgtkIO.migrate_units(obj.units))
+    return o
+end
+
+# The units object a bundle's file in the world `unit` declares (`_bundle_style`'s), for a record a version step
+# builds in memory: the declaration in the layout IO's `migrate_units` reads.
+_units_object(b::AbstractBundle, unit) = VgtkIO.migrate_units((
+    world = unit_string(unit), density = unit_string(dpi),
+    lengths = map(unit_string, b isa BoardBundle ? _bundle_roles(b.preamble.board_config.layout_grid) : (;)),
+))
 
 # (`after_write(dst)`: a test hook run on the written file before it is read back)
 function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, from::AbstractString, after_write)
@@ -318,7 +336,8 @@ function _migrate_bundle_file_checked(src::AbstractString, dst::AbstractString, 
     identity_old = _bundle_identity(old)
     identity_old == stored ||
         @info "migrating $(basename(src)): the identity recomputed under the current encoding ($(identity_old[1:8])…) is not the stored hashes.config ($(stored[1:8])…); the stored hash is carried over"
-    VgtkIO.write_record(dst, _bundle_tree(old, stored, render; unit); style = _FILE_STYLE)
+    (; tree, style) = _bundle_file(old, stored, render; unit)
+    _write_record(dst, tree; style)
     after_write(dst)
     written = _read_record(dst)                     # the file as written, read once
     new, config_hash = _bundle_and_hash(written, dst)

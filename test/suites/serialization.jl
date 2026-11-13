@@ -101,7 +101,7 @@ const V0_FIXTURE = """
             @test read(path, String) == V1_FIXTURE                    # the file is not rewritten
             out = joinpath(dir, "migrated", "blob_pattern_abc_12345.json")
             r = VgtkIO.vgio_migrate(path; out)
-            @test r.from == "blobboards/pattern/v1" && r.to == "blobboards/pattern/v4"
+            @test r.from == "blobboards/pattern/v1" && r.to == "blobboards/pattern/v5.0"
             write(joinpath(dir, "migrated", "blob_pattern_abc_12345.png"), "")
             bundle, _, config_hash = BlobBoards.load_bundle(out)
             pc = bundle.pattern_config
@@ -165,8 +165,9 @@ const V0_FIXTURE = """
             read(path, String)
         end
         obj = JSON.parse(str)
-        @test obj.schema == "blobboards/pattern/v4"
-        @test VgtkIO.from_json(VgtkIO.UnitContract, obj.units) == VgtkIO.UnitContract()
+        @test obj.schema == "blobboards/pattern/v5.0"
+        @test VgtkIO.VgioStyle(obj).contract == VgtkIO.UnitContract()                    # the envelope's units: mm, dpi
+        @test obj.generator.caller.name == "BlobBoards"                                  # BlobBoards named as the writer
         @test obj.pattern_config.min_scale == 3 && obj.pattern_config.max_scale == 6 &&
             obj.pattern_config.pattern_resolution.width == 64   # numbers, pixels
         @test haskey(obj.pattern_config, :max_scale) && !haskey(obj.pattern_config, :max_diameter_fraction)

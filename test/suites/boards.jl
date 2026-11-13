@@ -286,7 +286,7 @@ end
             mkpath(dirname(legacy))
             open(io -> JSON.json(io, d), legacy, "w")
             out = joinpath(dir, "v6.json")
-            @test VgtkIO.vgio_migrate(legacy; out).to == "blobboards/board/v6"
+            @test VgtkIO.vgio_migrate(legacy; out).to == "blobboards/board/v7.0"
             b, h = BlobBoards._parse_bundle(out)
             want, hw = BlobBoards._parse_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "framed600.json"))
             @test b.preamble.board_config.ruler_spec == want.preamble.board_config.ruler_spec
@@ -1207,7 +1207,7 @@ end
     @test err isa ArgumentError && occursin("schema v5", err.msg)
     # ... of the IDENTITY schema, not of the file format: a board file is v6 and its printed QR code stays BB4
     @test BlobBoards.BOARD_CODE_TAG == "BB" * last(split(BlobBoards.IDENTITY_SCHEMA, "/v")) == "BB4"
-    @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v6" && BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"
+    @test BlobBoards.BOARD_SCHEMA == "blobboards/board/v7.0" && BlobBoards.IDENTITY_SCHEMA == "blobboards/board/v4"
     # a stored v3 board's identity is still its configuration's alone (its stored hash)
     v3, _, h3 = BlobBoards.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
     @test hash_config(v3.preamble) == h3 == BlobBoards._bundle_identity(v3)

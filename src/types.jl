@@ -400,7 +400,7 @@ function _construct_blobs(data)
 end
 
 JSON.lower(s::VgtkIO.VgioStyle, pb::PatternBundle) =
-    (units = _bundle_units(s, pb), pattern_config = JSON.lower(s, pb.pattern_config), blobs = _file_blobs(pb.blobs))
+    (pattern_config = JSON.lower(s, pb.pattern_config), blobs = _file_blobs(pb.blobs))
 
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:PatternBundle}, x::VgtkIO.Record)
     @with _FILE_UNITS => _declared_units(x) begin
@@ -1088,7 +1088,7 @@ _blob_unit(::PixelGrid) = "px"
 _blob_unit(::PointGrid) = "pt"
 
 JSON.lower(s::VgtkIO.VgioStyle, bb::BoardBundle) =
-    (units = _bundle_units(s, bb), preamble = JSON.lower(s, bb.preamble), blobs = _file_blobs(bb.blobs))
+    (preamble = JSON.lower(s, bb.preamble), blobs = _file_blobs(bb.blobs))
 
 function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardBundle}, x::VgtkIO.Record)
     units = _declared_units(x)
@@ -1102,15 +1102,16 @@ function JSON.lift(s::VgtkIO.VgioStyle, ::Type{<:BoardBundle}, x::VgtkIO.Record)
     end
 end
 
-_declares_pattern_role(x) = (u = x.units; haskey(u, :lengths) && haskey(u.lengths, :pattern))
+_declares_pattern_role(x) = haskey(VgtkIO.VgioStyle(x).contract.lengths, :pattern)
 
-# The `units` a bundle's file declares: the world length, the density and, on a
-# point grid, the length role `pattern` (VisualGeometryToolkitIO's `UnitContract`).
-# The world unit is the style's (`_file_length_unit`, json.jl).
-_units_contract(::PixelGrid, world) = VgtkIO.UnitContract(; world, density = dpi)
-_units_contract(::PointGrid, world) = VgtkIO.UnitContract(; world, density = dpi, lengths = (pattern = pt,))
-_bundle_units(s::VgtkIO.VgioStyle, b::BoardBundle) = VgtkIO.json_value(_units_contract(b.preamble.board_config.layout_grid, s.length_unit))
-_bundle_units(s::VgtkIO.VgioStyle, ::PatternBundle) = VgtkIO.json_value(VgtkIO.UnitContract(world = s.length_unit, density = dpi))
+# The style a bundle's file is written with, whose `units` object (the envelope's,
+# VisualGeometryToolkitIO 0.10) declares the world length `unit` (`_file_length_unit`,
+# json.jl), the density (dpi) and, on a point grid, the length role `pattern` (pt).
+_bundle_roles(::PixelGrid) = (;)
+_bundle_roles(::PointGrid) = (pattern = pt,)
+_bundle_style(b::BoardBundle, unit) =
+    VgtkIO.VgioStyle(; length_unit = unit, density = dpi, length_roles = _bundle_roles(b.preamble.board_config.layout_grid))
+_bundle_style(::PatternBundle, unit) = VgtkIO.VgioStyle(; length_unit = unit, density = dpi)
 
 # =============================================================================
 # Constants

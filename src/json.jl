@@ -90,6 +90,10 @@ const _Style = Union{VgtkIO.VgioStyle, _IdentityStyle, _LengthProbe}
 _file_style(u) = VgtkIO.VgioStyle(; length_unit = u)
 const _FILE_STYLE = _file_style(mm)
 
+# Every BlobBoards file goes through IO's `write_record` with BlobBoards named as the
+# calling package in its `generator` (`with_caller`).
+_write_record(path, tree; style) = VgtkIO.with_caller(() -> VgtkIO.write_record(path, tree; style), BlobBoards)
+
 # The world units a file may declare, in the order they are tried.
 const _FILE_LENGTH_UNITS = (mm, inch, m)
 
@@ -188,9 +192,9 @@ function _file_quantity(x, kind::Symbol)
 end
 _file_size2(x, kind::Symbol) = Size2(width = _file_quantity(x.width, kind), height = _file_quantity(x.height, kind))
 
-# The `units` block a file declares, read: a VisualGeometryToolkitIO
-# `UnitContract`. A board declares a world length (mm), a density (dpi) and, on a
-# point grid, the length role `pattern` (pt); any other role is refused.
+# The `units` object a file declares (the envelope's, VisualGeometryToolkitIO 0.10),
+# read through IO's style: a board declares a world length (mm), a density (dpi)
+# and, on a point grid, the length role `pattern` (pt); any other role is refused.
 function _declared_units(x; required::Bool = true)
     if !haskey(x, :units)
         required || return (mm, dpi)
@@ -204,7 +208,7 @@ function _declared_units(x; required::Bool = true)
         )
         throw(ArgumentError("a board or pattern file declares its `units` (world, density); this one has none"))
     end
-    c = VgtkIO.from_json(VgtkIO.UnitContract, x.units)
+    c = VgtkIO.VgioStyle(x).contract
     extra = setdiff(keys(c.lengths), (:world, :pattern))
     isempty(extra) || throw(ArgumentError("a board file's units declare no length role $(first(extra)); only `pattern`"))
     haskey(c.lengths, :pattern) && (c.lengths.pattern == pt || throw(ArgumentError("the length role `pattern` is in pt, got $(c.lengths.pattern)")))

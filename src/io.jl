@@ -40,9 +40,9 @@ function make_filebase(
 end
 
 
-# Bundle JSON schema. Files are written in ONE format, board v6 and pattern v4:
-# every quantity a number in the unit the file's `units` block declares
-# (VisualGeometryToolkitIO's quantity format), the file in the vgio file shape
+# Bundle JSON schema. Files are written in ONE format, board v7.0 and pattern v5.0:
+# every quantity a number in the unit the file's `units` object declares (the
+# envelope's, VisualGeometryToolkitIO 0.10), the file in the vgio file shape
 # (`VgtkIO.write_record`). Every earlier schema is read through its version
 # step in memory (the `migrate_schema(::Val{schema}, tree)` methods of
 # src/migrate_boards.jl, run by `VgtkIO.read_record`), and can be rewritten
@@ -86,8 +86,15 @@ end
 # clone v5 and v3 were written by (which printed `3.0` as `3`), so the bytes
 # differ. Their version step reads the record with the current lift and gives
 # the tree the current writer writes (a render block's `"bleed": 0` is `0.0`).
-const BOARD_SCHEMA = "blobboards/board/v6"
-const PATTERN_SCHEMA = "blobboards/pattern/v4"
+#
+# board v7.0 / pattern v5.0 (2026-11, VisualGeometryToolkitIO 0.10): the 0.10
+# envelope. The record states no `units` of its own: `write_record` writes the
+# style's (`_bundle_style`: the world length, dpi and, on a point grid, the
+# length role `pattern` in pt) with `generator` and `conventions`; the body is
+# v6's / v4's key for key. Their step (and every earlier one) gives that units
+# object from the old layout by IO's `migrate_units`.
+const BOARD_SCHEMA = "blobboards/board/v7.0"
+const PATTERN_SCHEMA = "blobboards/pattern/v5.0"
 const IDENTITY_SCHEMA = "blobboards/board/v4"   # frozen: the schema a point-grid board's identity (and its QR code) is minted under
 const READABLE_SCHEMAS = (BOARD_SCHEMA, PATTERN_SCHEMA)
 # the schemas of the retired quantity form: read through their version steps (never written)
@@ -97,7 +104,7 @@ const MIGRATED_SCHEMAS = (
 )
 # the schemas of the JSON3-printed files, the current records under an earlier
 # name: read with the current lift through their version steps (never written)
-const PRINTED_SCHEMAS = ("blobboards/board/v5", "blobboards/pattern/v3")
+const PRINTED_SCHEMAS = ("blobboards/board/v6", "blobboards/pattern/v4", "blobboards/board/v5", "blobboards/pattern/v3")
 
 _bundle_schema(::BoardBundle) = BOARD_SCHEMA
 _bundle_schema(::PatternBundle) = PATTERN_SCHEMA
@@ -121,7 +128,8 @@ function save_json(
     if !overwrite && ispath(json_path)
         throw(ArgumentError("JSON already exist: $json_path"))
     end
-    VgtkIO.write_record(json_path, _bundle_tree(bundle, config_hash, render); style = _FILE_STYLE)
+    (; tree, style) = _bundle_file(bundle, config_hash, render)
+    _write_record(json_path, tree; style)
     return @info "Saved metadata" metadata = json_path
 end
 
@@ -134,13 +142,17 @@ end
 # The file declares its world `unit`: by default the first in which every length of the bundle and its render
 # block reads back bit for bit (`_file_length_unit`, json.jl); a migration keeps the unit of the file it migrates,
 # whose numbers it carries.
-function _bundle_tree(
+#
+# Returns the record (`tree`, no `units`: the envelope's) and the `style` it is written with, whose units object
+# `write_record` writes: the world `unit`, dpi and, on a point grid, the length role `pattern` (`_bundle_style`).
+function _bundle_file(
         bundle::AbstractBundle, config_hash::Union{Nothing, AbstractString}, render; unit = _bundle_length_unit(bundle, render)
     )
-    s = _file_style(unit)
-    output = (schema = _bundle_schema(bundle), JSON.lower(s, bundle)...)
+    style = _bundle_style(bundle, unit)
+    output = (schema = _bundle_schema(bundle), JSON.lower(style, bundle)...)
     config_hash === nothing || (output = merge(output, (; hashes = (config = String(config_hash),))))
-    return render === nothing ? output : merge(output, (; render = _lower_render(s, render)))
+    tree = render === nothing ? output : merge(output, (; render = _lower_render(style, render)))
+    return (; tree, style)
 end
 
 # The lengths a bundle's file holds (its configuration's, its render block's bleed), and the world unit they
