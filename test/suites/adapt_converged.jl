@@ -91,3 +91,38 @@ end
     @test BlobBoards._shape_refusal(-1.0, 0.0, -0.001, 10.0) == :aspect_ratio  # axis ratio √1000 ≈ 31.6 > 10
     @test BlobBoards._shape_refusal(-1.0, 0.0, -0.02, 10.0) == :none           # axis ratio √50 ≈ 7.1
 end
+
+@testset "adapt: a blob of 10–19 samples is judged on its isotropic fit" begin
+    # Fewer than `_MIN_POINTS_ANISOTROPIC` (20) samples fit the isotropic paraboloid
+    # z = a₀ + bᵀx + c·|x|² (4 parameters, Core's Paraboloid3D{T,4}: C = c·I); 20 or more
+    # the anisotropic one (6). Two dark Gaussian blobs (σ = 1.2 px) on a flat ground,
+    # each darkening only the pixels within `ρ` of its centre: the 13 pixels of
+    # |x|² ≤ 4.2 (the isotropic model) and the 21 of |x|² ≤ 5.3 (the anisotropic
+    # one); every other pixel of the scan window is the background (no sample). The
+    # data are exactly log-quadratic, so both models recover the blob: the shape
+    # σ·I, the centre, and a converged, unrefused record. The sites are 1.5 px
+    # discs (the seed, which the fit leaves). The image is Float64, so the data
+    # are log-quadratic to rounding, and every comparison is held at the IRLS's own
+    # stopping tolerance, `rtol` (1e-6, the relative parameter step).
+    σ, a, ground = 1.2, 0.4, 0.85
+    blobs = [(60.5, 40.5, 4.2, 13), (120.5, 40.5, 5.3, 21)]          # centre (pixel centres), ρ², samples
+    img = fill(ground, 80, 180)
+    for (cx, cy, ρ2, _) in blobs, y in axes(img, 1), x in axes(img, 2)
+        r2 = (x - 0.5 - cx)^2 + (y - 0.5 - cy)^2                       # pixel x's centre is x − ½
+        r2 <= ρ2 && (img[y, x] = ground - a * exp(-r2 / (2σ^2)))
+    end
+    for (cx, cy, ρ2, n) in blobs                                       # the sample counts the models are chosen by
+        @test count(I -> (I[2] - 0.5 - cx)^2 + (I[1] - 0.5 - cy)^2 <= ρ2, CartesianIndices(img)) == n
+    end
+    sites = [BlobBoards.Disc(BlobBoards.Point2(cx, cy), 1.5) for (cx, cy, _, _) in blobs]
+    cfg = BlobBoards.AdaptConfig()
+    frames = BlobBoards.adapt(sites, Gray.(img); config = cfg, device = CPU())
+    @test [f.id for f in frames] == [1, 2]
+    for f in frames
+        @test f.rejection === :none
+        @test VisualGeometryToolkitCore.successful_retcode(f.retcode)
+        @test f.frame.S ≈ σ * [1 0; 0 1] rtol = cfg.rtol
+        @test f.frame.center ≈ BlobBoards.Point2(blobs[f.id][1], blobs[f.id][2]) rtol = cfg.rtol
+    end
+    @test BlobBoards.count_rejected(frames) == 0
+end
