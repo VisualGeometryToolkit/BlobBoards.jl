@@ -1,4 +1,4 @@
-docs-pass: 56ddb9f
+docs-pass: a87dc2a
 landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.6.3 change is in the detection guide, which the next Docs deploy publishes)
 
 # 0.6.3 docs pass (julia-docs-pass) — Julia 1.13
@@ -12,6 +12,8 @@ refused at its seed.
   adaptation model (no change).
 - CHANGELOG: the 0.6.3 section names the result change; 0.6.2's header dated.
 - Docs build and the `docs`/`readme` items: run by the fresh-clone gate on Julia 1.13.3 against the registered stack.
+- Re-recorded after the compat floors were raised to Core 0.9.6, IO 0.9.4, Features 0.8.3, Estimation 0.10.2, Eval 0.7.3
+  (Project.toml [compat] and the CHANGELOG only; the README/guide install lines name no version: no docs change).
 
 ---
 
