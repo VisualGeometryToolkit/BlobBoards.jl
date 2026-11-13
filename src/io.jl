@@ -679,3 +679,41 @@ function load(::Type{T}, path::AbstractString) where {T <: AbstractBundle}
     image = _load_image(image_path, bundle)
     return bundle, image
 end
+
+# =============================================================================
+# The Python package's correspondence exports (python/blobboards/correspondences.py)
+# =============================================================================
+#
+# A BlobBoards run directory holds its observations (`observations.json`, IO's
+# `vgio/observations`) and the target definitions they resolve in (`targets_*.json`,
+# `vgio/rig`). The Python package hands them to third-party calibrators through
+# VisualGeometryToolkitIO's ONE export and converter — `save_correspondences` (the
+# references resolved into point arrays, the pixels moved into the calibrator's
+# frame) and `convert_opencv_calibration` (an OpenCV fit into the native camera
+# store and poses) — rather than restating them in Python. The pixel conventions
+# the Python side names: "opencv" (top-left pixel centre at (0, 0)), "colmap"
+# (0.5, 0.5), "matlab"/"julia" (1, 1).
+const _PYTHON_PIXEL_FRAMES = Dict("opencv" => PixelFrame{:opencv}, "colmap" => PixelFrame{:colmap},
+                                  "matlab" => PixelFrame{:julia}, "julia" => PixelFrame{:julia})
+function _python_pixel_frame(convention::AbstractString)
+    F = get(_PYTHON_PIXEL_FRAMES, String(convention), nothing)
+    F === nothing && throw(ArgumentError("unknown pixel convention $(repr(convention)); one of $(sort!(collect(keys(_PYTHON_PIXEL_FRAMES))))"))
+    return F
+end
+
+# `run_dir`'s correspondences in `convention`, exported to `out` (IO's `export/correspondences/v2`).
+function _correspondences_python(run_dir::AbstractString, convention::AbstractString, out::AbstractString)
+    obs = VgtkIO.load(VgtkCore.TargetObservations, joinpath(run_dir, "observations.json"))
+    rigs = sort!(filter(f -> startswith(basename(f), "targets_") && endswith(f, ".json"), readdir(run_dir; join = true)))
+    isempty(rigs) && throw(ArgumentError("$(run_dir): no targets_*.json beside its observations"))
+    VgtkIO.with_caller(() -> VgtkIO.save_correspondences(_python_pixel_frame(convention), out, obs, rigs...), BlobBoards)
+    return String(out)
+end
+
+# An OpenCV export written by the Python side (`path`) converted to the native camera store and poses beside it.
+function _convert_opencv_python(path::AbstractString, images, width::Integer, height::Integer, target::AbstractString)
+    r = VgtkIO.with_caller(BlobBoards) do
+        VgtkIO.convert_opencv_calibration(path; images = String.(collect(images)), image_size = (Int(width), Int(height)), target = String(target))
+    end
+    return (String(r.cameras), String(r.poses))
+end

@@ -35,6 +35,13 @@ Estimation 0.11 (bmvc2026 also Eval 0.8), with LocalOptimizationDoneRight 0.7. B
   are written by IO's `write_record`. Every earlier board and pattern file (v1–v6, v1–v4) still loads, through its
   version step, with its stored identity; `VisualGeometryToolkitIO.vgio_migrate` rewrites one. No board's uid or QR
   code moves (`IDENTITY_SCHEMA` stays `blobboards/board/v4`).
+- **Python `blobboards.correspondences` goes through VisualGeometryToolkitIO** (no Python copy of its formats):
+  `load_correspondences(run_dir, convention)` reads IO's `save_correspondences` export of the run
+  (`vgio/observations` + `vgio/rig`), one entry per (frame, target) — `t`, `image`, `sensor`, `target`,
+  `object_points` (mm, on the target's surface: a calibrated target's measured points, which the old reader
+  refused), `image_points` — where it was one entry per frame with `keys`; `write_native_calibration` writes the
+  OpenCV export and converts it with IO's `convert_opencv_calibration` (the current camera store and poses);
+  `opencv_lens_record` is deleted (IO's `opencv_lens`); `calibrate_opencv` and `save_matlab` take one target's views.
 - **One TIFF codec in the stack** (owner ruling): a `Tiff` board output and `rasterize_pdf`'s page go through
   VisualGeometryToolkitIO's `write_tiff` / `read_tiff` (libtiff; byte-identical board TIFFs). BlobBoards' own copy is
   deleted, with its public `BlobBoards.write_tiff` (call `VisualGeometryToolkitIO.write_tiff`) and the `Libtiff_jll`

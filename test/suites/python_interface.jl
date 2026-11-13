@@ -221,11 +221,10 @@
         end
     end
 
-    # The `opencv` export (blobboards.correspondences): OpenCV is fed the
-    # observations converted from their DECLARED frame — COLMAP's xy − 0.5 —
-    # and the fit is written natively, the two files migrate_opencv writes.
-    # cv2 itself is not in the py env, so the fit is replaced by a known camera
-    # and known poses; everything around it runs.
+    # The `opencv` export (blobboards.correspondences): OpenCV is fed VisualGeometryToolkitIO's
+    # correspondence export of the run in its own pixels — COLMAP's xy − 0.5 — and the fit is written
+    # natively through IO's convert_opencv_calibration. cv2 itself is not in the py env, so the fit is
+    # replaced by a known camera and known poses; everything around it runs.
     @testset "load_board / render_board: a v4 board's pixels at its own raster density or the caller's" begin
         dir = mktempdir()
         blob_board("A5"; blob_sizes = (9.0mm, 0.2short_side), seed = 0x40, dir)      # 9 mm discs
@@ -258,7 +257,7 @@
         @test JSON.parse(read(only(filter(endswith(".json"), readdir(pdf; join = true))), String)).render.shading_function == "sampled"
     end
 
-    @testset "opencv export: OpenCV's pixels from the declared frame, native v2 out" begin
+    @testset "opencv export: IO's correspondence export in OpenCV's pixels, IO's converter out" begin
         import PythonCall
         VgtkIO, VGC, Rot = BlobBoards.VisualGeometryToolkitIO, BlobBoards.VisualGeometryToolkitCore, BlobBoards.Rotations
         corr = PythonCall.pyimport("blobboards.correspondences")
@@ -267,22 +266,26 @@
         grid = [VGC.Vec3{Float64}(20.0 * i, 20.0 * j, 0.0) for i in 0:4 for j in 0:3]
         poses = [(Rot.RotMatrix{3, Float64}(Rot.RotXYZ(0.1 * k, -0.15, 0.05 * k)), VGC.Vec3{Float64}(-40.0, -30.0, 600.0 + 50k)) for k in 1:3]
         pix(R, t, X) = (P = R * X + t; VGC.Vec2{Float64}(f * P[1] / P[3] + cx, f * P[2] / P[3] + cy))
+        idpose = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0) .* VGC.m)   # a saved rig holds lengths as quantities
+        plane = [VGC.Vec2{Float64}(X[1], X[2]) .* VGC.mm for X in grid]
+        function save_run(dir, rig, ids)
+            tp = joinpath(dir, "targets_1.json")
+            VgtkIO.save(tp, rig)
+            obs = VGC.TargetObservations{VGC.PixelFrame{:colmap}}(
+                Dict(
+                    k => Dict(id => VGC.correspondences(collect(eachindex(grid)), [pix(R, t, X) for X in grid]) for id in ids)
+                        for (k, (R, t)) in enumerate(poses)
+                );
+                images = Dict(k => "f$(k).png" for k in eachindex(poses)), sensors = "cam", times = Dict{Int, Float64}(), time_origin = nothing,
+                targets = [VgtkIO.content_id(tp)],
+            )
+            VgtkIO.save(joinpath(dir, "observations.json"), obs)
+            return dir
+        end
         function run_dir(two_targets)
             dir = mktempdir()
             ids = two_targets ? (:b1, :b2) : (:b1,)
-            idpose = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0) .* VGC.m)   # a saved rig holds lengths as quantities
-            plane = [VGC.Vec2{Float64}(X[1], X[2]) .* VGC.mm for X in grid]
-            rig = VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.PosedTarget(VGC.PlanarTarget(plane), idpose) for id in ids))
-            tp = joinpath(dir, "targets_1.json")
-            VgtkIO.save(tp, rig)
-            obs = VGC.TargetPoints2D{VGC.PixelFrame{:colmap}}(
-                Dict(
-                    k => [(target = id, index = i, xy = pix(R, t, grid[i]), weight = 1.0) for id in ids for i in eachindex(grid)]
-                        for (k, (R, t)) in enumerate(poses)
-                );
-                images = Dict(k => "f$(k).png" for k in eachindex(poses)), sensors = "cam", targets = [VgtkIO.content_id(tp)],
-            )
-            VgtkIO.save(joinpath(dir, "observations.json"), obs)
+            save_run(dir, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.PosedTarget(VGC.PlanarTarget(plane), idpose) for id in ids)), ids)
             cam = VGC.CameraModel(VGC.LogicalIntrinsics(VGC.CameraCalibrationMat(f * px, [cx * px, cy * px])), VGC.Pinhole())
             VgtkIO.save(joinpath(dir, "camera_mocap.json"), Dict(:cam => VGC.BoundedCamera(cam, VGC.Size2(W, H))))
             return dir
@@ -292,90 +295,38 @@
         @test pyconvert(Int, PythonCall.pybuiltins.len(frames)) == length(poses)
         for (k, (R, t)) in enumerate(poses)
             U = pyconvert(Matrix{Float64}, frames[k - 1]["image_points"])
+            X = pyconvert(Matrix{Float64}, frames[k - 1]["object_points"])
             @test all(U[i, :] == pix(R, t, grid[i]) .- 0.5 for i in eachindex(grid))   # xy − 0.5, exactly
+            @test all(X[i, :] ≈ grid[i] for i in eachindex(grid))                     # millimetres, the target's frame
+            @test pyconvert(String, frames[k - 1]["target"]) == "b1"
         end
-        # a planar target whose calibration is not rigid has measured points other than its nominal ones:
-        # refused, never handed back as its design
-        bent = mktempdir()
-        cp(run, bent; force = true)
-        rigfile = joinpath(bent, "targets_1.json")
-        rec_bent = JSON.parse(read(rigfile, String))
-        @test rec_bent["schema"] == "vgio/rig/v9" && rec_bent["targets"][1]["target"]["calibration"]["type"] == "rigid"
-        rec_bent["targets"][1]["target"]["calibration"] = Dict("type" => "aspect", "parameters" => [0.01])
-        write(rigfile, JSON.json(rec_bent))
-        err = try
-            corr.load_correspondences(bent, "opencv")
-            nothing
-        catch e
-            e
-        end
-        @test err isa PythonCall.PyException && occursin("calibrated as 'aspect'", sprint(showerror, err))
-        # … and so is a composition of kinds (target v3's `{"type": "composition", "compose": [outer, …]}`)
-        rec_bent["targets"][1]["target"]["calibration"] = Dict(
-            "type" => "composition",
-            "compose" => [Dict("type" => "aspect", "parameters" => [0.01]), Dict("type" => "skew", "parameters" => [0.002])],
-        )
-        write(rigfile, JSON.json(rec_bent))
-        err = try
-            corr.load_correspondences(bent, "opencv")
-            nothing
-        catch e
-            e
-        end
-        @test err isa PythonCall.PyException && occursin("calibrated as 'composition'", sprint(showerror, err))
-        # a rigid planar target stated by its layout (rig v7+), a real AprilGrid target's record as IO writes it:
-        # skipped while no observation names it (a mixed rig reads its other target as before) …
-        apriltarget = VGC.PlanarTarget(VGC.AprilGrid(; tag_rows = 2, tag_cols = 3, tag_size = 20.0VGC.mm, tag_spacing = 6.0VGC.mm))
-        origin = VGC.EuclideanMap(one(Rot.RotMatrix{3, Float64}), VGC.Vec3{Float64}(0, 0, 0) .* VGC.m)
-        plane = [VGC.Vec2{Float64}(X[1], X[2]) .* VGC.mm for X in grid]
-        VgtkIO.save(rigfile, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(
-            :b1 => VGC.PosedTarget(VGC.PlanarTarget(plane), origin), :b9 => VGC.PosedTarget(apriltarget, origin),
-        )))
-        mixed = JSON.parse(read(rigfile, String))
-        @test any(t -> haskey(t["target"], "layout"), mixed["targets"]) && any(t -> haskey(t["target"], "nominal"), mixed["targets"])
-        @test pyconvert(Int, PythonCall.pybuiltins.len(corr.load_correspondences(bent, "opencv"))) == length(poses)
-        # … and refused, naming the layout record, once an observation names it
-        VgtkIO.save(rigfile, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(:b1 => VGC.PosedTarget(apriltarget, origin))))
-        laid = JSON.parse(read(rigfile, String))
-        @test laid["targets"][1]["target"]["layout"]["type"] == "april_grid" && !haskey(laid["targets"][1]["target"], "nominal")
-        err = try
-            corr.load_correspondences(bent, "opencv")
-            nothing
-        catch e
-            e
-        end
-        @test err isa PythonCall.PyException && occursin("stated by its layout ('april_grid')", sprint(showerror, err))
-        rec_bent = laid
-        # a v4 or v5 rig is refused by name
-        for old in ("vgio/rig/v4", "vgio/rig/v5")
-            rec_bent["schema"] = old
-            write(rigfile, JSON.json(rec_bent))
-            @test_throws PythonCall.PyException corr.load_correspondences(bent, "opencv")
-        end
-        # a frame seeing two targets is refused, before OpenCV is even imported
-        @test_throws PythonCall.PyException corr.calibrate_opencv(run_dir(true), "default")
-        # the fit's output, written natively, reads back as the camera and poses it came from
+        @test pyconvert(Tuple{Int, Int}, corr.image_size(run)) == (W, H)
+        # a calibrated planar target hands back its MEASURED points (IO resolves the calibration), not its design
+        bent = run_dir(false)
+        aspect = VGC.PlanarTarget(plane; calibration = VGC.Aspect(0.01))
+        save_run(bent, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(:b1 => VGC.PosedTarget(aspect, idpose))), (:b1,))
+        Xb = pyconvert(Matrix{Float64}, corr.load_correspondences(bent, "opencv")[0]["object_points"])
+        @test any(Xb[i, :] != grid[i] for i in eachindex(grid))
+        @test_throws PythonCall.PyException corr.load_correspondences(run, "pixels")      # an unknown convention
+        # two targets: one view per (frame, target); a calibration of both at once is refused before OpenCV is imported
+        two = run_dir(true)
+        @test pyconvert(Int, PythonCall.pybuiltins.len(corr.load_correspondences(two, "opencv"))) == 2 * length(poses)
+        @test_throws PythonCall.PyException corr.calibrate_opencv(two, "default")
+        # the fit's output, written natively by IO's converter, reads back as the camera and poses it came from
         K_cv = np.array(PythonCall.pylist([PythonCall.pylist([f, 0.0, cx - 0.5]), PythonCall.pylist([0.0, f, cy - 0.5]), PythonCall.pylist([0.0, 0.0, 1.0])]))
         pp = PythonCall.pylist([
             PythonCall.pydict(Dict("image" => "f$(k).png", "target" => "b1", "rvec" => np.array(PythonCall.pylist(collect(Rot.params(Rot.RotationVec(R))))), "tvec" => np.array(PythonCall.pylist(collect(t)))))
                 for (k, (R, t)) in enumerate(poses)
         ])
         out = mktempdir()
-        paths = corr.write_native_calibration(out, "calibration_opencv_default", K_cv, np.zeros(5), pp, PythonCall.pytuple((W, H)), PythonCall.pydict(Dict("source" => "opencv", "reprojection_error" => 0.0, "error_statistic" => "rms")))
+        paths = corr.write_native_calibration(out, "calibration_opencv_default", K_cv, np.zeros(5), pp, PythonCall.pytuple((W, H)), PythonCall.pydict(Dict("reprojection_error" => 0.0)))
         cams, posesf = pyconvert(String, paths[0]), pyconvert(String, paths[1])
         @test VgtkIO.validate(cams) == "cameras" && VgtkIO.validate(posesf) == "transforms"
         store = VgtkIO.load(Dict{Symbol, VGC.BoundedCamera}, cams)
         rec = only(values(store))
         @test only(keys(store)) == :calibration_opencv_default && VGC.extent(rec) == VGC.Size2(W, H)
         @test VGC.model(rec).intrinsics.K ≈ VGC.CameraCalibrationMat(f * px, [cx * px, cy * px]) atol = 1.0e-12   # canonical: OpenCV's cx + 0.5
-        # the writer's lens record IS VisualGeometryToolkitIO's opencv_lens, for every OpenCV vector length
-        for n in (4, 5, 8, 12, 14)
-            v = [1.0e-3 * (-1)^i * i for i in 1:n]
-            pyrec = corr.opencv_lens_record(np.array(PythonCall.pylist(v)))
-            rec_jl = JSON.parse(pyconvert(String, PythonCall.pyimport("json").dumps(pyrec)); dicttype = Dict{String, Any})
-            @test VGC.lens_from_record(rec_jl) === VgtkIO.opencv_lens(v)
-        end
-        @test_throws PythonCall.PyException corr.opencv_lens_record(np.zeros(6))
+        @test_throws PythonCall.PyException corr.write_native_calibration(out, "x", K_cv, np.zeros(6), pp, PythonCall.pytuple((W, H)))
         recs = VgtkIO.load(Vector{VGC.EuclideanMap}, posesf)
         @test all(((r, k),) -> VGC.geom(r) isa VGC.EuclideanMap{3, Float64, <:Any, <:Any, VGC.TargetFrame{:b1}, VGC.ViewFrame{Symbol("f$(k).png")}}, zip(recs, eachindex(poses)))
         # the loaded pose holds metres (a length is a quantity); the poses above are millimetres
