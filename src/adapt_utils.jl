@@ -36,7 +36,8 @@ using StaticArrays: SVector, SMatrix
 # Constants
 # =============================================================================
 
-const _MIN_POINTS_FIXED_CENTER = 10
+# A blob's IRLS model by its sample count: fewer than 10 is dropped, fewer than 20
+# fits the isotropic paraboloid (4 parameters), 20 or more the anisotropic one (6).
 const _MIN_POINTS_ISOTROPIC = 10
 const _MIN_POINTS_ANISOTROPIC = 20
 const _MIN_REGION_HALFWIDTH = 2

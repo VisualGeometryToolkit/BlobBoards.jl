@@ -869,11 +869,8 @@ function _adapt_ka(
     for i in 1:N
         valid[i] || continue
         n = Int(counts_h[i])
-        n < _MIN_POINTS_FIXED_CENTER && (valid[i] = false; continue)
-        np_vec[i] = Int32(
-            n < _MIN_POINTS_ISOTROPIC ? 2 :
-                n < _MIN_POINTS_ANISOTROPIC ? 4 : 6
-        )
+        n < _MIN_POINTS_ISOTROPIC && (valid[i] = false; continue)
+        np_vec[i] = Int32(n < _MIN_POINTS_ANISOTROPIC ? 4 : 6)   # the isotropic model (`_solved_quadratic`) or the full one
     end
     d_np = ka_upload(Int32, device, np_vec)
     d_valid_live = ka_upload(Bool, device, collect(valid))
