@@ -383,6 +383,18 @@ end
     return Int32(0)
 end
 
+# The model a blob's IRLS solved, from its parameter count `np`, in the 6-parameter
+# layout [a₀, bx, by, Cxx, Cxy, Cyy] the kernels hold: the anisotropic model (6: the
+# columns 1, dx, dy, dx², 2·dx·dy, dy²) as solved; the isotropic one (4: a₀, bx, by, c
+# over the columns 1, dx, dy, dx² + dy²) is Core's `Paraboloid3D{T,4}` (C = c·I),
+# whose 6-parameter coefficients `coeffs` gives.
+@inline function _solved_theta(AtWz, blob, np)
+    T = eltype(AtWz)
+    np == Int32(4) || return SVector{6, T}(ntuple(j -> AtWz[j, 1, blob], Val(6)))
+    iso = Paraboloid3D(SVector{4, T}(ntuple(j -> AtWz[j, 1, blob], Val(4))))
+    return coeffs(Paraboloid3D{T, 6}(iso))
+end
+
 # The gate's verdict by name (host side, and the tests): `:none` (acceptable),
 # `:not_peak` or `:aspect_ratio`.
 _shape_refusal(θ4, θ5, θ6, max_aspect_ratio) =
@@ -536,7 +548,7 @@ end
             wi = Ta(w[gid]) * fi * fi
             a1 = Ta(A[gid, 1]); a2 = Ta(A[gid, 2]); a3 = Ta(A[gid, 3])
             a4 = Ta(A[gid, 4]); a5 = Ta(A[gid, 5]); a6 = Ta(A[gid, 6])
-            # The isotropic model (np = 4): one curvature, θ₄ = θ₆ on dx² + dy².
+            # the isotropic model's column 4 is dx² + dy² (`_solved_theta`)
             np[blob] == Int32(4) && (a4 += a6)
             acc[1] += wi * a1 * a1; acc[2] += wi * a1 * a2; acc[3] += wi * a1 * a3
             acc[4] += wi * a1 * a4; acc[5] += wi * a1 * a5; acc[6] += wi * a1 * a6
@@ -624,11 +636,8 @@ end
             valid[blob] = false
         else
             m = np[blob]
-            # The quadratic part C of the step: the isotropic model's (np = 4) is θ₄·I.
-            iso = m == Int32(4)
-            θ5 = iso ? zero(Ta) : AtWz[5, 1, blob]
-            θ6 = iso ? AtWz[4, 1, blob] : AtWz[6, 1, blob]
-            refused = _shape_gate_state(AtWz[4, 1, blob], θ5, θ6, max_aspect_ratio)
+            θ = _solved_theta(AtWz, blob, m)
+            refused = _shape_gate_state(θ[4], θ[5], θ[6], max_aspect_ratio)
             if refused != Int32(0)
                 for j in 1:6
                     theta[j, blob] = theta_old[j, blob]
@@ -636,12 +645,8 @@ end
                 # Stopped, NOT converged: the shape gate refused the step (why).
                 converged[blob] = refused
             else
-                for j in 1:Int(m)
-                    theta[j, blob] = AtWz[j, 1, blob]
-                end
-                if iso
-                    theta[5, blob] = θ5
-                    theta[6, blob] = θ6
+                for j in 1:6
+                    theta[j, blob] = θ[j]
                 end
                 diff_sq = zero(Ta)
                 norm_sq = zero(Ta)
