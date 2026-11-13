@@ -337,7 +337,7 @@ rewrites one in the current version, its uid kept.
   has one hash.
   `rebuild_board` and the gallery's regeneration render as recorded; a file
   without the block renders as PDF/X-4 with no label.
-- **Older schemas migrate, they do not load.** Boards before v5 and patterns
+- **Older schemas load through their version steps, and migrate once.** Boards before v5 and patterns
   before v3 stored every quantity as a `{"value": …, "unit": …}` object. They are
   migrated once with VisualGeometryToolkitIO's `vgio_migrate(path)` (or
   `bin/vgio_migrate.jl file|tree`), which reads the old file, writes the current file
@@ -347,8 +347,8 @@ rewrites one in the current version, its uid kept.
   the fraction converts to the largest σ it produced, so v1 boards re-place
   bit-identically), v1/v2 rulers (a `ruler_spec.width` and half-length tick
   widths: the one is dropped and the others doubled, the ruler those boards were
-  drawn with), v3 pixel-grid files and v4 point-grid files. `load_bundle` refuses
-  an old file and names the command. The command-line form needs BlobBoards
+  drawn with), v3 pixel-grid files and v4 point-grid files. `load_bundle` reads
+  an old file through its step, in memory (the file untouched). The command-line form needs BlobBoards
   loaded, which is what registers these migrations:
   `julia --project=. -e 'using BlobBoards; import VisualGeometryToolkitIO as VgtkIO; include(joinpath(pkgdir(VgtkIO), "bin", "vgio_migrate.jl"))' tree --apply DIR`.
 - **The file format is not part of the identity.** `hashes.config` is minted
