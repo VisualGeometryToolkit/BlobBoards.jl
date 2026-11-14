@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1 (2026-11-14)
+
+- **The `blobboards` Python package (0.2.1) no longer touches a Julia host's environment.** Imported from Julia through
+  PythonCall (`pyimport("blobboards")`, as BlobBoards' own test suite does), its first call ran `import Pkg`,
+  activated `authoring/` and instantiated it inside the host session: under `Pkg.test` (whose LOAD_PATH holds no
+  `@stdlib`) that failed with `Package Pkg not found in current path`, and elsewhere it re-pointed the host's active
+  project. With Julia as the host it now only runs `using BlobBoards` in that session's environment; from Python
+  (juliacall the host) it activates `authoring/` as before.
+
 ## 0.7.0 (2026-11-13)
 
 On the VisualGeometryToolkit wave-10 stack: VisualGeometryToolkitCore 0.10, IO 0.10, Features 0.9,

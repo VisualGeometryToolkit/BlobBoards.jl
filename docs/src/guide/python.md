@@ -33,7 +33,10 @@ pip install -e .        # juliacall, numpy; `pip install pint matplotlib` for un
 The package runs Julia in the checkout's `authoring/` environment, which adds
 PythonCall (the Python wrappers' Julia side) to the checkout, plus CUDA and
 cuDNN, which are loaded only when detection first runs. The package activates
-it on first use; the first call can take minutes on a fresh machine.
+it on first use; the first call can take minutes on a fresh machine. Imported
+from a Julia session through PythonCall (`pyimport("blobboards")`), it uses that
+session's environment instead, which must hold BlobBoards and PythonCall, and
+activates nothing.
 
 ## Functions
 

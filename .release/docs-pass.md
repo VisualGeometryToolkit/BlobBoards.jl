@@ -1,3 +1,21 @@
+docs-pass: a535d08 + this commit (the 0.7.1 patch)
+landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.7.1 change is one paragraph of the Python guide, which the next Docs deploy publishes)
+
+# 0.7.1 docs pass (julia-docs-pass) — Julia 1.13
+
+BlobBoards 0.7.1 is a patch (GitHub CI run 43529713233, main a535d08): the `blobboards` Python package (0.2.1),
+imported from Julia through PythonCall, ran `import Pkg` and activated authoring/ in the host session; under
+`Pkg.test` that is "Package Pkg not found in current path". With Julia the host it now only loads BlobBoards from the
+host's environment.
+[x] API diff since 0.7.0: none (no Julia or Python name added, removed or re-signatured; `_init` is internal).
+[x] Docstrings: none describe the environment handling (no change).
+[x] Guides: docs/src/guide/python.md "Manual setup" now states the Julia-host case (the session's environment, which
+    must hold BlobBoards and PythonCall; nothing activated). README and python/README: no environment text (no change).
+[x] CHANGELOG: the 0.7.1 section, dated, names the failure and the fix; blobboards (Python) 0.2.1.
+[x] Docs build: docs/make.jl (strict) in the release gate.
+
+---
+
 docs-pass: 17ce292
 landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; it shows 0.7.0 once main's Docs job deploys it)
 

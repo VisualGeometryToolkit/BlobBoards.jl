@@ -17,7 +17,7 @@ Examples
 (300, 400)
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from dataclasses import dataclass
 from typing import Optional
@@ -328,10 +328,26 @@ def _init():
     # juliacall has not been imported yet; a caller's own settings win.
     os.environ.setdefault("PYTHON_JULIACALL_HANDLE_SIGNALS", "yes")
     os.environ.setdefault("PYTHON_JULIACALL_THREADS", "auto")
+    import juliacall
     from juliacall import Main as jl
     _jl = jl
 
-    # Activate BlobBoards.jl's companion environment (authoring/Project.toml):
+    # Julia is the host process (Python embedded by PythonCall: a Julia
+    # session, or BlobBoards' own `Pkg.test`, calling `pyimport("blobboards")`).
+    # PythonCall loads its bundled juliacall with PYTHON_JULIACALL_INIT=no, so
+    # CONFIG["init"] is False. The environment is then the host's: activating
+    # authoring/ would re-point the host's active project mid-session, and
+    # `import Pkg` need not even resolve there (Pkg.test's LOAD_PATH is the
+    # test sandbox alone, without @stdlib: "Package Pkg not found in current
+    # path" on GitHub CI, 2026-11-13). Load BlobBoards from the host's
+    # environment, which already holds it and PythonCall (hence the
+    # BlobBoardsPythonExt wrappers this module calls).
+    if not juliacall.CONFIG.get("init", True):
+        _jl.seval("using BlobBoards")
+        _initialized = True
+        return
+
+    # Python is the host. Activate BlobBoards.jl's companion environment (authoring/Project.toml):
     # it dev's the checkout and lists PythonCall (BlobBoardsPythonExt, the
     # Python wrappers), a weak dependency the root project cannot load itself;
     # the old `Pkg.add("PythonCall")` here rewrote the tracked root

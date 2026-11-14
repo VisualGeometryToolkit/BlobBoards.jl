@@ -261,6 +261,10 @@
         import PythonCall
         VgtkIO, VGC, Rot = BlobBoards.VisualGeometryToolkitIO, BlobBoards.VisualGeometryToolkitCore, BlobBoards.Rotations
         corr = PythonCall.pyimport("blobboards.correspondences")
+        # Julia hosts Python here: the blobboards package must load BlobBoards from
+        # THIS environment, never activate authoring/ (it did, re-pointing the test
+        # process's project) nor `import Pkg` (Pkg.test's LOAD_PATH has no @stdlib).
+        host_project = Base.active_project()
         np = PythonCall.pyimport("numpy")
         W, H, f, cx, cy = 1280, 960, 1000.0, 640.5, 480.5                       # canonical (COLMAP) principal point
         grid = [VGC.Vec3{Float64}(20.0 * i, 20.0 * j, 0.0) for i in 0:4 for j in 0:3]
@@ -292,6 +296,7 @@
         end
         run = run_dir(false)
         frames = corr.load_correspondences(run, "opencv")
+        @test Base.active_project() == host_project
         @test pyconvert(Int, PythonCall.pybuiltins.len(frames)) == length(poses)
         for (k, (R, t)) in enumerate(poses)
             U = pyconvert(Matrix{Float64}, frames[k - 1]["image_points"])
