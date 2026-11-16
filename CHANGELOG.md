@@ -11,8 +11,14 @@ no host-LM verdict: its convergence record is the detector's IRLS (`retcode`, `s
 and board geometry are unchanged; an authored board names 0.7.2 where it names the version (the TIFF Software tag,
 the PDF Creator, the sheet footer), so its bytes differ from 0.7.1's there.
 
-bmvc2026 needs the Eval 0.9 port (held on port-eval09 for the owner); the package itself is unaffected. Core 0.11 admits
-no Eval 0.8, and bmvc2026 still calls `cached_result`, which Eval 0.9.0 removed.
+The GPU readme row's environment takes `test/Project.toml`'s GPUCompiler ≤ 1.9 and LLVM ≤ 9.8.0 bounds. The
+install line resolves CUDA 5.11.1, and with GPUCompiler ≥ 1.10 its 3-argument `link_libraries!` override is
+deprecated, so the row's first kernel failed under `--depwarn=error`.
+
+bmvc2026 needs its held Eval 0.9 / IO 0.10 port (on port-eval09 for the owner); the package itself is unaffected. Core
+0.11 admits no Eval 0.8, and bmvc2026 still calls the Eval 0.8 caching API that Eval 0.9.0 removed (`cached_result`,
+`keyed_cell_dir`); its formats test still expects the record schemas from before IO 0.10 (`vgio/transforms/v4`,
+`vgio/rig/v9`, a target type `planar`).
 
 ## 0.7.1 (2026-11-14)
 

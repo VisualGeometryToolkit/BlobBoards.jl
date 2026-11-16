@@ -88,7 +88,12 @@ end
     using CUDA: CUDA
     include("suites/readme_rows.jl")
     if get(ENV, "BB_TEST_SKIP_GPU", "0") != "1" && CUDA.functional()
-        run_row("find boards on the GPU"; setup = BlobBoards.CUDA_RUNTIME_PIN)
+        # The row's environment takes test/Project.toml's GPUCompiler and LLVM bounds (their comment there says why
+        # and when to lift them). The install line resolves CUDA 5.11.1, because no cuDNN for CUDA 5 admits 5.11.2+.
+        # Unbounded, that CUDA meets a GPUCompiler ≥ 1.10, which deprecates CUDA 5.11.1's 3-argument
+        # `link_libraries!` override, and the row's first kernel fails under --depwarn=error, which the child inherits.
+        bounds = """Pkg.add([PackageSpec(name = "GPUCompiler", version = "1.9"), PackageSpec(name = "LLVM", version = "9.8.0")]; io = devnull)"""
+        run_row("find boards on the GPU"; setup = bounds * "\n" * BlobBoards.CUDA_RUNTIME_PIN)
     else
         @test_skip "find boards on the GPU: no functional CUDA device"
     end
