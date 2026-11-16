@@ -1,0 +1,16 @@
+% poster_error_floorplan_ab.tex — the POSTER's copy of
+% figures/floorplan/error_floorplan_ab.tex (rows (a) and (b) of the floorplan
+% figure). Same panels, same layout; only the row captions differ: lowercase,
+% as in the poster's other figures (the paper keeps Title Case, set by
+% scripts/plots/error_distributions.jl, which regenerates the original).
+% The panel files are still the generated ones.
+\providecommand{\fpscale}{1}\renewcommand{\fpscale}{0.42}   % fan geometry scale (fonts unaffected)
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{tabular}{@{}ccc l@{}}
+\textbf{BlobBoards} & \textbf{AprilTag} & \textbf{ArUco} & \\[2pt]
+\input{figures/floorplan/floorplan_blob_det} & \input{figures/floorplan/floorplan_april_det} & \input{figures/floorplan/floorplan_aruco_det} & \input{figures/floorplan/floorplan_cbar_det} \\[2pt]
+\multicolumn{3}{c}{(a) probability of detection} & \\[8pt]
+\input{figures/floorplan/floorplan_blob_trans} & \input{figures/floorplan/floorplan_april_trans} & \input{figures/floorplan/floorplan_aruco_trans} & \input{figures/floorplan/floorplan_cbar_trans} \\[2pt]
+\multicolumn{3}{c}{(b) median translation error [mm]} & \\
+\end{tabular}

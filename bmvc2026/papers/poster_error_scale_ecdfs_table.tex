@@ -1,0 +1,27 @@
+% poster_error_scale_ecdfs_table.tex — the POSTER's copy of figures/floorplan/error_scale_ecdfs_table.tex:
+% same panels, same layout, all captions lowercase (the poster style; the
+% paper keeps the original, which scripts/plots/ regenerates). The panel
+% files are still the generated ones.
+\centering
+\setlength{\tabcolsep}{2pt}
+\providecolor{bbGreen}{HTML}{009E73}
+\providecolor{bbBlue}{HTML}{0072B2}
+\providecolor{bbOrange}{HTML}{E69F00}
+\begin{tabular}{@{}ccc@{}}
+{\small small (4\,cm)} & {\small medium (6\,cm)} & {\small large (12\,cm)} \\[1pt]
+\input{figures/floorplan/hist_trans_small} & \input{figures/floorplan/hist_trans_medium} & \input{figures/floorplan/hist_trans_large} \\
+\multicolumn{3}{c}{(a) translation error} \\[6pt]
+\input{figures/floorplan/hist_rot_small} & \input{figures/floorplan/hist_rot_medium} & \input{figures/floorplan/hist_rot_large} \\
+\multicolumn{3}{c}{(b) rotation error} \\
+\\%[4pt]
+\multicolumn{3}{c}{
+\begin{tikzpicture}[baseline]
+\draw[bbBlue, line width=1.2pt] (0.0cm,0) -- (0.6cm,0);
+\node[anchor=west, font=\small] at (0.7cm,0) {BlobBoards};
+\draw[bbOrange, line width=1.2pt] (3.0cm,0) -- (3.6cm,0);
+\node[anchor=west, font=\small] at (3.7cm,0) {AprilTag};
+\draw[bbGreen, line width=1.2pt] (6.0cm,0) -- (6.6cm,0);
+\node[anchor=west, font=\small] at (6.7cm,0) {ArUco};
+\end{tikzpicture}
+}
+\end{tabular}
