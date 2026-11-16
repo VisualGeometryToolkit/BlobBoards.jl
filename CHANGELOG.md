@@ -3,17 +3,16 @@
 ## 0.7.2 (2026-11-16)
 
 On VisualGeometryToolkitCore 0.11, Estimation 0.12, IO 0.10.6 and Features 0.9.7, with LocalOptimizationDoneRight 0.7.1
-(`[compat]` in the package and every member that names them: test, docs, examples, gpu, bmvc2026; bmvc2026 also Eval
-0.9.2). No API change.
+(`[compat]` in every workspace member's entry; bmvc2026 also Eval 0.9.2). No API change.
 
-Core 0.11.0 reports a host-LM tolerance stop on a finite step as `Success` (it used to be `Stalled` at a
-non-stationary point). BlobBoards reads no host-LM verdict. Its one convergence record is the detector's own IRLS
-(`retcode` and `stop_rule` of each blob, through Estimation's `irls_termination`, unchanged), and it never reads the
-`worst_retcode` of `find_homography` or `find_absolute_pose`, whose models and inliers Estimation 0.12 leaves
-unchanged. The detections and boards are the same, so this is a patch.
+Core 0.11.0 reports a host-LM tolerance stop on a finite step as `Success` (it used to be `Stalled`). BlobBoards reads
+no host-LM verdict: its convergence record is the detector's IRLS (`retcode`, `stop_rule`, through Estimation's
+`irls_termination`), and it never reads the `worst_retcode` of `find_homography` or `find_absolute_pose`. Detections
+and board geometry are unchanged; an authored board names 0.7.2 where it names the version (the TIFF Software tag,
+the PDF Creator, the sheet footer), so its bytes differ from 0.7.1's there.
 
 bmvc2026 needs the Eval 0.9 port (held on port-eval09 for the owner); the package itself is unaffected. Core 0.11 admits
-no Eval 0.8, and bmvc2026 still calls the Eval 0.8 caching API that Eval 0.9.0 removed (`cached_result`).
+no Eval 0.8, and bmvc2026 still calls `cached_result`, which Eval 0.9.0 removed.
 
 ## 0.7.1 (2026-11-14)
 
