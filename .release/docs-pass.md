@@ -1,3 +1,19 @@
+docs-pass: ca7823e
+landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; 0.7.2 changes no page)
+
+# 0.7.2 docs review (the Julia docs skill), on VisualGeometryToolkitCore 0.11 / Estimation 0.12 / IO 0.10.6 / Features 0.9.7 / LODR 0.7.1
+
+[x] API diff since 0.7.1: none (git diff c97dc39..ca7823e -- src ext python README.md is empty; docs/ moves its
+    Features compat only).
+[x] Docstrings and guides: no page describes a host-LM verdict; the detector's `retcode`/`stop_rule` (its IRLS,
+    Estimation's `irls_termination`) are unchanged. The suite's `docs` item and docs/make.jl (strict) run in the gate.
+[x] README and install lines: no stack version named; the readme rows resolve the install lines in the gate (the GPU
+    row with the test environment's GPUCompiler/LLVM bounds).
+[x] The TIFF byte pins re-pinned at 0.7.2 (test/suites/boards.jl); the CHANGELOG says an authored board names its version.
+[x] bmvc2026 needs its held Eval 0.9 / IO 0.10 port (port-eval09); the CHANGELOG says so.
+
+---
+
 docs-pass: a535d08 + this commit (the 0.7.1 patch)
 landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; the 0.7.1 change is one paragraph of the Python guide, which the next Docs deploy publishes)
 
