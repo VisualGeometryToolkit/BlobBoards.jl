@@ -75,9 +75,9 @@ using DrWatson
 
 using BlobBoards
 using CairoMakie; CairoMakie.activate!()
-using CUDA
-import cuDNN
-using CUDA: CUDABackend
+# using CUDA
+# import cuDNN
+# using CUDA: CUDABackend
 using FileIO: load as load_image, save as save_image
 using Colors: Gray, distinguishable_colors, RGB
 using Images: imresize, N0f8
@@ -93,9 +93,10 @@ end
 using Main.BlobBoardsEval: data_root, results_root, paper_images_dir, figure_config, write_figure_records, network_path, load_config
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
+using KernelAbstractions: CPU
 
 const BB = BlobBoards
-const DEVICE = CUDABackend()
+const DEVICE = CPU()
 const CFG, CFG_PATH = figure_config("adapted_panels"; default = projectdir("configs", "figures", "adapted_panels.toml"))
 const INP, FB, RND, OUT, JPG = CFG["inputs"], CFG["find_boards"], CFG["render"], CFG["output"], CFG["jpeg"]
 const ROOT = data_root(; tiers = String.(CFG["experiment"]["tiers"]))
@@ -182,7 +183,7 @@ function main()
     # panels look washed out next to Fig. 1.
     img_color = load_image(IMG_PATH)
     img = Gray.(img_color)
-    net = DescriptorNetwork(_network_path(INP["network"]))
+    net = DescriptorNetwork(_network_path(INP["network"]), allow_cpu_fallback = true)
     mkpath(dirname(GALLERY))
     gallery = BoardGallery(GALLERY, net)
     board_paths = filter(endswith(".json"), readdir(joinpath(ROOT, INP["boards_dir"]); join = true))

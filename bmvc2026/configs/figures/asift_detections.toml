@@ -1,0 +1,43 @@
+# Config of record of scripts/make_asift_detections.jl: the RAW ASIFT detections
+# (detect_blobs, before adaptation) on a blob-board photo, drawn on the photo and
+# on a Gaussian-blurred copy of it.
+
+[experiment]
+generator = "asift_detections"
+tiers = ["bb_pipeline_figure"]          # DSC02800 ships in bb_pipeline_figure (as for pipeline_panels)
+
+[inputs]
+image = "IMG_6441.jpeg"   # data_root()-relative (the adapted panels' teaser photo)
+
+[detect]
+device = "auto"                          # "auto" (CUDA on Linux, else CPU) | "cuda" | "cpu"
+polarity = "dark"                        # "dark" | "light" | "none"
+peak_threshold = 0.1
+edge_threshold = 5.0
+nms = "ellipse"                          # "ellipse" | "mxm" | "none" (every per-warp extremum, no cross-warp suppression)
+nms_cutoff = "default"                   # EllipseNms footprint; "default" = BlobBoards.DEFAULT_CUTOFF
+upsample = false                         # 2x upsample (pyramid from octave -1)
+
+[blur]
+sigma = 32.0                              # Gaussian σ of the blurred copy, in pixels of the photo
+redetect = false                         # false: the SAME detections drawn on the blurred copy; true: detect again on it
+
+[render]
+crop = []                                # [row0, col0, rows, cols] of the photo (1-based); [] = the full image
+figure_width = 1600                      # Makie units per panel; height follows the (cropped) image's aspect
+px_per_unit = 1.5
+cutoff = "default"                       # ellipse drawn at cutoff·σ; "default" = BlobBoards.DEFAULT_CUTOFF
+color_by = "single"                       # "warp" (one colour per ASIFT warp) | "single"
+color = "red"                         # used when color_by = "single"
+strokewidth = 1.5
+alpha = 0.9
+
+[output]
+dir = "asift_detections"                 # under plotsdir()
+paper_dir = "asift_detections"           # ALSO copied here, under papers/images (paper_images_dir; BB_PAPER_IMAGES overrides); "" = don't
+names = ["asift_original.png", "asift_blurred.png", "asift_side_by_side.png"]
+
+[jpeg]
+# Each panel is ALSO written as a JPEG of the same render (same name, .jpg).
+write = true
+quality = 90

@@ -3,11 +3,8 @@
 	a0paper,
 	portrait,
 	colspace=15mm,
-    blockverticalspace=5mm,
-    % margin=25mm
+    blockverticalspace=5mm
 ]{tikzposter}
-
-% \renewcommand{\cite}[1]{}
 
 \renewcommand{\familydefault}{\sfdefault}
 
@@ -70,18 +67,30 @@
 
 \institute{Marine Data Science, Kiel University}
 
+\newlength{\subcaptiongap}
+\setlength{\subcaptiongap}{0.5cm}
+
 \definecolor{TFblau}{HTML}{003d86}
 \definecolor{CAUpurple}{HTML}{9b0a7d}
 
+\iftrue
+    \definecolor{ThemeColor}{named}{CAUpurple}
+    \newcommand{\caulogo}{images/logos/kite/PDKiTE_norm_en_lilagreylila_CMYK_v.pdf}
+    \newcommand{\qrcode}{images/project_page_qr_purple.png}
+\else
+    \definecolor{ThemeColor}{named}{TFblau}
+    \newcommand{\caulogo}{images/logos/kite/PDKiTE_norm_en_blackgrey2_SW_v.pdf}
+    \newcommand{\qrcode}{images/project_page_qr_blue.png}
+\fi
 
 \definecolorstyle{TFStyle}{
-    \definecolor{colorOne}{named}{TFblau}
+    \definecolor{colorOne}{named}{ThemeColor}
     \definecolor{colorTwo}{named}{white}
 }{
     \colorlet{backgroundcolor}{white}
 	\colorlet{framecolor}{colorOne}
 	\colorlet{titlebgcolor}{colorOne}
-    \colorlet{titlefgcolor}{white}
+    \colorlet{titlefgcolor}{colorOne}
 	\colorlet{notefgcolor}{black}
     \colorlet{notebgcolor}{colorOne!20}
     \colorlet{notefrcolor}{colorOne}
@@ -97,41 +106,36 @@
 
 \usetheme{Desert}
 \usecolorstyle{TFStyle}
-\usetitlestyle{VerticalShading}
+\usetitlestyle[width=\paperwidth, innersep=0pt, titletotopverticalspace=0mm]{Empty}
+
+\newcommand{\headerheight}{10cm}
+\setlength{\fboxsep}{0pt}
+\setlength{\fboxrule}{0pt}
 
 \makeatletter
 \settitle{
-    \centering
-    \makebox[\linewidth]{
-        \begin{minipage}{0.1\linewidth}
+    \makebox[\linewidth][s]{%
+        \begin{minipage}[t]{0.25\linewidth}\vspace{0pt}
+            \includegraphics[width=\linewidth]{\caulogo}
+        \end{minipage}%
+        \hfill%
+		\begin{minipage}[t]{0.55\linewidth}\vspace{1.5cm}
             \centering
-            \includegraphics[width=\linewidth]{images/logos/kite/PDKiTE_norm_en_blackwhitegrey_SW_v.eps}
-			\vfill
-        \end{minipage}
-		\hfill
-        \begin{minipage}{0.1\linewidth}
-            \centering
-            % \includegraphics[width=\linewidth]{images/project_page_qr.png}
-        \end{minipage}
-        \hfill
-		\begin{minipage}{0.55\linewidth}
-            \centering
-            \color{titlefgcolor} {\Huge \scshape \@title \par}
+            \color{titlefgcolor} {\Huge \scshape \bfseries \@title \par}
             \vspace*{1em}
             {\huge \@author \par}
             \vspace*{1em}
             {\LARGE \@institute}
-        \end{minipage}
-		\hfill
-        \begin{minipage}{0.1\linewidth}
+        \end{minipage}%
+        \hfill%
+        \begin{minipage}[t][\headerheight]{0.1\linewidth}\vspace{0pt}
             \centering
-            \includegraphics[width=\linewidth]{images/logos/bmvc-2026-white.png}
-        \end{minipage}
-        \hfill
-        \begin{minipage}{0.1\linewidth}
-            \centering
-            \includegraphics[width=\linewidth]{images/project_page_qr.png}
-        \end{minipage}
+            \vspace{1.5cm}
+            \includegraphics[width=\linewidth]{images/logos/bmvc-2026-white.png}\\
+            \vspace{1.5cm}
+            \includegraphics[width=0.8\linewidth]{\qrcode}
+        \end{minipage}%
+        \hspace{1.5cm}
     }
 }
 \makeatother
@@ -145,88 +149,28 @@
 
 \block{Contribution}{
     \begin{center}
-        \includegraphics[width=0.9\linewidth]{images/intro_overlay_transparent_background.png}
+        \includegraphics[width=\linewidth]{images/intro_overlay.png}
     \end{center}
 
-    \textbf{Fiducial marker system}
+    \textbf{fiducial marker system} that is
     \begin{itemize}[nosep]
         \item intrinsically multiscale
-        \item coverage density for accuracy
-        \item robustness against occlusion
+        \item accurate through coverage density
+        \item robust against occlusion
     \end{itemize}
 }
 
 \block{Why Blobs?}{
-    % 	\begin{center}
-    % 	\begin{minipage}{0.31\linewidth}
-    % 		\centering
-    % 		{\small maximum diameter fraction}\\[2pt]
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_259_e8a21_co1.5_a1.2_df0.4_s0.2.png}
-    % 		\end{minipage}
-    % 		\hfill
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_d2d_1c2c0_co1.5_a1.2_df0.5_s0.2.png}
-    % 		\end{minipage}
-    % 		\hfill
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_714_d3d26_co1.5_a1.2_df0.7_s0.2.png}
-    % 		\end{minipage}
-    % 	\end{minipage}
-    % 	\hfill
-    % 	\begin{minipage}{0.31\linewidth}
-    % 		\centering
-    % 		{\small minimum blob scale}\\[2pt]
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_259_e8a21_co1.5_a1.2_df0.4_s0.2.png}
-    % 		\end{minipage}
-    % 		\hfill
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_76a_dc19e_co1.5_a1.2_df0.4_s0.7.png}
-    % 		\end{minipage}
-    % 		\hfill
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_09f_028f0_co1.5_a1.2_df0.4_s1.7.png}
-    % 		\end{minipage}
-    % 	\end{minipage}
-    %     \hfill
-    % 	\begin{minipage}{0.31\linewidth}
-    % 		\centering
-    % 		{\small support cutoff $c$}\\[2pt]
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_259_e8a21_co1.5_a1.2_df0.4_s0.2.png}
-    % 		\end{minipage}
-    % 		\hfill
-    % 		\begin{minipage}{0.31\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_00d_01603_co1.8_a1.2_df0.4_s0.2.png}
-    % 		\end{minipage}
-    % 		\hfill
-    % 		\begin{minipage}{0.3\linewidth}
-    % 			\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_3af_2509f_co2.0_a1.2_df0.4_s0.2.png}
-    % 		\end{minipage}
-    % 	\end{minipage}
-    % 	% \hfill
-    % 	% \begin{minipage}{0.48\linewidth}
-    % 	% 	\centering
-    % 	% 	{\small scale-sampling distribution}\\[2pt]
-    % 	% 	\begin{minipage}{0.32\linewidth}
-    % 	% 		\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_259_e8a21_co1.5_a1.2_df0.4_s0.2.png}
-    % 	% 	\end{minipage}
-    % 	% 	\hfill
-    % 	% 	\begin{minipage}{0.32\linewidth}
-    % 	% 		\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_028_1251d_co1.5_a1.6_df0.4_s0.2.png}
-    % 	% 	\end{minipage}
-    % 	% 	\hfill
-    % 	% 	\begin{minipage}{0.32\linewidth}
-    % 	% 		\includegraphics[width=\linewidth]{images/blob_variations_squared/blob_pattern_4a3_79c86_co1.5_a2.4_df0.4_s0.2.png}
-    % 	% 	\end{minipage}
-    % 	% \end{minipage}
-    % \end{center}
-
-\begin{itemize}[nosep]
-    \item maximises SIFT response
-    \item robust to defocus
-\end{itemize}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        {maximises SIFT response}\\[\subcaptiongap]
+        \includegraphics[width=\linewidth]{images/asift_detections/asift_original.jpg}
+    \end{minipage}\hfill%
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        {robust to defocus}\\[\subcaptiongap]
+        \includegraphics[width=\linewidth]{images/asift_detections/asift_blurred.jpg}
+    \end{minipage}
 }
 
 % one panel is \pipepanel wide (3:4); panels sit \pipegap = 0.047 panels apart
@@ -240,37 +184,36 @@
 	\setlength{\pipegap}{0.047\pipepanel}%
 	\begin{minipage}{\pipepanel}
 		\centering
-		{\small (a) detect}\\[2pt]
+		{(a) detect}\\[\subcaptiongap]
 		\includegraphics[width=\linewidth]{images/bb_pipe_detect.pdf}
 	\end{minipage}\hspace{\pipegap}%
 	\begin{minipage}{\pipepanel}
 		\centering
-		{\small (b) adapt}\\[2pt]
+		{(b) adapt}\\[\subcaptiongap]
 		\includegraphics[width=\linewidth]{images/bb_pipe_adapt.pdf}
 	\end{minipage}\hspace{\pipegap}%
 	\begin{minipage}{\pipepanel}
 		\centering
-		{\small (c) canonicalize}\\[2pt]
+		{(c) canonicalize}\\[\subcaptiongap]
 		\includegraphics[width=\linewidth]{images/bb_pipe_logpolar.pdf}
-	\end{minipage}\\[5pt]
+	\end{minipage}\\[2\subcaptiongap]
 	\begin{minipage}{2.047\pipepanel}
 		\centering
-		{\small (d) match}\\[2pt]
+		{(d) match}\\[\subcaptiongap]
 		\includegraphics[width=\linewidth, height=\dimexpr 4\pipepanel/3\relax]{images/bb_pipe_match.pdf}
 	\end{minipage}\hspace{\pipegap}%
 	\begin{minipage}{\pipepanel}
 		\centering
-		{\small (e) estimate pose}\\[2pt]
+		{(e) estimate pose}\\[\subcaptiongap]
 		\includegraphics[width=\linewidth]{images/bb_pipe_register.pdf}
 	\end{minipage}
 }
 
-
 \block{Experimental Setup}{
 	\begin{description}[nosep]
-		\item[Setup:] 30 boards at different sizes observed from different distances and view angles
-		\item[Baselines:] AprilTag~3 and OpenCV's ArUco detector
-		\item[Ground Truth:] motion capture
+		\item[setup:] 30 boards at different sizes observed from different distances and view angles
+		\item[baselines:] AprilTag~3 and OpenCV's ArUco detector
+		\item[ground truth:] motion capture
 	\end{description}
 	\begin{center}
 		\begin{minipage}{0.32\linewidth}
@@ -297,7 +240,7 @@
 	\begin{center}
 		\begin{minipage}{\linewidth}
 			\begin{centering}
-				\figheading{p detection and translation error}
+				\figheading{probability detection and translation error}
 				\resizebox{1.05\linewidth}{!}{%
 					\paperfontsettings
 					\input{figures/floorplan/error_floorplan_ab.tex}
@@ -305,9 +248,9 @@
 			\end{centering}
 		\end{minipage}
 	\end{center}
-		
+
 	\bigskip
-	
+
 	\begin{center}
 		\begin{minipage}{\linewidth}
 			\begin{centering}
@@ -319,15 +262,6 @@
 			\end{centering}
 		\end{minipage}
 	\end{center}
-    
-	% \bigskip
-    
-	% \begin{center}
-    %     \figheading{Planar pose flips (rot error \(> 10\,^\circ\))}
-    %     {\small
-	% 	\input{figures/floorplan/flip_table.tex}
-    %     }
-	% \end{center}
 }
 
 \block{Occlusion}{
@@ -353,7 +287,7 @@
 
     \begin{minipage}{\linewidth}
 		\begin{center}
-			\figheading{p detection for occlusion}
+			\figheading{accuracy and probability of detection for occluded boards}
 			\resizebox{\linewidth}{!}{%
 			\paperfontsettings
 			\input{figures/floorplan/occlusion_sweep_table.tex}
@@ -368,16 +302,16 @@
 		\includegraphics[width=\linewidth]{images/adapted/original.jpg}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_fde.jpg}
+		\includegraphics[width=\linewidth]{images/adapted/adapted_fde.png}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_f80.jpg}
+		\includegraphics[width=\linewidth]{images/adapted/adapted_f80.png}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_336.jpg}
+		\includegraphics[width=\linewidth]{images/adapted/adapted_336.png}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_14b.jpg}
+		\includegraphics[width=\linewidth]{images/adapted/adapted_14b.png}
 	\end{minipage}
 \end{center}
 \bigskip
@@ -388,7 +322,7 @@
 	\end{minipage}
 	\begin{minipage}{0.48\linewidth}
 		\centering
-		\TODO{Robot Image}
+		\includegraphics[width=\linewidth]{images/robot.png}
 	\end{minipage}
 \end{center}
 }
