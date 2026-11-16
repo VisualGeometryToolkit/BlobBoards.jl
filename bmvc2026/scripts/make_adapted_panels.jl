@@ -2,7 +2,7 @@
 make_adapted_panels.jl — one figure per detected board: the adapted inlier
 features overlaid on the FULL image.
 
-Writes ONE PNG PER BOARD (not a grid), so the paper can arrange them as
+Writes ONE FIGURE PER BOARD (not a grid), so the paper can arrange them as
 subfigures and caption them individually.
 
 What each panel shows, and why both layers are needed:
@@ -37,22 +37,14 @@ CairoMakie, not GLMakie: this only writes files, and a CPU renderer avoids the
 OpenGL context that aborts inside libnvidia-glcore when `find_boards` is holding
 ~18 GB of device memory in the same process.
 
-OUTPUT = WHAT THE PAPER INCLUDES. Fig. occexamples (top row) \includegraphics
-`images/adapted/original.jpg` and `images/adapted/adapted_<uid>.png` for the
-four boards in PAPER_UIDS, so that is what this writes: the source photo
-(byte copy) and one 2400x3200 PNG per paper board (the 1600-unit-wide figure
-at px_per_unit = 1.5).
-
-ADDITIONALLY (the poster's copy; the paper never reads it) it writes
-`adapted_<uid>.jpg`: the same panel at the source photo's resolution
-(1920x2560: the full-resolution photo, px_per_unit = 1.2) and compression
-(quality 90, 4:2:0, 72 dpi — the config's [jpeg] table). It is a SEPARATE
-render of the figure, so the PNGs are byte-for-byte what they were without it.
-
-The vector PDF (~23 MB each, gitignored) was the old
-output and is now opt-in (BB_PANEL_VECTOR=1); the PNGs used to be converted
-from it by hand, which is how the script's output and the paper's input came
-to differ.
+OUTPUT = WHAT THE PAPER AND POSTER INCLUDE. Fig. occexamples (top row)
+\includegraphics `images/adapted/original.jpg` and
+`images/adapted/adapted_<uid>.pdf` for the four boards in PAPER_UIDS, so that is
+what this writes: the source photo (byte copy) and, per paper board, the
+layers of scripts/overlaid_figure.jl — `adapted_<uid>_photo.jpg` (the photo),
+`adapted_<uid>.pdf` (outlines, blob circles, adapted ellipses and `+` markers
+only, a transparent page the size of the photo; composited with `\overlaid`,
+papers/overlaid.tex) and `adapted_<uid>.jpg` (the full panel, a plain backup).
 
 Run: pixi run julia --project=bmvc2026 bmvc2026/scripts/make_adapted_panels.jl
 (GPU; the gallery cache lives under results_root()/galleries/.)
@@ -60,13 +52,12 @@ Run: pixi run julia --project=bmvc2026 bmvc2026/scripts/make_adapted_panels.jl
 Every parameter — source photo, gallery, detector settings, render sizes and
 strokes, the paper's boards, output names — is in the config of record,
 configs/figures/adapted_panels.toml (`--config=<path>` overrides; `uids = []`
-writes every detected board, `write_vector = true` adds the PDF masters). Env:
+writes every detected board). Env:
 BB_PAPER_IMAGES (images root, default papers/images — see src/paper_assets.jl;
 set it to review a regeneration before it replaces the submitted panels).
 Each run writes its record under plotsdir("records").
 =#
-# reproduce: writes papers/images/adapted/adapted_*.png
-# reproduce: writes papers/images/adapted/adapted_*.jpg
+# reproduce: writes papers/images/adapted/adapted_*{.pdf,.jpg,_photo.jpg}
 # reproduce: writes papers/images/adapted/original.jpg
 # reproduce: reads configs/figures/adapted_panels.toml
 
@@ -78,27 +69,26 @@ using CairoMakie; CairoMakie.activate!()
 # using CUDA
 # import cuDNN
 # using CUDA: CUDABackend
-using FileIO: load as load_image, save as save_image
+using FileIO: load as load_image
 using Colors: Gray, distinguishable_colors, RGB
-using Images: imresize, N0f8
 using StaticArrays: SMatrix
 using GeometryBasics: Point2, Point2f, Rect
 using CoordinateTransformations: PerspectiveMap
-using VisualGeometryToolkitCore: is_map_inlier, imshow, ellipses!, HomographyMap, feature_frame, centroid,
+using VisualGeometryToolkitCore: is_map_inlier, ellipses!, HomographyMap, feature_frame, centroid,
     ustrip, targets, sources, EllipticFrame
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, results_root, paper_images_dir, figure_config, write_figure_records, network_path, load_config
+include(joinpath(@__DIR__, "overlaid_figure.jl"))
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using DrWatson: projectdir
-using KernelAbstractions: CPU
 
 const BB = BlobBoards
-const DEVICE = CPU()
+const DEVICE = BB.KA.CPU()
 const CFG, CFG_PATH = figure_config("adapted_panels"; default = projectdir("configs", "figures", "adapted_panels.toml"))
-const INP, FB, RND, OUT, JPG = CFG["inputs"], CFG["find_boards"], CFG["render"], CFG["output"], CFG["jpeg"]
+const INP, FB, RND, OUT = CFG["inputs"], CFG["find_boards"], CFG["render"], CFG["output"]
 const ROOT = data_root(; tiers = String.(CFG["experiment"]["tiers"]))
 const IMG_PATH = joinpath(ROOT, INP["image"])
 const PHOTO_PX = RND["photo_px"]
@@ -108,62 +98,31 @@ const PHOTO_PX = RND["photo_px"]
 const OUT_DIR = paper_images_dir(OUT["dir"])
 # The boards Fig. occexamples shows, in its column order; empty = every board.
 const PANEL_UIDS = isempty(OUT["uids"]) ? nothing : String.(OUT["uids"])
-const WRITE_VECTOR = RND["write_vector"]
-const PX_PER_UNIT = RND["px_per_unit"]
 _cutoff(v) = v == "default" ? Float32(BB.DEFAULT_CUTOFF) : Float32(v)
 # "package" = the package's default network (configs/default.toml), else a run
 # config under configs/ naming it.
 _network_path(v) = v == "package" ? descriptor_network_path() : network_path(load_config(v))
 const GALLERY = joinpath(results_root(), "galleries", INP["gallery"])   # a cache, never in the input tree
 
-# VECTOR output with a DOWNSAMPLED photo. The overlay must stay vector --
-# rasterising it is what produced the pixelation -- but CairoMakie embeds
-# the background losslessly in every panel, and at full resolution that is
-# 37 MB per panel (669 MB for 25). A subfigure at a third of \textwidth
-# needs ~1350 px at 600 dpi against a 3816 px source, so the photo can
-# shrink ~2.8x with nothing visible lost while the paths stay exact.
-#
-# Scaling the image by `sc` requires scaling the geometry with it:
-# world->image homography by diag(sc, sc, 1), and each adapted frame by
-# centre -> sc*centre, S -> sc*S (verified: doubling S doubles the rendered
-# radii, S*sc^2 quadruples them).
-function _photo(img_color, photo_px)
-    sc = min(1.0, photo_px / size(img_color, 2))
-    return (; sc, img = sc < 1 ? imresize(img_color; ratio = sc) : img_color,
-        S = SMatrix{3, 3, Float64}(sc, 0, 0, 0, sc, 0, 0, 0, 1))
-end
-
-# One panel: the photo `ph` (from `_photo`), the board's inlier frames `fr0`
-# (full-resolution pixels), its homography `model`, its pattern and colour.
-function _panel(img_color, ph, fr0, model, bundle, col)
-    sc = ph.sc
-    fr = [
-        EllipticFrame(
-                Point2(sc .* Float64.(ustrip.(centroid(f)))...),
-                SMatrix{2, 2, Float64}(sc .* f.S)
-            ) for f in fr0
-    ]
-    ctr = [Point2f(Float32.(ustrip.(centroid(f)))...) for f in fr]
-
-    # Aspect of the ORIGINAL photo, not of the resized copy: the resize
-    # rounds its height, which put the panel one pixel off the submitted
-    # 2400x3200 (2026-10-08 review).
-    fw = RND["figure_width"]
-    fig = Makie.Figure(size = (fw, round(Int, fw * size(img_color, 1) / size(img_color, 2))))
-    ax, _ = imshow(fig[1, 1], ph.img)
+# One panel: the photo layer (resized to `photo_px` wide when > 0, drawn over
+# the full-resolution extent), the board's inlier frames `fr0` and its
+# homography `model` (full-resolution pixels), its pattern and colour.
+function _panel(img_color, fr0, model, bundle, col)
+    fig, ax, photo = photo_figure(img_color; width = RND["figure_width"], photo_px = PHOTO_PX)
+    ctr = [Point2f(Float32.(ustrip.(centroid(f)))...) for f in fr0]
     # Thick strokes: at FULL-frame scale a small distant board's ellipses
     # are only a few pixels across, and a hairline outline disappears in
     # print. The `+` marks the feature point itself, which stays visible
     # even where the ellipse is too small to read.
     ellipses!(
-        ax, fr; cutoff = Float64(BB.DEFAULT_CUTOFF),
+        ax, fr0; cutoff = Float64(BB.DEFAULT_CUTOFF),
         strokecolor = Symbol(RND["inlier_color"]), strokewidth = RND["inlier_strokewidth"]
     )
     Makie.scatter!(
         ax, ctr; marker = :+, color = Symbol(RND["inlier_color"]),
         markersize = RND["marker_size"], strokewidth = 0
     )
-    proj = PerspectiveMap() ∘ HomographyMap(ph.S * SMatrix{3, 3, Float64}(model))
+    proj = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(model))
     # FULL pattern, as in Fig. 1: the dense tracery is what makes a board
     # read as a board. Drawing only the matched subset was tried and left
     # the partly-occluded boards looking empty.
@@ -173,8 +132,7 @@ function _panel(img_color, ph, fr0, model, bundle, col)
         blob_color = col, outline_width = RND["outline_width"], blob_width = RND["blob_width"],
         show_frame = false
     )
-    Makie.hidedecorations!(ax); Makie.hidespines!(ax)
-    return fig
+    return fig, photo
 end
 
 function main()
@@ -203,15 +161,15 @@ function main()
     )
     acc = find_boards(bfd, net, img; config = cfg, device = DEVICE, board_bundles = bundles)
 
-    ph_png = _photo(img_color, PHOTO_PX)            # the paper's PNG
-    ph_jpg = _photo(img_color, JPG["photo_px"])     # the poster's JPEG
 
     mkpath(OUT_DIR)
     # The source frame is the first cell of the figure's top row, so it has to
     # be produced here too -- it was a hand copy, which meant the figure could
     # not be rebuilt from the script alone.
     original = joinpath(OUT_DIR, OUT["original"] * last(splitext(IMG_PATH)))
-    cp(IMG_PATH, original; force = true)
+    # follow_symlinks: the data view links into the artifact store; copy the file, not the link
+    cp(IMG_PATH, original; force = true, follow_symlinks = true)
+    chmod(original, 0o644)   # not the artifact store's read-only, executable mode
     outputs = [original]
     cols = distinguishable_colors(length(acc), [RGB(1, 1, 1), RGB(0, 0, 0)]; dropseed = true)
     found = [first(a) for a in acc]
@@ -227,33 +185,11 @@ function main()
         fr0 = feature_frame.(targets(scored))[keep]
         bundle = bundles[uid]
 
-        # The paper's PNG -- exactly as before the JPEG existed.
-        fig = _panel(img_color, ph_png, fr0, model, bundle, cols[i])
-        out = joinpath(OUT_DIR, replace(OUT["name"], "{uid}" => uid))
-        Makie.save(out, fig; px_per_unit = PX_PER_UNIT)
-        push!(outputs, out)
-        if WRITE_VECTOR
-            # Opt-in VECTOR master: only the photograph is raster; outlines,
-            # blob circles, adapted ellipses and `+` markers stay paths.
-            Makie.save(joinpath(OUT_DIR, "adapted_$(uid).pdf"), fig)
-        end
-
-        # The poster's JPEG: its own render (full-resolution photo), encoded
-        # here because Makie.save passes no encoder settings, and it must
-        # match the source photo's resolution and compression.
-        fig_jpg = _panel(img_color, ph_jpg, fr0, model, bundle, cols[i])
-        px = RGB{N0f8}.(Makie.colorbuffer(fig_jpg; px_per_unit = JPG["px_per_unit"]))
-        if size(px) != size(img_color)
-            # fig height is rounded in Makie units, so px_per_unit can land a pixel off.
-            maximum(abs.(size(px) .- size(img_color))) <= 1 ||
-                error("JPEG panel is $(size(px)), source photo $(size(img_color)): [jpeg] px_per_unit * figure_width must equal the photo width")
-            px = RGB{N0f8}.(imresize(px, size(img_color)))
-        end
-        out_jpg = joinpath(OUT_DIR, replace(JPG["name"], "{uid}" => uid))
-        save_image(out_jpg, px; quality = JPG["quality"],
-            density_unit = 1, X_density = JPG["dpi"], Y_density = JPG["dpi"])
-        push!(outputs, out_jpg)
-        @info "panel" uid n_inliers = count(keep) png = out jpg = out_jpg
+        fig, photo = _panel(img_color, fr0, model, bundle, cols[i])
+        base = joinpath(OUT_DIR, replace(OUT["name"], "{uid}" => uid))
+        written = save_overlaid(base, fig, photo; source = IMG_PATH, quality = CFG["jpeg"]["quality"], pt_per_unit = RND["pt_per_unit"])
+        append!(outputs, written)
+        @info "panel" uid n_inliers = count(keep) written mb = [round(filesize(o) / 2^20; digits = 1) for o in written]
     end
     write_figure_records(CFG, CFG_PATH; driver = "bmvc2026/scripts/make_adapted_panels.jl", outputs,
         inputs = [IMG_PATH, GALLERY, joinpath(ROOT, INP["boards_dir"])])

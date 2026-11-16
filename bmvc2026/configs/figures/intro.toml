@@ -21,11 +21,15 @@ edge_threshold = 5.0
 nms_cutoff = "default"
 
 [render]
-figure_width = 1600
-px_per_unit = 2                          # RASTER: the vector PDF is ~48 MB
-background = "white"                     # "transparent" for the project site
+figure_width = 1600                      # Makie units (= pt of the overlay PDF page); strokes are relative to it
+photo_px = 0                             # resize the photo layer to at most this width; 0 = as is (a JPEG source then ships as its own bytes)
+fit_overlays = true                      # grow the page past the photo to boards overhanging it (white padding); false = clip to the photo
+pt_per_unit = 1.0                        # PDF page: 1 pt per Makie unit (CairoMakie defaults to 0.75)
 outline_width = 2.0
 blob_width = 1.0
 
 [output]
-name = "intro_overlay.png"               # under papers/images
+name = "intro_overlay"                  # under papers/images: <name>_photo.jpg + <name>.pdf (overlay) + <name>.jpg (backup)
+
+[jpeg]
+quality = 90                             # an encoded photo layer (a non-JPEG source) and the backup

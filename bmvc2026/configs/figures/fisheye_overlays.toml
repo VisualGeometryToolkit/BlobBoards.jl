@@ -1,0 +1,35 @@
+# Config of record of scripts/make_bmvc2026_intro.jl: fig:teaser.
+
+[experiment]
+generator = "intro"
+tiers = ["bb_absolute_pose_inputs", "bb_assets"]
+
+[inputs]
+image = "DSC03036.JPG"  # data_root()-relative
+boards_dir = "evaluation/blobboards_original"
+gallery = "board_features.jld2"                          # a CACHE: results_root()/galleries/<gallery>
+network = "bmvc2026_260527.toml"                         # configs/-relative run config naming the descriptor network ("package" = the package default)
+
+[find_boards]
+# Detector settings differ from the run config of record, deliberately:
+detector_exception = "uncalibrated montage teaser (no single camera): the homography path with min_inliers 6, not the calibrated evaluation config"
+geometry = "homography"
+min_inliers = 6                          # 6, not 5: the count gate became inclusive (2026-08-11)
+polarity = "dark"
+peak_threshold = 0.02
+edge_threshold = 5.0
+nms_cutoff = "default"
+
+[render]
+figure_width = 1600                      # Makie units (= pt of the overlay PDF page); strokes are relative to it
+photo_px = 0                             # resize the photo layer to at most this width; 0 = as is (a JPEG source then ships as its own bytes)
+fit_overlays = true                      # grow the page past the photo to boards overhanging it (white padding); false = clip to the photo
+pt_per_unit = 1.0                        # PDF page: 1 pt per Makie unit (CairoMakie defaults to 0.75)
+outline_width = 2.0
+blob_width = 1.0
+
+[output]
+name = "fisheye_overlays"                  # under papers/images: <name>_photo.jpg + <name>.pdf (overlay) + <name>.jpg (backup)
+
+[jpeg]
+quality = 90                             # an encoded photo layer (a non-JPEG source) and the backup

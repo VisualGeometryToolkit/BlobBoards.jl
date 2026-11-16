@@ -44,6 +44,7 @@ board_oversample = 2                     # the board raster's height / the crop'
 match_gap = 40                           # crop pixels between the board and the photo
 match_width = 0.75                       # line width (Makie units)
 match_alpha = 0.7
+jpeg_quality = 90                        # the match panel's photo layer and its backup
 
 [output]
 names = ["bb_pipe_detect.pdf", "bb_pipe_adapt.pdf", "bb_pipe_logpolar.pdf", "bb_pipe_register.pdf", "bb_pipe_match.pdf"]

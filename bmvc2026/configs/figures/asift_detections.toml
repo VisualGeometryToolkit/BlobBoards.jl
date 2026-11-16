@@ -23,21 +23,21 @@ sigma = 32.0                              # Gaussian σ of the blurred copy, in 
 redetect = false                         # false: the SAME detections drawn on the blurred copy; true: detect again on it
 
 [render]
-crop = []                                # [row0, col0, rows, cols] of the photo (1-based); [] = the full image
-figure_width = 1600                      # Makie units per panel; height follows the (cropped) image's aspect
-px_per_unit = 1.5
+crop = [100, 100, 3500, 4000]                                # [row0, col0, rows, cols] of the photo (1-based); [] = the full image
+photo_px = 0                             # resize the photo layer to at most this width; 0 = as is (the original then ships as its source JPEG's bytes)
+figure_width = 1600                      # Makie units per panel (= pt of the overlay PDF page); height follows the (cropped) image's aspect; strokes are relative to it
+pt_per_unit = 1.0                        # PDF page: 1 pt per Makie unit (CairoMakie defaults to 0.75)
 cutoff = "default"                       # ellipse drawn at cutoff·σ; "default" = BlobBoards.DEFAULT_CUTOFF
 color_by = "single"                       # "warp" (one colour per ASIFT warp) | "single"
-color = "red"                         # used when color_by = "single"
+color = "cyan"                         # used when color_by = "single"
 strokewidth = 1.5
 alpha = 0.9
 
 [output]
 dir = "asift_detections"                 # under plotsdir()
 paper_dir = "asift_detections"           # ALSO copied here, under papers/images (paper_images_dir; BB_PAPER_IMAGES overrides); "" = don't
-names = ["asift_original.png", "asift_blurred.png", "asift_side_by_side.png"]
+names = ["asift_original", "asift_blurred", "asift_side_by_side"]   # bases: <name>_photo.jpg + <name>.pdf (overlay) + <name>.jpg (backup); the side-by-side is a JPEG only
+side_by_side_gap = 15                    # px of white between the two panels
 
 [jpeg]
-# Each panel is ALSO written as a JPEG of the same render (same name, .jpg).
-write = true
-quality = 90
+quality = 90                             # the encoded photo layers and the backups

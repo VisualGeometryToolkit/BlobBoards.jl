@@ -14,8 +14,11 @@ detections sit on them. By default it carries the SAME detections as the photo
 panel (`[blur] redetect = false`); `redetect = true` runs the detector again on
 the blurred copy, to show what survives the blur.
 
-Outputs: one PNG (+ JPEG) per panel and a side-by-side of the two, under
-plotsdir(), and copied to papers/images/<[output] paper_dir> for the
+Outputs, per panel (scripts/overlaid_figure.jl): `<name>_photo.jpg` (the photo
+layer), `<name>.pdf` (the ellipses only, on a transparent page the size of the
+photo; the paper composites the two with `\overlaid`, papers/overlaid.tex) and
+`<name>.jpg` (the full panel, a plain backup); plus a side-by-side of the two
+backups as a JPEG. All under plotsdir(), and copied to papers/images/<[output] paper_dir> for the
 paper/poster sources (paper_images_dir: BB_PAPER_IMAGES overrides the root).
 
 Run (CPU on macOS, CUDA on Linux by default — `[detect] device`):
@@ -26,12 +29,10 @@ names — is in the config of record, configs/figures/asift_detections.toml
 (`--config=<path>` overrides). Each run writes its record under
 plotsdir("records").
 =#
-# reproduce: writes plots/asift_detections/asift_original.png
-# reproduce: writes plots/asift_detections/asift_blurred.png
-# reproduce: writes plots/asift_detections/asift_side_by_side.png
-# reproduce: writes plots/asift_detections/asift_*.jpg
-# reproduce: writes papers/images/asift_detections/asift_*.png
-# reproduce: writes papers/images/asift_detections/asift_*.jpg
+# reproduce: writes plots/asift_detections/asift_original{.pdf,.jpg,_photo.jpg}
+# reproduce: writes plots/asift_detections/asift_blurred{.pdf,.jpg,_photo.jpg}
+# reproduce: writes plots/asift_detections/asift_side_by_side.jpg
+# reproduce: writes papers/images/asift_detections/asift_*
 # reproduce: reads configs/figures/asift_detections.toml
 
 using DrWatson
@@ -44,14 +45,14 @@ using FileIO: load as load_image, save as save_image
 using Colors: Gray, RGB, distinguishable_colors
 using Images: imfilter, Kernel, N0f8
 using GeometryBasics: Point2
-using KernelAbstractions: CPU
-using VisualGeometryToolkitCore: imshow, ellipses!, feature_frame, centroid, EllipticFrame
+using VisualGeometryToolkitCore: ellipses!, feature_frame, centroid, EllipticFrame
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, figure_config, write_figure_records, paper_images_dir
+include(joinpath(@__DIR__, "overlaid_figure.jl"))
 
 const BB = BlobBoards
 const CFG, CFG_PATH = figure_config("asift_detections"; default = projectdir("configs", "figures", "asift_detections.toml"))
@@ -65,7 +66,7 @@ if USE_CUDA
     using CUDA
     import cuDNN
 end
-_device() = USE_CUDA ? CUDA.CUDABackend() : CPU()
+_device() = USE_CUDA ? CUDA.CUDABackend() : BB.KA.CPU()
 
 _cutoff(v) = v == "default" ? Float32(BB.DEFAULT_CUTOFF) : Float32(v)
 
@@ -103,10 +104,9 @@ function _in_window(frames, warps, rows, cols)
     return moved, warps[keep]
 end
 
-# Draw `frames` on `img` in axis slot `pos`; one stroke colour per warp
+# Draw `frames` on the photo axis `ax`; one stroke colour per warp
 # (`palette[w]`), or the single configured colour.
-function _panel!(pos, img, frames, warps, palette)
-    ax, _ = imshow(pos, img)
+function _overlay!(ax, frames, warps, palette)
     cut = Float64(_cutoff(RND["cutoff"]))
     kw = (; cutoff = cut, strokewidth = RND["strokewidth"])
     if RND["color_by"] == "warp"
@@ -118,26 +118,7 @@ function _panel!(pos, img, frames, warps, palette)
     else
         error("asift_detections: unknown render.color_by $(repr(RND["color_by"]))")
     end
-    # pin the axis to the image: ellipses reaching past the edge must not widen
-    # it (imshow reverses y, so pin in that orientation)
-    limits!(ax, 0.5, size(img, 2) + 0.5, size(img, 1) + 0.5, 0.5)
-    hidedecorations!(ax); hidespines!(ax)
     return ax
-end
-
-# Write `fig` to `path` (PNG) and, with [jpeg] write = true, the same render as
-# a JPEG beside it. The JPEG is encoded here from the colour buffer because
-# Makie.save passes no encoder settings (the quality).
-function _save!(outputs, path, fig)
-    save(path, fig; px_per_unit = RND["px_per_unit"])
-    push!(outputs, path)
-    if JPG["write"]
-        px = RGB{N0f8}.(Makie.colorbuffer(fig; px_per_unit = RND["px_per_unit"]))
-        jpg = first(splitext(path)) * ".jpg"
-        save_image(jpg, px; quality = JPG["quality"])
-        push!(outputs, jpg)
-    end
-    return outputs
 end
 
 function main()
@@ -157,20 +138,23 @@ function main()
     nwarp = max(maximum(warps; init = 1), maximum(warps_b; init = 1))
     palette = distinguishable_colors(nwarp, [RGB(1, 1, 1), RGB(0, 0, 0)]; dropseed = true)
 
-    fw = RND["figure_width"]
-    fh = round(Int, fw * size(crop, 1) / size(crop, 2))
     out_dir = plotsdir(OUT["dir"]); mkpath(out_dir)
     outputs = String[]
-    for (name, img, f, w) in ((OUT["names"][1], crop, fr, wr), (OUT["names"][2], crop_b, fr_b, wr_b))
-        fig = Figure(size = (fw, fh), figure_padding = 0)
-        _panel!(fig[1, 1], img, f, w, palette)
-        _save!(outputs, joinpath(out_dir, name), fig)
+    # the original photo is its source file's bytes when shown uncropped and unresized
+    uncropped = (rows, cols) == (axes(img_color, 1), axes(img_color, 2))
+    for (name, img, f, w, src) in ((OUT["names"][1], crop, fr, wr, uncropped ? IMG_PATH : nothing),
+            (OUT["names"][2], crop_b, fr_b, wr_b, nothing))
+        fig, ax, photo = photo_figure(img; width = RND["figure_width"], photo_px = RND["photo_px"])
+        _overlay!(ax, f, w, palette)
+        append!(outputs, save_overlaid(joinpath(out_dir, name), fig, photo; source = src,
+            quality = JPG["quality"], pt_per_unit = RND["pt_per_unit"]))
     end
-    fig = Figure(size = (2fw, fh), figure_padding = 0)
-    _panel!(fig[1, 1], crop, fr, wr, palette)
-    _panel!(fig[1, 2], crop_b, fr_b, wr_b, palette)
-    colgap!(fig.layout, 10)
-    _save!(outputs, joinpath(out_dir, OUT["names"][3]), fig)
+    # side by side: the two backups with a white gap, a JPEG only
+    a, b = (load_image(joinpath(out_dir, n * ".jpg")) for n in OUT["names"][1:2])
+    gap = fill(RGB{N0f8}(1, 1, 1), size(a, 1), OUT["side_by_side_gap"])
+    sbs = joinpath(out_dir, OUT["names"][3] * ".jpg")
+    save_image(sbs, hcat(a, gap, b[axes(a, 1), :]); quality = JPG["quality"])
+    push!(outputs, sbs)
 
     # The same files, byte for byte, where the paper/poster sources include them.
     if !isempty(OUT["paper_dir"])

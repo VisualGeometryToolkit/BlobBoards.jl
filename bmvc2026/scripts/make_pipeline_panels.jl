@@ -6,7 +6,7 @@ stages of the detection-to-pose pipeline on ONE detected board.
 # reproduce: writes papers/images/bb_pipe_adapt.pdf
 # reproduce: writes papers/images/bb_pipe_logpolar.pdf
 # reproduce: writes papers/images/bb_pipe_register.pdf
-# reproduce: writes papers/images/bb_pipe_match.pdf
+# reproduce: writes papers/images/bb_pipe_match{.tex,.pdf,_board.pdf,_photo.jpg,.jpg}
 
 The frame, board and crop are those of the submitted panels (identified
 2026-10-08 by registering board 6b0 in the submitted panel rasters and in
@@ -73,8 +73,9 @@ using CUDA
 import cuDNN
 using CUDA: CUDABackend
 using Accessors: @set
-using FileIO: load as load_image
+using FileIO: load as load_image, save as save_image
 using Colors: Gray, RGB, RGBA
+const N0f8 = BlobBoards.N0f8
 using StaticArrays: SMatrix, SVector
 using GeometryBasics: Point2, Point2f, Rect
 using LinearAlgebra: det, norm, eigvals, Symmetric
@@ -285,13 +286,20 @@ function main()
     pin!(ax, lims)
     push!(files, joinpath(out, CFG["output"]["names"][4])); Makie.save(files[end], fig; pt_per_unit = RND["pt_per_unit"])
 
-    # (e) match — the board's csponds as lines from its reference raster (left)
+    # (e) match — the board's csponds as lines from the reference board (left)
     # to the photo (right). The run config undistorts globally (`undistortion =
     # "global"`), so the targets are already in the displayed frame.
+    #
+    # Written as LAYERS the poster composites (`\input` of the generated
+    # bb_pipe_match.tex, a `picture` of the page): the board's OWN PDF (vector,
+    # ~60 kB — a raster of it drawn by CairoMakie was ~7 MB, one rectangle per
+    # pixel), the photo crop as a JPEG, and the csponds on a transparent page
+    # (bb_pipe_match.pdf). bb_pipe_match.jpg is the composite, a plain backup.
     board_path = only(bp for bp in board_paths if load_board(bp).uid == uid)
     lb = load_board(board_path)
     nr = length(rows)
-    # the raster's height is `board_oversample` x the crop's, scaled down to it
+    # the raster's height is `board_oversample` x the crop's, scaled down to it;
+    # it places the board (and draws it in the backup)
     ppi = round(Int, RND["board_oversample"] * nr / wd[2] * 25.4)   # wd: the board's world extent, mm
     braster = BlobBoards.rasterize_pdf(lb.image_path, ppi)
     # The panel is `match_span` panels wide at a panel's height (Makie rounds a
@@ -320,17 +328,54 @@ function main()
     bpt(f) = (p = to_px(SVector{2, Float64}(ustrip.(centroid(feature_frame(f)))...)); Point2f(xb0 + s * (p[1] - 0.5), yb0 + s * (p[2] - 0.5)))
     ipt(f) = (c = ustrip.(centroid(feature_frame(f))); Point2f(c[1] - dx, c[2] - dy))
     seg = [(bpt(a), ipt(b), is_map_inlier(x)) for (a, b, x) in zip(sources(scored), targets(scored), w)]
-    lims = (xl, xr, yc - yh, yc + yh)
-    fig = Figure(size = (fw, fh), figure_padding = pad)
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), yreversed = true)
+    ytop = yc - yh
+    # No DataAspect: the limits already have the inner page's aspect, and the
+    # axis must fill it exactly for the layers' page coordinates below.
+    fig = Figure(size = (fw, fh), figure_padding = pad, backgroundcolor = :transparent)
+    ax = Axis(fig[1, 1]; yreversed = true, backgroundcolor = :transparent)
     hidedecorations!(ax); hidespines!(ax)
-    image!(ax, xb0 .. (xb0 + bw), yb0 .. (yb0 + bh), transpose(Gray.(braster)); interpolate = false)
-    image!(ax, 0.5 .. (size(crop, 2) + 0.5), 0.5 .. (nr + 0.5), transpose(crop); interpolate = false)
+    board_img = image!(ax, xb0 .. (xb0 + bw), yb0 .. (yb0 + bh), transpose(Gray.(braster)); interpolate = false)
+    photo_img = image!(ax, 0.5 .. (nc + 0.5), 0.5 .. (nr + 0.5), transpose(crop); interpolate = false)
     for (inlier, color) in ((false, RGBA(1, 0.15, 0.1, RND["match_alpha"])), (true, RGBA(0, 1, 0.3, RND["match_alpha"])))
         linesegments!(ax, [p => q for (p, q, i) in seg if i == inlier]; color, linewidth = RND["match_width"])
     end
-    pin!(ax, lims)
-    push!(files, joinpath(out, CFG["output"]["names"][5])); Makie.save(files[end], fig; pt_per_unit = RND["pt_per_unit"])
+    limits!(ax, xl, xr, ytop + 2yh, ytop)
+
+    base = joinpath(out, splitext(CFG["output"]["names"][5])[1])
+    # the backup: the composite on white, at the crop's own resolution
+    fig.scene.backgroundcolor[] = Makie.to_color(:white)
+    save_image(base * ".jpg", RGB{N0f8}.(Makie.colorbuffer(fig; px_per_unit = 1 / k)); quality = RND["jpeg_quality"])
+    fig.scene.backgroundcolor[] = Makie.to_color(:transparent)
+    # the csponds alone
+    board_img.visible = false; photo_img.visible = false
+    Makie.save(base * ".pdf", fig; pt_per_unit = 1.0)
+    # the board's own PDF and the photo crop
+    cp(lb.image_path, base * "_board.pdf"; force = true, follow_symlinks = true); chmod(base * "_board.pdf", 0o644)
+    save_image(base * "_photo.jpg", RGB{N0f8}.(crop); quality = RND["jpeg_quality"])
+    # where each lands on the fw x fh pt page (picture coordinates: y up)
+    pgx(x) = pad + (x - xl) * k
+    pgy(y) = fh - pad - (y - ytop) * k       # a crop-pixel y (down) -> pt from the page bottom
+    mb = match(r"/MediaBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]", read(lb.image_path, String))
+    mb === nothing && error("match panel: no /MediaBox in $(lb.image_path)")
+    pw, ph = parse(Float64, mb[3]) - parse(Float64, mb[1]), parse(Float64, mb[4]) - parse(Float64, mb[2])
+    # the raster is the page at `ppi` (Poppler's grid, anchored top-left): its
+    # page spans s * pw * ppi / 72 crop pixels
+    bwp, bhp = s * pw * ppi / 72, s * ph * ppi / 72
+    rel(f) = relpath(f, projectdir("papers"))
+    f4(x) = string(round(x; digits = 4))
+    put(x0, ytopc, wc, hc, file) = "\\put($(f4(pgx(x0))),$(f4(pgy(ytopc + hc)))){\\includegraphics[width=$(f4(wc * k))pt,height=$(f4(hc * k))pt]{$(rel(file))}}%"
+    write(base * ".tex", join([
+        "% $(basename(base)): written by bmvc2026/scripts/make_pipeline_panels.jl; do not edit.",
+        "% The match panel as layers on a $(fw) x $(fh) pt page: the board's own PDF, the photo",
+        "% crop and the csponds (a transparent page). Use: \\resizebox{<w>}{<h>}{\\input{$(rel(base))}}",
+        "{\\setlength{\\unitlength}{1pt}%",
+        "\\begin{picture}($(fw),$(fh))%",
+        put(xb0, yb0, bwp, bhp, base * "_board.pdf"),
+        put(0.5, 0.5, nc, nr, base * "_photo.jpg"),
+        "\\put(0,0){\\includegraphics[width=$(fw)pt,height=$(fh)pt]{$(rel(base * ".pdf"))}}%",
+        "\\end{picture}}%",                  # % : no end-of-line space (\resizebox would scale it in)
+    ], "\n") * "\n")
+    append!(files, [base * ".pdf", base * "_board.pdf", base * "_photo.jpg", base * ".tex", base * ".jpg"])
     @info "match panel" n_csponds = length(seg) n_inliers = count(last, seg) size = (fw, fh)
 
     write_figure_records(CFG, CFG_PATH; driver = "bmvc2026/scripts/make_pipeline_panels.jl",

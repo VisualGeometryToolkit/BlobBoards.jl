@@ -11,9 +11,6 @@
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
 
-\newcommand{\todo}[1]{{\color{red}#1}}
-\newcommand{\TODO}[1]{\textbf{\color{red}[TODO: #1]}}
-
 \newcommand{\paperfontsettings}{
     \renewcommand{\normalsize}{\fontsize{9}{10pt}\selectfont}%
     \renewcommand{\small}{\fontsize{8}{9pt}\selectfont}%
@@ -45,6 +42,7 @@
 
 \usepackage{booktabs} 
 \usepackage{pgfplots}
+\pgfplotsset{compat=1.18}   % as the paper: the figures/floorplan plots are written for it
 \usepackage{url}
 
 \title{BlobBoards: Robust Markers for Accurate Pose}
@@ -68,7 +66,7 @@
 \institute{Marine Data Science, Kiel University}
 
 \newlength{\subcaptiongap}
-\setlength{\subcaptiongap}{0.5cm}
+\setlength{\subcaptiongap}{0.25cm}
 
 \definecolor{TFblau}{HTML}{003d86}
 \definecolor{CAUpurple}{HTML}{9b0a7d}
@@ -106,6 +104,30 @@
 
 \usetheme{Desert}
 \usecolorstyle{TFStyle}
+% Desert's Slide block style without the body fill: a block may reach into the
+% footer bar (the background style), which then shows through instead of being
+% covered by a white rectangle. The title bar fades out instead of into white.
+\usetikzlibrary{fadings}
+\defineblockstyle{SlideTransparent}{
+    titlewidthscale=1, bodywidthscale=1, titleleft,
+    titleoffsetx=0pt, titleoffsety=0pt, bodyoffsetx=0pt, bodyoffsety=0pt,
+    bodyverticalshift=0pt, roundedcorners=0, linewidth=0pt, titleinnersep=1cm,
+    bodyinnersep=1cm
+}{
+    \ifBlockHasTitle%
+        \fill[blocktitlebgcolor, path fading=east]
+           (blocktitle.south west) rectangle (blocktitle.north east);
+    \fi%
+}
+\useblockstyle{SlideTransparent}
+% The footer bar (Desert's BottomVerticalGradation shades between titlebgcolor
+% and framecolor, both colorOne here, so it was solid): colorOne at the bottom
+% edge, fading out towards the top.
+\definebackgroundstyle{FooterGradient}{
+    \fill[titlebgcolor, path fading=north]
+        (bottomleft) rectangle ($(bottomleft)+(\textwidth,3)$);
+}
+\usebackgroundstyle{FooterGradient}
 \usetitlestyle[width=\paperwidth, innersep=0pt, titletotopverticalspace=0mm]{Empty}
 
 \newcommand{\headerheight}{10cm}
@@ -140,6 +162,8 @@
 }
 \makeatother
 
+\input{overlaid}
+
 \begin{document}
 
 \maketitle
@@ -149,7 +173,7 @@
 
 \block{Contribution}{
     \begin{center}
-        \includegraphics[width=\linewidth]{images/intro_overlay.png}
+        \includegraphics[width=\linewidth]{images/intro_overlay.jpg}
     \end{center}
 
     \textbf{fiducial marker system} that is
@@ -164,12 +188,12 @@
     \begin{minipage}{0.48\linewidth}
         \centering
         {maximises SIFT response}\\[\subcaptiongap]
-        \includegraphics[width=\linewidth]{images/asift_detections/asift_original.jpg}
+        \overlaid[width=\linewidth]{images/asift_detections/asift_original_photo.jpg}{images/asift_detections/asift_original.pdf}
     \end{minipage}\hfill%
     \begin{minipage}{0.48\linewidth}
         \centering
         {robust to defocus}\\[\subcaptiongap]
-        \includegraphics[width=\linewidth]{images/asift_detections/asift_blurred.jpg}
+        \overlaid[width=\linewidth]{images/asift_detections/asift_blurred_photo.jpg}{images/asift_detections/asift_blurred.pdf}
     \end{minipage}
 }
 
@@ -200,7 +224,7 @@
 	\begin{minipage}{2.047\pipepanel}
 		\centering
 		{(d) match}\\[\subcaptiongap]
-		\includegraphics[width=\linewidth, height=\dimexpr 4\pipepanel/3\relax]{images/bb_pipe_match.pdf}
+		\resizebox{\linewidth}{\dimexpr 4\pipepanel/3\relax}{\input{images/bb_pipe_match}}
 	\end{minipage}\hspace{\pipegap}%
 	\begin{minipage}{\pipepanel}
 		\centering
@@ -219,17 +243,17 @@
 		\begin{minipage}{0.32\linewidth}
 			\centering
 			{\small BlobBoards}\\[2pt]
-			\includegraphics[width=\linewidth]{images/experiment/bb/DSC04530_val.png}
+			\includegraphics[width=\linewidth]{images/experiment/bb/DSC04530_val.jpg}
 		\end{minipage}\hfill
 		\begin{minipage}{0.32\linewidth}
 			\centering
 			{\small AprilTag}\\[2pt]
-			\includegraphics[width=\linewidth]{images/experiment/apr/DSC04433_val.png}
+			\includegraphics[width=\linewidth]{images/experiment/apr/DSC04433_val.jpg}
 		\end{minipage}\hfill
 		\begin{minipage}{0.32\linewidth}
 			\centering
 			{\small ArUco}\\[2pt]
-			\includegraphics[width=\linewidth]{images/experiment/aru/DSC04343_val.png}
+			\includegraphics[width=\linewidth]{images/experiment/aru/DSC04343_val.jpg}
 		\end{minipage}
 	\end{center}
 }
@@ -240,8 +264,8 @@
 	\begin{center}
 		\begin{minipage}{\linewidth}
 			\begin{centering}
-				\figheading{probability detection and translation error}
-				\resizebox{1.05\linewidth}{!}{%
+				\figheading{probability of detection and translation error}
+				\resizebox{0.95\linewidth}{!}{%
 					\paperfontsettings
 					\input{figures/floorplan/error_floorplan_ab.tex}
 				}
@@ -254,8 +278,8 @@
 	\begin{center}
 		\begin{minipage}{\linewidth}
 			\begin{centering}
-				\figheading{Recall as a function of error}
-				\resizebox{1.05\linewidth}{!}{%
+				\figheading{recall as a function of error}
+				\resizebox{0.95\linewidth}{!}{%
 					\paperfontsettings
 					\input{figures/floorplan/error_scale_ecdfs_table.tex}
 				}
@@ -266,7 +290,7 @@
 
 \block{Occlusion}{
     \begin{description}
-        \item[Occlusion Setup:] synthetically occlude boards in 10\,\% increments
+        \item[occlusion setup:] synthetically occlude boards in 10\,\% increments
     \end{description}
 
 	\bigskip
@@ -297,32 +321,42 @@
 }
 
 \block{Conclusion}{
+	{\textbf{state of the art marker} in pose accuracy and occlusion robustness}
+
+	\bigskip
+
 \begin{center}
+
 	\begin{minipage}[c]{0.19\linewidth}
 		\includegraphics[width=\linewidth]{images/adapted/original.jpg}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_fde.png}
+		\overlaid[width=\linewidth]{images/adapted/original.jpg}{images/adapted/adapted_fde.pdf}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_f80.png}
+		\overlaid[width=\linewidth]{images/adapted/original.jpg}{images/adapted/adapted_f80.pdf}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_336.png}
+		\overlaid[width=\linewidth]{images/adapted/original.jpg}{images/adapted/adapted_336.pdf}
 	\end{minipage}\hfill
 	\begin{minipage}[c]{0.19\linewidth}
-		\includegraphics[width=\linewidth]{images/adapted/adapted_14b.png}
+		\overlaid[width=\linewidth]{images/adapted/original.jpg}{images/adapted/adapted_14b.pdf}
 	\end{minipage}
 \end{center}
 \bigskip
 \begin{center}
-	\begin{minipage}{0.48\linewidth}
+	\figheading{future work}
+	\begin{minipage}[t]{0.48\linewidth}
 		\centering
-		\TODO{Calibration image}
-	\end{minipage}
-	\begin{minipage}{0.48\linewidth}
+		{camera calibration}\\[\subcaptiongap]
+		% \overlaid[width=\linewidth]{images/fisheye_overlays_photo.jpg}{images/fisheye_overlays.pdf}
+		\includegraphics[width=\linewidth]{images/fisheye_overlays.jpg}
+	\end{minipage}%
+	\hfill%
+	\begin{minipage}[t]{0.48\linewidth}
 		\centering
-		\includegraphics[width=\linewidth]{images/robot.png}
+		{real time application}\\[\subcaptiongap]
+		\includegraphics[width=\linewidth]{images/robot.jpg}
 	\end{minipage}
 \end{center}
 }

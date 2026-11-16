@@ -24,31 +24,22 @@ edge_threshold = 5.0
 nms_cutoff = "default"                   # "default" = BlobBoards.DEFAULT_CUTOFF
 
 [render]
-photo_px = 1400                          # the photo is resized to this width under the vector overlay
-figure_width = 1600                      # Makie units; height follows the photo's aspect
-px_per_unit = 1.5                        # -> the 2400x3200 PNG the paper includes
+photo_px = 0                             # resize the photo layer to at most this width; 0 = as is (the source JPEG's own bytes)
+figure_width = 1600                      # Makie units (= pt of the overlay PDF page); height follows the photo's aspect; strokes are relative to it
+pt_per_unit = 1.0                        # PDF page: 1 pt per Makie unit (CairoMakie defaults to 0.75)
 inlier_color = "yellow"
 inlier_strokewidth = 2.5
 marker_size = 12
 outline_width = 7.0
 blob_width = 4.0
-write_vector = false                     # also write the vector PDF master (~23 MB each)
 
 [output]
 dir = "adapted"                          # under papers/images
 original = "original"                    # + the photo's extension
-name = "adapted_{uid}.png"
+name = "adapted_{uid}"                   # base: <name>_photo.jpg + <name>.pdf (overlay) + <name>.jpg (backup)
 # The boards the figure shows, in column order (colours are assigned over all detections).
 uids = ["fde", "f80", "336", "14b"]
 
+
 [jpeg]
-# ADDITIONAL output (the poster includes it; the paper does not): the same
-# panel as a JPEG at the source photo's resolution and compression. It is drawn
-# from its own render of the figure, so the paper's PNGs above are unchanged.
-name = "adapted_{uid}.jpg"
-photo_px = 1920                          # the source's own width: no downsampling
-px_per_unit = 1.2                        # 1600 units -> 1920x2560, the source photo's size (checked against it)
-# JPEG settings of the source photo (original.jpg: baseline, 4:2:0, JFIF 72 dpi —
-# libjpeg's defaults besides quality and density), so the panels match it.
-quality = 90
-dpi = 72
+quality = 90                             # an encoded photo layer (resized) and the backup

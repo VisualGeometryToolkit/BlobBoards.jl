@@ -1,0 +1,14 @@
+% \overlaid[<includegraphics options>]{<photo>}{<overlay pdf>}
+%
+% A photo with its vector overlay: the photo is set with the given options, and
+% the overlay PDF is stretched over exactly the photo's box. The figure
+% generators (bmvc2026/scripts/overlaid_figure.jl) write the overlay as a
+% transparent page whose extent IS the photo's, so the two line up; the photo
+% stays the JPEG it is (a single PDF of both stored it losslessly, 5-10x larger).
+%
+%   \overlaid[width=\linewidth]{images/adapted/adapted_fde_photo.jpg}{images/adapted/adapted_fde.pdf}
+\newsavebox{\overlaidbox}
+\newcommand{\overlaid}[3][]{%
+  \sbox{\overlaidbox}{\includegraphics[#1]{#2}}%
+  \leavevmode\rlap{\usebox{\overlaidbox}}%
+  \includegraphics[width=\wd\overlaidbox,height=\ht\overlaidbox]{#3}}
