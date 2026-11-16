@@ -306,8 +306,8 @@ packages:
   requires_python: '>=3.10'
 - pypi: ./python
   name: blobboards
-  version: 0.1.0
-  sha256: 63c765f8146441d79ac875d169e160770e359be04068463f876da4bc709cf7c9
+  version: 0.2.1
+  sha256: 4e74cae01a649dc27b28e70750d115c3f44b2a76d75d8102959dfda2fb8bbe14
   requires_dist:
   - juliacall>=0.9.20
   - numpy>=1.20
