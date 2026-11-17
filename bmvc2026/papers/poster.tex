@@ -148,15 +148,17 @@
 \usebackgroundstyle{FooterGradient}
 \usetitlestyle[width=\paperwidth, innersep=0pt, titletotopverticalspace=0mm]{Empty}
 
-\newcommand{\headerheight}{10cm}
 \setlength{\fboxsep}{0pt}
 \setlength{\fboxrule}{0pt}
 
 \makeatletter
 \settitle{
     \makebox[\linewidth][s]{%
-        \begin{minipage}[t]{0.25\linewidth}\vspace{0pt}
+        \begin{minipage}[t]{0.155\linewidth}\vspace{0pt}
             \includegraphics[width=\linewidth]{\caulogo}
+
+            \vspace{1.5cm}
+            \includegraphics[width=\linewidth]{images/logos/bmvc-2026-white.png}
         \end{minipage}%
         \hfill%
 		\begin{minipage}[t]{0.55\linewidth}\vspace{1.5cm}
@@ -168,14 +170,19 @@
             {\LARGE \@institute}
         \end{minipage}%
         \hfill%
-        \begin{minipage}[t][\headerheight]{0.1\linewidth}\vspace{0pt}
+        \begin{minipage}[t][1cm]{0.173\linewidth}\vspace{0pt}
             \centering
-            \vspace{1.5cm}
-            \includegraphics[width=\linewidth]{images/logos/bmvc-2026-white.png}\\
-            \vspace{1.5cm}
-            \includegraphics[width=0.8\linewidth]{\qrcode}
-        \end{minipage}%
-        \hspace{1.5cm}
+            \vspace{1cm}
+                \includegraphics[width=\linewidth]{\qrcode}
+                {\huge\centering
+                \textcolor{colorOne}{blobboards.github.io}
+                }
+
+                {\Large
+                \textcolor{colorOne}{project page with source code, paper, documentation}  
+                }
+            \end{minipage}%
+        \hspace{1cm}
     }
 }
 \makeatother
@@ -262,12 +269,19 @@
         \includegraphics[width=\linewidth]{images/intro_overlay.jpg}
     \end{center}
 
-    \emph{fiducial marker system} that is
-    \begin{itemize}
-        \item intrinsically multiscale
-        \item accurate through coverage density
-        \item robust against occlusion
-    \end{itemize}
+    \bigskip
+
+    \begin{minipage}{0.47\linewidth}
+        novel \emph{fiducial marker system} outperforming AprilTag and ArUco in terms of probability of detection, robustness and accuracy
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\linewidth}
+        \begin{itemize}
+            \item intrinsically multiscale
+            \item accurate through coverage density
+            \item robust against occlusion
+        \end{itemize}
+    \end{minipage}
 }
 
 \block{Why Blobs?}{
@@ -346,6 +360,8 @@
 
 \column{0.5}
 
+\block{}{\vspace{3cm}}
+
 \block{Results}{
 	\begin{center}
 		\begin{minipage}{\linewidth}
@@ -398,13 +414,9 @@
 			\paperfigure{poster_occlusion_sweep_table.tex}
 		\end{center}
 	\end{minipage}
-}
 
-\block{Conclusion}{
-	\begin{description}
-		\item[state-of-the-art marker] in pose accuracy and occlusion robustness
-		\item[future work:] camera calibration, real-time application
-	\end{description}
+    \bigskip\bigskip
+
 	\begin{center}
 		\begin{minipage}[c]{0.19\linewidth}
 			\includegraphics[width=\linewidth]{images/adapted/original.jpg}
