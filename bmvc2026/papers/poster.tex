@@ -156,11 +156,10 @@
 \makeatletter
 \settitle{
     \makebox[\linewidth][s]{%
-        \begin{minipage}[t]{0.155\linewidth}\vspace{0pt}
-            \includegraphics[width=\linewidth]{\caulogo}
-
-            \vspace{1.5cm}
-            \includegraphics[width=\linewidth]{images/logos/bmvc-2026-white.png}
+        \hspace{2cm}
+        \begin{minipage}[t]{0.19\linewidth}\centering\vspace{0pt}
+            \vspace{1cm}
+            \includegraphics[width=\linewidth]{images/logos/bmvc-2026-white.png}            
         \end{minipage}%
         \hfill%
 		\begin{minipage}[t]{0.55\linewidth}\vspace{1.5cm}
@@ -271,7 +270,7 @@
         \includegraphics[width=\linewidth]{images/intro_overlay.jpg}
     \end{center}
 
-    \bigskip
+    \bigskip\bigskip
 
     \begin{minipage}{0.47\linewidth}
         novel \emph{fiducial marker system} outperforming AprilTag and ArUco in terms of probability of detection, robustness and accuracy
@@ -304,7 +303,7 @@
 % 2.047 panels wide, at a panel's height, and its edges line up with (a)/(b)
 \newlength{\pipepanel}
 \newlength{\pipegap}
-\block{Pipeline}{
+\block{Method}{
 	\centering
 	\setlength{\pipepanel}{0.32\linewidth}%
 	\setlength{\pipegap}{0.047\pipepanel}%
@@ -335,7 +334,7 @@
 	\end{minipage}
 }
 
-\block{Experimental Setup}{
+\block{Test Setup}{
 	\begin{description}
 		\item[setup:] 30 boards at different sizes observed from different distances and view angles
 		\item[baselines:] AprilTag~3 and OpenCV's ArUco detector
@@ -362,7 +361,20 @@
 
 \column{0.5}
 
-\block{}{\vspace{3cm}}
+\block{}{
+    \begin{minipage}{0.6\linewidth}
+        \begin{minipage}{0.35\linewidth}
+            \includegraphics[width=\linewidth]{images/logos/kite/KiTE logo.pdf}
+        \end{minipage}%
+        \hfill%
+        \begin{minipage}{0.5\linewidth}
+            \includegraphics[width=\linewidth]{images/logos/dfg/dfg_logo_schriftzug_schwarz_foerderung_en.pdf}
+
+            \vspace{0.5cm}
+            \includegraphics[width=\linewidth]{images/logos/eu/horizontal/EN Co-funded by the EU_PANTONE.pdf}
+        \end{minipage}
+    \end{minipage}
+}
 
 \block{Results}{
 	\begin{center}
