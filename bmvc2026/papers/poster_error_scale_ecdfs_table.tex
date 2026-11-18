@@ -7,9 +7,14 @@
 \providecolor{bbGreen}{HTML}{009E73}
 \providecolor{bbBlue}{HTML}{0072B2}
 \providecolor{bbOrange}{HTML}{E69F00}
+% The scale headings are the top row's axis titles, so each is centred over its
+% plot box; a tabular row above centred them over the whole panel, y label and
+% tick labels included, which set them visibly left of the plots.
+\newcommand{\scalepanel}[2]{{%
+    \pgfplotsset{every axis/.append style={title={#1}, title style={font=\small}}}%
+    \input{#2}}}
 \begin{tabular}{@{}ccc@{}}
-{\small small (4\,cm)} & {\small medium (6\,cm)} & {\small large (12\,cm)} \\[1pt]
-\input{figures/floorplan/hist_trans_small} & \input{figures/floorplan/hist_trans_medium} & \input{figures/floorplan/hist_trans_large} \\
+\scalepanel{small (4\,cm)}{figures/floorplan/hist_trans_small} & \scalepanel{medium (6\,cm)}{figures/floorplan/hist_trans_medium} & \scalepanel{large (12\,cm)}{figures/floorplan/hist_trans_large} \\
 \multicolumn{3}{c}{(a) translation error} \\[6pt]
 \input{figures/floorplan/hist_rot_small} & \input{figures/floorplan/hist_rot_medium} & \input{figures/floorplan/hist_rot_large} \\
 \multicolumn{3}{c}{(b) rotation error} \\

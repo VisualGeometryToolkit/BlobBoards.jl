@@ -140,10 +140,12 @@
 \useblockstyle{SlideTransparent}
 % The footer bar (Desert's BottomVerticalGradation shades between titlebgcolor
 % and framecolor, both colorOne here, so it was solid): colorOne at the bottom
-% edge, fading out towards the top.
+% edge, fading out towards the top. The rectangle overhangs the page by 2 cm on
+% each side (the page clip trims it): a fading stretched to the full A0 width
+% loses its right ~7 mm, so the bar ended short of the right edge.
 \definebackgroundstyle{FooterGradient}{
     \fill[titlebgcolor, path fading=north]
-        (bottomleft) rectangle ($(bottomleft)+(\textwidth,3)$);
+        ($(bottomleft)+(-2,0)$) rectangle ($(bottomleft)+(\textwidth+2cm,3)$);
 }
 \usebackgroundstyle{FooterGradient}
 \usetitlestyle[width=\paperwidth, innersep=0pt, titletotopverticalspace=0mm]{Empty}
@@ -173,15 +175,15 @@
         \begin{minipage}[t][1cm]{0.173\linewidth}\vspace{0pt}
             \centering
             \vspace{1cm}
-                \includegraphics[width=\linewidth]{\qrcode}
-                {\huge\centering
-                \textcolor{colorOne}{blobboards.github.io}
-                }
+            \includegraphics[width=\linewidth]{\qrcode}
+            {\huge\centering
+            \textcolor{colorOne}{blobboards.github.io}
+            }
 
-                {\Large
-                \textcolor{colorOne}{project page with source code, paper, documentation}  
+            {\Large
+            \textcolor{colorOne}{project page with source code, paper, documentation}  
                 }
-            \end{minipage}%
+        \end{minipage}%
         \hspace{1cm}
     }
 }
