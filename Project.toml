@@ -64,6 +64,14 @@ BlobBoardsMakieExt = "Makie"
 BlobBoardsPythonExt = "PythonCall"
 BlobBoardsTrainingExt = ["Lux", "Optimisers", "Enzyme", "Reactant", "NNlib", "TensorBoardLogger", "Zygote"]
 
+[sources]
+# TEMPORARY (the cascade of VisualGeometryToolkitCore 0.12.0): removed before this tree is registered.
+LocalOptimizationDoneRight = {url = "https://github.com/VisualGeometryToolkit/LocalOptimizationDoneRight.jl", rev = "cascade/vgtk-0.12"}
+VisualGeometryToolkitCore = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitCore"}
+VisualGeometryToolkitEstimation = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitEstimation"}
+VisualGeometryToolkitFeatures = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitFeatures"}
+VisualGeometryToolkitIO = {url = "https://github.com/VisualGeometryToolkit/VisualGeometryToolkit.jl", rev = "vrtk/retire-radiometric", subdir = "VisualGeometryToolkitIO"}
+
 [compat]
 Base64 = "1"
 Colors = "0.13.3"
