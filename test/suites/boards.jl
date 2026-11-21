@@ -715,10 +715,10 @@ end
 # are a version's: re-pin at each version bump (0.6.2's differ from 0.7.0's in those two places only; 0.7.1, 0.7.2 and 0.7.3
 # re-pinned, their only change to these bytes the version).
 const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF at BlobBoards 0.7.3)
-    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "6a6cd7631496483696852351972144667866e20d6501407790a187493ae3c7e3"),
-    ("A5", (1mm, 6mm), 0x77, 300dpi, "f7c4bbb3b293cb151d1a6aed01afce028735bc07a70c711ba784c297f09c35d9"),
-    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "5e81ce18d98b40a1d2ec89c6cd128803ceada73e59b809edfd1ab7a820e7136c"),
-    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "4f53e201f4cb376a4735ad2476ca18e4033800c22b3a787d01e0457a42f37ef7"),
+    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "2bffa827e9479e28501e4733cfd7c28860e5a8247847e8b2357163680b50aead"),
+    ("A5", (1mm, 6mm), 0x77, 300dpi, "c375563754a22607fe53e1114294f02f29536e156d6bd73534d87b55a502f58d"),
+    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "bbaa953ba63c3e3a271cf5fbc9f04ce89a22c10cec07adc76713843afd7f5854"),
+    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "7f3596c1aec58b08f701e0d94035cb68894ae2a47fad1a4e8e6827318e55d448"),
 ]
 @testset "board TIFFs: byte pins (IO's write_tiff, BlobBoards' bytes)" begin
     @test pkgversion(BlobBoards) == v"0.7.3"   # the pins are this version's (see above)

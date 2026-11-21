@@ -1,5 +1,6 @@
-docs-pass: ca7823e
+docs-pass: 4376e2f
 landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; 0.7.2 changes no page)
+(a compat-only patch on VisualGeometryToolkitCore 0.12 / VisualGeometryToolkitIO 0.11: no page, docstring, README line or example names a stack version or a moved name — checked by search; the docs build is part of the release gate)
 
 # 0.7.2 docs review (the Julia docs skill), on VisualGeometryToolkitCore 0.11 / Estimation 0.12 / IO 0.10.6 / Features 0.9.7 / LODR 0.7.1
 
