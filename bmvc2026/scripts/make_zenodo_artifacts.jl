@@ -11,13 +11,14 @@ results_root() (src/runs.jl), so no tier carries one. What each tier holds is
 configs/data_artifacts.toml; the packing is VisualGeometryToolkitEval's
 DataArtifacts.pack_artifacts, from the author's data root (data_root()).
 
-Before packing, the author's tree is in the published layout and the current
-schemas: a file whose schema has a migration is migrated on the author's tree by
-VisualGeometryToolkitIO.vgio_migrate_tree; the inputs tier's camera of record
-(<session>/calibration/<camera>.json) is scripts/import_cameras.jl's output, and
-its provenance/ material sits under absolute_pose_experiments/provenance/. The
-published records reproduce from such a tree byte for byte (each binding's
-git-tree-sha1).
+The author's tree holds each tier's files as the tier publishes them: a bound
+tier re-packs to its own git-tree-sha1 only from its published bytes (a tree
+composed of the published trees reproduces every binding). A NEW record's tier
+is laid out and migrated first (VisualGeometryToolkitIO.vgio_migrate_tree on the
+author's tree; the inputs tier's camera of record, <session>/calibration/, is
+scripts/import_cameras.jl's output; its provenance/ material sits under
+absolute_pose_experiments/provenance/); its new hashes are a new record, never
+a rebind of a published one.
 
 `--record=<group>=<id>` names a record's Zenodo id (or Hugging Face revision)
 for the URLs (the rebind after a deposit is published); without it the

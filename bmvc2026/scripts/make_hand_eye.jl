@@ -37,7 +37,7 @@ end
 using Main.BlobBoardsEval
 using Main.BlobBoardsEval: _stem   # an image file's stem (src/error_table.jl)
 
-const EVAL, _ = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
+const EVAL, EVAL_PATH = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
 const SRC = eval_sources(EVAL)
 # The hand-eye records are DERIVED from the detections and the motion-capture
 # records, so they are keyed on those products (`hand_eye_product`), never written
@@ -48,7 +48,7 @@ const PRODUCT = hand_eye_product(SRC)
 const RESULTS = product_dir(PRODUCT)
 
 println("sources: ", Dict(k => p.key for (k, p) in SRC.products))
-produce(PRODUCT; driver = "bmvc2026/scripts/make_hand_eye.jl", config_source = "bmvc2026/configs/figures/evaluation.toml") do results_dir
+produce(PRODUCT; driver = "bmvc2026/scripts/make_hand_eye.jl", config_source = EVAL_PATH) do results_dir
 for bt in BlobBoardsEval.BOARD_TYPES
     calib_poses = poses_dir(SRC, bt.name; calibration = true)
 
@@ -63,7 +63,7 @@ for bt in BlobBoardsEval.BOARD_TYPES
     # The ONE hand-eye authority (src/calibration.jl): cached, keyed on the
     # frames and markers that determine the fit, and tagged with the commit.
     # This was an independent refit — the project had FOUR of them.
-    he = hand_eye(SRC, frames, detected; subset = "calibration_" * bt.abbr)
+    he = hand_eye(SRC, frames, detected; subset = "calibration_" * bt.abbr, config_source = EVAL_PATH)
     diag = he.diagnostics
 
     # The published records: the cache's pair (X with its covariance, the

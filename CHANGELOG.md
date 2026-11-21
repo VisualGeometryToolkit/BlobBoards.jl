@@ -14,7 +14,15 @@ bmvc2026 follows the stack's storage design: its tiers are DataArtifacts `tree` 
 git-tree-sha1), `scripts/fetch_data.jl` installs them (`fetch_data!`), `scripts/make_zenodo_artifacts.jl` packs and binds
 them through `pack_artifacts` (its own packer is gone), `src/data.jl` binds the catalog's view (`catalog_view`) without
 the `BlobBoards.data_dir()` rung (the site profile's data root takes its place), and `configs/reproduce.toml` names no
-machine path. Its held Eval 0.9 / IO 0.10 port is still held (see 0.7.2).
+machine path.
+
+bmvc2026 is ported off the Eval 0.8 caching API that Eval 0.9 retired (see 0.7.2): every run is a VisualGeometryToolkitEval
+`Product` (`<[experiment] layout…>/bmvc2026/<name>/<key>`, keyed by the config of record, the code it runs and its
+upstream products), every driver produces through `produce`, the pose-error cells and the hand-eye fit are products,
+and the stages declare their products or are checks. Results move to that layout; the runs of record were regenerated
+from the published inputs and their paper assets compared with the deployed ones. The records' time origin carries the
+capture clock's UTC offset (`[mocap] utc_offset`), as VisualGeometryToolkitIO 0.11.1 requires; the formats test pins
+IO's current record schemas.
 
 ## 0.7.3 (2026-11-21)
 

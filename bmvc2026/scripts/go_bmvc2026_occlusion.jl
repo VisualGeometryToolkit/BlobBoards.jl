@@ -50,6 +50,7 @@ const BOARDS_DIR = BBE.input_path(RUN.config_toml, "boards")         # shared ac
 const FRAME_LIMIT = Int(RUN.experiment["limit"])
 
 using VisualGeometryToolkitEval.Experiments: produce, product_dir
+import TOML
 
 const PRODUCT = BBE.sweep_product(CONFIG_PATH; kind = "occlusion")
 const RUN_KEY = PRODUCT.key
@@ -72,6 +73,7 @@ function sweep()
                 joinpath(RUN_ROOT, "occlusion", level, "val", "bb")
             ) for level in LEVELS
     ]
+    UNITS_OF_RUN = units
 
     run_sweep(
         units, ctx;
@@ -80,6 +82,8 @@ function sweep()
         write_provenance = BBE.write_provenance,
         extra_provenance = Dict("levels" => join(LEVELS, ","), "run_key" => RUN_KEY, "config_source" => CONFIG_PATH, "camera" => CAMERA_JSON),
     )
+    # the product's output, written last: the units it holds
+    open(io -> TOML.print(io, Dict("units" => [relpath(u.poses, RUN_ROOT) for u in UNITS_OF_RUN])), joinpath(RUN_ROOT, "_units.toml"), "w")
     return nothing
 end
 

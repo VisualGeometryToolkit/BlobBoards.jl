@@ -367,6 +367,7 @@ function roundtrip_all(root)
 end
 # THE RUN — produce-or-skip: a run whose records exist is complete.
 function main()
+    rm(MANIFEST; force = true)   # an interrupted production's rows: the manifest is this production's alone
     mkpath(OUT_ROOT)
     for session in SESSIONS
         convert_mocap(session)

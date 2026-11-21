@@ -80,11 +80,13 @@ gallery_path(rc::AbstractDict) = joinpath(results_root(), "galleries", basename(
 
 The product of a BlobBoards sweep of the run config `config`: `bb` (the run's
 image subsets, under `poses/` and `val/`) or `occlusion` (the occlusion levels,
-under `occlusion/<LL>/`).
+under `occlusion/<LL>/`). Its output is `_units.toml`, written after every unit:
+`produce` removes only it before a production, so the finished units of an
+interrupted one stay and are resumed.
 """
 function sweep_product(config::AbstractString; kind::AbstractString = "bb")
     kind in ("bb", "occlusion") || error("sweep kind $(repr(kind)): bb or occlusion")
-    return stage_product(load_config(config), kind; output = kind == "bb" ? "poses" : "occlusion")
+    return stage_product(load_config(config), kind; output = "_units.toml")
 end
 
 "The directory of a BlobBoards sweep (its product's)."

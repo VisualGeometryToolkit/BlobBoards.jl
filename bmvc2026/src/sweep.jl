@@ -329,7 +329,8 @@ end
 # live inside the sweep's product (src/runs.jl `sweep_product`), whose key
 # holds the config of record and the code it runs, so a unit of another config
 # or other code is in another directory; this resumes a product whose earlier
-# production was interrupted. The frame cap is the config's `[experiment]
+# production was interrupted (its output, `_units.toml`, is written after the
+# units, so `produce` removes nothing a finished unit wrote). The frame cap is the config's `[experiment]
 # limit`, a stated value in the key.
 _unit_complete(u) = isfile(joinpath(u.poses, TARGET_POSES_FILE)) && isfile(joinpath(u.poses, "_provenance.toml"))
 

@@ -26,17 +26,17 @@ include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 using .BlobBoardsEval
 
 function main()
-    eval_cfg, _ = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
+    eval_cfg, eval_path = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
     src = eval_sources(eval_cfg)
     force = "--force" in ARGS
     println("dataset: $(src.dataset); sources: ", Dict(k => p.key for (k, p) in src.products))
-    write_pose_results(src; force)
+    write_pose_results(src; force, config_source = eval_path)
 
     # The occlusion levels are the BlobBoards occlusion sweep's (its run config
     # of record, [experiment] occlusion_levels); every system is evaluated on each.
     for level in src.levels
         println("\nocclusion level $level:")
-        write_pose_results(src; occlusion_level = level, force)
+        write_pose_results(src; occlusion_level = level, force, config_source = eval_path)
     end
 
     # Collect immediately so a bad cell surfaces here rather than at plot time.

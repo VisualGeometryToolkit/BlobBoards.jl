@@ -70,7 +70,8 @@ _save_hand_eye_record(file, data::AbstractDict) =
 
 function hand_eye(
         src::Sources, frames::Vector{RigFrame}, detected::Dict;
-        subset::AbstractString, min_rel_angle::Float64 = deg2rad(5), force::Bool = false
+        subset::AbstractString, min_rel_angle::Float64 = deg2rad(5), force::Bool = false,
+        config_source::AbstractString = "bmvc2026/configs/figures/evaluation.toml",
     )
     dataset = src.dataset
     # Normalise the join key HERE so no caller has to know it. `_stem` was
@@ -114,8 +115,7 @@ function hand_eye(
             for (stem, ps) in detected))),
     )
     product = stage_product(cfg, "hand_eye_fit"; output = string("handeye_", dataset, "_", subset, ".json"))
-    produce(product; driver = "bmvc2026/src/calibration.jl", config_source = "bmvc2026/configs/figures/evaluation.toml",
-            force) do _
+    produce(product; driver = "bmvc2026/src/calibration.jl", config_source, force) do _
         he = hand_eye_calibrate(frames, detected; min_rel_angle)
         _save_hand_eye_record(product_output(product), Dict{String, Any}(
             "fit" => he, "config" => cfg, "n_frames" => length(usable), "n_markers" => length(markers),
@@ -126,6 +126,7 @@ function hand_eye(
         nothing
     end
     file = product_output(product)
+    commit = get(read_provenance(product_dir(product)), "gitcommit", nothing)   # the code that fitted it (its records)
 
     X, targets = load_hand_eye(file)
     # `load` hands back the records only; the diagnostics ride in the file's
@@ -134,7 +135,7 @@ function hand_eye(
     diagnostics = (
         n_frames = Int(prov.n_frames), n_markers = Int(prov.n_markers),
         sigma_rot_rad = prov.sigma_rot_rad, sigma_trans_mm = prov.sigma_trans_mm,
-        gitcommit = get(prov, :gitcommit, nothing),
+        gitcommit = commit,
     )
     return (; X = geom(X), targets = _plain_targets(targets), uncertain = (; X, targets), diagnostics, file)
 end

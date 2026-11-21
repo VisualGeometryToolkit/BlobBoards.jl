@@ -47,6 +47,7 @@ VisualGeometryToolkitCore = "0.13"
 VisualGeometryToolkitEstimation = "0.12"
 VisualGeometryToolkitEval = "0.10"
 VisualGeometryToolkitFeatures = "0.9.7"
+VisualGeometryToolkitIO = "0.11.1"
 
 [extras]
 CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"

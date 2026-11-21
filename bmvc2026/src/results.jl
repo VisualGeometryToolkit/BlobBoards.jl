@@ -82,7 +82,7 @@ Returns the cells' output paths.
 function write_pose_results(
         src::Sources;
         occlusion_level::Union{Nothing, AbstractString} = nothing,
-        force::Bool = false
+        force::Bool = false, config_source::AbstractString = "bmvc2026/configs/figures/evaluation.toml",
     )
     level = something(occlusion_level, "none")
     evaluated = Ref{Any}(nothing)
@@ -90,8 +90,7 @@ function write_pose_results(
     files = String[]
     for bt in BOARD_TYPES
         product = cell_product(src, bt.system, level)
-        produce(product; driver = "bmvc2026/scripts/make_pose_results.jl",
-                config_source = "bmvc2026/configs/figures/evaluation.toml", force) do _
+        produce(product; driver = "bmvc2026/scripts/make_pose_results.jl", config_source, force) do _
             r = evaluation()[bt.system]
             merge(
                 _cell_config(src, bt.system, level),
@@ -118,9 +117,9 @@ a bespoke script per question. `long = false` returns the raw one-row-per-cell
 frame with vector columns.
 """
 function pose_results(src::Sources; long::Bool = true)
-    cells = [cell_product(src, bt.system, level) for level in ["none"; src.levels] for bt in BOARD_TYPES]
-    missing_cells = [c for c in cells if !produced(c)]
-    isempty(missing_cells) || error("pose-error cells not produced: $(join(string.(missing_cells), ", ")) — run make_pose_results.jl first")
+    # the produced cells of every system at every level (a level not yet evaluated contributes none)
+    cells = filter(produced, [cell_product(src, bt.system, level) for level in ["none"; src.levels] for bt in BOARD_TYPES])
+    isempty(cells) && error("no pose-error cell of these sources is produced — run make_pose_results.jl first")
     rows = [DataFrame(Dict{Symbol, Any}(Symbol(k) => [v] for (k, v) in load_output(Dict{String, Any}, c))) for c in cells]
     df = vcat(rows...; cols = :union)
     have = Set(Symbol.(names(df)))
