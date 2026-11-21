@@ -73,12 +73,16 @@ path = "absolute_pose_experiments/260521/images"
 provenance = "the 260521 captures (f/9.0), the validation side of the registered scene split (its bb subset)"
 
 [inputs.camera]
-# The validation session's camera store, the copy the tuning runs of record read
-# (3a346460b90dc25d, c80d42e9055f8cd5: their records state this sha256).
+# The validation session's camera store. The copy the tuning runs of record read
+# (3a346460b90dc25d, c80d42e9055f8cd5: their records state sha256 0ef0c750…) is
+# LOST. This is the latest surviving copy (bb_formats_2026-10/41ba64df87c084e7):
+# it differs from the lost one only in its provenance run_key; its calibration
+# content (K, lens, calibration block) is byte-identical to the conversion of the
+# export of record (b745b737…, in this tier).
 tier = "bb_absolute_pose_tuning_260521"
 path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
-provenance = "the 260521 camera (the session's OpenCV calibrateCamera fit), as the tuning runs read it"
-sha256 = "0ef0c750232f9c0f17caa77bf9fab07a63f7f4e2cf4820af1b9b49d378617e1b"
+provenance = "the 260521 camera (the session's OpenCV calibrateCamera fit, its exact native port); the surviving copy of the store the tuning runs read (theirs, sha256 0ef0c750232f9c0f17caa77bf9fab07a63f7f4e2cf4820af1b9b49d378617e1b, is lost)"
+sha256 = "2a6c050e5ea298bc7a7fe77340d0b63b05d4bb06a390581d383941ef49721a9e"
 
 [inputs.boards]
 # The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids

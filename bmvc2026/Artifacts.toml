@@ -95,11 +95,11 @@ lazy = true
     url = "https://zenodo.org/records/23937759/files/bb_absolute_pose_occlusion_90_260527.tar.gz?download=1"
 
 [bb_absolute_pose_tuning_260521]
-git-tree-sha1 = "30980da744f23bb6fda6312d97922e007f142e1c"
+git-tree-sha1 = "694408ab2231d105a5856b0fa131075db4199f9e"
 lazy = true
 
     [[bb_absolute_pose_tuning_260521.download]]
-    sha256 = "babbe4b5afb8997610665e5ef0ca0868418e2f5f486d1e305305ff97480e2338"
+    sha256 = "d51d721ce1d852e0253ffee3d186d5e645f22ea0bbeeded3e1a90d1c013b70bc"
     url = "https://zenodo.org/records/ZENODO_260521_RECORD_ID/files/bb_absolute_pose_tuning_260521.tar.gz?download=1"
 
 [bb_assets]
