@@ -148,7 +148,10 @@ function main()
     # be produced here too -- it was a hand copy, which meant the figure could
     # not be rebuilt from the script alone.
     original = joinpath(OUT_DIR, OUT["original"] * last(splitext(IMG_PATH)))
-    cp(IMG_PATH, original; force = true)
+    # The input is a link into the artifact store (a data root's view): copy its bytes, never the link, and drop a
+    # link an earlier run left there (cp refuses a destination that resolves to its source).
+    rm(original; force = true)
+    cp(IMG_PATH, original; follow_symlinks = true)
     outputs = [original]
     cols = distinguishable_colors(length(acc), [RGB(1, 1, 1), RGB(0, 0, 0)]; dropseed = true)
     h, w = size(img_plot)
