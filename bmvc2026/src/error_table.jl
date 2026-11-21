@@ -187,8 +187,6 @@ function evaluate_dataset(
         # therefore EVERY error column below, so it is recorded from the
         # trajectory's provenance.
         static_recovered = static_recovery_accepted(src.mocap, "calibration_" * bt.abbr)
-        calib_frames = rig_sequence(src.mocap, "calibration_" * bt.abbr)
-        calib_detected = load_detected_poses(poses_dir(src, bt.name; calibration = true))
 
         # ONE hand-eye authority (src/calibration.jl): cached, keyed on the
         # frames and markers that determine it, and tagged with the commit.
@@ -203,7 +201,10 @@ function evaluate_dataset(
         # different printed targets, so each needs its own fit, which is why the
         # default stays `nothing`.
         he = hand_eye_fit === nothing ?
-            hand_eye(src, calib_frames, calib_detected; subset = "calibration_" * bt.abbr) :
+            # (the calibration subset is read only to fit: a pinned fit needs none, and a
+            # series without one, the no-disambiguation ablation, is censused pinned)
+            hand_eye(src, rig_sequence(src.mocap, "calibration_" * bt.abbr),
+                     load_detected_poses(poses_dir(src, bt.name; calibration = true)); subset = "calibration_" * bt.abbr) :
             hand_eye_fit
         df = pose_error_table(frames, detected, he.X, he.targets; marker_sizes)
         upstream = joinpath(pdir, "_config.toml")

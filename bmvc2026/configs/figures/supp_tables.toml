@@ -25,6 +25,10 @@ sha256 = "788adf4e3a8158d3c06f0f3412e35e671503fa4b0cdc6035bc8908d0ca155ec9"
 output = "board_params.tex"              # under plotsdir(); the copy_tex stage copies it into papers/figures/floorplan
 # Size classes in increasing pattern extent; each name becomes the suffix of its macros.
 size_classes = ["Small", "Medium", "Large"]
+# The maximum blob diameter as a fraction of the pattern's short side, as the
+# gallery was generated (the board/v1 files of records 1.0.0-1.2.0 state 0.5 for
+# every board); the board/v5 records store the ladder rung it produced (max_scale).
+max_diameter_fraction = 0.5
 
 [run_settings]
 output = "run_settings.tex"

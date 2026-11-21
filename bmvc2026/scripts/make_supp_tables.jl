@@ -41,12 +41,12 @@ import JSON
 import TOML
 using Statistics: median
 using BlobBoards: FindBoardsConfig, config_dict
-using VisualGeometryToolkitCore: BoundedCamera, ustrip, mm, dpi
+using VisualGeometryToolkitCore: BoundedCamera, ustrip, mm, dpi, parse_unit
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir, _quantity   # a board JSON's `{value, unit}` field as a quantity
+using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
 
@@ -58,17 +58,19 @@ const RUN_CONFIG = joinpath(sweep_dir(CFG["runs"]["bb"]), "poses", "bb", "_confi
 
 # ---- tab:supp:params ---------------------------------------------------------
 
-# A board JSON's pattern extent in mm (pattern resolution at the print density).
+# A board JSON's pattern parameters (blobboards/board/v5: plain numbers in the
+# file's `units`; pattern lengths in print pixels, converted at the print density).
 function _pattern(path)
     j = JSON.parse(read(path, String))
+    String(j.schema) == "blobboards/board/v5" || error("$path: expected blobboards/board/v5, got $(j.schema)")
     pc, bc = j.preamble.pattern_config, j.preamble.board_config
-    density = _quantity(bc.print_density)
-    extent_mm = round(Int, ustrip(mm, _quantity(pc.pattern_resolution.width) / density))
+    density = Float64(bc.print_density) * parse_unit(String(j.units.density))
+    printed(x) = Float64(x) / density          # a length in print pixels, as a length
     return (;
-        extent_mm, n_blobs = length(j.blobs.centers), dpi = ustrip(dpi, density),
-        min_scale_mm = ustrip(mm, _quantity(pc.min_scale) / density),
-        max_diameter_fraction = Float64(pc.max_diameter_fraction), cutoff = Float64(pc.cutoff),
-        alpha = Float64(pc.alpha), scales_per_octave = Int(pc.scales_per_octave),
+        extent_mm = round(Int, ustrip(mm, printed(pc.pattern_resolution.width))),
+        n_blobs = length(j.blobs.centers), dpi = ustrip(dpi, density),
+        min_scale_mm = ustrip(mm, printed(pc.min_scale)),
+        cutoff = Float64(pc.cutoff), alpha = Float64(pc.alpha), scales_per_octave = Int(pc.scales_per_octave),
         polarity = String(pc.polarity),
     )
 end
@@ -98,7 +100,10 @@ function write_board_params(nums)
     # make one table column a lie.
     shared(f) = (v = unique(f.(boards)); length(v) == 1 ? only(v) : error("boards disagree on $f: $v"))
     add_number!(nums, "bbPatMinScaleMM", shared(b -> b.min_scale_mm); digits = 3)
-    add_number!(nums, "bbPatMaxDiamFrac", shared(b -> b.max_diameter_fraction); sigdigits = 15)
+    # d_f is a design parameter the board records no longer store: BlobBoards converts a
+    # board/v1 file's max_diameter_fraction to the ladder rung it produced (max_scale),
+    # so the value is the config's, the one of the boards as printed (board/v1).
+    add_number!(nums, "bbPatMaxDiamFrac", Float64(CFG["board_params"]["max_diameter_fraction"]); sigdigits = 15)
     add_number!(nums, "bbPatCutoff", shared(b -> b.cutoff); sigdigits = 15)
     add_number!(nums, "bbPatAlpha", shared(b -> b.alpha); sigdigits = 15)
     add_number!(nums, "bbPatScalesPerOctave", shared(b -> b.scales_per_octave))
