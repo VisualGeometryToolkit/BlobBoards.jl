@@ -81,7 +81,7 @@ function panel_config(p)
         "max_trials" => PAT["max_trials"], "alpha" => p["alpha"], "cutoff" => p["cutoff"],
         "raster_aligned" => PAT["raster_aligned"], "polarity" => PAT["polarity"],
     )
-    return JSON.parse(JSON.json(v1), PatternConfig)
+    return BlobBoards._legacy_pattern_config(JSON.parse(JSON.json(v1)))   # the package's v1 reader (src/migrate_boards.jl)
 end
 
 function main()
