@@ -9,8 +9,8 @@ level writes:
   <run>/occlusion/<LL>/poses/bb/target_poses.json — the detected poses (+ telemetry.jsonl)
   <run>/occlusion/<LL>/val/bb/<image>_val.png      — colored-board overlay
 
-where <run> is the run config's keyed directory `…/bmvc2026/occlusion-<key>`
-(src/runs.jl `sweep_dir(config; kind = "occlusion")`, Eval's `keyed_cell_dir`):
+where <run> is the run config's product `…/bmvc2026/occlusion/<key>`
+(src/runs.jl `sweep_product(config; kind = "occlusion")`, Eval's `Product`):
 the same run config of record as the main sweep, the
 levels its `[experiment] occlusion_levels`. Each level is bb-only (no
 calibration subset); the camera, boards and gallery are the parent session's.
@@ -49,33 +49,42 @@ const GALLERY = BBE.gallery_path(RUN.config_toml)
 const BOARDS_DIR = BBE.input_path(RUN.config_toml, "boards")         # shared across levels
 const FRAME_LIMIT = Int(RUN.experiment["limit"])
 
-mkpath(dirname(GALLERY))
-ctx = sweep_context(;
-    config_path = CONFIG_PATH, run_config = RUN,
-    network_path = BBE.input_path(RUN.config_toml, "network"),
-    gallery_path = GALLERY, boards_dir = BOARDS_DIR,
-    camera_json = CAMERA_JSON, device = CUDABackend()
-)
+using VisualGeometryToolkitEval.Experiments: produce, product_dir
 
-const RUN_KEY = BBE.run_key(BBE.load_config(CONFIG_PATH))
-const RUN_ROOT = BBE.sweep_dir(CONFIG_PATH; kind = "occlusion")
+const PRODUCT = BBE.sweep_product(CONFIG_PATH; kind = "occlusion")
+const RUN_KEY = PRODUCT.key
+const RUN_ROOT = product_dir(PRODUCT)
 
-units = [
-    SweepUnit(
-            "occ$level",
-            joinpath(BBE.input_path(RUN.config_toml, "occlusion_$(level)"), "bb"),
-            joinpath(RUN_ROOT, "occlusion", level, "poses", "bb"),
-            joinpath(RUN_ROOT, "occlusion", level, "val", "bb")
-        ) for level in LEVELS
-]
+function sweep()
+    mkpath(dirname(GALLERY))
+    ctx = sweep_context(;
+        config_path = CONFIG_PATH, run_config = RUN,
+        network_path = BBE.input_path(RUN.config_toml, "network"),
+        gallery_path = GALLERY, boards_dir = BOARDS_DIR,
+        camera_json = CAMERA_JSON, device = CUDABackend()
+    )
 
-run_sweep(
-    units, ctx;
-    limit = FRAME_LIMIT,
-    driver = "bmvc2026/scripts/go_bmvc2026_occlusion.jl",
-    write_provenance = BBE.write_provenance,
-    extra_provenance = Dict("levels" => join(LEVELS, ","), "run_key" => RUN_KEY, "config_source" => CONFIG_PATH, "camera" => CAMERA_JSON),
-    force = "--force" in ARGS
-)
+    units = [
+        SweepUnit(
+                "occ$level",
+                joinpath(BBE.input_path(RUN.config_toml, "occlusion_$(level)"), "bb"),
+                joinpath(RUN_ROOT, "occlusion", level, "poses", "bb"),
+                joinpath(RUN_ROOT, "occlusion", level, "val", "bb")
+            ) for level in LEVELS
+    ]
+
+    run_sweep(
+        units, ctx;
+        limit = FRAME_LIMIT,
+        driver = "bmvc2026/scripts/go_bmvc2026_occlusion.jl",
+        write_provenance = BBE.write_provenance,
+        extra_provenance = Dict("levels" => join(LEVELS, ","), "run_key" => RUN_KEY, "config_source" => CONFIG_PATH, "camera" => CAMERA_JSON),
+    )
+    return nothing
+end
+
+produce(_ -> sweep(), PRODUCT; driver = "bmvc2026/scripts/go_bmvc2026_occlusion.jl", config_source = CONFIG_PATH,
+        inputs = [CAMERA_JSON, BOARDS_DIR, (BBE.input_path(RUN.config_toml, "occlusion_$(l)") for l in LEVELS)...],
+        force = "--force" in ARGS)
 
 println("\nDone. Run $RUN_KEY -> $RUN_ROOT")

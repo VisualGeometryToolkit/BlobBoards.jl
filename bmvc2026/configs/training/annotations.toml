@@ -2,9 +2,9 @@
 # training corpus — every source of the training footage annotated with its
 # boards (per-frame canonical patches, BlobBoards `build_annotations`), then
 # split by board identity into train/val/test (`split_training_data`). The
-# corpus is DATA of its own tier, [output] tier below: written add-only by its
-# one producer into VisualGeometryToolkitEval's keyed_data_dir
-# (data_root()/<tier>/annotations-<run_key>), never into another tier's tree:
+# corpus is its producer's product (VisualGeometryToolkitEval `Product`:
+# results_root()/<layout…>/bmvc2026/annotations/<key>), never written into the
+# input tree; scripts/training/train_descriptor.jl reads it as its upstream:
 #   truth_images/   the per-frame annotations (+ refs/, _log.jsonl, build.log)
 #   splits/         train.jld2, val.jld2, test.jld2
 # The same config is the same
@@ -15,6 +15,7 @@
 
 [experiment]
 generator = "annotations"
+layout = ["descriptor_training"]
 
 # The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-
 # relative). The footage tree is the authors' (unpublished as laid out here;
@@ -39,9 +40,6 @@ tier = "bb_assets"
 path = "models/track_logpolar_circ_s96_iter4.onnx"
 provenance = "the descriptor network that finds the boards (the network of record, as configs/bmvc2026_260527.toml)"
 sha256 = "6efc291ab94e812ce043d919ecc72ded7e4b16bd1c0c50b1492b1ce245bae8b9"
-
-[output]
-tier = "bb_descriptor_annotations"     # the data tier the corpus is (Eval keyed_data_dir)
 
 [gallery]
 path = "board_gallery_training.jld2"   # a cache: results_root()/galleries/<path> (src/runs.jl gallery_path)

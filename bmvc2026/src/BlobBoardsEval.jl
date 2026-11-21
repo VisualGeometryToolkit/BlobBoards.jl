@@ -34,13 +34,11 @@ include("pose_error.jl")
 include("error_table.jl")
 include("recovery.jl")
 # The provenance record (write_provenance / read_provenance) is the stack's
-# one implementation, VisualGeometryToolkitEval.Experiments; cache.jl wraps its keyed
-# result cache.
+# one implementation, VisualGeometryToolkitEval.Experiments.
 using VisualGeometryToolkitEval.Experiments: write_provenance, read_provenance
-include("cache.jl")
-# After cache.jl (`cached_result`) and error_table.jl (uses `evaluate_dataset`).
+# After error_table.jl (uses `evaluate_dataset`).
 include("results.jl")
-# after cache.jl and pose_error.jl: the one hand-eye authority
+# after pose_error.jl: the one hand-eye authority
 include("calibration.jl")
 # Where the tuned detection operating point lives (scripts/detection_cv.jl writes it).
 include("operating_points.jl")
@@ -59,7 +57,8 @@ export RigFrame, rig_sequence, load_detected_poses, marker_sizes, detected_marke
     data_root, results_root, paper_images_dir, paper_figures_dir, figure_config, write_figure_records, figure_numbers, EVAL_TIERS,
     camera_of_record,
     config_path, load_config, input_path, records_dir, mocap_dir, gallery_path,
-    sweep_dir, baselines_dir, PoseRun, Sources, eval_sources, poses_dir, val_dir, derived_dir, hand_eye_dir,
+    records_product, sweep_product, sweep_dir, baselines_product, baselines_dir, stage_product, PoseRun, Sources, eval_sources,
+    poses_dir, val_dir, derived_product, hand_eye_product, hand_eye_dir, cell_product,
     write_provenance, read_provenance,
     hand_eye, save_hand_eye, load_hand_eye, uncertain_hand_eye,
     write_pose_results, pose_results, BOARD_TYPES,

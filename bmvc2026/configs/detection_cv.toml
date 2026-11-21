@@ -48,8 +48,8 @@
 
 [experiment]
 generator = "detection_cv"
-# The results tree's layout of its runs (VisualGeometryToolkitEval experiment_dir:
-# results_root()/<layout…>/bmvc2026/<kind>-<run_key>).
+# The results tree's layout of its runs (src/operating_points.jl stage_product:
+# results_root()/<layout…>/bmvc2026/<product>/<key>: Eval's Product).
 layout = ["tuning"]
 
 [runs]

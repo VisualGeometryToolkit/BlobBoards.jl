@@ -21,11 +21,10 @@ scripts/baselines/detect_markers.py and run in the pinned pixi environment
      `poses/<system>/target_poses.json` + `telemetry.jsonl`
      (`export_target_poses`; also `poses/calibration/<system>/` and
      `occlusion/<LL>/poses/<system>/`);
-  4. writes the run records.
+  4. Eval's `produce` writes the run records.
 
-Everything lands in the keyed run `…/bmvc2026/baselines-<run key>` (src/runs.jl
-`baselines_dir`, Eval's `keyed_cell_dir`); a complete run (Eval's
-`run_complete`) is skipped.
+Everything lands in the product `…/bmvc2026/baselines/<key>` (src/runs.jl
+`baselines_product`, Eval's `Product`); a produced run is reused.
 =#
 # reproduce: reads configs/baselines.toml
 
@@ -35,16 +34,17 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: figure_config, baselines_dir, input_path, export_target_poses
+using Main.BlobBoardsEval: figure_config, baselines_product, input_path, export_target_poses
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: opencv_parameters
 using VisualGeometryToolkitCore: BoundedCamera, value_of
-using VisualGeometryToolkitEval.Experiments: run_key, write_run_records, run_complete
+using VisualGeometryToolkitEval.Experiments: produce, product_dir
 import JSON
 
 const CFG, CFG_PATH = figure_config("baselines"; default = projectdir("configs", "baselines.toml"))
-const KEY = run_key(CFG)
-const RUN_ROOT = baselines_dir(CFG_PATH)
+const PRODUCT = baselines_product(CFG_PATH)
+const KEY = PRODUCT.key
+const RUN_ROOT = product_dir(PRODUCT)
 const LEVELS = String.(CFG["occlusion"]["levels"])
 const SESSION = input_path(CFG, "session")
 const IMAGES = input_path(CFG, "images")
@@ -70,7 +70,6 @@ function write_opencv_camera(path)
 end
 
 function main()
-    isdir(RUN_ROOT) && error("$(RUN_ROOT) exists without its run records — an interrupted run; move it aside to redo")
     mkpath(RUN_ROOT)
     cam = write_opencv_camera(joinpath(RUN_ROOT, "camera_opencv.json"))
     run(`pixi run --manifest-path $(PIXI) -e baselines python $(DRIVER) --config $(CFG_PATH)
@@ -89,10 +88,10 @@ function main()
             println("$(system): $(rel) -> $(out)")
         end
     end
-    write_run_records(RUN_ROOT, CFG; driver = "bmvc2026/scripts/detect_baselines.jl", config_source = CFG_PATH, key = KEY,
-        inputs = [SESSION, IMAGES, CAMERA, (OCCLUSION[l] for l in LEVELS)...])
     println("baselines -> $(RUN_ROOT)")
     return nothing
 end
 
-run_complete(RUN_ROOT; sidecar = "camera_opencv.json") ? println("detect_baselines: run $(KEY) complete at $(RUN_ROOT)") : main()
+produce(_ -> main(), PRODUCT; driver = "bmvc2026/scripts/detect_baselines.jl", config_source = CFG_PATH,
+        inputs = [SESSION, IMAGES, CAMERA, (OCCLUSION[l] for l in LEVELS)...])
+println("detect_baselines: run $(KEY) at $(RUN_ROOT)")

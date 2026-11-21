@@ -47,4 +47,4 @@ function copy_tex()
     return copied
 end
 
-run_stages("copy_tex", [Stage(:copy, "plots/*.tex (and plots/occ_<L>/*.tex) into papers/figures", () -> false, () -> (copy_tex(); nothing))])
+run_stages("copy_tex", [Stage(:copy, "plots/*.tex (and plots/occ_<L>/*.tex) into papers/figures"; check = () -> (copy_tex(); nothing))])

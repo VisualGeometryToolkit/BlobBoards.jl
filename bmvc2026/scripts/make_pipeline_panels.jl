@@ -263,4 +263,4 @@ function main()
 end
 
 const RESULT = Ref{Any}(nothing)
-run_stages("make_pipeline_panels", [Stage(:render, "the four pipeline panels (GPU)", () -> false, () -> (RESULT[] = main(); nothing))])
+run_stages("make_pipeline_panels", [Stage(:render, "the four pipeline panels (GPU)"; check = () -> (RESULT[] = main(); nothing))])

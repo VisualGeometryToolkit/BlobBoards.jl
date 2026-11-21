@@ -8,8 +8,8 @@ camera-untracked calibration frames carry the evidence-gated static-camera
 substitution (flagged `recovered` in the camera-rig trajectory) — and write
 the result, every pose with the fit's covariance:
 
-  …/bmvc2026/hand_eye-<key>/hand_eye_<name>.json   (src/runs.jl `hand_eye_dir`:
-                                       Eval's keyed_cell_dir, keyed on the run keys of its sources)
+  …/bmvc2026/hand_eye/<key>/hand_eye_<name>.json   (src/runs.jl `hand_eye_product`:
+                                       Eval's Product, keyed on the products of its sources)
     vgio/transforms/v3   X: body:camera_rig → camera_optical (+ diagnostics in provenance)
   …/hand_eye_<name>_board_rig.json
     vgio/rig/v6          Y_m: target:<uid> → body:board_rig, one per marker
@@ -40,14 +40,15 @@ using Main.BlobBoardsEval: _stem   # an image file's stem (src/error_table.jl)
 const EVAL, _ = figure_config("evaluation"; default = projectdir("configs", "figures", "evaluation.toml"))
 const SRC = eval_sources(EVAL)
 # The hand-eye records are DERIVED from the detections and the motion-capture
-# records, so they are keyed on those runs (`hand_eye_dir`), never written into
-# the input tree. The fit itself is cached and keyed by `hand_eye`
-# (src/calibration.jl); this is its published, human-readable form.
-results_dir = hand_eye_dir(SRC)
-mkpath(results_dir)
+# records, so they are keyed on those products (`hand_eye_product`), never written
+# into the input tree. The fit itself is its own product (`hand_eye`,
+# src/calibration.jl); this is its published, human-readable form.
+using VisualGeometryToolkitEval.Experiments: produce, product_dir
+const PRODUCT = hand_eye_product(SRC)
+const RESULTS = product_dir(PRODUCT)
 
-
-println("sources: $(SRC.keys)")
+println("sources: ", Dict(k => p.key for (k, p) in SRC.products))
+produce(PRODUCT; driver = "bmvc2026/scripts/make_hand_eye.jl", config_source = "bmvc2026/configs/figures/evaluation.toml") do results_dir
 for bt in BlobBoardsEval.BOARD_TYPES
     calib_poses = poses_dir(SRC, bt.name; calibration = true)
 
@@ -93,4 +94,6 @@ for bt in BlobBoardsEval.BOARD_TYPES
             "σ_rot=$(round(rad2deg(diag.sigma_rot_rad); digits = 3))°, " *
             "σ_trans=$(round(diag.sigma_trans_mm; digits = 2))mm -> $out"
     )
+end
+nothing
 end

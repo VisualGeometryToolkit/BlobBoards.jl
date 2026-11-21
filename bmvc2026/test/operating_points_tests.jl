@@ -17,12 +17,11 @@
     @test s isa JointCoarseFine && s.criterion == MeanAverageAccuracy(10.0)
     @test sort!(collect(keys(s.axes))) == ["min_similarity", "outlier_halfwidth", "peak_threshold"]
     @test [n for (n, a) in s.axes if a.expensive] == ["peak_threshold"]
-    key = OperatingPoints.detection_cv_key(cfg)
-    dir = OperatingPoints.detection_cv_dir(cfg)
-    @test endswith(dir, joinpath(OperatingPoints.EXPERIMENT, "detection_cv-" * key))
+    p = OperatingPoints.detection_cv_product(cfg)
+    @test endswith(VgtkEval.Experiments.product_dir(p), joinpath("tuning", OperatingPoints.EXPERIMENT, "detection_cv", p.key))
     # the run config's key is folded in: the search is around it
     @test haskey(OperatingPoints.detection_cv_upstream(cfg), "bb")
-    @test key != VgtkEval.Experiments.run_key(cfg)
+    @test p.key != VgtkEval.Experiments.run_key(cfg)
     # every adopted value comes from one record: the config's under its 0.8 key
     @test length(unique(op.artifact for op in OperatingPoints.ADOPTED_OPERATING_POINTS)) == 1
 end

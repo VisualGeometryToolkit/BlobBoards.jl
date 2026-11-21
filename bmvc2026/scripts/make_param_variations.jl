@@ -105,4 +105,4 @@ function main()
     return out_dir
 end
 
-run_stages("make_param_variations", [Stage(:render, "the nine pattern panels", () -> false, main)])
+run_stages("make_param_variations", [Stage(:render, "the nine pattern panels"; check = main)])

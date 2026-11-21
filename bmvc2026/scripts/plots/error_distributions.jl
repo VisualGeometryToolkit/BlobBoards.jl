@@ -1064,6 +1064,6 @@ function main()
 end
 
 run_stages("error_distributions", [
-    Stage(:emit, "floor plans, ECDFs, histograms, occlusion sweep and the macro files from the pose_results cells",
-        () -> false, main),
+    Stage(:emit, "floor plans, ECDFs, histograms, occlusion sweep and the macro files from the pose_results cells";
+        check = main),
 ])

@@ -8,9 +8,9 @@ by board identity into train/val/test.
 Its ONE config of record is configs/training/annotations.toml (or --config):
 the inputs (`[inputs.<id>]`: the boards, the photo and video sets, the network
 that finds the boards), the detector (`[annotate]`) and the split (`[split]`).
-The corpus is data of its own tier (`[output] tier`): it lands in
-VisualGeometryToolkitEval's `keyed_data_dir` (`data_root()/<tier>/annotations-<key>`),
-written by this one producer and never into another tier's tree:
+The corpus is this producer's product (VisualGeometryToolkitEval `Product`:
+`results_root()/descriptor_training/bmvc2026/annotations/<key>`), never written
+into the input tree:
 
   <run>/truth_images/   per-frame annotations (+ refs/, _log.jsonl)
   <run>/splits/         train.jld2, val.jld2, test.jld2
@@ -32,17 +32,18 @@ using BlobBoards: build_annotations, walk_media   # advanced API (unexported); t
 using CUDA, cuDNN
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load (pixel operations take a BoundedCamera)
-using VisualGeometryToolkitEval.Experiments: run_key, keyed_data_dir, write_run_records, run_complete
+using VisualGeometryToolkitEval.Experiments: produce, product_dir, Produced
 using Logging, Dates
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: figure_config, input_path, gallery_path
+using Main.BlobBoardsEval: figure_config, input_path, gallery_path, stage_product
 
 const CFG, CFG_PATH = figure_config("annotations"; default = projectdir("configs", "training", "annotations.toml"))
-const KEY = run_key(CFG)
-const RUN_DIR = keyed_data_dir(CFG, CFG["output"]["tier"], "annotations")
+const PRODUCT = stage_product(CFG, "annotations"; output = "splits")
+const KEY = PRODUCT.key
+const RUN_DIR = product_dir(PRODUCT)
 const ANN, SPLIT = CFG["annotate"], CFG["split"]
 
 # Timestamped lines, tee'd to stdout and the run's build.log.
@@ -128,11 +129,9 @@ function main()
         validation_fraction = SPLIT["validation_fraction"], test_fraction = SPLIT["test_fraction"], seed = SPLIT["seed"])
     @info "train $(result.stats.train_patches) patches ($(result.stats.train_boards) boards), " *
         "val $(result.stats.val_patches) ($(result.stats.val_boards_n)), test $(result.stats.test_patches) ($(result.stats.test_boards_n))"
-    write_run_records(RUN_DIR, CFG; driver = "bmvc2026/scripts/training/build_annotations.jl", config_source = CFG_PATH, key = KEY,
-        inputs = [boards_dir, input_path(CFG, "images"), input_path(CFG, "videos"), input_path(CFG, "network")], producer = true)
     close(log_io)
-    return RUN_DIR
+    return Produced(nothing; inputs = [boards_dir, input_path(CFG, "images"), input_path(CFG, "videos"), input_path(CFG, "network")])
 end
 
-run_complete(RUN_DIR; sidecar = joinpath("splits", "train.jld2")) ?
-    println("build_annotations: run $(KEY) complete at $(RUN_DIR)") : main()
+produce(_ -> main(), PRODUCT; driver = "bmvc2026/scripts/training/build_annotations.jl", config_source = CFG_PATH)
+println("build_annotations: run $(KEY) at $(RUN_DIR)")

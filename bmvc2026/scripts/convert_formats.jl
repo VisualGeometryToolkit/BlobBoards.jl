@@ -8,9 +8,9 @@ VisualGeometryToolkitIO's kinds, verified.
 Reads data_root()/absolute_pose_experiments/<session>/poses/motion_tracker
 (the vendor's `marker_*.json`, READ ONLY) and the image listing of each subset
 (the positional frame ↔ image join), and writes the records to
-<keyed run: …/bmvc2026/convert_formats-<run key>>/absolute_pose_experiments/<session>/
-poses/motion_tracker/ (src/runs.jl `records_dir`), the run key that of the
-config of record (configs/convert_formats.toml):
+<product: …/bmvc2026/convert_formats/<key>>/absolute_pose_experiments/<session>/
+poses/motion_tracker/ (src/runs.jl `records_product`, `records_dir`), keyed by the
+config of record (configs/convert_formats.toml) and the code:
 
   <subset>/markers.json               vgio/observations (the 14 markers, 3D target-point observations)
   <subset>/board_rig.json             vgio/trajectory/v3, body:board_rig → world
@@ -20,9 +20,10 @@ config of record (configs/convert_formats.toml):
   <subset>/<body>.kabsch.json         the reference re-solve from the markers
   constellation_<body>.json           vgio/rig/v6, frame body:<id> (a PointTarget)
 
-Every file carries its sources in `provenance`; the run writes `_config.toml`,
-`_provenance.toml` (config, commit, inputs), `_manifest.jsonl` (one line per
-source file: its sha256 and what it became) and `_report.json` at its root.
+Every file carries its sources in `provenance`; the run writes `_manifest.jsonl`
+(one line per source file: its sha256 and what it became) and `_report.json`
+(its output) at its root, and Eval's `produce` its `_config.toml` and
+`_provenance.toml` (config, code, inputs).
 Every file is the direct serialization of a VisualGeometryToolkitCore value
 (VisualGeometryToolkitIO `save`) and reads back to that value exactly. A mocap
 pose's column-major `rot_mat` is quaternion-encoded by VisualGeometryToolkitIO's one
@@ -31,7 +32,7 @@ that reads back to the same Float64.
 
 The cameras of record and the detections are not converted here: the camera
 is an input (vgio/cameras/v3, calibration/<camera>.json), and every detection
-is produced in its own keyed run (src/runs.jl).
+is produced in its own product (src/runs.jl).
 =#
 
 using DrWatson
@@ -40,14 +41,14 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, figure_config, static_camera_recovery, records_dir, EVAL_TIERS
+using Main.BlobBoardsEval: data_root, figure_config, static_camera_recovery, records_product, EVAL_TIERS
 include(joinpath(@__DIR__, "..", "src", "eval_images.jl"))   # `_is_image`: the subsets' image predicate
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitIO: append_jsonl
 using VisualGeometryToolkitCore: EuclideanMap, WorldFrame, BodyFrame, kabsch, geom, Rig,
     PosedTarget, PointTarget, BoundedCamera, Trajectory, TargetPoses, TargetObservations, correspondences, ids, with_unit, mm, ustrip
 using Rotations: QuatRotation, params
-using VisualGeometryToolkitEval.Experiments: run_key, write_run_records, run_complete
+using VisualGeometryToolkitEval.Experiments: produce, product_dir
 import VisualGeometryToolkitCore
 using StaticArrays: SMatrix, SVector
 using Rotations: RotMatrix, rotation_angle
@@ -57,11 +58,12 @@ import JSON, TOML
 import VisualGeometryToolkitEval
 
 const CFG, CFG_PATH = figure_config("convert_formats"; default = projectdir("configs", "convert_formats.toml"))
-const KEY = run_key(CFG)
+const PRODUCT = records_product(CFG_PATH)
+const KEY = PRODUCT.key
 const SRC_ROOT = joinpath(data_root(; tiers = EVAL_TIERS), "absolute_pose_experiments")
 const SESSIONS = [String(CFG["experiment"]["dataset"])]
-const OUT_ROOT = dirname(records_dir(only(SESSIONS); config = CFG_PATH))   # <run>/absolute_pose_experiments
-const RUN_ROOT = dirname(OUT_ROOT)                                       # the keyed run (Eval keyed_cell_dir)
+const RUN_ROOT = product_dir(PRODUCT)                                    # the product's directory
+const OUT_ROOT = joinpath(RUN_ROOT, "absolute_pose_experiments")
 const MANIFEST = joinpath(RUN_ROOT, "_manifest.jsonl")
 const REPORT = Dict{String, Any}()
 
@@ -365,7 +367,6 @@ function roundtrip_all(root)
 end
 # THE RUN — produce-or-skip: a run whose records exist is complete.
 function main()
-    isdir(RUN_ROOT) && error("$(RUN_ROOT) exists without its run records — an interrupted run; move it aside to redo")
     mkpath(OUT_ROOT)
     for session in SESSIONS
         convert_mocap(session)
@@ -381,12 +382,8 @@ function main()
     REPORT["largest_files"] = first(sort(collect(sizes); by = last, rev = true), 10)
     REPORT["over_10MB"] = [k for (k, v) in sizes if v > 10_000_000]
 
-    write_run_records(
-        RUN_ROOT, CFG; driver = "bmvc2026/scripts/convert_formats.jl",
-        config_source = CFG_PATH, key = KEY, inputs = [joinpath(SRC_ROOT, s) for s in SESSIONS],
-    )
-    # The code that converted is in the run's records: Eval's code trees of the project and of every stack
-    # package it loads (_provenance.toml).
+    # The code that converted is in the run's records (`produce`): Eval's code trees of the project and of every
+    # stack package it loads (_provenance.toml).
     open(joinpath(RUN_ROOT, "_report.json"), "w") do io
         JSON.json(io, REPORT; pretty = 4, sort_keys = false)
     end
@@ -394,5 +391,6 @@ function main()
     return nothing
 end
 
-run_complete(RUN_ROOT; sidecar = basename(MANIFEST)) ?
-    println("convert_formats: run $(KEY) complete at $(RUN_ROOT)") : main()
+produce(_ -> main(), PRODUCT; driver = "bmvc2026/scripts/convert_formats.jl", config_source = CFG_PATH,
+        inputs = [joinpath(SRC_ROOT, s) for s in SESSIONS])
+println("convert_formats: run $(KEY) at $(RUN_ROOT)")

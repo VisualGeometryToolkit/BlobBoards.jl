@@ -13,45 +13,52 @@
 # the same directory the producer wrote, so a changed config is a new
 # directory and a stale result has no name to be read under.
 #
-#   stage                       config of record                 directory (keyed_cell_dir)
-#   motion-capture records      configs/convert_formats.toml     …/convert_formats-<key>/
-#   BlobBoards detections       configs/bmvc2026_260527*.toml    …/bb-<key>/       (+ the run's subsets)
-#   BlobBoards, occlusion       the same config                  …/occlusion-<key>/occlusion/<LL>/
-#   AprilTag/ArUco baselines    configs/baselines.toml           …/baselines-<key>/
-#   camera import               configs/import_cameras.toml      …/import_cameras-<key>/
-#   hand-eye records            the evaluation's [runs]          …/hand_eye-<key>/
-#   pose-error cells            the evaluation's [runs]          …/pose_results-<key>/
+#   stage                       config of record                 product (its name; output)
+#   motion-capture records      configs/convert_formats.toml     convert_formats  (_report.json)
+#   BlobBoards detections       configs/bmvc2026_260527*.toml    bb               (poses/: the run's subsets)
+#   BlobBoards, occlusion       the same config                  occlusion        (occlusion/<LL>/)
+#   AprilTag/ArUco baselines    configs/baselines.toml           baselines        (poses/)
+#   camera import               configs/import_cameras.toml      import_cameras   (_cameras.toml)
+#   hand-eye records            the evaluation's [runs]          hand_eye         (hand_eye_<series>.json)
+#   pose-error cells            the evaluation's [runs]          pose_results     (one per system and level)
 #
-# Every directory is VisualGeometryToolkitEval's `keyed_cell_dir(cfg, EXPERIMENT,
-# kind)`: `results_root()/<layout…>/bmvc2026/<kind>-<run_key>`, the layout the
-# config's `[experiment] layout` literal. A key is Eval's `run_key` of the config
-# of record, which states every input it reads as `[inputs.<id>]` (tier, path,
-# provenance, sha256, checked by Eval's `input_path` — the descriptor network's
-# content is in the key that way); a derived stage keys the evaluation's
-# [experiment] layout with the run keys of the upstreams it reads folded in
-# (`run_key(…; upstream)`). Code is
-# provenance (DrWatson `tag!` in every run's records), not key.
+# Every directory is a VisualGeometryToolkitEval `Product` of the config of
+# record (`stage_product`): `results_root()/<layout…>/bmvc2026/<name>/<key>`,
+# DrWatson's `datadir("exp_pro", experiment, name, key)`, the layout the
+# config's `[experiment] layout` literal. A key is Eval's `run_key` of the
+# config of record, which states every input it reads as `[inputs.<id>]`
+# (tier, path, provenance, sha256, checked by Eval's `input_path` — the
+# descriptor network's content is in the key that way), with the code trees it
+# runs folded in; a derived stage keys the evaluation's [experiment] layout
+# with the upstream products it reads (their keys and their outputs' content
+# hashes, `upstream`). A product is produced once (`produce`: its
+# `_provenance.toml`, written last, is the completion mark) and reused while
+# `produced`.
 
 import TOML
 using DrWatson: projectdir
 # `input_path(cfg, id)`: Eval's one reader of an `[inputs.<id>]` (its tier's
 # root, its sha256 checked); re-exported by BlobBoardsEval for the drivers.
-using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, input_path
+using VisualGeometryToolkitEval.Experiments: run_key, input_path, Product, product_dir, product_output, produce, produced, load_output
 
 # `EXPERIMENT`, the name every run directory is filed under, is
 # src/operating_points.jl's (a self-contained file; BlobBoardsEval includes it), and so are
-# `config_path`/`load_config`, the config of record by name.
+# `config_path`/`load_config`, the config of record by name, and `stage_product`.
 
 # --- motion-capture records ---------------------------------------------------
+
+"The product of the motion-capture records (scripts/convert_formats.jl) of the config of record `config`."
+records_product(config::AbstractString = "convert_formats.toml") =
+    stage_product(load_config(config), "convert_formats"; output = "_report.json")
 
 """
     records_dir(dataset; config = "convert_formats.toml") -> String
 
 The session directory of the motion-capture records of `dataset`:
-`<convert_formats run>/absolute_pose_experiments/<dataset>`.
+`<convert_formats product>/absolute_pose_experiments/<dataset>`.
 """
 records_dir(dataset::AbstractString; config::AbstractString = "convert_formats.toml") =
-    joinpath(keyed_cell_dir(load_config(config), EXPERIMENT, "convert_formats"), "absolute_pose_experiments", dataset)
+    joinpath(product_dir(records_product(config)), "absolute_pose_experiments", dataset)
 
 "The motion-tracker directory of a session's records (`poses/motion_tracker`)."
 mocap_dir(dataset::AbstractString; config::AbstractString = "convert_formats.toml") =
@@ -69,20 +76,27 @@ own cache key carries the network, patch and each board's cutoff).
 gallery_path(rc::AbstractDict) = joinpath(results_root(), "galleries", basename(String(rc["gallery"]["path"])))
 
 """
-    sweep_dir(config; kind = "bb") -> String
+    sweep_product(config; kind = "bb") -> Product
 
-The directory of a BlobBoards sweep: `bb-<key>` (the run's image subsets) or
-`occlusion-<key>` (the occlusion levels).
+The product of a BlobBoards sweep of the run config `config`: `bb` (the run's
+image subsets, under `poses/` and `val/`) or `occlusion` (the occlusion levels,
+under `occlusion/<LL>/`).
 """
-function sweep_dir(config::AbstractString; kind::AbstractString = "bb")
+function sweep_product(config::AbstractString; kind::AbstractString = "bb")
     kind in ("bb", "occlusion") || error("sweep kind $(repr(kind)): bb or occlusion")
-    return keyed_cell_dir(load_config(config), EXPERIMENT, kind)
+    return stage_product(load_config(config), kind; output = kind == "bb" ? "poses" : "occlusion")
 end
+
+"The directory of a BlobBoards sweep (its product's)."
+sweep_dir(config::AbstractString; kind::AbstractString = "bb") = product_dir(sweep_product(config; kind))
 
 # --- AprilTag/ArUco baselines -------------------------------------------------
 
+"The product of the AprilTag/ArUco baselines (scripts/detect_baselines.jl)."
+baselines_product(config::AbstractString = "baselines.toml") = stage_product(load_config(config), "baselines"; output = "poses")
+
 "The directory of the AprilTag/ArUco baselines."
-baselines_dir(config::AbstractString = "baselines.toml") = keyed_cell_dir(load_config(config), EXPERIMENT, "baselines")
+baselines_dir(config::AbstractString = "baselines.toml") = product_dir(baselines_product(config))
 
 # --- the evaluation's sources -------------------------------------------------
 
@@ -107,7 +121,9 @@ Everything the evaluation of one dataset reads, resolved from its config of
 record: its `[experiment]` layout (`experiment`: its `layout`, and `dataset`), the
 INPUTS (`inputs`, data_root()'s session directory: images, boards), the
 motion-capture records (`mocap`), the detections of each series
-(`poses[series]`) and the run keys that identify them all (`keys`).
+(`poses[series]`), the upstream products that hold them all (`products`) and
+the occlusion levels of the BlobBoards sweep (`levels`, its run config's
+`[experiment] occlusion_levels`).
 """
 struct Sources
     experiment::Dict{String, Any}
@@ -115,7 +131,8 @@ struct Sources
     inputs::String
     mocap::String
     poses::Dict{String, PoseRun}
-    keys::Dict{String, String}
+    products::Dict{String, Product}
+    levels::Vector{String}
 end
 
 """
@@ -138,21 +155,22 @@ function eval_sources(cfg::AbstractDict; tiers = EVAL_TIERS)
     ds = String(cfg["experiment"]["dataset"])
     r = cfg["runs"]
     bb, nf, bl = String(r["bb"]), String(r["bb_noflip"]), String(r["baselines"])
-    bl_dir = baselines_dir(bl)
+    products = Dict{String, Product}(
+        "records" => records_product(String(r["records"])), "baselines" => baselines_product(bl),
+        "bb" => sweep_product(bb), "occlusion" => sweep_product(bb; kind = "occlusion"), "bb_noflip" => sweep_product(nf),
+    )
+    bl_dir = product_dir(products["baselines"])
     poses = Dict(
         "apriltags" => PoseRun(bl_dir, bl_dir, "apriltags"),
         "aruco" => PoseRun(bl_dir, bl_dir, "aruco"),
-        "bb" => PoseRun(sweep_dir(bb), sweep_dir(bb; kind = "occlusion"), "bb"),
-        "bb_noflip" => PoseRun(sweep_dir(nf), nothing, "bb"),
+        "bb" => PoseRun(product_dir(products["bb"]), product_dir(products["occlusion"]), "bb"),
+        "bb_noflip" => PoseRun(product_dir(products["bb_noflip"]), nothing, "bb"),
     )
-    keys = Dict(
-        "records" => run_key(load_config(String(r["records"]))), "baselines" => run_key(load_config(bl)),
-        "bb" => run_key(load_config(bb)), "occlusion" => run_key(load_config(bb)), "bb_noflip" => run_key(load_config(nf)),
-    )
-    # the [experiment] keys Eval's experiment_dir lays a run out by
-    layout = Dict{String, Any}(k => v for (k, v) in cfg["experiment"] if k in ("dataset", "matcher", "problem", "layout"))
+    # the [experiment] keys a derived product is filed and keyed by
+    layout = Dict{String, Any}(k => v for (k, v) in cfg["experiment"] if k in ("dataset", "layout"))
     return Sources(layout, ds, joinpath(data_root(; tiers), "absolute_pose_experiments", ds),
-        mocap_dir(ds; config = String(r["records"])), poses, keys)
+        joinpath(product_dir(products["records"]), "absolute_pose_experiments", ds, "poses", "motion_tracker"), poses, products,
+        String.(load_config(bb)["experiment"]["occlusion_levels"]))
 end
 
 """
@@ -177,22 +195,26 @@ The detection overlays (`<image>_val.png`) of a series' main run.
 val_dir(src::Sources, series::AbstractString) = joinpath(src.poses[series].main, "val", src.poses[series].name)
 
 """
-    derived_dir(src, kind, which) -> String
+    derived_product(src, name, which; output, record = Dict()) -> Product
 
-The run directory of a stage derived from the evaluation's sources (the
-hand-eye records, the pose-error cells): Eval's `keyed_cell_dir` over the
-evaluation's [experiment] layout, the run keys of the upstreams `which` folded
-in (`upstream`).
+The product of a stage derived from the evaluation's sources (the hand-eye
+records, a pose-error cell): Eval's `Product` over the evaluation's
+[experiment] layout (and `record`, the cell's own keys), the upstream products
+`which` folded in (`upstream`: their keys and their outputs' content hashes).
 """
-derived_dir(src::Sources, kind::AbstractString, which) =
-    keyed_cell_dir(Dict{String, Any}("experiment" => copy(src.experiment)), EXPERIMENT, kind;
-        upstream = Dict{String, String}(k => src.keys[k] for k in which))
+derived_product(src::Sources, name::AbstractString, which; output::AbstractString,
+                record::AbstractDict = Dict{String, Any}()) =
+    stage_product(merge(Dict{String, Any}("experiment" => copy(src.experiment)), record), name; output,
+        upstream = Dict{String, Product}(k => src.products[k] for k in which))
 
 """
-    hand_eye_dir(src) -> String
+    hand_eye_product(src) -> Product
 
-The hand-eye records of the evaluation (scripts/make_hand_eye.jl):
-`hand_eye-<key>/`, keyed on the motion-capture records and the detections of
-the calibration subsets they are fitted on.
+The hand-eye records of the evaluation (scripts/make_hand_eye.jl), keyed on
+the motion-capture records and the detections of the calibration subsets they
+are fitted on; one `hand_eye_<series>.json` per series.
 """
-hand_eye_dir(src::Sources) = derived_dir(src, "hand_eye", ["records", "baselines", "bb"])
+hand_eye_product(src::Sources) = derived_product(src, "hand_eye", ["records", "baselines", "bb"]; output = "hand_eye_bb.json")
+
+"The directory of the evaluation's hand-eye records."
+hand_eye_dir(src::Sources) = product_dir(hand_eye_product(src))

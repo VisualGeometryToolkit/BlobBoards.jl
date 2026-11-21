@@ -21,7 +21,7 @@ and pair count); the incumbent's are its saved errors. A cell the search asks
 for that neither artifact holds is an error — never interpolated — and the
 replayed coarse and fine objectives must equal the source run's. The record
 lands where detection_cv.jl would write it (same config, same run key), its
-records (Eval's write_run_records, with its code trees) naming both sources by
+records (Eval's `produce`, with its code trees) naming both sources by
 path and sha256.
 
 Usage:
@@ -38,7 +38,7 @@ using Statistics: quantile
 using VisualGeometryToolkitEval.Tuning: tuning_spec, tuning_table, load_tuning_artifact, grid_spec, bootstrap_argmin,
     unit_statistics, QueryUnit
 using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, save_coarse_fine_artifact, deployed_setting
-using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, results_root, write_run_records
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages, results_root, produce, product_dir
 using VisualGeometryToolkitEval.Render: emit_tuning_table
 import VisualGeometryToolkitCore
 
@@ -52,7 +52,8 @@ const CFG = TOML.parsefile(CFG_PATH)
 const SPEC = tuning_spec(CFG, "detection")
 const SEARCH = joinpath("tuning", "detection_cv-c80d42e9055f8cd5", "detection.jld2")
 const INCUMBENT = joinpath("tuning", "outlier_halfwidth_cv-3a346460b90dc25d", "outlier_halfwidth_pose.jld2")
-const OUTDIR = OP.detection_cv_dir(CFG)
+const PRODUCT = OP.detection_cv_product(CFG)
+const OUTDIR = product_dir(PRODUCT)
 
 # A units × items error matrix with the per-unit mAA@T statistics `S`.
 function errors_of(S, T)
@@ -108,15 +109,8 @@ function replay()
         bootstrap_interval = interval, objective = src["objective"], arm = "pose",
         replayed_from = Dict{String,Any}(SEARCH => sha(SEARCH), INCUMBENT => sha(INCUMBENT)))
     sel = deployed_setting(OP.detection_cv_artifact(OUTDIR); context = "joint detection CV (replay)")
-    # The run's records through Eval (its code trees name the repositories and their trees); the replay's own
-    # payload: its sources by results_root-relative path and sha256, and the method.
-    write_run_records(OUTDIR, CFG; driver = "bmvc2026/scripts/detection_cv_replay.jl", config_source = CFG_PATH,
-        key = OP.detection_cv_key(CFG),
-        fields = Dict{String,Any}(
-            "data" => Dict{String,Any}("results_root_relative" => Dict{String,Any}(SEARCH => sha(SEARCH), INCUMBENT => sha(INCUMBENT))),
-            "method" => "replay of the joint search from the saved evaluations (no detection run)"))
     @info "replayed" selected = sel kept_incumbent = rec.kept_incumbent gain = rec.gain interval
-    return OUTDIR
+    return nothing
 end
 
 const AXES = sort!(collect(keys(SPEC.scheme.axes)))
@@ -127,10 +121,15 @@ write_tables() = foreach(TABLES) do ax
 end
 
 run_stages("detection_cv_replay", [
-    Stage(:replay, "the joint detection CV replayed from $SEARCH and $INCUMBENT -> $(OUTDIR)",
-        () -> run_complete(OUTDIR; sidecar = basename(OP.detection_cv_artifact(OUTDIR))),
-        () -> (replay(); nothing)),
-    Stage(:tables, "the curve of each axis and the surface of each pair -> $(OUTDIR)/table_*.tex",
-        () -> all(ax -> isfile(OP.detection_cv_table(OUTDIR, ax)), TABLES),
-        () -> (write_tables(); nothing)),
+    # The run's records through Eval's `produce` (its code trees name the repositories and their trees); the
+    # replay's own payload: its sources by results_root-relative path and sha256, and the method.
+    Stage(:replay, "the joint detection CV replayed from $SEARCH and $INCUMBENT -> $(OUTDIR)";
+        items = () -> [PRODUCT], product = identity,
+        run = p -> produce(_ -> replay(), p; driver = "bmvc2026/scripts/detection_cv_replay.jl", config_source = CFG_PATH,
+            fields = Dict{String,Any}(
+                "data" => Dict{String,Any}("results_root_relative" => Dict{String,Any}(
+                    f => VgtkEval.file_sha256(joinpath(results_root(), f)) for f in (SEARCH, INCUMBENT))),
+                "method" => "replay of the joint search from the saved evaluations (no detection run)"))),
+    Stage(:tables, "the curve of each axis and the surface of each pair -> $(OUTDIR)/table_*.tex";
+        check = () -> (all(ax -> isfile(OP.detection_cv_table(OUTDIR, ax)), TABLES) || write_tables(); nothing)),
 ])

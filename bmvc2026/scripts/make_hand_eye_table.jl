@@ -98,4 +98,4 @@ function main()
     return nothing
 end
 
-run_stages("make_hand_eye_table", [Stage(:emit, "handeye_table.tex + handeye_stats.tex from the hand-eye records", () -> false, main)])
+run_stages("make_hand_eye_table", [Stage(:emit, "handeye_table.tex + handeye_stats.tex from the hand-eye records"; check = main)])

@@ -60,4 +60,4 @@ function main()
     return nothing
 end
 
-run_stages("make_occlusion_picks", [Stage(:render, "the occlusion-level panels", () -> false, main)])
+run_stages("make_occlusion_picks", [Stage(:render, "the occlusion-level panels"; check = main)])

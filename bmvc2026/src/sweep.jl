@@ -44,7 +44,6 @@ using Rotations: RotMatrix
 using CUDA: CUDABackend
 using JSON
 import TOML
-using VisualGeometryToolkitEval.Experiments: run_complete
 using VisualGeometryToolkitFeatures: KnnMatch
 using VisualGeometryToolkitCore: ustrip, mm, CameraModel, Pinhole, PosedCamera, undistort, imshow, EuclideanMap, CameraFrame,
     BoundedCamera, TargetPoses
@@ -324,18 +323,19 @@ function _warmup(ctx::SweepContext, unit::SweepUnit)
     return nothing
 end
 
-# A unit is complete when Eval's `run_complete` says so: its target poses AND
-# its `_provenance.toml` exist. The provenance is the FINISH marker — written
-# after the unit's frame loop (2026-08-11), so its presence genuinely means the
-# run finished. The frame cap is not checked here: it is the config's
-# `[experiment] limit`, a stated value in the run key, so a capped run is
-# another directory, never mistaken for the full one. Code is not keyed: a unit
-# whose recorded code trees changed is not complete (`run_complete` runs it
-# again, naming the changed trees).
+# A unit is complete when its target poses AND its `_provenance.toml` exist.
+# The provenance is the FINISH marker — written after the unit's frame loop
+# (2026-08-11), so its presence genuinely means the unit finished. The units
+# live inside the sweep's product (src/runs.jl `sweep_product`), whose key
+# holds the config of record and the code it runs, so a unit of another config
+# or other code is in another directory; this resumes a product whose earlier
+# production was interrupted. The frame cap is the config's `[experiment]
+# limit`, a stated value in the key.
+_unit_complete(u) = isfile(joinpath(u.poses, TARGET_POSES_FILE)) && isfile(joinpath(u.poses, "_provenance.toml"))
 
 function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_provenance, force, telemetry)
     isempty(units) && return nothing
-    all(u -> !force && run_complete(u.poses; sidecar = TARGET_POSES_FILE), units) && return nothing
+    all(u -> !force && _unit_complete(u), units) && return nothing
     _warmup(ctx, first(units))
 
     for unit in units
@@ -346,7 +346,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
         # The unit path is keyed on the config, so a changed config is a NEW
         # directory and there is nothing to clear; an existing complete
         # directory is a cache hit, exactly like `produce_or_load`.
-        if !force && run_complete(unit.poses; sidecar = TARGET_POSES_FILE)
+        if !force && _unit_complete(unit)
             println("=== '$(unit.label)' already produced -> $(unit.poses)  (skipping; force = true to redo)")
             continue
         end
@@ -403,7 +403,7 @@ function _detect_all(chan, units, ctx, limit, driver, write_provenance, extra_pr
 
         # The FINISH marker — written after the unit's frame loop (2026-08-11;
         # it used to be written up-front, so a run killed mid-unit looked
-        # finished: `run_complete`'s marker).
+        # finished).
         payload = Dict{String, Any}(
             "config_source" => ctx.config_path,
             "descriptor_network" => ctx.network_path,

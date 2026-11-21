@@ -180,4 +180,4 @@ function main()
     return nothing
 end
 
-run_stages("make_supp_tables", [Stage(:render, "board_params.tex + run_settings.tex", () -> false, main)])
+run_stages("make_supp_tables", [Stage(:render, "board_params.tex + run_settings.tex"; check = main)])

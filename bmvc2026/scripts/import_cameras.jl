@@ -15,8 +15,9 @@ camera is built in VisualGeometryToolkitCore (`CameraModel(K; lens = opencv_lens
 its calibration block is filled from the export, and it is written ONLY through
 VisualGeometryToolkitIO's `save`, read back, and checked equal.
 
-Writes, add-only, under the keyed run `…/bmvc2026/import_cameras-<run key>/` (Eval's `keyed_cell_dir`):
+Writes, add-only, in its product `…/bmvc2026/import_cameras/<key>/` (Eval's `Product`):
     <session>/calibration/<output>     vgio/cameras/v3, the camera of record
+    _cameras.toml                      the cameras written (its output)
     _config.toml, _provenance.toml     the run's records (source paths + sha256)
 
 The outputs, placed at <session>/calibration/ of the author's tree, are packed
@@ -33,14 +34,16 @@ using DrWatson
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: figure_config, upstream_camera, EXPERIMENT
+using Main.BlobBoardsEval: figure_config, upstream_camera, stage_product
 import VisualGeometryToolkitIO as VgtkIO
 using VisualGeometryToolkitCore: BoundedCamera
-using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, write_run_records, run_complete
+using VisualGeometryToolkitEval.Experiments: produce, product_dir, Produced
+import TOML
 
 const CFG, CFG_PATH = figure_config("import_cameras"; default = projectdir("configs", "import_cameras.toml"))
-const KEY = run_key(CFG)
-const OUT = keyed_cell_dir(CFG, EXPERIMENT, "import_cameras")
+const PRODUCT = stage_product(CFG, "import_cameras"; output = "_cameras.toml")
+const KEY = PRODUCT.key
+const OUT = product_dir(PRODUCT)
 function main()
     written, inputs = String[], String[]
     for entry in CFG["cameras"]
@@ -53,8 +56,9 @@ function main()
         push!(written, out); push!(inputs, src)
         println("$(entry["session"]): $(name) -> $(out)")
     end
-    write_run_records(OUT, CFG; driver = "bmvc2026/scripts/import_cameras.jl", config_source = CFG_PATH, key = KEY, inputs)
-    return nothing
+    open(io -> TOML.print(io, Dict("cameras" => [relpath(w, OUT) for w in written])), joinpath(OUT, "_cameras.toml"), "w")
+    return Produced(nothing; inputs)
 end
 
-run_complete(OUT; sidecar = "_config.toml") ? println("import_cameras: run $(KEY) complete at $(OUT)") : main()
+produce(_ -> main(), PRODUCT; driver = "bmvc2026/scripts/import_cameras.jl", config_source = CFG_PATH)
+println("import_cameras: run $(KEY) at $(OUT)")

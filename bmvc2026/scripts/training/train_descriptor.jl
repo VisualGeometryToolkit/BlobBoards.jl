@@ -9,7 +9,7 @@ Its ONE config of record is configs/training/train_descriptor.toml (or
 --config): the corpus (`[runs] annotations`, whose run key is folded into this
 run's) and every TrainingConfig field (`[train]`). The checkpoints (best_model.jld2
 whenever val FPR@95 improves, the TensorBoard events) land in the run's keyed
-directory (VisualGeometryToolkitEval `keyed_cell_dir`: …/bmvc2026/descriptor-<run_key>/).
+product (VisualGeometryToolkitEval `Product`: …/bmvc2026/descriptor/<key>/).
 
 ENVIRONMENT: BlobBoardsTrainingExt triggers on Lux + Optimisers + Enzyme +
 Reactant + NNlib + TensorBoardLogger + Zygote, which the paper project does not
@@ -23,12 +23,12 @@ using DrWatson
 
 using BlobBoards
 using Lux, Optimisers, Enzyme, Reactant, NNlib, TensorBoardLogger, Zygote
-using VisualGeometryToolkitEval.Experiments: run_key, keyed_cell_dir, keyed_data_dir, write_run_records, run_complete
+using VisualGeometryToolkitEval.Experiments: produce, product_dir, Produced
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: figure_config, load_config, EXPERIMENT
+using Main.BlobBoardsEval: figure_config, load_config, stage_product
 
 const Training = Base.get_extension(BlobBoards, :BlobBoardsTrainingExt)
 Training === nothing && error("BlobBoardsTrainingExt is not loaded: its triggers (Lux, Optimisers, Enzyme, Reactant, NNlib, " *
@@ -36,12 +36,13 @@ Training === nothing && error("BlobBoardsTrainingExt is not loaded: its triggers
 
 const CFG, CFG_PATH = figure_config("train_descriptor"; default = projectdir("configs", "training", "train_descriptor.toml"))
 const ANNOTATIONS = load_config(CFG["runs"]["annotations"])
-# The run is keyed on this config with the corpus' run key folded in (`upstream`).
-const UPSTREAM = Dict{String, String}("annotations" => run_key(ANNOTATIONS))
-const KEY = run_key(CFG; upstream = UPSTREAM)
-const RUN_DIR = keyed_cell_dir(CFG, EXPERIMENT, "descriptor"; upstream = UPSTREAM)
-# the corpus: data of its tier, where its producer wrote it (Eval keyed_data_dir)
-const SPLITS = joinpath(keyed_data_dir(ANNOTATIONS, ANNOTATIONS["output"]["tier"], "annotations"), "splits")
+# The run is keyed on this config with the corpus' product folded in (`upstream`).
+const CORPUS = stage_product(ANNOTATIONS, "annotations"; output = "splits")
+const PRODUCT = stage_product(CFG, "descriptor"; output = "best_model.jld2", upstream = Dict("annotations" => CORPUS))
+const KEY = PRODUCT.key
+const RUN_DIR = product_dir(PRODUCT)
+# the corpus, where its producer wrote it (scripts/training/build_annotations.jl)
+const SPLITS = joinpath(product_dir(CORPUS), "splits")
 
 function main()
     T = CFG["train"]
@@ -58,9 +59,8 @@ function main()
     @info "training" run = KEY train val RUN_DIR
     result = Training.train_descriptor(train, val; cfg, output_dir = RUN_DIR)
     @info "training done" epochs = result.epoch best_fpr = result.best_fpr
-    write_run_records(RUN_DIR, CFG; driver = "bmvc2026/scripts/training/train_descriptor.jl", config_source = CFG_PATH,
-        key = KEY, inputs = [train, val])
-    return RUN_DIR
+    return Produced(nothing; inputs = [train, val])
 end
 
-run_complete(RUN_DIR; sidecar = "best_model.jld2") ? println("train_descriptor: run $(KEY) complete at $(RUN_DIR)") : main()
+produce(_ -> main(), PRODUCT; driver = "bmvc2026/scripts/training/train_descriptor.jl", config_source = CFG_PATH)
+println("train_descriptor: run $(KEY) at $(RUN_DIR)")

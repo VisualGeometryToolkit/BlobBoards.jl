@@ -53,29 +53,20 @@ minted on access). `diagnostics`
 carries the fit's scalar health numbers. `file` is the artifact path, for
 provenance.
 
-Supply `force = true` to refit and overwrite.
+Supply `force = true` to fit again (the product produced again).
 """
 # THE ARTIFACT IS a vgio transforms file (X) and a vgio rig file (the Y_m),
 # written by VisualGeometryToolkitIO's `save` from the labeled poses and read
 # back through `load`, the labels minted from the files' typed frames — never a
 # JLD2, which would embed either a private layout (the 16-float 4×4 this
 # replaced on 2026-09-14) or a package type. Keyed like every run: Eval's
-# `cached_result` with `key = run_key` and a vgio codec, the file
-# `handeye_<dataset>_<subset>_<key>.json` in the fit's `keyed_cell_dir`
-# (`…/bmvc2026/hand_eye_fit-<run_key>`, the key over the evaluation's
-# [experiment] layout and everything the fit reads, below); `force` keeps the
-# outgoing file as Eval's `_#<n>`.
-# The fit as Eval's `cached_result` codec of a vgio record (ext = ".json"):
-# `save` writes the two VisualGeometryToolkitIO records, every other field of
-# the cached Dict (the keying config, the scalar diagnostics, the code trees and
-# DrWatson's tag) in the transforms file's provenance; `load` reads that
-# provenance back (an incomplete pair — no mount beside it — reads as nothing,
-# so the fit is computed again). The previous version is kept by Eval
-# (safesave's `_#n`).
+# `Product` of the fit's config (the evaluation's [experiment] layout and
+# everything the fit reads, below; `hand_eye_fit`), its output
+# `handeye_<dataset>_<subset>.json`, produced once (`produce`). The driver
+# writes the two VisualGeometryToolkitIO records; the keying config and the
+# scalar diagnostics ride in the transforms file's provenance.
 _save_hand_eye_record(file, data::AbstractDict) =
     save_hand_eye(file, data["fit"]; provenance = (; (Symbol(k) => v for (k, v) in data if k != "fit")...))
-_load_hand_eye_record(file) = isfile(hand_eye_mount_file(file)) ?
-    JSON.parse(read(file, String); dicttype = Dict{String, Any})["provenance"] : Dict{String, Any}()
 
 function hand_eye(
         src::Sources, frames::Vector{RigFrame}, detected::Dict;
@@ -122,18 +113,19 @@ function hand_eye(
             stem => [Dict{String, Any}("id" => p.id, "R" => collect(vec(p.R)), "t" => collect(p.t)) for p in ps]
             for (stem, ps) in detected))),
     )
-    _, file = cached_result(
-        c -> let he = hand_eye_calibrate(frames, detected; min_rel_angle)
-            Dict{String, Any}(
-                "fit" => he, "config" => c, "n_frames" => length(usable), "n_markers" => length(markers),
-                # Scalars only — see the header on not embedding RVG's fit object.
-                "sigma_rot_rad" => he.fit.metadata.σ_rot,      # the fit's per-block noise scales (its metadata)
-                "sigma_trans_mm" => he.fit.metadata.σ_trans,
-            )
-        end,
-        string("handeye_", dataset, "_", subset), cfg, keyed_cell_dir(cfg, EXPERIMENT, "hand_eye_fit");
-        key = run_key, ext = ".json", load = _load_hand_eye_record, save = _save_hand_eye_record, force,
-    )
+    product = stage_product(cfg, "hand_eye_fit"; output = string("handeye_", dataset, "_", subset, ".json"))
+    produce(product; driver = "bmvc2026/src/calibration.jl", config_source = "bmvc2026/configs/figures/evaluation.toml",
+            force) do _
+        he = hand_eye_calibrate(frames, detected; min_rel_angle)
+        _save_hand_eye_record(product_output(product), Dict{String, Any}(
+            "fit" => he, "config" => cfg, "n_frames" => length(usable), "n_markers" => length(markers),
+            # Scalars only — see the header on not embedding RVG's fit object.
+            "sigma_rot_rad" => he.fit.metadata.σ_rot,      # the fit's per-block noise scales (its metadata)
+            "sigma_trans_mm" => he.fit.metadata.σ_trans,
+        ))
+        nothing
+    end
+    file = product_output(product)
 
     X, targets = load_hand_eye(file)
     # `load` hands back the records only; the diagnostics ride in the file's

@@ -217,4 +217,4 @@ function main()
     return nothing
 end
 
-run_stages("make_adapted_panels", [Stage(:render, "original.jpg + one panel per paper board (GPU)", () -> false, main)])
+run_stages("make_adapted_panels", [Stage(:render, "original.jpg + one panel per paper board (GPU)"; check = main)])

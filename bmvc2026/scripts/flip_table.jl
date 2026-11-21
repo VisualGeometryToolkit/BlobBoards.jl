@@ -122,4 +122,4 @@ function main()
     return nothing
 end
 
-run_stages("flip_table", [Stage(:emit, "flip_table.tex + flip_stats.tex: planar-pose flips per marker system", () -> false, main)])
+run_stages("flip_table", [Stage(:emit, "flip_table.tex + flip_stats.tex: planar-pose flips per marker system"; check = main)])

@@ -1,14 +1,14 @@
 # Training scripts — environment contract
 
 Two experiments, each ONE config of record and ONE driver (no environment
-variable configures either). The corpus is data of its own tier, written by its
-one producer (Eval's `keyed_data_dir`); the descriptor is a result
-(`keyed_cell_dir` under results_root()). Neither writes into another tier:
+variable configures either). Each writes its own product (Eval's `Product`
+under results_root()); the descriptor's run reads the corpus as its upstream.
+Neither writes into the input tree:
 
 | experiment | config of record | driver | output |
 |---|---|---|---|
-| the training corpus (annotate + split) | `configs/training/annotations.toml` | `build_annotations.jl` | data tier `bb_descriptor_annotations`: `data_root()/bb_descriptor_annotations/annotations-<key>/{truth_images,splits}` (Eval's `keyed_data_dir`) |
-| a descriptor trained on it | `configs/training/train_descriptor.toml` | `train_descriptor.jl` | `…/bmvc2026/descriptor-<key>/` |
+| the training corpus (annotate + split) | `configs/training/annotations.toml` | `build_annotations.jl` | `…/descriptor_training/bmvc2026/annotations/<key>/{truth_images,splits}` |
+| a descriptor trained on it | `configs/training/train_descriptor.toml` | `train_descriptor.jl` | `…/descriptor_training/bmvc2026/descriptor/<key>/` |
 
 Both are stages of `configs/reproduce.toml` (`annotations`, `train_descriptor`;
 `default = false`: the paper's network of record is an INPUT, the bb_assets

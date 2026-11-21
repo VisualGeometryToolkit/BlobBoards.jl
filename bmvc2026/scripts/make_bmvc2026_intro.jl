@@ -139,4 +139,4 @@ function main()
     return nothing
 end
 
-run_stages("make_bmvc2026_intro", [Stage(:render, "intro_overlay.png (GPU)", () -> false, main)])
+run_stages("make_bmvc2026_intro", [Stage(:render, "intro_overlay.png (GPU)"; check = main)])

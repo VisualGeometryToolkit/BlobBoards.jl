@@ -81,4 +81,4 @@ function main()
     return nothing
 end
 
-run_stages("make_detection_stats", [Stage(:emit, "det_stats.tex from the BlobBoards detections", () -> false, main)])
+run_stages("make_detection_stats", [Stage(:emit, "det_stats.tex from the BlobBoards detections"; check = main)])

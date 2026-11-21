@@ -26,7 +26,7 @@ per (frame, board pair) of the C(n_boards, 2) possible; an undetected pair is
 a failure (Inf). The spec's `mean_average_accuracy` criterion turns them into
 the continuous mAA@10 mm.
 
-Outputs, in the keyed run directory `detection_cv_dir(cfg)` (Eval's `keyed_cell_dir`: `…/bmvc2026/detection_cv-<run_key>`)
+Outputs, in the product `detection_cv_product(cfg)` (Eval's `Product`: `…/tuning/bmvc2026/detection_cv/<key>`)
 (src/operating_points.jl): the tuning artifact `detection.jld2`
 (VisualGeometryToolkitEval `save_coarse_fine_artifact`: the spec, the coarse and fine
 grids of every axis, the objective over both product grids, every evaluated
@@ -64,13 +64,13 @@ using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverag
 using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, rigid_invariance_errors,
     save_coarse_fine_artifact, deployed_setting
 using VisualGeometryToolkitEval.Render: emit_tuning_table
-using VisualGeometryToolkitEval.Experiments: Stage, run_stages, run_complete, write_run_records
+using VisualGeometryToolkitEval.Experiments: Stage, run_stages, produce, product_dir, Produced
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
 using Main.BlobBoardsEval: data_root, results_root, input_path, config_path, load_config,
-    detection_cv_key, detection_cv_dir, detection_cv_artifact, detection_cv_table
+    detection_cv_product, detection_cv_artifact, detection_cv_table
 
 const CFG_PATH = config_path("detection_cv.toml")
 const CFG = TOML.parsefile(CFG_PATH)
@@ -89,7 +89,8 @@ Set(keys(SPEC.scheme.axes)) == Set(keys(SETTERS)) ||
     error("[tuning.detection] axes $(sort!(collect(keys(SPEC.scheme.axes)))) are not $(sort!(collect(keys(SETTERS))))")
 [n for (n, a) in SPEC.scheme.axes if a.expensive] == ["peak_threshold"] ||
     error("[tuning.detection]: peak_threshold, and only it, is the expensive (detection) axis")
-const OUTDIR = detection_cv_dir(CFG)
+const PRODUCT = detection_cv_product(CFG)
+const OUTDIR = product_dir(PRODUCT)
 
 # The validation frames: the ONE validation scene of the spec's registered
 # scene split (`<session>/<subset>`), sampled by its validation sampling.
@@ -180,10 +181,7 @@ function run_cv()
         arm = "pose")
     # the read-side gate, before anything is recorded complete
     @info "selected" deployed_setting(detection_cv_artifact(OUTDIR); context = "joint detection CV") interval
-    write_run_records(OUTDIR, CFG; driver = "bmvc2026/scripts/detection_cv.jl",
-        config_source = CFG_PATH, key = detection_cv_key(CFG),
-        inputs = [image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), run_config])
-    return OUTDIR
+    return Produced(nothing; inputs = [image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), run_config])
 end
 
 # The curve of each axis and the surface of each pair of axes through the
@@ -196,10 +194,9 @@ write_tables() = foreach(TABLES) do ax
 end
 
 run_stages("detection_cv", [
-    Stage(:cv, "joint (half-width, peak threshold, similarity) CV, pose arm (GPU) -> $(OUTDIR)",
-        () -> run_complete(OUTDIR; sidecar = basename(detection_cv_artifact(OUTDIR))),
-        () -> (run_cv(); nothing)),
-    Stage(:tables, "the curve of each axis and the surface of each pair -> $(OUTDIR)/table_*.tex",
-        () -> all(ax -> isfile(detection_cv_table(OUTDIR, ax)), TABLES),
-        () -> (write_tables(); nothing)),
+    Stage(:cv, "joint (half-width, peak threshold, similarity) CV, pose arm (GPU) -> $(OUTDIR)";
+        items = () -> [PRODUCT], product = identity,
+        run = p -> produce(_ -> run_cv(), p; driver = "bmvc2026/scripts/detection_cv.jl", config_source = CFG_PATH)),
+    Stage(:tables, "the curve of each axis and the surface of each pair -> $(OUTDIR)/table_*.tex";
+        check = () -> (all(ax -> isfile(detection_cv_table(OUTDIR, ax)), TABLES) || write_tables(); nothing)),
 ])

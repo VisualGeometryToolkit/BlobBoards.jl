@@ -8,11 +8,11 @@ BlobBoard image sets (inputs) and writes, per subset:
   <run>/val/<dst>/<image>_val.png      — colored-board overlay on the undistorted
                                         color image
 
-where <run> is the run config's keyed directory `…/bmvc2026/bb-<key>` (src/runs.jl
-`sweep_dir`: Eval's `keyed_cell_dir`; the key states the network's sha256
-through its [inputs.network]): the evaluation finds the
-run through the same config, so nothing is promoted or copied anywhere. The
-sweep is ADD-ONLY; a complete subset is skipped.
+where <run> is the run config's product `…/bmvc2026/bb/<key>` (src/runs.jl
+`sweep_product`: Eval's `Product`; the key states the network's sha256 through
+its [inputs.network], and the code): the evaluation finds the run through the
+same config, so nothing is promoted or copied anywhere. A produced run is
+reused; `--force` produces it again.
 
 Subsets ([experiment] subsets of the config):
   images/bb              -> <run>/poses/bb,             <run>/val/bb
@@ -62,33 +62,12 @@ const BOARDS_DIR = BBE.input_path(RUN.config_toml, "boards")
 # the output is a lie. `select_frames` in src/sweep.jl STRIDES.
 const FRAME_LIMIT = Int(RUN.experiment["limit"])
 
-mkpath(dirname(GALLERY))
-ctx = sweep_context(;
-    config_path = CONFIG_PATH, run_config = RUN,
-    network_path = BBE.input_path(RUN.config_toml, "network"),
-    gallery_path = GALLERY, boards_dir = BOARDS_DIR,
-    camera_json = CAMERA_JSON, device = CUDABackend()
-)
+using VisualGeometryToolkitEval.Experiments: produce, product_dir
 
-# The run's directory: its config of record and network content (src/runs.jl).
-const RUN_KEY = BBE.run_key(BBE.load_config(CONFIG_PATH))
-const RUN_ROOT = BBE.sweep_dir(CONFIG_PATH)
-
-const ALL_UNITS = [
-    SweepUnit(
-        "bb",
-        joinpath(IMAGES, "bb"),
-        joinpath(RUN_ROOT, "poses", "bb"),
-        joinpath(RUN_ROOT, "val", "bb")
-    ),
-    SweepUnit(
-        "calibration_bb",
-        joinpath(IMAGES, "calibration_bb"),
-        joinpath(RUN_ROOT, "poses", "calibration", "bb"),
-        joinpath(RUN_ROOT, "val", "calibration", "bb")
-    ),
-]
-const UNITS = filter(u -> u.label in RUN.experiment["subsets"], ALL_UNITS)
+# The run's product: its config of record, the network's content and the code (src/runs.jl).
+const PRODUCT = BBE.sweep_product(CONFIG_PATH)
+const RUN_KEY = PRODUCT.key
+const RUN_ROOT = product_dir(PRODUCT)
 
 # Telemetry sinks — experiment instrumentation, OFF unless an argument names a
 # path (never the environment: a side effect no record states). --branch-log
@@ -107,13 +86,41 @@ const TELEMETRY = let t = BlobBoards.Telemetry(;
     all(isnothing, (t.branch_log, t.appearance_log, t.phase2_log)) ? nothing : t
 end
 
-run_sweep(
-    UNITS, ctx;
-    limit = FRAME_LIMIT, telemetry = TELEMETRY,
-    driver = "bmvc2026/scripts/go_bmvc2026.jl",
-    write_provenance = BBE.write_provenance,
-    extra_provenance = Dict("run_key" => RUN_KEY, "config_source" => CONFIG_PATH, "camera" => CAMERA_JSON),
-    force = "--force" in ARGS
-)
+function sweep()
+    mkpath(dirname(GALLERY))
+    ctx = sweep_context(;
+        config_path = CONFIG_PATH, run_config = RUN,
+        network_path = BBE.input_path(RUN.config_toml, "network"),
+        gallery_path = GALLERY, boards_dir = BOARDS_DIR,
+        camera_json = CAMERA_JSON, device = CUDABackend()
+    )
 
+    ALL_UNITS = [
+        SweepUnit(
+            "bb",
+            joinpath(IMAGES, "bb"),
+            joinpath(RUN_ROOT, "poses", "bb"),
+            joinpath(RUN_ROOT, "val", "bb")
+        ),
+        SweepUnit(
+            "calibration_bb",
+            joinpath(IMAGES, "calibration_bb"),
+            joinpath(RUN_ROOT, "poses", "calibration", "bb"),
+            joinpath(RUN_ROOT, "val", "calibration", "bb")
+        ),
+    ]
+    UNITS = filter(u -> u.label in RUN.experiment["subsets"], ALL_UNITS)
+
+    run_sweep(
+        UNITS, ctx;
+        limit = FRAME_LIMIT, telemetry = TELEMETRY,
+        driver = "bmvc2026/scripts/go_bmvc2026.jl",
+        write_provenance = BBE.write_provenance,
+        extra_provenance = Dict("run_key" => RUN_KEY, "config_source" => CONFIG_PATH, "camera" => CAMERA_JSON),
+    )
+    return nothing
+end
+
+produce(_ -> sweep(), PRODUCT; driver = "bmvc2026/scripts/go_bmvc2026.jl", config_source = CONFIG_PATH,
+        inputs = [IMAGES, CAMERA_JSON, BOARDS_DIR, BBE.input_path(RUN.config_toml, "network")], force = "--force" in ARGS)
 println("\nDone. Run $RUN_KEY -> $RUN_ROOT")

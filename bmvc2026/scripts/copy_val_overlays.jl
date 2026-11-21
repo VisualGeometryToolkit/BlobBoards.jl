@@ -65,4 +65,4 @@ function main()
     return nothing
 end
 
-run_stages("copy_val_overlays", [Stage(:render, "the overlay panels, cropped from the detection runs", () -> false, main)])
+run_stages("copy_val_overlays", [Stage(:render, "the overlay panels, cropped from the detection runs"; check = main)])
