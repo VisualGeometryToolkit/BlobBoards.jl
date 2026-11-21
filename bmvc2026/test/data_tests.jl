@@ -124,13 +124,13 @@ end
 @testitem "the inputs tier holds inputs only" tags = [:data] begin
     using DrWatson: projectdir
     import TOML
-    import Pkg
+    using VisualGeometryToolkitCore: artifact_store
     toml = TOML.parsefile(projectdir("Artifacts.toml"))
     @test !haskey(toml, "bb_absolute_pose_metadata") && !haskey(toml, "bb_absolute_pose_val_260527")
     @test haskey(toml, "bb_absolute_pose_inputs")
-    hash = Base.SHA1(toml["bb_absolute_pose_inputs"]["git-tree-sha1"])
-    if Pkg.Artifacts.artifact_exists(hash)
-        root = Pkg.Artifacts.artifact_path(hash)
+    # the tree where the artifact store holds it (Pkg's layout, `<git-tree-sha1>/`), when installed there
+    root = joinpath(artifact_store().path, toml["bb_absolute_pose_inputs"]["git-tree-sha1"])
+    if isdir(root)
         input_kind = [
             r"^\d{6}/poses/motion_tracker/[a-z_]+/marker_[^/]+\.json(\.del)?$",     # raw motion capture
             r"^\d{6}/calibration/[^/]+\.json$",                                     # the camera of record
@@ -183,13 +183,13 @@ end
     end
 end
 
-# A non-default tier of the ArtifactView installs on READ: a fresh view (no
-# VGTK_DATA_ROOT, no fallback) has only the default tiers, and Eval's
+# A non-default tier of the artifact view installs on READ: a fresh view (no
+# VGTK_DATA_ROOT, no data/exp_raw link) has only the required tiers, and Eval's
 # input_path of pipeline_panels' inputs installs bb_pipeline_figure (≈5.4 MiB)
 # and verifies their stated sha256. Network: without it, a recorded skip.
 @testitem "a view tier installs on read (bb_pipeline_figure)" tags = [:data] setup = [BBEval] begin
     using DrWatson: projectdir
-    import TOML, Pkg
+    import TOML
     const B = BBEval.BlobBoardsEval
     const E = B.VgtkEval.Experiments
     cfg = TOML.parsefile(projectdir("configs", "figures", "pipeline_panels.toml"))
@@ -200,8 +200,8 @@ end
         withenv("VGTK_DATA_ROOT" => nothing) do
             # the project's own root (its data catalog, configs/data_artifacts.toml, decides which tiers the view
             # installs, Eval's view gate); only the view itself is in the scratch directory
-            E.set_project_root!(projectdir(); artifacts = E.ArtifactView(projectdir("Artifacts.toml");
-                dir = joinpath(scratch, "data", "exp_raw"), mount = B._tier_mount, default = B._DEFAULT_TIERS))
+            E.set_project_root!(projectdir(); artifacts = B.VgtkEval.DataArtifacts.catalog_view(B.CATALOG;
+                dir = joinpath(scratch, "data", "exp_raw")))
             try
                 paths = try
                     [E.input_path(cfg, id) for id in ("image", "camera")]

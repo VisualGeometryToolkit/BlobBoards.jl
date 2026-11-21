@@ -6,7 +6,8 @@
 # =============================================================================
 
 using DrWatson: projectdir
-using VisualGeometryToolkitEval.Experiments: set_project_root!, ArtifactView, data_root, results_root, assert_active_project
+using VisualGeometryToolkitEval.Experiments: set_project_root!, data_root, results_root, assert_active_project
+using VisualGeometryToolkitEval.DataArtifacts: project_catalog, catalog_view, required_artifacts
 import TOML
 
 # projectdir(), not joinpath(@__DIR__, ".."): @__DIR__ is relative to THIS
@@ -20,61 +21,46 @@ import TOML
 # message instead of silently resolving paths into the wrong tree.
 assert_active_project(joinpath("src", "BlobBoardsEval.jl"))   # VisualGeometryToolkitEval's check: projectdir() is this paper project
 
-const _ARTIFACTS_TOML = projectdir("Artifacts.toml")
+# THE catalog of the published inputs (configs/data_artifacts.toml): which tiers
+# exist, what each holds, and where each mounts in the artifact view.
+const CATALOG = project_catalog(projectdir())
 
-# Tiers needed per use; images/occlusion stay lazy until a driver asks. Every
-# tier holds INPUTS only (configs/data_artifacts.toml): the results are
-# regenerated under results_root() by the stages src/runs.jl names.
-const _DEFAULT_TIERS = ["bb_absolute_pose_inputs", "bb_assets"]
-# Drivers that walk rig sequences (`rig_sequence` pairs mocap files with the
-# image listing of images/<subset>, positionally) need the images tier too —
-# for the FILE NAMES, even though they never decode a pixel. Without it a
-# consumer of the Zenodo record hits ENOENT on images/apr (tier-1 test,
-# 2026-08-28). ~2.1 GB, lazy like the rest.
-const EVAL_TIERS = [_DEFAULT_TIERS..., "bb_absolute_pose_images_260527"]
-
-# Mount point per tier: the absolute-pose tiers hold trees RELATIVE TO
-# absolute_pose_experiments/; the tiers in `_ROOT_TIERS` hold trees relative
-# to the DATASET ROOT, so they mount at the view root and
-# `data_root()/evaluation/...`, `data_root()/descriptor_training/...` resolve
-# identically on both paths. `bb_assets` = evaluation/ board gallery +
-# models/ networks; `bb_descriptor_training_*` = the frozen descriptor
-# training set (sources, boards, bootstrap network chain) — see
-# make_zenodo_artifacts.jl. `bb_pipeline_figure` = the source frame of
-# fig:pipeline and its camera record, under blobboard_training/.
-const _ROOT_TIERS = (
-    "bb_assets",
-    "bb_descriptor_training_metadata",
-    "bb_descriptor_training_sources",
-    "bb_pipeline_figure",
-)
-_tier_mount(t) = t in _ROOT_TIERS ? "" : "absolute_pose_experiments"
+# Tiers needed per use; images/occlusion stay lazy until a driver asks. The
+# view's default is the catalog's `required` tiers (inputs, assets). Every tier
+# holds INPUTS only: the results are regenerated under results_root() by the
+# stages src/runs.jl names. Drivers that walk rig sequences (`rig_sequence`
+# pairs mocap files with the image listing of images/<subset>, positionally)
+# need the images tier too — for the FILE NAMES, even though they never decode
+# a pixel. Without it a consumer of the Zenodo record hits ENOENT on images/apr
+# (tier-1 test, 2026-08-28). ~2.1 GB, lazy like the rest.
+const EVAL_TIERS = [required_artifacts(CATALOG)..., "bb_absolute_pose_images_260527"]
 
 # THE data binding (VisualGeometryToolkitEval.Experiments, the stack's one
 # implementation). `data_root(; tiers)`:
 #
 #   1. ENV["VGTK_DATA_ROOT"]        explicit override
-#   2. datadir("exp_raw")          the project's own symlink, RESOLVED
-#                                  (`resolve_links`: run keys downstream hash
-#                                  paths under it) — per machine, gitignored
-#   3. BlobBoards.data_dir()       the author's copy of the inputs
-#                                  (BLOBBOARDS_DATA / LocalPreferences.toml)
-#   4. the artifact view           consumers: lazy per-tier download,
-#                                  symlink-merged, READ-ONLY, AT
-#                                  datadir("exp_raw") (ArtifactView's default)
+#   2. datadir("exp_raw")          the project's own link at the author's copy,
+#                                  RESOLVED (`resolve_links`: run keys
+#                                  downstream hash paths under it) — per
+#                                  machine, gitignored
+#   3. the site's data_root        the site profile VGTK_SITE names
+#                                  ([storage] data_root, once it exists)
+#   4. the artifact view           consumers: the catalog's tiers installed
+#                                  into the artifact store (scripts/fetch_data.jl,
+#                                  or lazily per tier on read), per-file links,
+#                                  READ-ONLY, AT datadir("exp_raw")
 #
-# Rungs 2-4 resolve to the same tree on the author's machine. Invariant:
-# staging-tree layout ≡ packed-tier layout ≡ composed view — artifact tarballs
-# store dataset-root-relative paths, so drivers use only data_root()-relative
-# paths and cannot tell whose machine they are on. `results_root()`:
-# ENV["VGTK_RESULTS_ROOT"] → datadir("exp_pro"), created on demand — the
-# add-only outputs tree, where EVERY result lives (src/runs.jl). Nothing is
-# ever written into data_root(): it is the input set.
+# Invariant: author's tree layout ≡ packed-tier layout ≡ composed view — the
+# tiers hold mount-root-relative paths (configs/data_artifacts.toml), so drivers
+# use only data_root()-relative paths and cannot tell whose machine they are on.
+# `results_root()`: ENV["VGTK_RESULTS_ROOT"] → datadir("exp_pro") → the site's
+# results_root, created on demand — the add-only outputs tree, where EVERY
+# result lives (src/runs.jl). Nothing is ever written into data_root(): it is
+# the input set.
 set_project_root!(
     projectdir();
     resolve_links = true,
-    data_fallback = () -> BlobBoards.data_dir(),
-    artifacts = ArtifactView(_ARTIFACTS_TOML; mount = _tier_mount, default = _DEFAULT_TIERS),
+    artifacts = catalog_view(CATALOG),
     create_results = true,
 )
 

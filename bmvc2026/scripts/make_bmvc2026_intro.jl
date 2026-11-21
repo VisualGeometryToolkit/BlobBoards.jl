@@ -13,8 +13,8 @@ calibrated camera view), the ONNX descriptor model, and the
 Run: pixi run julia --project=bmvc2026 bmvc2026/scripts/make_bmvc2026_intro.jl
 
 Reproducible: the source photo lives under the dataset at
-`absolute_pose_experiments/teaser/`, which is inside the tree
-make_zenodo_artifacts.jl walks -- so it ships in the inputs tier and a
+`absolute_pose_experiments/teaser/`, which the inputs tier's file list
+(configs/data_artifacts.toml) names -- so it ships in that tier and a
 consumer can rebuild this figure. (`evaluation/` is a SIBLING of that tree and
 is never packaged, which is where it first landed.) The PDF
 is written where the paper reads it (`bmvc2026/papers/images/`). Both used to be

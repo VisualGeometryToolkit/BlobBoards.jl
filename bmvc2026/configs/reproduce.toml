@@ -1,8 +1,10 @@
 # The stage graph of record of the paper: every result and generated asset from the published inputs, in one command
 # (VisualGeometryToolkitEval Reproduce, the runner). This file is data only: which driver runs on which config of record,
 # after what. How a stage runs (Slurm or here, the CPUs, the GPUs) is the site's, a machine profile shipped with
-# VisualGeometryToolkitEval (configs/sites/dgx01.toml, desktop.toml); where this project's data and results are on each
-# machine is [sites.<name>] below.
+# VisualGeometryToolkitEval (configs/sites/dgx01.toml, desktop.toml, vcai.toml), and so are this project's data and
+# results roots on it: the profile's [storage] data_root / results_root ("…/{project}", here bmvc2026), else
+# VGTK_DATA_ROOT / VGTK_RESULTS_ROOT or --data-root / --results-root. No machine path is written here: [sites.desktop]
+# below names only this checkout's own directories.
 #
 #   bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
 #   bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
@@ -21,11 +23,6 @@ julia_project = "bmvc2026"
 # reuses the finished stages
 code = ["Project.toml", "src", "ext", "configs", "bmvc2026/Project.toml", "bmvc2026/src", "bmvc2026/scripts",
         "bmvc2026/pixi.toml", "bmvc2026/pixi.lock"]
-
-[sites.dgx01]
-# the BlobBoards 0.9 data root on dgx01 (the published inputs); the runner's results beside it, never a tree of record
-data_root = "/raid/data/jpr/bb-0.9-data-root"
-results_root = "/raid/data/jpr/bmvc2026-results-0.9"
 
 [sites.desktop]
 # the owner's workstation: the data ladder's own binding (bmvc2026/data/exp_raw: a link, or the artifact view) and a

@@ -16,7 +16,12 @@ project:
 
 ```bash
 julia --startup-file=no --project=bmvc2026 -e 'using Pkg; Pkg.instantiate()'
+julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/fetch_data.jl --all   # the published inputs, into the artifact store
 ```
+
+On a cluster set `VGTK_SITE` (e.g. `vcai`) so the inputs go to its shared
+artifact store, never the node's depot. Without `--all` the required tiers are
+fetched and the others install when a stage first reads them.
 
 ## One command
 
@@ -91,9 +96,11 @@ reproduces the published exports bit for bit (poses, ids, camera matrix;
 ## Data tiers
 
 `data_root()` (src/data.jl) resolves the dataset: `VGTK_DATA_ROOT`, the
-project's `data/exp_raw` symlink, the BlobBoards `data_dir` preference, or the
-Zenodo artifact view (`Artifacts.toml`, lazily downloaded per tier). The tiers
-a generator needs are named in the `data` column:
+project's `data/exp_raw` symlink, the site profile's data root, or the artifact
+view of the Zenodo tiers (`configs/data_artifacts.toml`, bound in
+`Artifacts.toml`; `scripts/fetch_data.jl` installs them into the artifact store,
+and a tier not fetched installs when first read). The tiers a generator needs
+are named in the `data` column:
 
 | tier | holds |
 |---|---|

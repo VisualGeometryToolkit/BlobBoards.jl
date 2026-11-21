@@ -136,17 +136,21 @@ RESOLVED spec, and its directory is keyed by it.
 
 ## Data root
 
-Data is distributed via the Julia Artifacts system (`Artifacts.toml` here;
-Zenodo-hosted tiers, lazy per-tier download). The resolution ladder is the
+Data is distributed as Julia artifacts (`Artifacts.toml` here; Zenodo-hosted
+tiers, catalogued in `configs/data_artifacts.toml`). On a new machine,
+`julia --project=bmvc2026 bmvc2026/scripts/fetch_data.jl` (`--all` for every
+tier, `--list` for the catalog) installs them into the artifact store
+(VisualGeometryToolkitCore's `artifact_store`: `VGTK_ARTIFACT_STORE`, the site
+profile `VGTK_SITE` names, a preference, else the depot — refused on a
+cluster) and links them into the artifact view. The resolution ladder is the
 stack's one implementation (VisualGeometryToolkitEval.Experiments), bound in
 `src/data.jl`:
 
 1. `ENV["VGTK_DATA_ROOT"]` — explicit override;
-2. `datadir("exp_raw")` — the per-machine link, resolved;
-3. `BlobBoards.data_dir()` (`BLOBBOARDS_DATA` / `LocalPreferences.toml`) —
-   the author's primary **writable** copy;
-4. composed artifact view (at `datadir("exp_raw")`, ArtifactView's default)
-   — consumers; read-only, downloads only the tiers a driver needs.
+2. `datadir("exp_raw")` — the per-machine link at the author's copy, resolved;
+3. the site profile's `[storage] data_root` (`VGTK_SITE`), once it exists;
+4. the artifact view (at `datadir("exp_raw")`) — consumers; read-only, and a
+   tier not fetched yet installs when a driver first reads it.
 
 Expected download time: Zenodo served ~0.1–0.5 MB/s per single stream (measured 2026-10-09), so a multi-GB tier takes hours.
 
@@ -160,8 +164,9 @@ D3 output directories are keyed (Eval's `keyed_cell_dir`:
 The descriptor's frozen training set ships as two further root-mounted tiers,
 `bb_descriptor_training_metadata` (boards, bootstrap network chain, recipe
 README) and `bb_descriptor_training_sources` (the 634 captures); see
-`descriptor_training/README.md` in the dataset and the `training` tier of
-`scripts/make_zenodo_artifacts.jl`.
+`descriptor_training/README.md` in the dataset. The author packs and binds the
+tiers with `scripts/make_zenodo_artifacts.jl` (VisualGeometryToolkitEval's
+`pack_artifacts`, from the catalog's file lists).
 
 **Nothing writes into the dataset.** `data_root()` is the input set; every
 result goes to `results_root()` (`bmvc2026/data/exp_pro`, `VGTK_RESULTS_ROOT`

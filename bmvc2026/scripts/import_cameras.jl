@@ -19,7 +19,8 @@ Writes, add-only, under the keyed run `…/bmvc2026/import_cameras-<run key>/` (
     <session>/calibration/<output>     vgio/cameras/v3, the camera of record
     _config.toml, _provenance.toml     the run's records (source paths + sha256)
 
-The outputs are then packed into the inputs tier by make_zenodo_artifacts.jl;
+The outputs, placed at <session>/calibration/ of the author's tree, are packed
+into the inputs tier by make_zenodo_artifacts.jl (configs/data_artifacts.toml);
 test/cameras_tests.jl holds each to the previous camera of record, K and lens
 bit for bit.
 

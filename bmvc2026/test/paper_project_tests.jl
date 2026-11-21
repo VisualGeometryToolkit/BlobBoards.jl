@@ -18,7 +18,6 @@
     if isdefined(VisualGeometryToolkitEval, :PaperProjects)
         vs = VgtkEval.PaperProjects.paper_project_violations(projectdir();
             papers = ["papers/blob_boards_bmvc.tex", "papers/bmvc_supp.tex"],
-            catalog_kinds = ["bb_tier"],
             allow = [VgtkEval.Experiments.DataPolicyAllow(a...) for a in PAPER_PROJECT_ALLOW])
         foreach(v -> @info(sprint(show, v)), vs)
         @test isempty(vs)
