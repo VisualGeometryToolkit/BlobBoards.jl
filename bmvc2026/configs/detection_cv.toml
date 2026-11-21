@@ -68,17 +68,17 @@ path = "cache/board_features_260521.jld2"   # results_root()-relative: the galle
 
 # The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
 [inputs.images]
-tier = "unpublished"
+tier = "bb_absolute_pose_tuning_260521"
 path = "absolute_pose_experiments/260521/images"
-provenance = "the 260521 captures (f/9.0), the validation side of the registered scene split; unpublished"
+provenance = "the 260521 captures (f/9.0), the validation side of the registered scene split (its bb subset)"
 
 [inputs.camera]
-# The validation session's camera as a vgio/cameras/v3 record (converted
-# exactly from the session's OpenCV calibration).
-tier = "unpublished"
+# The validation session's camera store, the copy the tuning runs of record read
+# (3a346460b90dc25d, c80d42e9055f8cd5: their records state this sha256).
+tier = "bb_absolute_pose_tuning_260521"
 path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
-provenance = "the 260521 camera (scripts/import_cameras.jl's port of calibrate_pinhole)"
-# UNVERIFIED: three differing copies; primary copy not located
+provenance = "the 260521 camera (the session's OpenCV calibrateCamera fit), as the tuning runs read it"
+sha256 = "0ef0c750232f9c0f17caa77bf9fab07a63f7f4e2cf4820af1b9b49d378617e1b"
 
 [inputs.boards]
 # The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids

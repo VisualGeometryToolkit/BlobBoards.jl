@@ -71,6 +71,18 @@ license = "MIT"
 id = "23965208"
 placeholder = "ZENODO_IMAGES_RECORD_ID"
 
+[records.bb_260521]
+title = "BlobBoards absolute-pose tuning session (260521): the validation captures, camera and calibration export of the detection operating point"
+license = "CC-BY-4.0"
+# The 260521 session (f/9.0) is the VALIDATION side of the registered scene split
+# blobboards_cross_session: the detection operating point of record (outlier
+# half-width, peak threshold, similarity gate; configs/detection_cv.toml) was
+# selected on it, and 260527 (the reported session) is never read by a tuning
+# step. The session fails end-to-end hand-eye validation, so it is not an
+# evaluation session; it is published as the tuning data of record. Zenodo-ready,
+# nothing uploaded: the placeholder stands until the record is deposited.
+placeholder = "ZENODO_260521_RECORD_ID"
+
 [artifacts.bb_absolute_pose_inputs]
 kind = "tree"
 mount_dir = "absolute_pose_experiments"
@@ -231,3 +243,14 @@ record = "bb"
 required = false
 what = "the source frame of fig:pipeline (DSC02800.JPG, Sony FX3 + Tamron 20 mm f/8 corridor session) and that session's camera as a VisualGeometryToolkitIO cameras/v4 record"
 provenance = "captured by the authors (descriptor-training corridor session, 2026-01-19); the camera is that session's OpenCV calibrateCamera fit (36 images, RMS 0.159 px), converted exactly to the v3 record and migrated to v4 by vgio_migrate (record 1.3.0)"
+
+[artifacts.bb_absolute_pose_tuning_260521]
+kind = "tree"
+mount_dir = "absolute_pose_experiments"
+dir = "260521/images"
+filter = ["260521/images/bb/*", "260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json", "260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"]
+mount = "data"
+record = "bb_260521"
+required = false
+what = "the detection tuning's inputs: the 260521 bb captures (the validation scene 260521/bb), the session's camera as the tuning runs read it (vgio camera store) and its upstream calibrate_pinhole export"
+provenance = "captured by the authors (absolute_pose_experiments/260521, f/9.0); the camera is the session's OpenCV calibrateCamera fit (BlobBoards-Evaluation calibrate_pinhole), its export beside it; the camera store is the copy the tuning runs 3a346460b90dc25d and c80d42e9055f8cd5 read (sha256 0ef0c750…); packed by scripts/make_zenodo_artifacts.jl"

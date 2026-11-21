@@ -24,6 +24,11 @@ from the published inputs and their paper assets compared with the deployed ones
 capture clock's UTC offset (`[mocap] utc_offset`), as VisualGeometryToolkitIO 0.11.1 requires; the formats test pins
 IO's current record schemas.
 
+The detection operating point's tuning session is catalogued: `bb_absolute_pose_tuning_260521` (record `bb_260521`, a
+placeholder until it is deposited) holds the 260521 bb captures, the camera store the tuning runs of record read (its
+sha256 now stated in `configs/detection_cv.toml`) and its calibration export, so every experiment of the paper names
+its data.
+
 ## 0.7.3 (2026-11-21)
 
 On VisualGeometryToolkitCore 0.12 and VisualGeometryToolkitIO 0.11 (`[compat]` in every workspace member's entry), with

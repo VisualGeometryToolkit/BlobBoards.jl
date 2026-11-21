@@ -54,7 +54,7 @@ provenance = "BlobBoards-Evaluation calibrate_pinhole's export of the 260527 cam
 sha256 = "0c452de05aafb2df6df831bce4ffbdf065f2ab6230cfdb8bd1b36f299f677602"
 
 [inputs.export_260521]
-tier = "unpublished"
+tier = "bb_absolute_pose_tuning_260521"
 path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0).json"
-provenance = "BlobBoards-Evaluation calibrate_pinhole's export of the 260521 camera (the session is unpublished: it fails end-to-end validation)"
+provenance = "BlobBoards-Evaluation calibrate_pinhole's export of the 260521 camera (the tuning session: it fails end-to-end validation, so it is never an evaluation session)"
 sha256 = "b745b7370fcaca5b5335026c34f48b01ebd0dbcc15b2993d92fdf41a716f4d56"

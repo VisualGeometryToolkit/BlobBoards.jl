@@ -109,6 +109,7 @@ are named in the `data` column:
 | `images` | `bb_absolute_pose_images_260527`: the evaluation, calibration and intrinsic-calibration captures (their own Zenodo record, doi:10.5281/zenodo.23965208, a supplement of the data record; every other tier is in the data record) |
 | `occlusion-LL` | `bb_absolute_pose_occlusion_LL_260527`: the synthetic occlusion images at level LL (inputs with provenance: BlobBoards-Evaluation 88bca9f `evaluation_pipe/occlusion_generator.py`, hand-clicked corners and a MAGSAC homography per board) |
 | `assets` | `bb_assets`: the descriptor networks of record and the evaluation board gallery |
+| `tuning-260521` | `bb_absolute_pose_tuning_260521`: the tuning session's inputs — the 260521 bb captures (the validation scene of the operating-point search), its camera as the tuning runs read it, and its calibration export (record `bb_260521`, Zenodo-ready: a placeholder until it is deposited) |
 
 **Cameras of record** (inputs): each session's camera is
 `<session>/calibration/<camera>.json` (vgio/cameras/v4 with its calibration
