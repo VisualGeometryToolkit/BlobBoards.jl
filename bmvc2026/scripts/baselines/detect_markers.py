@@ -256,3 +256,8 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+    # Every export is written and closed: leave without the interpreter's teardown, where the native detector
+    # libraries segfaulted (signal 11) after the last image on the vcai cluster, failing a complete run.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
