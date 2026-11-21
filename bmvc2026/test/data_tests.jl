@@ -124,13 +124,14 @@ end
 @testitem "the inputs tier holds inputs only" tags = [:data] begin
     using DrWatson: projectdir
     import TOML
-    using VisualGeometryToolkitCore: artifact_store
+    using VisualGeometryToolkitCore: with_artifact_store, Artifacts
     toml = TOML.parsefile(projectdir("Artifacts.toml"))
     @test !haskey(toml, "bb_absolute_pose_metadata") && !haskey(toml, "bb_absolute_pose_val_260527")
     @test haskey(toml, "bb_absolute_pose_inputs")
-    # the tree where the artifact store holds it (Pkg's layout, `<git-tree-sha1>/`), when installed there
-    root = joinpath(artifact_store().path, toml["bb_absolute_pose_inputs"]["git-tree-sha1"])
-    if isdir(root)
+    # the tree in the artifact store, when installed there (Core's one wrapper of Pkg's artifact functions)
+    hash = Base.SHA1(toml["bb_absolute_pose_inputs"]["git-tree-sha1"])
+    root = with_artifact_store(() -> Artifacts.artifact_exists(hash) ? Artifacts.artifact_path(hash) : nothing)
+    if root !== nothing
         input_kind = [
             r"^\d{6}/poses/motion_tracker/[a-z_]+/marker_[^/]+\.json(\.del)?$",     # raw motion capture
             r"^\d{6}/calibration/[^/]+\.json$",                                     # the camera of record

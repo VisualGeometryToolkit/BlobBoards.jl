@@ -80,7 +80,7 @@ mount = "data"
 record = "bb"
 required = true
 what = "the motion-capture measurements of record (the tracker's per-frame exports), the cameras of record (vgio/cameras/v4, with their calibration block), the board definitions of the three marker systems (the BlobBoards ones as blobboards/board/v5), the teaser photos, and the provenance material (the external evaluation code archive and the upstream calibration exports)"
-provenance = "captured by the authors (absolute_pose_experiments/260527); cameras: OpenCV calibrateCamera by BlobBoards-Evaluation calibrate_pinhole, ported by scripts/import_cameras.jl; packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "captured by the authors (absolute_pose_experiments/260527); cameras: OpenCV calibrateCamera by BlobBoards-Evaluation calibrate_pinhole, ported by scripts/import_cameras.jl; packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_images_260527]
 kind = "tree"
@@ -91,7 +91,7 @@ mount = "data"
 record = "bb_images"
 required = false
 what = "the evaluation, calibration and intrinsic-calibration captures of the 260527 session (record 1.0.0's captures, unchanged; the cameras of record are in the inputs tier)"
-provenance = "captured and processed by the authors (absolute_pose_experiments/260527), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "captured and processed by the authors (absolute_pose_experiments/260527), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_00_260527]
 kind = "tree"
@@ -101,7 +101,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 0% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_10_260527]
 kind = "tree"
@@ -111,7 +111,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 10% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_20_260527]
 kind = "tree"
@@ -121,7 +121,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 20% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_30_260527]
 kind = "tree"
@@ -131,7 +131,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 30% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_40_260527]
 kind = "tree"
@@ -141,7 +141,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 40% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_50_260527]
 kind = "tree"
@@ -151,7 +151,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 50% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_60_260527]
 kind = "tree"
@@ -161,7 +161,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 60% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_70_260527]
 kind = "tree"
@@ -171,7 +171,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 70% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_80_260527]
 kind = "tree"
@@ -181,7 +181,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 80% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_absolute_pose_occlusion_90_260527]
 kind = "tree"
@@ -191,7 +191,7 @@ mount = "data"
 record = "bb"
 required = false
 what = "the synthetic occlusion images at 90% (inputs: the detections on them are regenerated)"
-provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl (DataArtifacts pack_artifacts)"
+provenance = "synthesized from the 260527 captures by the external generator BlobBoards-Evaluation 88bca9f evaluation_pipe/occlusion_generator.py (hand-clicked board corners, a MAGSAC homography per board, 2026-05-30; the code archive is in the inputs tier under provenance/), packed by scripts/make_zenodo_artifacts.jl"
 
 [artifacts.bb_assets]
 kind = "tree"

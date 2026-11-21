@@ -15,11 +15,10 @@ Run: pixi run julia --project=bmvc2026 bmvc2026/scripts/make_bmvc2026_intro.jl
 Reproducible: the source photo lives under the dataset at
 `absolute_pose_experiments/teaser/`, which the inputs tier's file list
 (configs/data_artifacts.toml) names -- so it ships in that tier and a
-consumer can rebuild this figure. (`evaluation/` is a SIBLING of that tree and
-is never packaged, which is where it first landed.) The PDF
+consumer can rebuild this figure. The PDF
 is written where the paper reads it (`bmvc2026/papers/images/`). Both used to be
-per-machine paths -- ~/Downloads for the input and the RETIRED ~/Documents
-Overleaf copy for the output -- so the teaser could not be rebuilt by anyone,
+per-machine paths (a downloads folder for the input, a retired Overleaf copy
+for the output), so the teaser could not be rebuilt by anyone,
 including its author. Every parameter — photo, gallery, network, detector
 settings, render sizes, background, output name — is in the config of record,
 configs/figures/intro.toml; a variant (the project site's transparent

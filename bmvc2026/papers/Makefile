@@ -63,8 +63,8 @@ notes:
 # records, the hand-eye fits, the cells: keyed runs under results_root(),
 # src/runs.jl) and every generated asset the paper reads, the GPU figures
 # included (REPRODUCE.md indexes each: label -> asset -> generator -> data).
-# Nothing is selected by hand: the configs of record name the runs. On dgx01:
-# bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh.
+# Nothing is selected by hand: the configs of record name the runs. On a Slurm
+# site: bash bmvc2026/scripts/reproduce/reproduce.sh --site=<site>.
 BB_REPO  := ../..
 BB_JL    := julia --startup-file=no --project=bmvc2026
 
@@ -83,7 +83,7 @@ figcheck:
 $(DOCS): figcheck
 
 figures:
-	cd $(BB_REPO) && bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh
+	cd $(BB_REPO) && bash bmvc2026/scripts/reproduce/reproduce.sh --site=desktop
 
 # The reproducible-figures contract: every asset the two documents read is
 # indexed in ../REPRODUCE.md with an existing generator that writes it (or is

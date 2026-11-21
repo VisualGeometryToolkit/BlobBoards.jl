@@ -13,7 +13,7 @@ one producer (Eval's `keyed_data_dir`); the descriptor is a result
 Both are stages of `configs/reproduce.toml` (`annotations`, `train_descriptor`;
 `default = false`: the paper's network of record is an INPUT, the bb_assets
 tier, trained by the bootstrap chain the descriptor_training tiers publish).
-Run them with `bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh
+Run them with `bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01
 --only=annotations` (or `train_descriptor`), or call a driver directly.
 
 The drivers run under the `bmvc2026` project, which declares everything the

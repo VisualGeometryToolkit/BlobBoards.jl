@@ -2,13 +2,13 @@
 # Data root — the EVAL-CONVENTIONS.md (cau-tooling) contract, bound through
 # VisualGeometryToolkitEval.Experiments (the ladder is spelled out at the
 # `set_project_root!` call below). This file keeps only what is THIS
-# project's: its tiers, their mounts, and the derived-artifact layout.
+# project's: the binding of its data catalog, EVAL_TIERS, and the camera of
+# record.
 # =============================================================================
 
 using DrWatson: projectdir
 using VisualGeometryToolkitEval.Experiments: set_project_root!, data_root, results_root, assert_active_project
 using VisualGeometryToolkitEval.DataArtifacts: project_catalog, catalog_view, required_artifacts
-import TOML
 
 # projectdir(), not joinpath(@__DIR__, ".."): @__DIR__ is relative to THIS
 # FILE, so every such path breaks silently when a directory is renamed —

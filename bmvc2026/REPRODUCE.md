@@ -26,16 +26,16 @@ fetched and the others install when a stage first reads them.
 ## One command
 
 ```bash
-bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh --dry-run      # the job graph and every missing input, nothing run
-bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh                # dgx01 (Slurm): every stage, the GPU ones on a GPU each
-bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh            # the desktop: the same stages, in order, here
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01 --dry-run   # the job graph and every missing input, nothing run
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01             # Slurm: every stage, the GPU ones on a GPU each
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=desktop           # the desktop: the same stages, in order, here
 cd bmvc2026/papers && make                                              # supplement, then paper
 ```
 
 The stage graph of record is `configs/reproduce.toml` (VisualGeometryToolkitEval's
 runner: which driver on which config of record, after what; `--only=<stage>,…`
 runs a subset with its prerequisites, `--no-deps` without; `make figures` in
-`papers/` runs the desktop launcher). The inputs every stage reads are its
+`papers/` runs it with `--site=desktop`). The inputs every stage reads are its
 configs' `[inputs.<id>]` (tier, path, provenance, sha256), reported before
 anything runs. The run starts from the INPUTS alone and regenerates every result on the way to the
 paper's assets; nothing is promoted, copied into the dataset or read from a

@@ -7,7 +7,7 @@ board definitions, the synthetic occlusion images, the networks); every
 result — the motion-capture records, the detections of all three marker
 systems, the hand-eye fits, the pose-error cells — is regenerated from them by
 the stages of `configs/reproduce.toml` (VisualGeometryToolkitEval's runner:
-`scripts/reproduce/reproduce_results_{dgx,desktop}.sh`) into keyed run
+`scripts/reproduce/reproduce.sh --site=<site>`) into keyed run
 directories under `results_root()` (`src/runs.jl`; REPRODUCE.md).
 
 A DrWatson project nested inside the BlobBoards package repo. The package
@@ -57,7 +57,7 @@ not exist here — or reinvents one that does:
 | Run keys: the SHA-256 `run_key` of a stage's config of record (+ the network's sha256 for a sweep, the upstream run keys for a consumer) | VisualGeometryToolkitEval `run_key` | `src/runs.jl` |
 | Keyed run directories `<stage>-<key>/`, found through the config of record | DrWatson `produce_or_load` idea, for a directory | `src/runs.jl`, every stage |
 | Effective-config sidecar `_config.toml` | custom (`BlobBoards.write_config`) | `src/sweep.jl` |
-| Immutable-data distribution + root ladder | Julia **Artifacts** (Pkg stdlib) through VisualGeometryToolkitEval `ArtifactView`/`data_root` | `Artifacts.toml`, `src/data.jl` |
+| Immutable-data distribution + root ladder | Julia **Artifacts** in the artifact store, through VisualGeometryToolkitEval DataArtifacts (`fetch_data!`, `pack_artifacts`, `catalog_view`) and `data_root` | `configs/data_artifacts.toml`, `Artifacts.toml`, `src/data.jl` |
 | Board-feature cache | custom (VGF FileCache; self-keyed on network sha + cutoff + patch geometry) | `BoardGallery` |
 
 Nearest DrWatson neighbours, deliberately NOT used (checked against
@@ -198,8 +198,8 @@ silently wrong the moment the config changes.
 dev chain) as path dependencies:
 
 ```sh
-bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh           # every result + the paper's assets (dgx01, Slurm)
-bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh       # the same here, stage by stage
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01      # every result + the paper's assets (Slurm)
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=desktop    # the same here, stage by stage
 julia --project=bmvc2026 bmvc2026/scripts/make_pose_results.jl     # just the result cells (after the detections)
 ```
 

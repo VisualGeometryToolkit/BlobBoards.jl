@@ -6,8 +6,7 @@
 # VGTK_DATA_ROOT / VGTK_RESULTS_ROOT or --data-root / --results-root. No machine path is written here: [sites.desktop]
 # below names only this checkout's own directories.
 #
-#   bash bmvc2026/scripts/reproduce/reproduce_results_dgx.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
-#   bash bmvc2026/scripts/reproduce/reproduce_results_desktop.sh [--dry-run] [--only=<stage>,…] [--no-deps] [status]
+#   bash bmvc2026/scripts/reproduce/reproduce.sh --site=<site> [--dry-run] [--only=<stage>,…] [--no-deps] [status]
 #
 # Without --only: every stage below that is not `default = false`. A finished stage is reused by its run key (the
 # runner's manifests under <results root>/_reproduce), and every driver itself skips a keyed run that is complete
