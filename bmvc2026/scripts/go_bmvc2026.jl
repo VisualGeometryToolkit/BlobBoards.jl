@@ -21,7 +21,7 @@ Subsets ([experiment] subsets of the config):
 The camera is the session's camera of record (an input, calibration/<camera>.json).
 The sweep itself lives in `src/sweep.jl`, shared with go_bmvc2026_occlusion.jl.
 
-Run:  JULIA_NUM_THREADS=auto julia --project=bmvc2026 bmvc2026/scripts/go_bmvc2026.jl [--run-config=<name under configs/>] [--force]
+Run:  JULIA_NUM_THREADS=auto julia --project=bmvc2026 bmvc2026/scripts/go_bmvc2026.jl [--config=<name under configs/>] [--force]
       [--branch-log=<jsonl>] [--appearance-log=<jsonl>] [--phase2-log=<jsonl>]
 (CUDA + ONNXRunTime cuda EP; the ONNX descriptor network the config names.)
 =#
@@ -46,12 +46,12 @@ using .BoardSweep: SweepUnit, sweep_context, run_sweep
 # Configuration
 # =============================================================================
 # ONE config file is the source of truth for this run: configs/bmvc2026_260527.toml,
-# or the run config named by `--run-config=<path>` (the no-disambiguation ablation
+# or the run config named by `--config=<path>` (the no-disambiguation ablation
 # is configs/bmvc2026_260527_noflip.toml). No env knobs: ambient values that
 # nothing recorded are how a stale BB_LIMIT=40 silently truncated a 56-image
 # sweep while looking perfectly clean.
 using VisualGeometryToolkitEval: cli_option
-const CONFIG_PATH = BBE.config_path(cli_option(ARGS, "run-config", "bmvc2026_260527.toml"))
+const CONFIG_PATH = BBE.config_path(cli_option(ARGS, "config", "bmvc2026_260527.toml"))
 const RUN = read_run_config(CONFIG_PATH)
 const IMAGES = BBE.input_path(RUN.config_toml, "images")
 const CAMERA_JSON = BBE.input_path(RUN.config_toml, "camera")

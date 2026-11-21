@@ -63,21 +63,22 @@ Only inputs are published (`configs/data_artifacts.toml`): the captures, the
 motion tracker's raw per-frame exports, the cameras of record, the board
 definitions, the synthetic occlusion images, the descriptor networks and the
 board gallery. Every result is produced by a codified stage into a keyed run
-directory under `results_root()` (`VGTK_RESULTS_ROOT`, default
-`bmvc2026/data/exp_pro`) and found again through the stage's config of record
-→ its run key → its directory (`src/runs.jl`, DrWatson-style; the evaluation
-names its upstream configs in `configs/figures/evaluation.toml` `[runs]`). A
-stage whose run is complete is skipped; a changed config is a new run.
+product under `results_root()` (`VGTK_RESULTS_ROOT`, default
+`bmvc2026/data/exp_pro`; Eval's `Product`) and found again through the stage's
+config of record → its key → its directory (`src/runs.jl`, DrWatson-style; the
+evaluation names its upstream configs in `configs/figures/evaluation.toml`
+`[runs]`). A produced stage is reused; a changed config or code is a new
+product.
 
 | stage | generator | config of record | run directory |
 |---|---|---|---|
-| motion-capture records (stage 0) | `scripts/convert_formats.jl` | `configs/convert_formats.toml` | `convert_formats-<key>/` |
-| BlobBoards detections (bb, calibration_bb) | `scripts/go_bmvc2026.jl` (GPU) | `configs/bmvc2026_260527.toml` | `bb-<key>/` |
-| the no-disambiguation ablation (flip table) | `scripts/go_bmvc2026.jl --run-config=…` (GPU) | `configs/bmvc2026_260527_noflip.toml` | `bb-<key>/` |
-| BlobBoards on every occlusion level | `scripts/go_bmvc2026_occlusion.jl` (GPU) | `configs/bmvc2026_260527.toml` | `occlusion-<key>/` |
-| AprilTag + ArUco on every subset | `scripts/detect_baselines.jl` → `scripts/baselines/detect_markers.py` (pixi env `baselines`, `bmvc2026/pixi.toml`) | `configs/baselines.toml` | `baselines-<key>/` |
-| hand-eye calibrations | `scripts/make_hand_eye.jl` | `configs/figures/evaluation.toml` | `hand_eye-<key>/` |
-| pose-error cells | `scripts/make_pose_results.jl` | `configs/figures/evaluation.toml` | `pose_results-<key>/` |
+| motion-capture records (stage 0) | `scripts/convert_formats.jl` | `configs/convert_formats.toml` | `convert_formats/<key>/` |
+| BlobBoards detections (bb, calibration_bb) | `scripts/go_bmvc2026.jl` (GPU) | `configs/bmvc2026_260527.toml` | `bb/<key>/` |
+| the no-disambiguation ablation (flip table) | `scripts/go_bmvc2026.jl --config=…` (GPU) | `configs/bmvc2026_260527_noflip.toml` | `bb/<key>/` |
+| BlobBoards on every occlusion level | `scripts/go_bmvc2026_occlusion.jl` (GPU) | `configs/bmvc2026_260527.toml` | `occlusion/<key>/` |
+| AprilTag + ArUco on every subset | `scripts/detect_baselines.jl` → `scripts/baselines/detect_markers.py` (pixi env `baselines`, `bmvc2026/pixi.toml`) | `configs/baselines.toml` | `baselines/<key>/` |
+| hand-eye calibrations | `scripts/make_hand_eye.jl` | `configs/figures/evaluation.toml` | `hand_eye/<key>/` |
+| pose-error cells | `scripts/make_pose_results.jl` | `configs/figures/evaluation.toml` | `pose_results/<key>/` |
 
 `tests/data_tests.jl` holds the line: every run resolver points into
 `results_root()`, no driver joins a `data_root()` path with a result kind, and
@@ -127,9 +128,9 @@ Tuned values are selected on the validation side of a registered scene split
 (VisualGeometryToolkitEval `configs/splits.toml`; `blobboards_cross_session`: tune on
 260521/bb, report on 260527/bb — 260527 is never read by a tuning step) by
 VisualGeometryToolkitEval's coarse-fine search and stored in its tuning artifacts
-(`save_coarse_fine_artifact`) in the keyed, add-only run directory
-Eval's `keyed_cell_dir` (`tuning/bmvc2026/<step>-<run_key>`, the `[experiment]
-layout` of its config, the run config's key folded in as `upstream`), beside its `_config.toml` and
+(`save_coarse_fine_artifact`) in its product (Eval's `Product`:
+`tuning/bmvc2026/<step>/<key>`, the `[experiment] layout` of its config, the run
+config's key folded in as `upstream`), beside its `_config.toml` and
 `_provenance.toml`. The record below predates that layout: it stays where it
 was made, `results_root()/tuning/<step>-<run_key>` under its 0.8 run key. A consumer reads them through VisualGeometryToolkitEval
 `deployed_setting` (paths in src/operating_points.jl), which refuses a search

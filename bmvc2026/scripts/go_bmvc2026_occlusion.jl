@@ -15,7 +15,7 @@ the same run config of record as the main sweep, the
 levels its `[experiment] occlusion_levels`. Each level is bb-only (no
 calibration subset); the camera, boards and gallery are the parent session's.
 
-Run:  JULIA_NUM_THREADS=auto julia --project=bmvc2026 bmvc2026/scripts/go_bmvc2026_occlusion.jl [--run-config=<name under configs/>] [--force]
+Run:  JULIA_NUM_THREADS=auto julia --project=bmvc2026 bmvc2026/scripts/go_bmvc2026_occlusion.jl [--config=<name under configs/>] [--force]
 =#
 
 using DrWatson
@@ -41,7 +41,7 @@ using .BoardSweep: SweepUnit, sweep_context, run_sweep
 # headline numbers come from the same estimator, the same network, the same
 # gallery).
 using VisualGeometryToolkitEval: cli_option
-const CONFIG_PATH = BBE.config_path(cli_option(ARGS, "run-config", "bmvc2026_260527.toml"))
+const CONFIG_PATH = BBE.config_path(cli_option(ARGS, "config", "bmvc2026_260527.toml"))
 const RUN = read_run_config(CONFIG_PATH)
 const LEVELS = String.(RUN.experiment["occlusion_levels"])
 const CAMERA_JSON = BBE.input_path(RUN.config_toml, "camera")

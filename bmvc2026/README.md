@@ -52,10 +52,10 @@ not exist here — or reinvents one that does:
 | `data/exp_raw` / `exp_pro` / `plots/` / `_research/` layout, `projectdir()`, `plotsdir()` | DrWatson | everywhere |
 | Tuning SEARCH: the joint coarse-fine search over the spec's axes | VisualGeometryToolkitEval `coarse_fine_search` | `detection_cv.jl` |
 | Grid APPLICATION: cell → config | custom — `Accessors.@set` over the deserialized `FindBoardsConfig` | `detection_cv.jl` |
-| Single-file derived caches (`cached`) | VisualGeometryToolkitEval `cached_result`: DrWatson's `produce_or_load(filename = hash)` file name, `wload`/`tagsave`, but a save error propagates (produce_or_load swallows it, saving_files.jl:107-116) | `src/cache.jl` |
-| Code provenance: gitcommit + dirty-tree patch | VisualGeometryToolkitEval `write_provenance`/`read_provenance`: DrWatson `tag!(storepatch = true)` as one flat TOML record | `src/cache.jl`, `src/sweep.jl` |
-| Run keys: the SHA-256 `run_key` of a stage's config of record (+ the network's sha256 for a sweep, the upstream run keys for a consumer) | VisualGeometryToolkitEval `run_key` | `src/runs.jl` |
-| Keyed run directories `<stage>-<key>/`, found through the config of record | DrWatson `produce_or_load` idea, for a directory | `src/runs.jl`, every stage |
+| Single-file derived results (pose-error cells, hand-eye fits) | VisualGeometryToolkitEval `Product`/`produce`: DrWatson's `produce_or_load` under the product's key, a save error propagates (produce_or_load swallows it, saving_files.jl:107-116) | `src/results.jl`, `src/calibration.jl` |
+| Code provenance: gitcommit + dirty-tree patch | VisualGeometryToolkitEval `write_provenance`/`read_provenance`: DrWatson `tag!(storepatch = true)` as one flat TOML record | `src/sweep.jl`, every product's `_provenance.toml` |
+| Keys: the SHA-256 `run_key` of a stage's config of record (+ the network's sha256 for a sweep, the code trees, the upstream products for a consumer) | VisualGeometryToolkitEval `Product` (`run_key`) | `src/runs.jl` |
+| Product directories `<name>/<key>/`, found through the config of record | VisualGeometryToolkitEval `Product` (DrWatson `produce_or_load`, for a directory too) | `src/runs.jl`, every stage |
 | Effective-config sidecar `_config.toml` | custom (`BlobBoards.write_config`) | `src/sweep.jl` |
 | Immutable-data distribution + root ladder | Julia **Artifacts** in the artifact store, through VisualGeometryToolkitEval DataArtifacts (`fetch_data!`, `pack_artifacts`, `catalog_view`) and `data_root` | `configs/data_artifacts.toml`, `Artifacts.toml`, `src/data.jl` |
 | Board-feature cache | custom (VGF FileCache; self-keyed on network sha + cutoff + patch geometry) | `BoardGallery` |
@@ -83,18 +83,14 @@ Nearest DrWatson neighbours, deliberately NOT used (checked against
 The two big custom pieces are the same DrWatson idea scaled past its
 primitives:
 
-- **`bb-<key>/` is `produce_or_load` for a directory**, through
-  VisualGeometryToolkitEval: the directory is `keyed_cell_dir` (the config's
-  [experiment] layout, `run_key` of the config of record — its
-  `[inputs.<id>]` sha256s included — and, for a derived stage, the upstream
-  run keys), add-only, skipped when Eval's `run_complete` holds, and a
-  consumer derives the same directory from the same config (`src/runs.jl`).
-  CODE is deliberately NOT keyed — it is RESTORABLE: `tag!` records the
-  commit and the dirty-tree patch in every sidecar, so any run regenerates
-  under its exact code state, and `run_complete` warns when skipping work
-  recorded under a different commit (`--force` redoes it). Commit-keying
-  would orphan 45-minute sweeps on every unrelated commit. Caches go through
-  Eval's `cached_result(…; key = run_key)` (never `savename`, which silently
+- **Every run is a VisualGeometryToolkitEval `Product`** (DrWatson's
+  `produce_or_load` with a key): `<layout…>/bmvc2026/<name>/<key>/`, the key
+  over the config of record (its `[inputs.<id>]` sha256s included), the code
+  trees it runs and, for a derived stage, its upstream products (their keys
+  and their outputs' content hashes); produced once (its `_provenance.toml`,
+  written last, is the mark), reused while `produced`, and a consumer derives
+  the same product from the same config (`src/runs.jl`). The pose-error cells
+  and the hand-eye fit are products too (never `savename`, which silently
   drops nested tables, nor `hash`, which moves between Julia versions).
 - **Selection is a config, not a promote.** Which run the paper reads is
   named by the evaluation's config of record (`configs/figures/evaluation.toml`
@@ -156,9 +152,8 @@ Expected download time: Zenodo served ~0.1–0.5 MB/s per single stream (measure
 
 The data policy (VisualGeometryToolkitEval `data_policy_violations`): D1 no machine paths in
 code or launchers; D2 nothing writes under `data_root()`;
-D3 output directories are keyed (Eval's `keyed_cell_dir`:
-`<layout…>/bmvc2026/<stage>-<run_key>`, the configs' `[experiment] layout`; caches
-`<prefix>_<run_key>`).
+D3 output directories are keyed (Eval's `Product`:
+`<layout…>/bmvc2026/<name>/<key>`, the configs' `[experiment] layout`).
 `test/paper_project_tests.jl` checks it (VisualGeometryToolkitEval PaperProjects).
 
 The descriptor's frozen training set ships as two further root-mounted tiers,

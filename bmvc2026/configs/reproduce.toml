@@ -68,7 +68,7 @@ name = "bb_noflip"
 what = "BlobBoards without the pose disambiguation: the flip table's base (bb-<key>), one GPU"
 after = ["setup"]
 command = ["julia", "--startup-file=no", "--project=bmvc2026", "-t", "auto", "bmvc2026/scripts/go_bmvc2026.jl",
-           "--run-config=bmvc2026_260527_noflip.toml"]
+           "--config=bmvc2026_260527_noflip.toml"]
 driver = "bmvc2026/scripts/go_bmvc2026.jl"
 config = "bmvc2026/configs/bmvc2026_260527_noflip.toml"
 gpu = true
