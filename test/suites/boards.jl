@@ -712,16 +712,16 @@ end
 # `write_tiff` (the stack's one TIFF codec, the io095 port) writes exactly what BlobBoards' own libtiff writer wrote:
 # checked 2026-11-13 on these four boards at 0.7.0 (BlobBoards' writer on w10-bb-tmp 8177304 against IO's on dfe28d5,
 # equal bytes). The sheet prints the package version in its footer and the TIFF's Software tag names it, so these pins
-# are a version's: re-pin at each version bump (0.6.2's differ from 0.7.0's in those two places only; 0.7.1 and 0.7.2
+# are a version's: re-pin at each version bump (0.6.2's differ from 0.7.0's in those two places only; 0.7.1, 0.7.2 and 0.7.3
 # re-pinned, their only change to these bytes the version).
-const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF at BlobBoards 0.7.2)
+const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF at BlobBoards 0.7.3)
     ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "6a6cd7631496483696852351972144667866e20d6501407790a187493ae3c7e3"),
     ("A5", (1mm, 6mm), 0x77, 300dpi, "f7c4bbb3b293cb151d1a6aed01afce028735bc07a70c711ba784c297f09c35d9"),
     ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "5e81ce18d98b40a1d2ec89c6cd128803ceada73e59b809edfd1ab7a820e7136c"),
     ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "4f53e201f4cb376a4735ad2476ca18e4033800c22b3a787d01e0457a42f37ef7"),
 ]
 @testset "board TIFFs: byte pins (IO's write_tiff, BlobBoards' bytes)" begin
-    @test pkgversion(BlobBoards) == v"0.7.2"   # the pins are this version's (see above)
+    @test pkgversion(BlobBoards) == v"0.7.3"   # the pins are this version's (see above)
     for (sz, bs, seed, d, digest) in _TIFF_GOLDEN
         mktempdir() do dir
             blob_board(sz; blob_sizes = bs, seed, dir, output = Tiff(d; icc_profile = :linear))

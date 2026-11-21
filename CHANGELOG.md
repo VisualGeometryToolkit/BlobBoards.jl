@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.3 (2026-11-21)
+
+On VisualGeometryToolkitCore 0.12 and VisualGeometryToolkitIO 0.11 (`[compat]` in every workspace member's entry), with
+LocalOptimizationDoneRight 0.7.2. Their radiometric types and kinds (vignetting, the environment light, the panorama record)
+moved to the Visual Radiometry Toolkit and PanoramaStitching; BlobBoards uses none of them. No API change. An authored board
+names 0.7.3 where it names the version, so its bytes differ from 0.7.2's there.
+
 ## 0.7.2 (2026-11-16)
 
 On VisualGeometryToolkitCore 0.11, Estimation 0.12, IO 0.10.6 and Features 0.9.7, with LocalOptimizationDoneRight 0.7.1
