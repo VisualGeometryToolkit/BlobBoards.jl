@@ -171,7 +171,9 @@ weights and the example data the package ships.
 - **Network weights and example data.** The same record holds the ONNX descriptor
   networks and the boards, still image and video the bundled examples run on. The
   package's `Artifacts.toml` is an add-only, hash-pinned catalog of them, each entry
-  fetched lazily from a numbered version of the record.
+  fetched lazily from a numbered version of the record into the artifact store
+  (VisualGeometryToolkitCore's `artifact_store`: `VGTK_ARTIFACT_STORE`, the site
+  profile `VGTK_SITE` names, a preference, else the Julia depot).
 
 ## Related projects
 

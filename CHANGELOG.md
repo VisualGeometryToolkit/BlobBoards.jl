@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.4
+
+On VisualGeometryToolkitCore 0.13 (`[compat]` in the package, `test/`, `gpu/`, `examples/` and `bmvc2026/`;
+bmvc2026 also VisualGeometryToolkitEval 0.10). Core 0.13 installs every artifact into the ARTIFACT STORE
+(`artifact_store()`: `VGTK_ARTIFACT_STORE`, the site profile `VGTK_SITE` names, a preference, else the depot, refused on
+a cluster): the descriptor networks and the example data (`[descriptor] model = { artifact = … }`, `example_data`) now
+install there through the same `install_artifact` call, so a cluster's jobs share one copy on its project space. The
+ONNX runtime binary stays in the depot. No API change.
+
+bmvc2026 follows the stack's storage design: its tiers are DataArtifacts `tree` entries of
+`configs/data_artifacts.toml` (their `mount_dir`, `dir` and `filter` are the file lists; each reproduces its published
+git-tree-sha1), `scripts/fetch_data.jl` installs them (`fetch_data!`), `scripts/make_zenodo_artifacts.jl` packs and binds
+them through `pack_artifacts` (its own packer is gone), `src/data.jl` binds the catalog's view (`catalog_view`) without
+the `BlobBoards.data_dir()` rung (the site profile's data root takes its place), and `configs/reproduce.toml` names no
+machine path. Its held Eval 0.9 / IO 0.10 port is still held (see 0.7.2).
+
 ## 0.7.3 (2026-11-21)
 
 On VisualGeometryToolkitCore 0.12 and VisualGeometryToolkitIO 0.11 (`[compat]` in every workspace member's entry), with
