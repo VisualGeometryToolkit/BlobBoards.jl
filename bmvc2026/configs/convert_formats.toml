@@ -45,5 +45,9 @@ bodies = [
 ]
 n_markers = 14
 method = "the tracker vendor's rigid-body solver, as exported per frame by the capture software"
+# The UTC offset of the capture PC's local clock, which stamps each export's file
+# name: the session is Kiel, 2026-05-27, Central European Summer Time. A record's
+# time_origin is an instant (VisualGeometryToolkitIO refuses one without an offset).
+utc_offset = "+02:00"
 # The static-camera recovery of camera-untracked calibration frames (src/recovery.jl).
 recovery = { subsets = "calibration_*", t_tol_mm = 1.0, ang_tol_deg = 0.5, bg_tol = 0.15 }

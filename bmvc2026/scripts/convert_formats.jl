@@ -203,7 +203,7 @@ function convert_mocap(session)
         sub = basename(s.dir)
         odir = joinpath(out_root, sub)
         mkpath(odir)
-        origin = s.date * "T00:00:00"
+        origin = s.date * "T00:00:00" * MOCAP["utc_offset"]   # the capture clock's local midnight, an instant
         images = Dict(fr.t => fr.image for fr in s.frames)
         times = Dict(fr.t => fr.time for fr in s.frames)
 
