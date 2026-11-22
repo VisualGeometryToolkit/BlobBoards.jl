@@ -103,10 +103,13 @@ const UPSTREAM_CV = Dict{String, Any}("cv" => run_key(CV), "bb" => run_key(load_
 const DRIVER = "bmvc2026/scripts/halfwidth_study.jl"
 const POPULATIONS = ("final", "guided", "descriptor")
 
-residuals_product() = Product(EXP, "halfwidth_residuals", CFG; output = "residuals.jld2", upstream = UPSTREAM_CV)
-arm_product(name) = Product(EXP, "halfwidth_arm", CFG; output = "arm.jld2", parts = Dict("arm" => name),
+# --max_frames=N (a smoke run): the first N validation frames only, a part of every product's key.
+const MAX_FRAMES = parse(Int, cli_option(ARGS, "max_frames", "0"))
+_parts(d = Dict{String, Any}()) = MAX_FRAMES > 0 ? merge(d, Dict{String, Any}("max_frames" => MAX_FRAMES)) : (isempty(d) ? nothing : d)
+residuals_product() = Product(EXP, "halfwidth_residuals", CFG; output = "residuals.jld2", upstream = UPSTREAM_CV, parts = _parts())
+arm_product(name) = Product(EXP, "halfwidth_arm", CFG; output = "arm.jld2", parts = _parts(Dict{String, Any}("arm" => name)),
                             upstream = merge(UPSTREAM_CV, Dict{String, Any}("residuals" => residuals_product())))
-report_product() = Product(EXP, "halfwidth_report", CFG; output = "summary.toml",
+report_product() = Product(EXP, "halfwidth_report", CFG; output = "summary.toml", parts = _parts(),
                            upstream = merge(Dict{String, Any}("residuals" => residuals_product()),
                                             Dict{String, Any}("arm_" * n => arm_product(n) for n in ARM_NAMES)))
 
@@ -306,8 +309,17 @@ function named_halfwidths(gate, pitch, W, H)
     return d
 end
 
-function run_residuals()
+# The CV's shared state, its frames capped by --max_frames.
+function study_context()
     ctx = invariance_cv(CV, SPEC.scheme.cross_validation; device = CUDABackend())
+    MAX_FRAMES > 0 || return ctx
+    n = min(MAX_FRAMES, length(ctx.frames))
+    return Main.BlobBoardsEval.InvarianceCV(ctx.image_dir, ctx.frames[1:n], ctx.stems[1:n], ctx.base, ctx.net, ctx.feats,
+                                            ctx.bundles, ctx.uids, ctx.min_obs, ctx.device, ctx.run_config)
+end
+
+function run_residuals()
+    ctx = study_context()
     cfg = ctx.base
     cam = BlobBoards._estimation_camera(cfg.geometry)
     min_iou = Float64(CFG["study"]["min_iou"])
@@ -395,7 +407,7 @@ function run_arm(name)
     arm = ARMS[name]
     res = load_jld2(product_output(residuals_product()), "record")
     m = res["inlier_rate_final"]
-    ctx = invariance_cv(CV, SPEC.scheme.cross_validation; device = CUDABackend())
+    ctx = study_context()
     base = ctx.base
     base = @set base.geometry.local_optimization_strategy = arm_lo(arm, base.geometry.local_optimization_strategy, m)
     features = detection_run(ctx, base)
