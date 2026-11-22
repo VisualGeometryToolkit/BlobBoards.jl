@@ -119,7 +119,9 @@ edge_threshold = 5.0
 # 2x upsample before the scale space (pyramid starts at octave -1).
 # Recovers small blobs at distance; the shipped 260527 poses were
 # produced with it on, which is what poses/bb.upsample was named for.
-upsample = true
+upsample = 1   # the count of 2× upsamplings (true/false read as 1/0)
+# DoG scales per octave (VisualGeometryToolkitFeatures' nb_scales).
+nb_scales = 3
 tilts = []   # empty = the IMAS-25 schedule
 # The ONE cutoff still configured, and a DIFFERENT quantity from the board's:
 # the Mahalanobis radius of each detection's elliptical footprint, used for

@@ -36,8 +36,13 @@ the run records, and (stage `tables`) the curve of each axis and the surface
 of each pair of axes (`emit_tuning_table`). Consumers read the selection
 through VisualGeometryToolkitEval `deployed_setting`.
 
+The spec may tune a SUBSET of the three axes (`--config=halfwidth_cv.toml`:
+the half-width alone, as the 2026-10-09 one-axis CV did); an axis it does not
+tune keeps the run config's value, and without `peak_threshold` the search
+runs one detection run, at the run config's threshold.
+
 Usage:
-  julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/detection_cv.jl [--plan] [--force]
+  julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/detection_cv.jl [--config=<name under configs/>] [--plan] [--force]
 =#
 # reproduce: reads configs/detection_cv.toml
 
@@ -65,6 +70,7 @@ using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, rigid_invariance
     save_coarse_fine_artifact, deployed_setting
 using VisualGeometryToolkitEval.Render: emit_tuning_table
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages, produce, product_dir, Produced
+using VisualGeometryToolkitEval: cli_option
 
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
@@ -72,7 +78,7 @@ end
 using Main.BlobBoardsEval: data_root, results_root, input_path, config_path, load_config,
     detection_cv_product, detection_cv_artifact, detection_cv_table
 
-const CFG_PATH = config_path("detection_cv.toml")
+const CFG_PATH = config_path(cli_option(ARGS, "config", "detection_cv.toml"))
 const CFG = TOML.parsefile(CFG_PATH)
 const PANEL = CFG["panel"]
 const SPEC = tuning_spec(CFG, "detection")
@@ -80,14 +86,14 @@ SPEC.scheme isa JointCoarseFine || error("[tuning.detection] must be a joint_coa
 SPEC.scheme.criterion isa MeanAverageAccuracy ||
     error("[tuning.detection] criterion must be mean_average_accuracy (the invariance mAA, mm)")
 # Each axis's setter over the deserialized run config; `peak_threshold` is
-# the one detection axis, and the spec must say so.
+# the one detection axis, and the spec must say so. The spec tunes a subset.
 const SETTERS = Dict(
     "outlier_halfwidth" => (c, x) -> @set(c.geometry.outlier_halfwidth = x),
     "peak_threshold" => (c, x) -> @set(c.detect.peak_threshold = x),
     "min_similarity" => (c, x) -> @set(c.min_similarity = x))
-Set(keys(SPEC.scheme.axes)) == Set(keys(SETTERS)) ||
-    error("[tuning.detection] axes $(sort!(collect(keys(SPEC.scheme.axes)))) are not $(sort!(collect(keys(SETTERS))))")
-[n for (n, a) in SPEC.scheme.axes if a.expensive] == ["peak_threshold"] ||
+issubset(keys(SPEC.scheme.axes), keys(SETTERS)) ||
+    error("[tuning.detection] axes $(sort!(collect(keys(SPEC.scheme.axes)))) are not among $(sort!(collect(keys(SETTERS))))")
+[n for (n, a) in SPEC.scheme.axes if a.expensive] == (haskey(SPEC.scheme.axes, "peak_threshold") ? ["peak_threshold"] : String[]) ||
     error("[tuning.detection]: peak_threshold, and only it, is the expensive (detection) axis")
 const PRODUCT = detection_cv_product(CFG)
 const OUTDIR = product_dir(PRODUCT)
@@ -152,7 +158,7 @@ function run_cv()
     end
     function errorsfn(points)
         ps = points[:pose]
-        pk = only(unique(p.peak_threshold for p in ps))
+        pk = only(unique(get(p, :peak_threshold, base.detect.peak_threshold) for p in ps))
         prepared = detected(pk)
         t = @elapsed out = [errors_at(prepared, p) for p in ps]
         @info "evaluated" peak_threshold = pk cells = length(ps) seconds = round(t; digits = 1)

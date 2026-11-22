@@ -84,6 +84,9 @@ returned vector, not something the detector device consumes.
 - `nms = EllipseNms(cutoff = 2.0f0)`: cross-warp NMS strategy (`MxmNms()`,
   `EllipseNms()`, or `nothing` to disable and let downstream RANSAC handle
   the duplicates).
+- `upsample = 1`: how many 2× upsamplings precede the scale space; the pyramid
+  starts at octave `-upsample` (`true`/`false` in a TOML read as 1/0).
+- `nb_scales = 3`: the DoG scales per octave (Features' `nb_scales`).
 
 Parameterized on the NMS config type `N` (`Nothing`, `MxmNms`, or
 `EllipseNms`) so the field stays concrete rather than an abstract union.
@@ -133,7 +136,15 @@ Base.@kwdef struct DetectConfig{N}
     # sweep is reproducible" — while nothing read either. A setting that
     # changes results, is named in artifacts, and cannot be set or recorded is
     # the same failure the descriptor-model consolidation removed.
-    upsample::Bool = _dflt("detect", "upsample")
+    #
+    # An integer since the record-era scale range needed a second upsampling:
+    # the count of 2× upsamplings, the pyramid starting at octave -upsample (a
+    # TOML `true`/`false` reads as 1/0). With `nb_scales`, the ASIFT scale
+    # ladder: interior slices s = 1 … S of octave o have
+    # σ = seed_sigma·2^((s + 0.5)/S)·2^o (Features' extraction searches no
+    # boundary slice), so these two set the finest and coarsest scales found.
+    upsample::Int = _dflt("detect", "upsample")
+    nb_scales::Int = _dflt("detect", "nb_scales")
 end
 
 """

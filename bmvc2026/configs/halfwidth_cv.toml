@@ -1,0 +1,92 @@
+# =============================================================================
+# halfwidth_cv — the one-axis cross-validation of the outlier half-width
+# (scripts/detection_cv.jl --config=halfwidth_cv.toml), the 2026-10-09 run's
+# protocol (record outlier_halfwidth_cv-3a346460b90dc25d, whose 0.9646 px the
+# configs of record carried) re-run on today's detector:
+#
+#   outlier_halfwidth  [find_boards.geometry] — the support of the uniform
+#                      outlier component of the Student-t + uniform scorer and
+#                      local optimization (px)
+#
+# peak_threshold and min_similarity stay the run config's (0.01, 0.6). Same
+# split (blobboards_cross_session: tune on 260521/bb, 260527 never read), same
+# criterion (the inter-board invariance mAA@10 mm of the relative pose's
+# translation over every (frame, board pair), an undetected pair a failure),
+# same grid: the 2026-10-09 coarse grid 16^(i/7) over [1, 16] with the three
+# points its extension added below (16^(-3/7) … 16^(-1/7)), and 5 px added,
+# the paper run's value (a listed grid: it cannot be extended, so the lower
+# extension is listed); the fine stage, 12 log-spaced points over the coarse
+# argmin's two neighbours, as then. The selection is the argmin (no incumbent),
+# its frame bootstrap the interval of the selection.
+# =============================================================================
+
+[experiment]
+generator = "detection_cv"   # the same driver, one axis
+# The results tree's layout of its runs (src/operating_points.jl stage_product:
+# results_root()/<layout…>/bmvc2026/<product>/<key>: Eval's Product).
+layout = ["tuning"]
+
+[runs]
+# configs/-relative: the EVALUATION's run config of record — detection,
+# adaptation, matching, verification, the network and the pose arm's geometry
+# are read from it (FindBoardsConfig); the search overrides only its axes. Its
+# run key is folded into this run's.
+bb = "bmvc2026_260527.toml"
+
+[panel]
+n_boards = 30         # boards on the panel: C(30,2) pairs per frame is the criterion's denominator
+min_obs = 3           # frames a board pair needs before it has a leave-one-out reference
+
+[gallery]
+path = "cache/board_features_260521.jld2"   # results_root()-relative: the gallery cache (keyed by the network inside)
+
+# The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
+[inputs.images]
+tier = "bb_absolute_pose_tuning_260521"
+path = "absolute_pose_experiments/260521/images"
+provenance = "the 260521 captures (f/9.0), the validation side of the registered scene split (its bb subset)"
+
+[inputs.camera]
+# The validation session's camera store. The copy the tuning runs of record read
+# (3a346460b90dc25d, c80d42e9055f8cd5: their records state sha256 0ef0c750…) is
+# LOST. This is the latest surviving copy (bb_formats_2026-10/41ba64df87c084e7):
+# it differs from the lost one only in its provenance run_key; its calibration
+# content (K, lens, calibration block) is byte-identical to the conversion of the
+# export of record (b745b737…, in this tier).
+tier = "bb_absolute_pose_tuning_260521"
+path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
+provenance = "the 260521 camera (the session's OpenCV calibrateCamera fit, its exact native port); the surviving copy of the store the tuning runs read (theirs, sha256 0ef0c750232f9c0f17caa77bf9fab07a63f7f4e2cf4820af1b9b49d378617e1b, is lost)"
+sha256 = "2a6c050e5ea298bc7a7fe77340d0b63b05d4bb06a390581d383941ef49721a9e"
+
+[inputs.boards]
+# The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids
+# and definition hashes); the inputs tier's 260527 definitions are read.
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/boards/blobboards"
+provenance = "the printed BlobBoards definitions (blobboards/board/v5)"
+
+[tuning.detection]
+type = "joint_coarse_fine"
+edge_margin = 1
+criterion = { type = "mean_average_accuracy", max_error = 10.0 }   # mm, translation of the inter-board relative pose
+
+[tuning.detection.cross_validation]
+scene_split = { type = "registered", name = "blobboards_cross_session" }
+validation = { type = "exhaustive" }
+
+# Pixels: 16^(i/7), i = -3 … 7 (0.305 … 16), and 5.0.
+[tuning.detection.axes.outlier_halfwidth]
+coarse = { type = "listed", values = [0.30475, 0.45286, 0.67295, 1.0, 1.48599, 2.20818, 3.28134, 4.87605, 5.0, 7.24579, 10.7672, 16.0] }
+extension = { npts = 3, max_rounds = 2 }
+fine = { type = "log_count", n = 12 }
+
+[uncertainty]
+# Frame bootstrap of the selection, as the 2026-10-09 run: resample the
+# validation frames with replacement and re-take the argmin over every
+# evaluated cell; the interval is the quantile of the half-width.
+n_resamples = 1000
+seed = 20261009
+interval = 0.9
+
+[tables]
+labels = { outlier_halfwidth = "half-width [px]" }
