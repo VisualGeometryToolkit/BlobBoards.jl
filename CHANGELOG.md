@@ -35,9 +35,11 @@ the run config of record then lost boards on oblique frames (1274 of the paper r
 against 1330 with the old kernel restored). Features 0.9.11 makes the scale ladder a setting (`asift_detect`'s
 `upsample` count, `nb_scales`, `nb_octaves`), forwarded here as `[find_boards.detect] upsample`, `nb_scales` and
 `nb_octaves` (`DetectConfig`; `upsample` is now a count, `nb_octaves = 0` Features' default). The run configs of record
-detect with upsample = 2, nb_scales = 3, nb_octaves = 10 (searched σ 0.57 … 460 px), the setting the detector-ladder CV
-selects (`scripts/detector_levels.jl`, `configs/detector_levels.toml`: seven ladders on the tuning session 260521,
-the half-width CV's split and criterion; a `reproduce.toml` stage). `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
+detect with upsample = 2, nb_scales = 3, nb_octaves = 10 (searched σ 0.57 … 460 px). The detector-ladder CV
+(`scripts/detector_levels.jl`, `configs/detector_levels.toml`; a `reproduce.toml` stage) evaluates seven ladders on the
+tuning session 260521 under the half-width CV's split and criterion; a ladder is eligible only if its searched range
+holds the record-era 0.90 … 290 px (interior and refined), and the selection is the eligible one of best mAA, a tie
+broken by seconds per frame, then memory. `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
 VisualGeometryToolkitCore 0.13.1 (Features' floor) everywhere.
 
 **Outlier half-width 0.9646 → 1.716 px.** The 2026-10-09 one-axis half-width CV (`configs/halfwidth_cv.toml`: split

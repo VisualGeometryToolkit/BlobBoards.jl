@@ -150,3 +150,12 @@ end
         end
     end
 end
+
+# The ladder CV's eligibility: which settings search the record-era range (a 4240×2832 frame, the 260521 camera's).
+@testitem "the scale ladders: eligibility" setup = [BBEval] begin
+    using .BBEval.BlobBoardsEval: ladder_sigma_range, load_config
+    cfg = load_config("detector_levels.toml")
+    lo, hi = cfg["eligibility"]["sigma"]
+    ok = [s["name"] for s in cfg["settings"] if let (a, b) = ladder_sigma_range(s, 4240, 2832); a <= lo && b >= hi end]
+    @test ok == ["A", "B", "C"]   # base, E, F top out at 230 or below; D's finest is 0.91 px
+end

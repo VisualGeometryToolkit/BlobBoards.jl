@@ -15,8 +15,12 @@
 # the run config's. Same split (blobboards_cross_session: tune on 260521/bb,
 # 260527 never read), same criterion (mAA@10 mm of the inter-board relative
 # pose's translation over every (frame, board pair), an undetected pair a
-# failure). The selection is the argmin (the first on a tie), its frame
-# bootstrap the share of resamples each setting wins. The table also records
+# failure). Every setting is evaluated and reported; only an ELIGIBLE one can
+# be selected ([eligibility]: its searched σ range holds the record-era range,
+# 0.90 … 290 px, so that range is interior and refined). The selection is the
+# eligible setting of best mAA, a tie broken by the lower median seconds per
+# frame, then the lower peak GPU memory; its frame bootstrap (over the
+# eligible settings) the share of resamples each one wins. The table also records
 # what each costs: the searched σ range, the boards found per frame, the
 # frames where the settings disagree, seconds per frame and peak GPU memory.
 # =============================================================================
@@ -123,6 +127,11 @@ validation = { type = "exhaustive" }
 [tuning.detector.axes.setting]
 type = "listed"
 values = [1, 2, 3, 4, 5, 6, 7]
+
+[eligibility]
+# The record-era searched range (input px) a selectable ladder must contain:
+# lo ≥ its finest searched σ and hi ≤ its coarsest (ladder_sigma_range).
+sigma = [0.90, 290.0]
 
 [uncertainty]
 # Frame bootstrap of the selection: resample the validation frames with

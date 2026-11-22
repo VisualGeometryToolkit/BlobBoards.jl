@@ -10,10 +10,12 @@ Each setting of the config's [[settings]] (the listed axis `setting` of its
 (the features of every frame under that ladder), then `find_boards` at the run
 config's every other value; its errors are VisualGeometryToolkitEval
 `rigid_invariance_errors` (src/invariance_cv.jl, the machinery
-scripts/detection_cv.jl runs on). The selection is the setting of least
-objective (the spec's mean_average_accuracy, negated; the first on a tie), and
-the frame bootstrap (`bootstrap_argmin`) gives the share of resamples each
-setting wins.
+scripts/detection_cv.jl runs on). Every setting is evaluated; only one whose
+searched σ range holds the config's [eligibility] range (the record-era
+0.90 … 290 px) can be selected: the eligible setting of best mAA (the spec's
+mean_average_accuracy), a tie broken by the lower median seconds per frame,
+then the lower peak memory. The frame bootstrap (`bootstrap_argmin`, over the
+eligible settings) gives the share of resamples each one wins.
 
 Outputs, in the product `detector_levels_product(cfg)` (Eval's `Product`:
 `…/tuning/bmvc2026/detector_levels/<key>`): the tuning artifact
@@ -101,24 +103,29 @@ function run_cv()
         @info "setting" s["name"] mAA = -stats_objective(crit, last(stats)) boards = sum(last(boards)) median_s = round(median(t); digits = 2) peak_GiB = round(peak / 2^30; digits = 1)
     end
     objective = [stats_objective(crit, S) for S in stats]
-    selected = argmin(objective)
-    unc = CFG["uncertainty"]
-    wins = bootstrap_argmin(crit, stats, Xoshiro(unc["seed"]); n_resamples = unc["n_resamples"])
-    share = [count(==(i), wins) / length(wins) for i in eachindex(SETTINGS)]
     H, W = size(load_image(joinpath(ctx.image_dir, first(ctx.frames))))   # Julia images are rows × columns
+    lo, hi = CFG["eligibility"]["sigma"]
+    eligible = [let (a, b) = ladder_sigma_range(s, W, H); a <= lo && b >= hi end for s in SETTINGS]
+    any(eligible) || error("[eligibility]: no setting searches σ $(lo) … $(hi) px")
+    cand = findall(eligible)
+    # best mAA, then the lower median s/frame, then the lower peak memory
+    selected = cand[argmin([(objective[i], median(seconds[i]), memory[i]) for i in cand])]
+    unc = CFG["uncertainty"]
+    wins = cand[bootstrap_argmin(crit, stats[cand], Xoshiro(unc["seed"]); n_resamples = unc["n_resamples"])]
+    share = [count(==(i), wins) / length(wins) for i in eachindex(SETTINGS)]
     mkpath(OUTDIR)
     save_tuning_artifact(product_output(PRODUCT), SPEC; grids = Dict(:setting => ListedGrid(INDICES)),
         unit = QueryUnit(), code = (BlobBoards, VisualGeometryToolkitCore, VisualGeometryToolkitFeatures),
         settings = SETTINGS, frames = ctx.stems, pairs = [collect(p) for p in pairs], image_size = [W, H],
         objective = objective, unit_stats = stats, boards = reduce(hcat, boards), seconds = seconds,
         gpu_memory_peak = memory, selected = selected, selected_name = SETTINGS[selected]["name"],
-        bootstrap_share = share,
+        bootstrap_share = share, eligible = eligible, eligibility_sigma = [lo, hi],
         objective_label = "mean_average_accuracy of the inter-board invariance translation errors [mm] over (frame, board pair), negated; undetected = failure")
     @info "selected" SETTINGS[selected]["name"] share
     return Produced(nothing; inputs = run_inputs(CFG, ctx))
 end
 
-# One row per setting; the frames where the settings find different numbers of boards, one column each.
+# One row per setting (⋆ selected, † not eligible); the frames where the settings find different numbers of boards, one column each.
 function write_table()
     a = load_jld2(product_output(PRODUCT))
     B, S = a["boards"], a["settings"]
@@ -126,7 +133,7 @@ function write_table()
     W, H = a["image_size"]
     rows = map(eachindex(S)) do i
         lo, hi = ladder_sigma_range(S[i], W, H)
-        star = i == a["selected"] ? "\$^\\star\$" : ""
+        star = i == a["selected"] ? "\$^\\star\$" : a["eligible"][i] ? "" : "\$^\\dagger\$"
         join([S[i]["name"] * star, string(S[i]["upsample"]), string(S[i]["nb_scales"]),
               S[i]["nb_octaves"] == 0 ? "--" : string(S[i]["nb_octaves"]), @sprintf("%.2f--%.0f", lo, hi),
               @sprintf("%.4f", -a["objective"][i]), @sprintf("%.2f", a["bootstrap_share"][i]), string(sum(B[:, i])),
