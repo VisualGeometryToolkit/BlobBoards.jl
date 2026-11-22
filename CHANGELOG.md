@@ -54,8 +54,10 @@ at 1.716, 1344 at 5. The half-width CV is a `reproduce.toml` stage (`halfwidth_c
 `test/operating_points_tests.jl` holds the configs to; the joint CV's incumbent (`configs/detection_cv.toml`) carries
 the new half-width.
 
-**For the owner: the paper's text states a = 5 px** (the paper run's half-width). The configs of record now carry
-1.716 px; the sentence needs an edit. The paper text is not changed here.
+**The paper's half-width sentence is edited** (owner's approval, 2026-11-22): `papers/blob_boards_bmvc.tex` stated
+a = 5 px (the paper run's value); it now reads the generated `\bbSetHalfwidthPx` (1.716, `make_supp_tables.jl` at 4
+significant digits) and says the value was cross-validated on a separate capture session (mAA@10 mm; a flat optimum,
+bootstrap interval about 1–3 px).
 
 `scripts/detection_cv.jl` refused every run since 2026-11-12: its validation-scene check compared the session against
 the wrong path component of `[inputs.images]`. Fixed; its frames, camera, network and gallery now come from

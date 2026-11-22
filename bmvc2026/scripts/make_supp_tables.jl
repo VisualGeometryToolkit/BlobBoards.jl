@@ -160,7 +160,7 @@ function write_run_settings(nums)
     add_number!(nums, "bbSetInnerRadius", board_cutoff; digits = 1)
     add_number!(nums, "bbSetMinSimilarity", d["min_similarity"]; sigdigits = 15)
     add_number!(nums, "bbSetMinInliers", geo["min_inliers"])
-    add_number!(nums, "bbSetHalfwidthPx", geo["outlier_halfwidth"]; sigdigits = 15)
+    add_number!(nums, "bbSetHalfwidthPx", geo["outlier_halfwidth"]; sigdigits = 4)   # 1.716: the cross-validated value as the paper states it
     add_number!(nums, "bbSetRansacMin", ran["min_trials"]; group_from = 5)
     add_number!(nums, "bbSetRansacMax", ran["max_trials"]; group_from = 5)
     add_number!(nums, "bbSetConfidence", ran["success_prob"]; sigdigits = 15)
