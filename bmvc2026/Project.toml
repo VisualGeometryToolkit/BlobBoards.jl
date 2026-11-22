@@ -11,6 +11,7 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+Ghostscript_jll = "61579ee1-b43e-5ca0-a5da-69d92c66a64b"
 Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
@@ -40,6 +41,10 @@ BlobBoards = {path = ".."}
 
 [compat]
 BlobBoards = "0.7"
+# Images loads ImageMagick, whose ImageMagick_jll build links libgs.so.9: an unconstrained resolve pairs it with
+# Ghostscript_jll 10 (libgs.so.10) and ImageMagick fails its __init__ on every node. 9.55 is the pair it was built
+# against (ImageMagick_jll 7.1.2029, as the paper run of 2026-08-26 resolved).
+Ghostscript_jll = "9.55"
 JSON = "1.13"
 julia = "1.13"
 ReTestItems = "1.35"
