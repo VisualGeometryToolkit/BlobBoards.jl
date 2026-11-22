@@ -462,18 +462,29 @@ function run_report(dir)
                                 "gate_constant" => res["gate_constant"], "thresholds" => res["thresholds"],
                                 "objective_reference" => res["objective_reference"], "versions" => res["versions"])
     # ---- curves
-    fig = Figure(size = (900, 560))
-    ax = Axis(fig[1, 1]; xscale = log10, xlabel = "outlier half-width a [px]", ylabel = "mAA@10 mm (260521/bb)",
-              title = "Half-width CV curve by scorer-prior arm (90% frame-bootstrap bands)")
+    fig = Figure(size = (900, 900))
+    ax = Axis(fig[1, 1]; xscale = log10, ylabel = "mAA@10 mm (260521/bb)",
+              title = "Half-width CV curve by scorer-prior arm")
+    axd = Axis(fig[2, 1]; xscale = log10, xlabel = "outlier half-width a [px]",
+               ylabel = "mAA − deployed mAA at a = record",
+               title = "Paired difference to the configuration of record (90% frame-bootstrap bands)")
+    linkxaxes!(ax, axd)
     palette = Makie.wong_colors()
     arm_summary = Dict{String, Any}()
+    # the reference of the paired differences: the deployed arm at the record's half-width, resample by resample
+    ref = let A = arms["deployed"], j = findfirst(x -> isapprox(x, named["record"]; rtol = 1e-9), A["halfwidth"])
+        S = A["unit_stats"][j]; [-stats_objective(CRIT, S[rows, :]) for rows in draws]
+    end
+    ref0 = let A = arms["deployed"]; A["objective"][findfirst(x -> isapprox(x, named["record"]; rtol = 1e-9), A["halfwidth"])] end
     for (c, n) in enumerate(n for n in ARM_NAMES if haskey(arms, n))
         A = arms[n]; a = A["halfwidth"]; S = A["unit_stats"]
         boot = [-stats_objective(CRIT, Sj[rows, :]) for rows in draws, Sj in S]      # resamples × cells
         lo = [quantile(boot[:, j], lvl) for j in eachindex(a)]; hi = [quantile(boot[:, j], 1 - lvl) for j in eachindex(a)]
         col = palette[mod1(c, length(palette))]
-        band!(ax, a, lo, hi; color = (col, 0.15))
         lines!(ax, a, A["objective"]; color = col, linewidth = n == "deployed" ? 3 : 1.5, label = n)
+        dlo = [quantile(boot[:, j] .- ref, lvl) for j in eachindex(a)]; dhi = [quantile(boot[:, j] .- ref, 1 - lvl) for j in eachindex(a)]
+        n in ("deployed", "profiled", "beta100") && band!(axd, a, dlo, dhi; color = (col, 0.15))
+        lines!(axd, a, A["objective"] .- ref0; color = col, linewidth = n == "deployed" ? 3 : 1.5)
         best = argmax(A["objective"])
         wins = bootstrap_argmin(CRIT, S, Xoshiro(unc["seed"]); n_resamples = unc["n_resamples"])
         ia = Dict{String, Any}()
@@ -482,7 +493,10 @@ function run_report(dir)
             j === nothing && continue
             # paired: P(mAA at k < mAA at the arm's optimum) over the resamples
             ia[k] = Dict{String, Any}("halfwidth" => v, "mAA" => A["objective"][j], "lo" => lo[j], "hi" => hi[j],
-                                      "p_below_best" => mean(boot[:, j] .< boot[:, best]))
+                                      "p_below_best" => mean(boot[:, j] .< boot[:, best]),
+                                      "diff_to_record" => A["objective"][j] - ref0,
+                                      "diff_to_record_interval" => [quantile(boot[:, j] .- ref, lvl), quantile(boot[:, j] .- ref, 1 - lvl)],
+                                      "p_below_record" => mean(boot[:, j] .< ref))
         end
         arm_summary[n] = Dict{String, Any}("best_halfwidth" => a[best], "best_mAA" => A["objective"][best],
             "argmin_interval" => [quantile(a[wins], lvl), quantile(a[wins], 1 - lvl)], "at" => ia,
@@ -491,9 +505,11 @@ function run_report(dir)
     end
     for (k, ls) in (("record", :solid), ("gate", :dash), ("pitch", :dashdot), ("half_diagonal", :dot), ("diagonal", :dot))
         vlines!(ax, [named[k]]; color = :gray40, linestyle = ls, linewidth = 1, label = @sprintf("%s %.3g px", k, named[k]))
+        vlines!(axd, [named[k]]; color = :gray40, linestyle = ls, linewidth = 1)
     end
-    axislegend(ax; position = :lb)
-    autolimits!(ax)
+    hlines!(axd, [0.0]; color = :black, linewidth = 0.5)
+    Legend(fig[1, 2], ax; framevisible = false)
+    hidexdecorations!(ax; grid = false)
     save(joinpath(dir, "fig_curves.png"), fig; px_per_unit = 2)
     summary["arms"] = arm_summary
     # ---- residual histograms by population and label, with the gates
@@ -623,21 +639,33 @@ function run_report(dir)
     end
     save(joinpath(dir, "fig_em.png"), fig; px_per_unit = 2)
     summary["em"] = em_summary
-    # ---- the MAP decision boundary as a function of a
-    ml = res["ml_final"]
-    as = _logspace(0.1, 5096.0, 24)
-    fig = Figure(size = (700, 420))
+    # ---- the scorer's MAP decision boundary as a function of a, board by board (as above), median and 10–90%
+    as = _logspace(0.1, 5096.0, 12)
+    fig = Figure(size = (760, 460))
     ax = Axis(fig[1, 1]; xscale = log10, yscale = log10, xlabel = "a [px]", ylabel = "decision boundary r* [px]",
-              title = @sprintf("MAP boundary at the pooled ML fit (s = %.3f px, ν = %.1f)", ml["s"], ml["nu"]))
-    for (g, lab, col) in ((0.5, "γ = 1/2 (configuration of record)", palette[1]),
-                          (ml["inlier_prior"], @sprintf("γ = π̂ = %.3f", ml["inlier_prior"]), palette[2]))
-        lines!(ax, as, [max(VgtkCore.decision_boundary(VgtkCore.GauInlier(ml["s"]^2; nu = ml["nu"], gamma = g, d_g = 2), a), 1e-3)
-                        for a in as]; color = col, label = lab)
+              title = @sprintf("The scorer's MAP boundary per board (%d boards; median ŝ = %.3f px)", length(scales), median(scales)))
+    for (fitted, lab, col) in ((false, "γ = 1/2 (configuration of record)", palette[1]), (true, "γ = k/N (the board's inlier share)", palette[2]))
+        qs = map(as) do a
+            v = Float64[]
+            for idx in values(groups)
+                acc = [i for i in idx if R["weight"][i] >= 0.5]
+                k = length(acc); k > 4 || continue
+                γ = fitted ? k / length(idx) : 0.5
+                γ < 1 || continue
+                ν, s2 = VgtkCore.partition_student_t(VgtkCore.JeffreysPrior(), sum(abs2, R["residual"][acc]), k; model_dof = 4, codimension = 2)
+                push!(v, VgtkCore.decision_boundary(VgtkCore.GauInlier(s2; nu = ν, gamma = γ, d_g = 2), a))
+            end
+            [quantile(v, p) for p in (0.1, 0.5, 0.9)]
+        end
+        band!(ax, as, max.(first.(qs), 1e-3), max.(last.(qs), 1e-3); color = (col, 0.2))
+        lines!(ax, as, max.(getindex.(qs, 2), 1e-3); color = col, label = lab)
     end
-    for (k, t) in res["thresholds"]
-        scatter!(ax, [t["halfwidth"]], [max(t["boundary_half"], 1e-3)]; color = palette[1])
-        text!(ax, t["halfwidth"], max(t["boundary_half"], 1e-3); text = " " * k, fontsize = 9, align = (:left, :top))
+    for k in ("record", "gate", "pitch", "half_diagonal")
+        vlines!(ax, [named[k]]; color = :gray40, linestyle = :dot)
+        text!(ax, named[k], 0.03; text = " " * k, fontsize = 9, rotation = pi / 2, align = (:left, :bottom))
     end
+    hlines!(ax, [median(R["residual"][[i for i in fsel if lab[i] && w[i] < 0.5]])]; color = :black, linestyle = :dash,
+            label = "median residual of the rejected inliers")
     axislegend(ax; position = :lt)
     save(joinpath(dir, "fig_boundary.png"), fig; px_per_unit = 2)
     open(io -> TOML.print(io, _tomlable(summary)), joinpath(dir, "summary.toml"), "w")
