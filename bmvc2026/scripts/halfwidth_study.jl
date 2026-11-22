@@ -219,6 +219,10 @@ function nn_pitch(centres)
 end
 
 # One population's residuals (the pose problem's own) and labels.
+# The label of a candidate by the board's geometry: its detection is nearer its own blob's projected centre than any
+# other blob's, and within one local pitch of it (beyond the pattern's edge a far detection's nearest blob can be its own).
+_is_inlier(own, other, pitch) = own <= other && own <= pitch
+
 # The detection's centre is read off the correspondence's own image side (the detection index of a phase-2
 # board is into that phase's pool); the blob index `src_id` is into the board's world blobs.
 function label_population!(rows, tbl, pop, cam, pose, centres, rho; frame, uid, c_gate, weights = nothing)
@@ -239,7 +243,7 @@ function label_population!(rows, tbl, pop, cam, pose, centres, rho; frame, uid, 
         # the candidate's own blob: its gate (the IoU gate's centre offset at its radius) and its local pitch
         # (the distance from its centre to the nearest other blob centre)
         pitch = minimum((_dist(cj, c) for (q, c) in enumerate(centres) if q != j && isfinite(c[1])); init = Inf)
-        push!(rows.inlier, own <= other); push!(rows.gate, c_gate * rho[j]); push!(rows.pitch, pitch)
+        push!(rows.inlier, _is_inlier(own, other, pitch)); push!(rows.gate, c_gate * rho[j]); push!(rows.pitch, pitch)
         push!(rows.weight, weights === nothing ? NaN : Float64(weights[k]))
     end
     return rows
@@ -494,6 +498,8 @@ function run_report(dir)
     summary["arms"] = arm_summary
     # ---- residual histograms by population and label, with the gates
     R = res["rows"]
+    R["inlier"] = _is_inlier.(R["own_px"], R["other_px"], R["pitch"])   # the label of record (a product labelled before the pitch bound included)
+    summary["inlier_rate_final_labelled"] = mean(R["inlier"][R["population"] .== "final"])
     fig = Figure(size = (1100, 380))
     for (c, pop) in enumerate(POPULATIONS)
         ax = Axis(fig[1, c]; xlabel = "log10 residual [px]", ylabel = c == 1 ? "count" : "", yscale = log10,
