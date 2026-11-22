@@ -542,6 +542,54 @@ function run_report(dir)
                                               for k in keys(th))
     end
     summary["populations"] = pops
+    # ---- the scorer's own decision boundary, board by board: the final population's accepted set (weight ≥ 1/2) is
+    # the consensus partition; its Student-t is Core's partition_student_t (Jeffreys, the LO seed's model_dof m + 1 = 4, d = 2), its label
+    # prior 1/2 (the configuration of record) or k/N; the boundary at each listed a is Core's decision_boundary.
+    fsel = findall(R["population"] .== "final")
+    groups = Dict{Tuple{String, String}, Vector{Int}}()
+    for i in fsel
+        push!(get!(groups, (R["frame"][i], R["uid"][i]), Int[]), i)
+    end
+    per_board = Dict{String, Vector{Float64}}(k => Float64[] for k in keys(res["thresholds"]))
+    per_board_fitted = Dict{String, Vector{Float64}}(k => Float64[] for k in keys(res["thresholds"]))
+    scales = Float64[]
+    for idx in values(groups)
+        acc = [i for i in idx if R["weight"][i] >= 0.5]
+        k = length(acc); k > 4 || continue
+        ν, s2 = VgtkCore.partition_student_t(VgtkCore.JeffreysPrior(), sum(abs2, R["residual"][acc]), k; model_dof = 4, codimension = 2)
+        push!(scales, sqrt(s2))
+        for (name, t) in res["thresholds"]
+            push!(per_board[name], VgtkCore.decision_boundary(VgtkCore.GauInlier(s2; nu = ν, gamma = 0.5, d_g = 2), t["halfwidth"]))
+            push!(per_board_fitted[name], VgtkCore.decision_boundary(VgtkCore.GauInlier(s2; nu = ν, gamma = k / length(idx), d_g = 2), t["halfwidth"]))
+        end
+    end
+    summary["boundary_per_board"] = Dict{String, Any}(
+        "n_boards" => length(scales), "scale_q" => [quantile(scales, p) for p in (0.1, 0.5, 0.9)],
+        "half" => Dict{String, Any}(k => [quantile(v, p) for p in (0.1, 0.5, 0.9)] for (k, v) in per_board),
+        "fitted" => Dict{String, Any}(k => [quantile(v, p) for p in (0.1, 0.5, 0.9)] for (k, v) in per_board_fitted))
+    # ---- heteroscedasticity: residual against the own blob's radius (ρ = gate / gate constant), final population
+    rho = R["gate"] ./ res["gate_constant"]
+    w = R["weight"]; lab = R["inlier"]
+    edges = quantile(rho[fsel], range(0, 1; length = 6))
+    bins = Dict{String, Any}()
+    for b in 1:5
+        sel = [i for i in fsel if lab[i] && edges[b] <= rho[i] <= edges[b + 1]]
+        isempty(sel) && continue
+        bins[@sprintf("%d", b)] = Dict{String, Any}("rho" => [edges[b], edges[b + 1]], "n" => length(sel),
+            "residual_q" => [quantile(R["residual"][sel], p) for p in (0.5, 0.9, 0.99)],
+            "rejected_share" => mean(w[sel] .< 0.5))
+    end
+    summary["heteroscedasticity"] = Dict{String, Any}("bins" => bins,
+        "rho_accepted_median" => median(rho[[i for i in fsel if lab[i] && w[i] >= 0.5]]),
+        "rho_rejected_inlier_median" => median(rho[[i for i in fsel if lab[i] && w[i] < 0.5]]))
+    fig = Figure(size = (700, 450))
+    ax = Axis(fig[1, 1]; xscale = log10, yscale = log10, xlabel = "own blob radius ρ [px]", ylabel = "residual [px]",
+              title = "Final population (labelled inliers): residual against blob size")
+    acc = [i for i in fsel if lab[i] && w[i] >= 0.5]; rej = [i for i in fsel if lab[i] && w[i] < 0.5]
+    scatter!(ax, rho[acc], max.(R["residual"][acc], 1e-3); markersize = 2, color = (palette[1], 0.3), label = "accepted (w ≥ ½)")
+    scatter!(ax, rho[rej], max.(R["residual"][rej], 1e-3); markersize = 2, color = (palette[2], 0.5), label = "rejected (w < ½)")
+    axislegend(ax; position = :lt)
+    save(joinpath(dir, "fig_heteroscedasticity.png"), fig; px_per_unit = 2)
     B = res["boards"]
     summary["boards"] = Dict{String, Any}("n" => length(B["gate"]), "gate_q" => [quantile(B["gate"], p) for p in (0.1, 0.5, 0.9)],
                                          "pitch_q" => [quantile(filter(isfinite, B["pitch"]), p) for p in (0.1, 0.5, 0.9)],
