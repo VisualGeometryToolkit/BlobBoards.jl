@@ -72,8 +72,11 @@ max_detections = "unbounded"    # cap: about this many of the strongest, spread 
 ransac_seed = 0x0b10b5eed
 
 [find_boards.detect]
-# CROSS-VALIDATED jointly with the half-width and min_similarity (see
-# [find_boards.geometry] outlier_halfwidth): the record kept this incumbent.
+# CROSS-VALIDATED jointly with the half-width and min_similarity: the record
+# results_root()/tuning/detection_cv-f5a385376eda453e/detection.jld2 (run key
+# f5a385376eda453e, 2026-10-14, on the 0.7.3-era detector at half-width
+# 0.9646 px) kept this incumbent; it was not re-run with the detector and
+# half-width of record (see [find_boards.geometry] outlier_halfwidth).
 peak_threshold = 0.01
 edge_threshold = 5.0
 # The ASIFT scale ladder: interior slices s = 1 … S of octave o have
@@ -167,7 +170,8 @@ min_inliers = 9
 # was not taken; with this detector it reproduces the 2026-10-09 run's
 # (0.9646 px, [0.965, 2.208]), whose value the configs carried until then.
 # peak_threshold and min_similarity stay the joint CV's (record
-# f5a385376eda453e, which kept them as its incumbent). The paper run used 5.0.
+# tuning/detection_cv-f5a385376eda453e, which kept them as its incumbent). The
+# paper run used 5.0.
 # test/operating_points_tests.jl holds each equal to its record's deployed
 # setting (deployed_setting).
 outlier_halfwidth = 1.7162036756919732

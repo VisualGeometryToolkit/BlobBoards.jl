@@ -25,9 +25,39 @@ capture clock's UTC offset (`[mocap] utc_offset`), as VisualGeometryToolkitIO 0.
 IO's current record schemas.
 
 The detection operating point's tuning session is catalogued: `bb_absolute_pose_tuning_260521` (record `bb_260521`, a
-placeholder until it is deposited) holds the 260521 bb captures, the camera store the tuning runs of record read (its
-sha256 now stated in `configs/detection_cv.toml`) and its calibration export, so every experiment of the paper names
-its data.
+placeholder until it is deposited) holds the 260521 bb captures, the latest surviving copy of the camera store the
+tuning runs of record read (theirs is lost; the copy differs only in its provenance run key, its sha256 now stated in
+`configs/detection_cv.toml`) and its calibration export, so every experiment of the paper names its data.
+
+**The detector of record recovers its oblique boards.** VisualGeometryToolkitFeatures f0246942 (2026-11-10) stopped
+searching the boundary DoG slices of each octave and dropped unrefined extrema; with one upsampling and three scales
+the run config of record then lost boards on oblique frames (1274 of the paper run's 1346 poses on the bb subset,
+against 1330 with the old kernel restored). Features 0.9.11 makes the scale ladder a setting (`asift_detect`'s
+`upsample` count, `nb_scales`, `nb_octaves`), forwarded here as `[find_boards.detect] upsample`, `nb_scales` and
+`nb_octaves` (`DetectConfig`; `upsample` is now a count, `nb_octaves = 0` Features' default). The run configs of record
+detect with upsample = 2, nb_scales = 3, nb_octaves = 10 (searched σ 0.57 … 460 px), the setting the detector-ladder CV
+selects (`scripts/detector_levels.jl`, `configs/detector_levels.toml`: seven ladders on the tuning session 260521,
+the half-width CV's split and criterion; a `reproduce.toml` stage). `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
+VisualGeometryToolkitCore 0.13.1 (Features' floor) everywhere.
+
+**Outlier half-width 0.9646 → 1.716 px.** The 2026-10-09 one-axis half-width CV (`configs/halfwidth_cv.toml`: split
+`blobboards_cross_session`, tune on 260521/bb, mAA@10 mm of the inter-board relative pose's translation, coarse grid
+16^(i/7) on [1, 16] with the edge extension, 12-point fine stage, 1000-resample frame bootstrap) rerun on the detector
+of record: optimum 1.716 px, 90% interval [1.0, 2.84] px, inside the 2026-10-09 run's [0.965, 2.208]; its curve
+reproduces that run's level and shape (mAA 0.4089 at 2.21, 0.4070 at 4.88, 0.4053 at 16). On the regressed
+one-upsampling detector the same CV is flat (mAA 0.3743–0.3754 over [1, 52.5]; optimum 13.4, interval [1.49, 16]), so
+that detector could not reproduce the 2026-10-09 curve. 5 px (the paper run's value) is 0.0018 mAA below the peak
+(0.4071 against 0.4089) and outside the interval. Bb-subset poses with the detector of record: 1332 at 0.9646 px, 1341
+at 1.716, 1344 at 5. The half-width CV is a `reproduce.toml` stage (`halfwidth_cv`), and its record is what
+`test/operating_points_tests.jl` holds the configs to; the joint CV's incumbent (`configs/detection_cv.toml`) carries
+the new half-width.
+
+**For the owner: the paper's text states a = 5 px** (the paper run's half-width). The configs of record now carry
+1.716 px; the sentence needs an edit. The paper text is not changed here.
+
+`scripts/detection_cv.jl` refused every run since 2026-11-12: its validation-scene check compared the session against
+the wrong path component of `[inputs.images]`. Fixed; its frames, camera, network and gallery now come from
+`src/invariance_cv.jl`, which the detector-ladder CV shares.
 
 ## 0.7.3 (2026-11-21)
 

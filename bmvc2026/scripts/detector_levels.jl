@@ -71,7 +71,12 @@ const TABLE = joinpath(OUTDIR, "table_detector_levels.tex")
 
 # The device's peak memory in use while `f` runs (s, bytes): sampled every 0.5 s
 # on another thread (the descriptor network's arena included).
+# Each measurement starts from the previous ladder's memory returned to the
+# driver (its cached ASIFT plan evicted, the pool reclaimed); what stays is the
+# descriptor network's arena, common to every setting.
 function peak_memory(f)
+    Threads.nthreads() > 1 || @warn "one thread: the memory sampler runs only when detection yields (run with -t auto)"
+    VisualGeometryToolkitFeatures.clear_asift_plans!(); GC.gc(); CUDA.reclaim()
     lo = Ref(CUDA.free_memory()); done = Threads.Atomic{Bool}(false)
     sampler = Threads.@spawn while !done[]
         lo[] = min(lo[], CUDA.free_memory()); sleep(0.5)
@@ -94,7 +99,6 @@ function run_cv()
         push!(errors, r.translation); push!(boards, [length(r.poses[st]) for st in ctx.stems])
         push!(seconds, t); push!(memory, peak)
         @info "setting" s["name"] mAA = -stats_objective(crit, unit_statistics(crit, r.translation)) boards = sum(last(boards)) median_s = round(median(t); digits = 2) peak_GiB = round(peak / 2^30; digits = 1)
-        prepared = nothing; GC.gc(); CUDA.reclaim()
     end
     stats = [unit_statistics(crit, E) for E in errors]
     objective = [stats_objective(crit, S) for S in stats]
@@ -102,7 +106,7 @@ function run_cv()
     unc = CFG["uncertainty"]
     wins = bootstrap_argmin(crit, stats, Xoshiro(unc["seed"]); n_resamples = unc["n_resamples"])
     share = [count(==(i), wins) / length(wins) for i in eachindex(SETTINGS)]
-    W, H = size(load_image(joinpath(ctx.image_dir, first(ctx.frames))))   # the octave count reads min(W, H) only
+    H, W = size(load_image(joinpath(ctx.image_dir, first(ctx.frames))))   # Julia images are rows × columns
     mkpath(OUTDIR)
     save_tuning_artifact(product_output(PRODUCT), SPEC; grids = Dict(:setting => ListedGrid(INDICES)),
         unit = QueryUnit(), code = (BlobBoards, VisualGeometryToolkitCore, VisualGeometryToolkitFeatures),
@@ -151,5 +155,5 @@ run_stages("detector_levels", [
         items = () -> [PRODUCT], product = identity,
         run = p -> produce(_ -> run_cv(), p; driver = "bmvc2026/scripts/detector_levels.jl", config_source = CFG_PATH)),
     Stage(:table, "the ladders' mAA, boards, cost -> $(TABLE)";
-        check = () -> (isfile(TABLE) || write_table(); nothing)),
+        check = () -> (write_table(); nothing)),   # rewritten from the artifact every time: never stale after a --force
 ])
