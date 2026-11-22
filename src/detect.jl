@@ -128,7 +128,8 @@ function _detect(
         # so every detection before 0.4.0 ran at native resolution. A count
         # since Features 0.9.11 (the pyramid starts at octave -upsample), with
         # the scales per octave beside it.
-        upsample = cfg.upsample, nb_scales = cfg.nb_scales
+        upsample = cfg.upsample, nb_scales = cfg.nb_scales,
+        nb_octaves = cfg.nb_octaves == 0 ? nothing : cfg.nb_octaves
     )
 end
 

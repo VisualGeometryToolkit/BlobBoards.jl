@@ -87,6 +87,9 @@ returned vector, not something the detector device consumes.
 - `upsample = 1`: how many 2× upsamplings precede the scale space; the pyramid
   starts at octave `-upsample` (`true`/`false` in a TOML read as 1/0).
 - `nb_scales = 3`: the DoG scales per octave (Features' `nb_scales`).
+- `nb_octaves = 0`: the pyramid's octave count, `0` for Features' default (it
+  grows with `upsample`, so the coarsest octave stays the same); Features
+  admits at most one more than its default (coarsest short side ≥ 16 px).
 
 Parameterized on the NMS config type `N` (`Nothing`, `MxmNms`, or
 `EllipseNms`) so the field stays concrete rather than an abstract union.
@@ -145,6 +148,7 @@ Base.@kwdef struct DetectConfig{N}
     # boundary slice), so these two set the finest and coarsest scales found.
     upsample::Int = _dflt("detect", "upsample")
     nb_scales::Int = _dflt("detect", "nb_scales")
+    nb_octaves::Int = _dflt("detect", "nb_octaves")   # 0: Features' default
 end
 
 """

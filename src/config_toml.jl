@@ -141,7 +141,8 @@ function _detect_from_toml(d)
         "peak_threshold" => Float64,
         "edge_threshold" => Float64,
         "upsample" => Int,
-        "nb_scales" => Int
+        "nb_scales" => Int,
+        "nb_octaves" => Int
     )
     # ASIFT tilt schedule as a list of [tilt, angle] pairs; absent OR empty ⇒
     # the struct default (nothing = IMAS-25).

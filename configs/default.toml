@@ -122,6 +122,8 @@ edge_threshold = 5.0
 upsample = 1   # the count of 2× upsamplings (true/false read as 1/0)
 # DoG scales per octave (VisualGeometryToolkitFeatures' nb_scales).
 nb_scales = 3
+# The pyramid's octave count; 0 = Features' default (at most one more is admitted).
+nb_octaves = 0
 tilts = []   # empty = the IMAS-25 schedule
 # The ONE cutoff still configured, and a DIFFERENT quantity from the board's:
 # the Mahalanobis radius of each detection's elliptical footprint, used for
