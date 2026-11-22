@@ -51,7 +51,7 @@ ReTestItems = "1.35"
 VisualGeometryToolkitCore = "0.13"
 VisualGeometryToolkitEstimation = "0.12"
 VisualGeometryToolkitEval = "0.10.1"
-VisualGeometryToolkitFeatures = "0.9.7"
+VisualGeometryToolkitFeatures = "0.9.11"
 VisualGeometryToolkitIO = "0.11.1"
 
 [extras]

@@ -79,10 +79,24 @@ ransac_seed = 0x0b10b5eed
 # [find_boards.geometry] outlier_halfwidth): the record kept this incumbent.
 peak_threshold = 0.01
 edge_threshold = 5.0
-# 2x upsample before the scale space (pyramid starts at octave -1).
-# Recovers small blobs at distance; the shipped 260527 poses were
-# produced with it on, which is what poses/bb.upsample was named for.
-upsample = true
+# The ASIFT scale ladder: interior slices s = 1 … S of octave o have
+# σ = 1.6·2^((s + 0.5)/S)·2^o input px, and VisualGeometryToolkitFeatures has
+# searched no boundary slice since 0.9 (monorepo f0246942, 2026-11-10). The
+# paper's run of 2026-08-26 searched them, down to 0.90 px; with one 2×
+# upsampling the finest interior slice is 1.13 px, and the oblique frames'
+# small blobs were lost (1346 → 1274 poses on the bb subset). Two upsamplings
+# (the pyramid starts at octave -2) make 0.57 px the finest interior scale and
+# one octave above the default makes 460 px the coarsest, so the record-era
+# range 0.90 … 290 px is interior and refined: 1332 poses (the level sweep of
+# 2026-11-22: upsample 2 / nb_scales 3 / nb_octaves 10 against nb_scales 4, 8
+# and 10 and the default octaves; the top end moved nothing). At upsample = 2
+# the input's blur (4 × 0.5 = 2.0 octave px) exceeds seed_sigma 1.6, so the
+# seed level is left unblurred (Features' rule) and the finest octave's levels
+# hold slightly more blur than their nominal σ. Cost: twice the GPU pool
+# (≈ 141 GiB peak on a B200, the warps chunked), ≈ 0.2 s more per frame.
+upsample = 2
+nb_scales = 3
+nb_octaves = 10   # Features' default for 4240×2832 at upsample = 2 is 9
 tilts = []   # empty = the IMAS-25 schedule
 # The ONE cutoff still configured, and a DIFFERENT quantity from the board's:
 # the Mahalanobis radius of each detection's elliptical footprint, used for
