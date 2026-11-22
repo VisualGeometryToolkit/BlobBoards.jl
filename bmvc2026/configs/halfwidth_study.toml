@@ -1,0 +1,119 @@
+# =============================================================================
+# halfwidth_study — why the cross-validated outlier half-width is small
+# (scripts/halfwidth_study.jl). A STUDY, not a selection: nothing here is read
+# by a run config, a record or a release.
+#
+# Everything the CV of record fixes — the split (tune on 260521/bb, 260527
+# never read), the criterion (inter-board invariance mAA@10 mm), the panel,
+# the gallery, the inputs and the run config (detector setting A, half-width
+# 1.716 px) — is read from [study] cv, the half-width CV's own config
+# (configs/halfwidth_cv.toml), never restated here; its key is folded into
+# every product's.
+#
+#   residuals  one detection run + find_boards at the run config's half-width;
+#              per found board three candidate populations, each scored by the
+#              pose problem's own residual at the refined pose and labelled by
+#              the board's known geometry (the detection's nearest projected
+#              blob is its own: inlier; another blob's or none: outlier):
+#                final       the correspondences the board was fitted on, as
+#                            find_boards returned them (guided union + the
+#                            descriptor matches the scorer rejected), weighted
+#                guided      every IoU-certified association of the projected
+#                            pattern (guided_search, no keep set, no claims)
+#                descriptor  the board's mutual-NN descriptor matches over the
+#                            whole frame (what the RANSAC stage scores)
+#              per board the guided gate (the centre offset at which two equal
+#              blob regions reach the IoU gate) and the lattice pitch (median
+#              nearest-neighbour distance of the projected blob centres), px;
+#              the truncated Student-t + uniform EM (Core's mixture blocks, π
+#              estimated) profiled over the half-width, pooled and per frame;
+#              the MAP decision boundary (Core's decision_boundary) at the
+#              listed half-widths.
+#   arm        the CV curve over an extended half-width grid under one scorer
+#              prior arm ([[arms]]); one product per arm (--arm=<name>), each
+#              its own detection run, so the arms run as parallel jobs.
+#   report     the figures and tables of the note (bmvc2026/notes/halfwidth-study.md).
+# =============================================================================
+
+[experiment]
+generator = "halfwidth_study"
+layout = ["tuning"]
+
+[study]
+cv = "halfwidth_cv.toml"   # configs/-relative: the half-width CV of record
+min_iou = 0.5              # find_board's guided-association overlap gate (its keyword default)
+
+[grid]
+# The extended half-width grid, px: log-spaced over [lo, hi], plus the named
+# values and the measured ones (from the residuals product: the pooled median
+# gate and pitch, and the image's half-diagonal and diagonal from its size).
+lo = 0.5
+hi = 5096.0
+per_decade = 6
+named = { record_2026_10 = 0.9646329181191862, record = 1.7162036756919732, paper = 5.0, cv_top = 16.0 }
+measured = ["gate", "pitch", "half_diagonal", "diagonal"]
+
+# Scorer-prior arms. `score`: the label prior of the Student-t + uniform scorer
+# (Core's StudentTUniformScoring: "flat" γ = 1/2 is the configuration of record,
+# "profiled" γ̂ = k/N, "beta" Beta(m·κ, (1 − m)·κ)); `lo`: the inlier prior π
+# of the posterior-weight LO (LODR's Stu-tU-IRLS on Estimation's posterior
+# iteration: "held" at the seed's 1/2 is the configuration of record,
+# "estimated" its EM block, "beta" the Beta MAP update). `strength` κ;
+# the centre m is the inlier rate of the residuals product's final population.
+[[arms]]
+name = "deployed"
+score = "flat"
+lo = "held"
+
+[[arms]]
+name = "profiled"
+score = "profiled"
+lo = "estimated"
+
+[[arms]]
+name = "beta10"
+score = "beta"
+lo = "beta"
+strength = 10.0
+
+[[arms]]
+name = "beta100"
+score = "beta"
+lo = "beta"
+strength = 100.0
+
+[[arms]]
+name = "beta1000"
+score = "beta"
+lo = "beta"
+strength = 1000.0
+
+[[arms]]
+name = "beta100_score"
+score = "beta"
+lo = "held"
+strength = 100.0
+
+[em]
+# The profile over the half-width: log-spaced [lo, hi], `per_decade` points
+# (pooled), `per_decade_frame` per frame; a frame's population needs `min_n`
+# residuals. The outlier support is the disc of the scorer's density's area,
+# radius 2a/√π: a residual beyond it is an inlier.
+lo = 0.1
+hi = 5096.0
+per_decade = 12
+per_decade_frame = 6
+min_n = 50
+max_iter = 300
+rtol = 1.0e-9
+nu0 = 30.0
+
+[thresholds]
+# The half-widths whose MAP decision boundary the report states (px; names
+# resolved as [grid]).
+at = ["record_2026_10", "record", "paper", "gate", "pitch", "half_diagonal"]
+
+[uncertainty]
+n_resamples = 1000
+seed = 20261122
+interval = 0.9

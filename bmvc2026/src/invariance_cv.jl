@@ -111,20 +111,21 @@ run_inputs(cfg::AbstractDict, ctx::InvarianceCV) =
     [ctx.image_dir, input_path(cfg, "camera"), input_path(cfg, "boards"), ctx.run_config]
 
 """
-    invariance_errors(ctx, features, cfg::FindBoardsConfig) -> (; translation, pairs, poses)
+    invariance_errors(ctx, features, cfg::FindBoardsConfig) -> (; translation, pairs, poses, found)
 
 The boards found in every frame of a detection run (`features`) under `cfg`,
 and their inter-board invariance errors (`rigid_invariance_errors`): the
 (frame × board pair) translation errors (mm; Inf = a failure) and their
-pairs; `poses` the boards found per frame.
+pairs; `poses` the boards found per frame, `found` the `find_boards` result
+of each frame as it returned it (`(uid, model, quality, scored)` per board:
+the correspondences each board was fitted on, weighted).
 """
 function invariance_errors(ctx::InvarianceCV, features, cfg::FindBoardsConfig)
-    poses = Dict(s => Dict(uid => m for (uid, m, _, _) in find_boards(ctx.feats, features[s];
-                                                                      config = cfg, device = ctx.device,
-                                                                      board_bundles = ctx.bundles))
+    found = Dict(s => find_boards(ctx.feats, features[s]; config = cfg, device = ctx.device, board_bundles = ctx.bundles)
                  for s in ctx.stems)
+    poses = Dict(s => Dict(uid => m for (uid, m, _, _) in found[s]) for s in ctx.stems)
     r = rigid_invariance_errors(poses; targets = ctx.uids, units = ctx.stems, min_obs = ctx.min_obs)
-    return (; translation = r.translation, pairs = r.pairs, poses)
+    return (; translation = r.translation, pairs = r.pairs, poses, found)
 end
 
 # ---- the detector's scale ladder (scripts/detector_levels.jl) -------------------------------------------------------
