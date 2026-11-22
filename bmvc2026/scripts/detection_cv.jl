@@ -104,7 +104,8 @@ function validation_frames(cv::CrossValidation)
     scene = only(validation_scenes(cv))
     session, subset = String.(split(scene, '/'))
     dir = joinpath(input_path(CFG, "images"), subset)
-    basename(dirname(dir)) == session || error("the validation scene $(scene) is not in [inputs.images] $(dir)")
+    # [inputs.images] is the session's images/ directory: <session>/images/<subset>
+    basename(dirname(dirname(dir))) == session || error("the validation scene $(scene) is not in [inputs.images] $(dir)")
     all_images = sort(filter(f -> lowercase(splitext(f)[2]) in (".jpg", ".jpeg", ".png"), readdir(dir)))
     return dir, only(validation_units(cv, Dict(scene => all_images))).second
 end
