@@ -12,12 +12,8 @@
 # split (blobboards_cross_session: tune on 260521/bb, 260527 never read), same
 # criterion (the inter-board invariance mAA@10 mm of the relative pose's
 # translation over every (frame, board pair), an undetected pair a failure),
-# same grid: the 2026-10-09 coarse grid 16^(i/7) over [1, 16] with the three
-# points its extension added below (16^(-3/7) … 16^(-1/7)), and 5 px added,
-# the paper run's value (a listed grid: it cannot be extended, so the lower
-# extension is listed); the fine stage, 12 log-spaced points over the coarse
-# argmin's two neighbours, as then. The selection is the argmin (no incumbent),
-# its frame bootstrap the interval of the selection.
+# same grid (below). The selection is the argmin (no incumbent), its frame
+# bootstrap the interval of the selection.
 # =============================================================================
 
 [experiment]
@@ -74,9 +70,13 @@ criterion = { type = "mean_average_accuracy", max_error = 10.0 }   # mm, transla
 scene_split = { type = "registered", name = "blobboards_cross_session" }
 validation = { type = "exhaustive" }
 
-# Pixels: 16^(i/7), i = -3 … 7 (0.305 … 16), and 5.0.
+# Pixels: the 2026-10-09 coarse grid, 16^(i/7) over [1, 16] (6 per decade:
+# 8 points), extended 3 points at a time (at most twice) while the argmin is
+# within edge_margin of a face; the fine stage, 12 log-spaced points over the
+# coarse argmin's two neighbours. 5 px (the paper run's value) is not on this
+# grid; its mAA is evaluated beside it with the same detections and frames.
 [tuning.detection.axes.outlier_halfwidth]
-coarse = { type = "listed", values = [0.30475, 0.45286, 0.67295, 1.0, 1.48599, 2.20818, 3.28134, 4.87605, 5.0, 7.24579, 10.7672, 16.0] }
+coarse = { type = "spaced", window = { type = "fixed", lo = 1.0, hi = 16.0 }, spacing = { type = "log_per_decade", per_decade = 6 } }
 extension = { npts = 3, max_rounds = 2 }
 fine = { type = "log_count", n = 12 }
 
