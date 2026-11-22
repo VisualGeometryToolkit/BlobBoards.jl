@@ -18,6 +18,7 @@
 # =============================================================================
 
 import TOML
+import JLD2
 using DrWatson: projectdir
 using VisualGeometryToolkitEval.Experiments: results_root, run_key, Product, product_dir
 
@@ -123,4 +124,19 @@ const ADOPTED_OPERATING_POINTS = let joint = joinpath("tuning", "detection_cv-f5
       artifact = joinpath("tuning", EXPERIMENT, "detection_cv", HALFWIDTH_CV_KEY, "detection.jld2")),
      (key = ("find_boards", "detect", "peak_threshold"), axis = :peak_threshold, artifact = joint),
      (key = ("find_boards", "min_similarity"), axis = :min_similarity, artifact = joint)]
+end
+
+"""
+    halfwidth_cv_interval() -> (lo, hi)
+
+The frame-bootstrap interval (px) of the half-width CV record the run configs
+carry (`ADOPTED_OPERATING_POINTS`' half-width artifact under `results_root()`):
+the paper states it beside the value (scripts/make_supp_tables.jl).
+"""
+function halfwidth_cv_interval()
+    op = only(op for op in ADOPTED_OPERATING_POINTS if op.axis == :outlier_halfwidth)
+    path = joinpath(results_root(), op.artifact)
+    isfile(path) || error("the half-width CV record is not at $(path) (results root not bound, or the record not kept)")
+    lo, hi = JLD2.load(path, "bootstrap_interval")["outlier_halfwidth"]
+    return Float64(lo), Float64(hi)
 end

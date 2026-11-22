@@ -846,7 +846,7 @@ per correspondence, $n_{\vtheta}=6$ is the number of pose degrees of freedom,
 and $a=\bbSetHalfwidthPx$ pixels is the outlier half-width, selected by
 cross-validation on a separate capture session (the mean average accuracy at
 10\,mm of the inter-board relative poses); the optimum is flat, its frame
-bootstrap interval spanning about 1--3 pixels. Because $\sigma^2$ is
+bootstrap interval spanning \bbSetHalfwidthCiLoPx--\bbSetHalfwidthCiHiPx\ pixels. Because $\sigma^2$ is
 marginalized, the score has no noise scale to tune. For each branch, the
 maximizing inlier set $I$ is found exactly by sweeping the sorted
 residuals~\cite{pritts2026scoring}. Since each branch is independently

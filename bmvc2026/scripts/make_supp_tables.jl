@@ -28,7 +28,7 @@ its record (effective config, provenance, outputs) under plotsdir("records").
 
 Usage:
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/make_supp_tables.jl [--config=<path>]
-Data: the inputs tier (boards/, the camera of record) and the BlobBoards run (its _config.toml).
+Data: the inputs tier (boards/, the camera of record), the BlobBoards run (its _config.toml) and the half-width CV record (its bootstrap interval).
 =#
 
 using DrWatson
@@ -46,7 +46,7 @@ using VisualGeometryToolkitCore: BoundedCamera, ustrip, mm, dpi, parse_unit
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir
+using Main.BlobBoardsEval: input_path, figure_config, write_figure_records, figure_numbers, sweep_dir, halfwidth_cv_interval
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages
 using VisualGeometryToolkitEval.Reproduce: add_number!, write_numbers
 
@@ -161,6 +161,10 @@ function write_run_settings(nums)
     add_number!(nums, "bbSetMinSimilarity", d["min_similarity"]; sigdigits = 15)
     add_number!(nums, "bbSetMinInliers", geo["min_inliers"])
     add_number!(nums, "bbSetHalfwidthPx", geo["outlier_halfwidth"]; sigdigits = 4)   # 1.716: the cross-validated value as the paper states it
+    # its record's frame-bootstrap interval, which the paper states beside it
+    ci_lo, ci_hi = halfwidth_cv_interval()
+    add_number!(nums, "bbSetHalfwidthCiLoPx", ci_lo; sigdigits = 3)
+    add_number!(nums, "bbSetHalfwidthCiHiPx", ci_hi; sigdigits = 3)
     add_number!(nums, "bbSetRansacMin", ran["min_trials"]; group_from = 5)
     add_number!(nums, "bbSetRansacMax", ran["max_trials"]; group_from = 5)
     add_number!(nums, "bbSetConfidence", ran["success_prob"]; sigdigits = 15)

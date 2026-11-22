@@ -39,8 +39,14 @@ detect with upsample = 2, nb_scales = 3, nb_octaves = 10 (searched σ 0.57 … 4
 (`scripts/detector_levels.jl`, `configs/detector_levels.toml`; a `reproduce.toml` stage) evaluates seven ladders on the
 tuning session 260521 under the half-width CV's split and criterion; a ladder is eligible only if its searched range
 holds the record-era 0.90 … 290 px (interior and refined), and the selection is the eligible one of best mAA, a tie
-broken by seconds per frame, then memory. PENDING the owner: its first run selects C (upsample 1, nb_scales 10,
-nb_octaves 9; mAA 0.4093, bootstrap share 0.56) over A (0.4090, 0.38) and B (0.4072, 0.06). `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
+broken by seconds per frame, then memory, is the challenger; it replaces the incumbent A (the owner's design: one
+upsampling more and one octave more) only when its paired frame bootstrap P(better) is ≥ 0.95, the joint CV's
+incumbent rule (VisualGeometryToolkitEval's). On 260521 the best eligible ladder is C (upsample 1, nb_scales 10,
+nb_octaves 9: mAA 0.4093, 1756 boards, 1.35 s/frame, 78 GiB) against A (0.4090, 1765 boards, 1.42 s/frame, 68 GiB): a
+gain of 0.0003 mAA that the frame bootstrap does not resolve (C wins 56% of resamples, A 38%, B 6%), and A recovers
+more poses on the bb subset (1341 at the half-width of record; C 1326 at 0.9646 px against A's 1332), so A is kept.
+Base (0.3758, 1481 boards), E (= A on this session; σ tops out at 230 px), D (finest σ 0.91 px) and F (= C; 212 px)
+are reported, not eligible. `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
 VisualGeometryToolkitCore 0.13.1 (Features' floor) everywhere.
 
 **Outlier half-width 0.9646 → 1.716 px.** The 2026-10-09 one-axis half-width CV (`configs/halfwidth_cv.toml`: split
@@ -57,8 +63,9 @@ the new half-width.
 
 **The paper's half-width sentence is edited** (owner's approval, 2026-11-22): `papers/blob_boards_bmvc.tex` stated
 a = 5 px (the paper run's value); it now reads the generated `\bbSetHalfwidthPx` (1.716, `make_supp_tables.jl` at 4
-significant digits) and says the value was cross-validated on a separate capture session (mAA@10 mm; a flat optimum,
-bootstrap interval about 1–3 px).
+significant digits) and says the value was cross-validated on a separate capture session (mAA@10 mm; a flat optimum),
+its frame-bootstrap interval the record's (`\bbSetHalfwidthCiLoPx`–`\bbSetHalfwidthCiHiPx`, generated from the
+half-width CV record by `make_supp_tables.jl`).
 
 `scripts/detection_cv.jl` refused every run since 2026-11-12: its validation-scene check compared the session against
 the wrong path component of `[inputs.images]`. Fixed; its frames, camera, network and gallery now come from
