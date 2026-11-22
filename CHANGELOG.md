@@ -39,7 +39,8 @@ detect with upsample = 2, nb_scales = 3, nb_octaves = 10 (searched σ 0.57 … 4
 (`scripts/detector_levels.jl`, `configs/detector_levels.toml`; a `reproduce.toml` stage) evaluates seven ladders on the
 tuning session 260521 under the half-width CV's split and criterion; a ladder is eligible only if its searched range
 holds the record-era 0.90 … 290 px (interior and refined), and the selection is the eligible one of best mAA, a tie
-broken by seconds per frame, then memory. `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
+broken by seconds per frame, then memory. PENDING the owner: its first run selects C (upsample 1, nb_scales 10,
+nb_octaves 9; mAA 0.4093, bootstrap share 0.56) over A (0.4090, 0.38) and B (0.4072, 0.06). `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
 VisualGeometryToolkitCore 0.13.1 (Features' floor) everywhere.
 
 **Outlier half-width 0.9646 → 1.716 px.** The 2026-10-09 one-axis half-width CV (`configs/halfwidth_cv.toml`: split
