@@ -14,7 +14,10 @@ scripts/detection_cv.jl runs on). Every setting is evaluated; only one whose
 searched σ range holds the config's [eligibility] range (the record-era
 0.90 … 290 px) can be selected: the eligible setting of best mAA (the spec's
 mean_average_accuracy), a tie broken by the lower median seconds per frame,
-then the lower peak memory. The frame bootstrap (`bootstrap_argmin`, over the
+then the lower peak memory, is the challenger; it replaces the config's
+[incumbent] only when the paired frame bootstrap puts its objective below the
+incumbent's with probability ≥ the incumbent's `confidence` (0.95: the joint
+detection CV's rule, VisualGeometryToolkitEval's implementation). The frame bootstrap (`bootstrap_argmin`, over the
 eligible settings) gives the share of resamples each one wins.
 
 Outputs, in the product `detector_levels_product(cfg)` (Eval's `Product`:
@@ -48,6 +51,8 @@ using Statistics: median
 using TOML: TOML
 using VisualGeometryToolkitEval.Tuning: tuning_spec, Factorial, MeanAverageAccuracy, ListedGrid, QueryUnit,
     grid_spec, bootstrap_argmin, unit_statistics, stats_objective, save_tuning_artifact
+using VisualGeometryToolkitEval.Tuning: Incumbent
+using VisualGeometryToolkitEval.Evaluation: _keep_incumbent   # the joint CV's incumbent rule, the one implementation
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages, produce, product_dir, product_output, Produced
 using VisualGeometryToolkitEval: cli_option
 
@@ -90,7 +95,7 @@ end
 function run_cv()
     ctx = invariance_cv(CFG, SPEC.scheme.cross_validation; device = CUDABackend())
     crit = SPEC.scheme.criterion
-    stats, boards, seconds, memory = Matrix{Float64}[], Vector{Int}[], Vector{Float64}[], Int[]
+    errors, stats, boards, seconds, memory = Matrix{Float64}[], Matrix{Float64}[], Vector{Int}[], Vector{Float64}[], Int[]
     pairs = nothing
     for s in SETTINGS
         cfg = with_ladder(ctx.base, s)
@@ -98,7 +103,7 @@ function run_cv()
         features, peak = peak_memory(() -> detection_run(ctx, cfg; on_frame = (_, dt) -> push!(t, dt)), ctx.device)
         r = invariance_errors(ctx, features, cfg)
         pairs = r.pairs
-        push!(stats, unit_statistics(crit, r.translation)); push!(boards, [length(r.poses[st]) for st in ctx.stems])
+        push!(errors, r.translation); push!(stats, unit_statistics(crit, r.translation)); push!(boards, [length(r.poses[st]) for st in ctx.stems])
         push!(seconds, t); push!(memory, peak)
         @info "setting" s["name"] mAA = -stats_objective(crit, last(stats)) boards = sum(last(boards)) median_s = round(median(t); digits = 2) peak_GiB = round(peak / 2^30; digits = 1)
     end
@@ -108,8 +113,21 @@ function run_cv()
     eligible = [let (a, b) = ladder_sigma_range(s, W, H); a <= lo && b >= hi end for s in SETTINGS]
     any(eligible) || error("[eligibility]: no setting searches σ $(lo) … $(hi) px")
     cand = findall(eligible)
-    # best mAA, then the lower median s/frame, then the lower peak memory
-    selected = cand[argmin([(objective[i], median(seconds[i]), memory[i]) for i in cand])]
+    # the challenger: best mAA, then the lower median s/frame, then the lower peak memory
+    challenger = cand[argmin([(objective[i], median(seconds[i]), memory[i]) for i in cand])]
+    # The incumbent rule of the joint CV (VisualGeometryToolkitEval's own, `_keep_incumbent`):
+    # the challenger replaces the incumbent only when the paired frame bootstrap puts its
+    # objective below the incumbent's with probability ≥ `confidence`.
+    inc = CFG["incumbent"]
+    incumbent = only(findall(s -> s["name"] == inc["name"], SETTINGS))
+    eligible[incumbent] || error("[incumbent] $(inc["name"]) is not eligible")
+    point(i) = (setting = Float64(i),)
+    rule = Incumbent(Dict("setting" => Float64(incumbent)), Float64(inc["confidence"]), Int(inc["n_resamples"]), Int(inc["seed"]))
+    kept = challenger == incumbent ?
+        (kept_incumbent = true, gain = (objective = 0.0, p_gain = 0.0)) :
+        _keep_incumbent((evaluated = [point(challenger) => errors[challenger]], selected = point(challenger)),
+                        point(incumbent), errors[incumbent], rule, crit)
+    selected = kept.kept_incumbent ? incumbent : challenger
     unc = CFG["uncertainty"]
     wins = cand[bootstrap_argmin(crit, stats[cand], Xoshiro(unc["seed"]); n_resamples = unc["n_resamples"])]
     share = [count(==(i), wins) / length(wins) for i in eachindex(SETTINGS)]
@@ -120,8 +138,10 @@ function run_cv()
         objective = objective, unit_stats = stats, boards = reduce(hcat, boards), seconds = seconds,
         gpu_memory_peak = memory, selected = selected, selected_name = SETTINGS[selected]["name"],
         bootstrap_share = share, eligible = eligible, eligibility_sigma = [lo, hi],
+        incumbent = incumbent, challenger = challenger, kept_incumbent = kept.kept_incumbent,
+        gain = kept.gain.objective, p_gain = kept.gain.p_gain,
         objective_label = "mean_average_accuracy of the inter-board invariance translation errors [mm] over (frame, board pair), negated; undetected = failure")
-    @info "selected" SETTINGS[selected]["name"] share
+    @info "selected" SETTINGS[selected]["name"] challenger = SETTINGS[challenger]["name"] kept.kept_incumbent kept.gain share
     return Produced(nothing; inputs = run_inputs(CFG, ctx))
 end
 

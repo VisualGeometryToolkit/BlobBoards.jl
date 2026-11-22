@@ -158,4 +158,5 @@ end
     lo, hi = cfg["eligibility"]["sigma"]
     ok = [s["name"] for s in cfg["settings"] if let (a, b) = ladder_sigma_range(s, 4240, 2832); a <= lo && b >= hi end]
     @test ok == ["A", "B", "C"]   # base, E, F top out at 230 or below; D's finest is 0.91 px
+    @test cfg["incumbent"]["name"] in ok && cfg["incumbent"]["confidence"] == 0.95
 end

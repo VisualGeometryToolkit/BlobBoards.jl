@@ -48,7 +48,7 @@
         @test SMatrix{3, 3, Float64}(bc.camera.intrinsics.K) == prev.K                     # bit for bit
         @test bc.camera.lens == CameraModel(prev.K; lens = opencv_lens(prev.k)).lens
         @test bc.bound == Size2(prev.size...)
-        cal = getfield(camera, :attributes).calibration
+        cal = getfield(camera, :attributes).calibration_record
         @test !haskey(cal, :reprojection_rms)                                              # the export's error is a mean
         @test occursin("mean reprojection error", cal.note) && occursin("modification date", cal.note)
         @test cal.date == entry["date"] && startswith(cal.source, basename(src_rel))

@@ -57,7 +57,7 @@ function upstream_camera(cfg::AbstractDict, entry::AbstractDict)
     all(iszero, k[(n + 1):end]) || error("$(src): coefficients past the fitted $(n) are not zero: $(k[(n + 1):end])")
     model = CameraModel(K; lens = opencv_lens(k[1:n]), pixel_frame = Symbol(UP["pixel_frame"]))
     cb, sq = collect(d.chessboard_size), d.square_size
-    calibration = (
+    calibration_record = (
         tool = String(UP["tool"]),
         source = "$(basename(src)) (sha256 $(sha))",
         date = String(entry["date"]),
@@ -68,6 +68,6 @@ function upstream_camera(cfg::AbstractDict, entry::AbstractDict)
             "principal point converted from OpenCV's pixel frame; date = the export file's modification date " *
             "(the export records no fit date)",
     )
-    camera = Attributed(BoundedCamera(model, Size2(Int(d.image_width), Int(d.image_height))), (; calibration))
+    camera = Attributed(BoundedCamera(model, Size2(Int(d.image_width), Int(d.image_height))), (; calibration_record))   # VisualGeometryToolkitIO's stored-camera attribute
     return Symbol(String(entry["name"])), camera, (; src, sha)
 end

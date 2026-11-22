@@ -17,10 +17,13 @@
 # pose's translation over every (frame, board pair), an undetected pair a
 # failure). Every setting is evaluated and reported; only an ELIGIBLE one can
 # be selected ([eligibility]: its searched σ range holds the record-era range,
-# 0.90 … 290 px, so that range is interior and refined). The selection is the
+# 0.90 … 290 px, so that range is interior and refined). The challenger is the
 # eligible setting of best mAA, a tie broken by the lower median seconds per
-# frame, then the lower peak GPU memory; its frame bootstrap (over the
-# eligible settings) the share of resamples each one wins. The table also records
+# frame, then the lower peak GPU memory. The selection stays the [incumbent]
+# (A: the owner's design, one upsampling more and one octave more) unless the
+# challenger's paired frame bootstrap P(better) is ≥ 0.95, the joint detection
+# CV's incumbent rule. The frame bootstrap over the eligible settings gives
+# the share of resamples each one wins. The table also records
 # what each costs: the searched σ range, the boards found per frame, the
 # frames where the settings disagree, seconds per frame and peak GPU memory.
 # =============================================================================
@@ -132,6 +135,14 @@ values = [1, 2, 3, 4, 5, 6, 7]
 # The record-era searched range (input px) a selectable ladder must contain:
 # lo ≥ its finest searched σ and hi ≤ its coarsest (ladder_sigma_range).
 sigma = [0.90, 290.0]
+
+[incumbent]
+# The ladder in force: kept unless a challenger beats it with paired-bootstrap
+# probability ≥ confidence (n_resamples frame resamples, StableRNG(seed)).
+name = "A"
+confidence = 0.95
+n_resamples = 1000
+seed = 20261122
 
 [uncertainty]
 # Frame bootstrap of the selection: resample the validation frames with
