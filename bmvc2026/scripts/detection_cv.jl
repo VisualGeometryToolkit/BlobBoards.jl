@@ -45,29 +45,23 @@ Usage:
   julia --startup-file=no --project=bmvc2026 bmvc2026/scripts/detection_cv.jl [--config=<name under configs/>] [--plan] [--force]
 =#
 # reproduce: reads configs/detection_cv.toml
+# reproduce: reads configs/halfwidth_cv.toml
 
 using DrWatson
 @quickactivate
-import VisualGeometryToolkitIO as VgtkIO
-using DrWatson: projectdir
 using BlobBoards
-using BlobBoards: FindBoardsConfig, DescriptorNetwork, BoardGallery, uid_from_hash, find_boards, load_bundle
 using CUDA
 import cuDNN
 using CUDA: CUDABackend
 import VisualGeometryToolkitCore
-using VisualGeometryToolkitCore: BoundedCamera
 using Accessors: @set
-using Colors: Gray
-using FileIO: load as load_image
 using Random: Xoshiro
 using Statistics: quantile
 using TOML: TOML
 import VisualGeometryToolkitEval
-using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy, CrossValidation,
-    QueryUnit, validation_units, validation_scenes, grid_spec, bootstrap_argmin, unit_statistics
-using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, rigid_invariance_errors,
-    save_coarse_fine_artifact, deployed_setting
+using VisualGeometryToolkitEval.Tuning: tuning_spec, JointCoarseFine, MeanAverageAccuracy,
+    QueryUnit, grid_spec, bootstrap_argmin, unit_statistics
+using VisualGeometryToolkitEval.Evaluation: coarse_fine_search, save_coarse_fine_artifact, deployed_setting
 using VisualGeometryToolkitEval.Render: emit_tuning_table
 using VisualGeometryToolkitEval.Experiments: Stage, run_stages, produce, product_dir, Produced
 using VisualGeometryToolkitEval: cli_option
@@ -75,12 +69,11 @@ using VisualGeometryToolkitEval: cli_option
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: data_root, results_root, input_path, config_path, load_config,
+using Main.BlobBoardsEval: input_path, config_path, invariance_cv, detection_run, invariance_errors,
     detection_cv_product, detection_cv_artifact, detection_cv_table
 
 const CFG_PATH = config_path(cli_option(ARGS, "config", "detection_cv.toml"))
 const CFG = TOML.parsefile(CFG_PATH)
-const PANEL = CFG["panel"]
 const SPEC = tuning_spec(CFG, "detection")
 SPEC.scheme isa JointCoarseFine || error("[tuning.detection] must be a joint_coarse_fine spec")
 SPEC.scheme.criterion isa MeanAverageAccuracy ||
@@ -98,34 +91,9 @@ issubset(keys(SPEC.scheme.axes), keys(SETTERS)) ||
 const PRODUCT = detection_cv_product(CFG)
 const OUTDIR = product_dir(PRODUCT)
 
-# The validation frames: the ONE validation scene of the spec's registered
-# scene split (`<session>/<subset>`), sampled by its validation sampling.
-function validation_frames(cv::CrossValidation)
-    scene = only(validation_scenes(cv))
-    session, subset = String.(split(scene, '/'))
-    dir = joinpath(input_path(CFG, "images"), subset)
-    # [inputs.images] is the session's images/ directory: <session>/images/<subset>
-    basename(dirname(dirname(dir))) == session || error("the validation scene $(scene) is not in [inputs.images] $(dir)")
-    all_images = sort(filter(f -> lowercase(splitext(f)[2]) in (".jpg", ".jpeg", ".png"), readdir(dir)))
-    return dir, only(validation_units(cv, Dict(scene => all_images))).second
-end
-
 function run_cv()
-    image_dir, frames = validation_frames(SPEC.scheme.cross_validation)
-    camera = VgtkIO.load(BoundedCamera, input_path(CFG, "camera"))   # pixel operations take a BoundedCamera
-    run_config = config_path(CFG["runs"]["bb"])
-    base = FindBoardsConfig(run_config; camera)
-    # the network is the run config's [inputs.network]
-    net = DescriptorNetwork(input_path(load_config(CFG["runs"]["bb"]), "network"))
-    gallery_path = joinpath(results_root(), CFG["gallery"]["path"]); mkpath(dirname(gallery_path))
-    gallery = BoardGallery(gallery_path, net)
-    board_paths = filter(endswith(".json"), readdir(input_path(CFG, "boards"); join = true))
-    feats = Dict(uid => f for (uid, f) in [insert!(gallery, bp, net) for bp in board_paths])
-    bundles = Dict(let (b, _, ch) = load_bundle(bp); uid_from_hash(ch) => b end for bp in board_paths)
-    uids = sort!(collect(keys(bundles)))
-    length(uids) == PANEL["n_boards"] || error("$(length(uids)) boards in [inputs.boards], the config states $(PANEL["n_boards"])")
-    stems = [splitext(f)[1] for f in frames]
-    device = CUDABackend()
+    ctx = invariance_cv(CFG, SPEC.scheme.cross_validation; device = CUDABackend())
+    base = ctx.base
     apply(cfg, p) = foldl((c, n) -> SETTERS[String(n)](c, p[n]), keys(p); init = cfg)
 
     # One detection run per peak threshold, kept for the run: the search asks
@@ -135,12 +103,7 @@ function run_cv()
     function detected(pk)
         i = findfirst(d -> isapprox(d.first, pk; rtol = 1e-9), detections)
         i === nothing || return detections[i].second
-        cfg = @set base.detect.peak_threshold = pk
-        prepared = Dict{String,Any}()
-        t = @elapsed for (k, f) in enumerate(frames)
-            prepared[stems[k]] = BlobBoards.prepare_image_features(net, Gray.(load_image(joinpath(image_dir, f)));
-                                                                   board_bundles = bundles, config = cfg, device)
-        end
+        t = @elapsed prepared = detection_run(ctx, @set base.detect.peak_threshold = pk)
         @info "detection run" peak_threshold = pk seconds = round(t; digits = 1) runs = length(detections) + 1
         push!(detections, pk => prepared)
         return prepared
@@ -149,11 +112,7 @@ function run_cv()
     # (frame × board pair) translation errors of the inter-board relative pose,
     # mm; Inf = not observed or no reference — a failure under the criterion.
     function errors_at(prepared, p)
-        cfg = apply(base, p)
-        poses = Dict(s => Dict(uid => m for (uid, m, _, _) in find_boards(feats, prepared[s].image_features;
-                                                                          config = cfg, device, board_bundles = bundles))
-                     for s in stems)
-        r = rigid_invariance_errors(poses; targets = uids, units = stems, min_obs = Int(PANEL["min_obs"]))
+        r = invariance_errors(ctx, prepared, apply(base, p))
         pairs[] = r.pairs
         return r.translation
     end
@@ -181,14 +140,14 @@ function run_cv()
                                 for n in names)
     mkpath(OUTDIR)
     save_coarse_fine_artifact(detection_cv_artifact(OUTDIR), SPEC, rec;
-        unit = QueryUnit(), code = (BlobBoards, VisualGeometryToolkitCore), frames = stems,
+        unit = QueryUnit(), code = (BlobBoards, VisualGeometryToolkitCore), frames = ctx.stems,
         pairs = [collect(p) for p in pairs[]], detection_runs = first.(detections),
         bootstrap_cells = [Float64(b[Symbol(n)]) for b in boot, n in names], bootstrap_interval = interval,
         objective = "mean_average_accuracy of the inter-board invariance translation errors [mm] over (frame, board pair); undetected = failure",
         arm = "pose")
     # the read-side gate, before anything is recorded complete
     @info "selected" deployed_setting(detection_cv_artifact(OUTDIR); context = "joint detection CV") interval
-    return Produced(nothing; inputs = [image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), run_config])
+    return Produced(nothing; inputs = [ctx.image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), ctx.run_config])
 end
 
 # The curve of each axis and the surface of each pair of axes through the

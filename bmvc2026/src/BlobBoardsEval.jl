@@ -42,6 +42,8 @@ include("results.jl")
 include("calibration.jl")
 # Where the tuned detection operating point lives (scripts/detection_cv.jl writes it).
 include("operating_points.jl")
+# The invariance CV's shared machinery (scripts/detection_cv.jl, scripts/detector_levels.jl).
+include("invariance_cv.jl")
 # Per-image detection exports (the AprilTag/ArUco baselines) → vgio/target_poses/v1.
 include("detections.jl")
 # The one-time port of the upstream calibration exports (scripts/import_cameras.jl).

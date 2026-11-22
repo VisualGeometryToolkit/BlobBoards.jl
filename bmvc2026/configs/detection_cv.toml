@@ -121,12 +121,14 @@ coarse = { type = "spaced", window = { type = "fixed", lo = 0.3, hi = 0.8 }, spa
 extension = { npts = 2, max_rounds = 2 }
 fine = { type = "linear_count", n = 5 }
 
-# The operating point in force (the configs of record, signed off 2026-10-09
-# and kept 2026-10-14): the search's selection replaces it only when the
-# paired frame bootstrap puts its mAA above the incumbent's with probability
-# ≥ `confidence` (VisualGeometryToolkitEval `fine_search`).
+# The operating point in force (the configs of record): the search's selection
+# replaces it only when the paired frame bootstrap puts its mAA above the
+# incumbent's with probability ≥ `confidence` (VisualGeometryToolkitEval
+# `fine_search`). The half-width is configs/halfwidth_cv.toml's record of
+# 2026-11-22 (1.716 px on the detector of record); the record of this search,
+# f5a385376eda453e (2026-10-14), ran with the half-width then in force, 0.9646 px.
 [tuning.detection.incumbent]
-values = { outlier_halfwidth = 0.9646329181191862, peak_threshold = 0.01, min_similarity = 0.6 }
+values = { outlier_halfwidth = 1.7162036756919732, peak_threshold = 0.01, min_similarity = 0.6 }
 confidence = 0.95
 
 [uncertainty]

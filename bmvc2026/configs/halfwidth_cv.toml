@@ -1,8 +1,9 @@
 # =============================================================================
 # halfwidth_cv — the one-axis cross-validation of the outlier half-width
-# (scripts/detection_cv.jl --config=halfwidth_cv.toml), the 2026-10-09 run's
-# protocol (record outlier_halfwidth_cv-3a346460b90dc25d, whose 0.9646 px the
-# configs of record carried) re-run on today's detector:
+# (scripts/detection_cv.jl --config=halfwidth_cv.toml), the protocol of the
+# 2026-10-09 run (record outlier_halfwidth_cv-3a346460b90dc25d, 0.9646 px) on
+# the detector of record, setting A of configs/detector_levels.toml (upsample
+# 2, nb_scales 3, nb_octaves 10: the run config's [find_boards.detect]):
 #
 #   outlier_halfwidth  [find_boards.geometry] — the support of the uniform
 #                      outlier component of the Student-t + uniform scorer and
@@ -74,7 +75,8 @@ validation = { type = "exhaustive" }
 # 8 points), extended 3 points at a time (at most twice) while the argmin is
 # within edge_margin of a face; the fine stage, 12 log-spaced points over the
 # coarse argmin's two neighbours. 5 px (the paper run's value) is not on this
-# grid; its mAA is evaluated beside it with the same detections and frames.
+# grid: the 2026-11-22 check put it on a coarse grid shifted to [5, 7.25]
+# (same detections and frames), 0.0018 mAA below the peak.
 [tuning.detection.axes.outlier_halfwidth]
 coarse = { type = "spaced", window = { type = "fixed", lo = 1.0, hi = 16.0 }, spacing = { type = "log_per_decade", per_decade = 6 } }
 extension = { npts = 3, max_rounds = 2 }

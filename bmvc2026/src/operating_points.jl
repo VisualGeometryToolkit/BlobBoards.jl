@@ -86,21 +86,42 @@ detection_cv_artifact(dir::AbstractString) = joinpath(dir, "detection.jld2")
 detection_cv_table(dir::AbstractString, ax) = joinpath(dir, "table_" * join(ax, "__") * ".tex")
 
 """
+    detector_levels_product(cfg) -> Product
+
+The product of the detector-ladder CV under the config `cfg` (the parsed
+configs/detector_levels.toml), its run config's key folded in as for the
+detection CV (`detection_cv_upstream`). Its output is the tuning artifact
+`detector_levels.jld2`; the table `table_detector_levels.tex` lies beside it.
+"""
+detector_levels_product(cfg::AbstractDict) =
+    stage_product(cfg, "detector_levels"; output = "detector_levels.jld2", upstream = detection_cv_upstream(cfg))
+
+# The product key of the detector-ladder CV record (configs/detector_levels.toml), and its artifact,
+# whose selected setting the run configs of record detect with.
+const DETECTOR_LEVELS_KEY = "DETECTOR_LEVELS_KEY"
+const ADOPTED_DETECTOR_LEVELS = joinpath("tuning", EXPERIMENT, "detector_levels", DETECTOR_LEVELS_KEY, "detector_levels.jld2")
+
+# The product key of the half-width CV record (configs/halfwidth_cv.toml, the run of 2026-11-22).
+const HALFWIDTH_CV_KEY = "HALFWIDTH_CV_KEY"
+
+"""
     ADOPTED_OPERATING_POINTS
 
 Every tuned value the run configs of record carry: its key path in a run
 config, the tuning artifact it is deployed from (`results_root()`-relative)
-and the artifact's axis. All three are the record of configs/detection_cv.toml
-under its run key of the 0.8 layout, `f5a385376eda453e`
-(`results_root()/tuning/detection_cv-<key>`): the joint search kept its
-declared incumbent, the configs' operating point
-(scripts/detection_cv_replay.jl). The products of Eval 0.9 on (the
-[experiment] layout, the run config's key and the code folded in) name a new
-directory for the config; the adopted record stays where it was made.
+and the artifact's axis. The half-width is the record of
+configs/halfwidth_cv.toml (the 2026-10-09 one-axis protocol on the detector of
+record, run 2026-11-22: Eval's product `tuning/bmvc2026/detection_cv/<key>`).
+The peak threshold and the similarity gate are the record of
+configs/detection_cv.toml under its run key of the 0.8 layout,
+`f5a385376eda453e` (`results_root()/tuning/detection_cv-<key>`): the joint
+search kept its declared incumbent (scripts/detection_cv_replay.jl). A record
+stays where it was made; a later code tree names a new product directory.
 """
 const ADOPTED_OPERATING_POINTS = [
-    (key = k, axis = a, artifact = joinpath("tuning", "detection_cv-f5a385376eda453e", "detection.jld2"))
-    for (k, a) in ((("find_boards", "geometry", "outlier_halfwidth"), :outlier_halfwidth),
-                   (("find_boards", "detect", "peak_threshold"), :peak_threshold),
-                   (("find_boards", "min_similarity"), :min_similarity))
+    (key = ("find_boards", "geometry", "outlier_halfwidth"), axis = :outlier_halfwidth,
+     artifact = joinpath("tuning", EXPERIMENT, "detection_cv", HALFWIDTH_CV_KEY, "detection.jld2")),
+    [(key = k, axis = a, artifact = joinpath("tuning", "detection_cv-f5a385376eda453e", "detection.jld2"))
+     for (k, a) in ((("find_boards", "detect", "peak_threshold"), :peak_threshold),
+                    (("find_boards", "min_similarity"), :min_similarity))]...
 ]

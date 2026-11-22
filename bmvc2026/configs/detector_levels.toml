@@ -1,0 +1,131 @@
+# =============================================================================
+# detector_levels — the cross-validation of the detector's scale ladder
+# (scripts/detector_levels.jl): which ASIFT pyramid the run config of record
+# detects with, chosen on the TUNING session (260521) by the inter-board
+# invariance mAA, the protocol of the half-width CV (configs/halfwidth_cv.toml):
+#
+#   upsample    [find_boards.detect] — 2× upsamplings of the first octave
+#   nb_scales   [find_boards.detect] — scales per octave S
+#   nb_octaves  [find_boards.detect] — the octave count (0: Features' default)
+#
+# The settings are hand-chosen ladders (a factorial over one listed axis,
+# `setting`, indexing [[settings]] below), not a product: the octave count a
+# pyramid admits depends on its upsampling, and a dense ladder at two
+# upsamplings does not fit a GPU. Everything else, the half-width included, is
+# the run config's. Same split (blobboards_cross_session: tune on 260521/bb,
+# 260527 never read), same criterion (mAA@10 mm of the inter-board relative
+# pose's translation over every (frame, board pair), an undetected pair a
+# failure). The selection is the argmin (the first on a tie), its frame
+# bootstrap the share of resamples each setting wins. The table also records
+# what each costs: the searched σ range, the boards found per frame, the
+# frames where the settings disagree, seconds per frame and peak GPU memory.
+# =============================================================================
+
+[experiment]
+generator = "detector_levels"
+# The results tree's layout of its runs (src/operating_points.jl stage_product:
+# results_root()/<layout…>/bmvc2026/<product>/<key>: Eval's Product).
+layout = ["tuning"]
+
+[runs]
+# configs/-relative: the EVALUATION's run config of record — detection,
+# adaptation, matching, verification, the network and the pose arm's geometry
+# are read from it (FindBoardsConfig); the search overrides only its axes. Its
+# run key is folded into this run's.
+bb = "bmvc2026_260527.toml"
+
+[panel]
+n_boards = 30         # boards on the panel: C(30,2) pairs per frame is the criterion's denominator
+min_obs = 3           # frames a board pair needs before it has a leave-one-out reference
+
+[gallery]
+path = "cache/board_features_260521.jld2"   # results_root()-relative: the gallery cache (keyed by the network inside)
+
+# The ladders of the 2026-11-22 level sweep, in its order: the 0.7.3
+# detector (one upsampling, three scales), two upsamplings with Features'
+# octaves or one more, four scales, and the denser one-upsampling ladders.
+[[settings]]
+name = "base"
+upsample = 1
+nb_scales = 3
+nb_octaves = 0
+
+[[settings]]
+name = "E"
+upsample = 2
+nb_scales = 3
+nb_octaves = 0
+
+[[settings]]
+name = "A"
+upsample = 2
+nb_scales = 3
+nb_octaves = 10
+
+[[settings]]
+name = "B"
+upsample = 2
+nb_scales = 4
+nb_octaves = 10
+
+[[settings]]
+name = "C"
+upsample = 1
+nb_scales = 10
+nb_octaves = 9
+
+[[settings]]
+name = "D"
+upsample = 1
+nb_scales = 8
+nb_octaves = 9
+
+[[settings]]
+name = "F"
+upsample = 1
+nb_scales = 10
+nb_octaves = 0
+
+# The inputs of record (VisualGeometryToolkitEval [inputs.<id>]: data_root()-relative).
+[inputs.images]
+tier = "bb_absolute_pose_tuning_260521"
+path = "absolute_pose_experiments/260521/images"
+provenance = "the 260521 captures (f/9.0), the validation side of the registered scene split (its bb subset)"
+
+[inputs.camera]
+# The validation session's camera store. The copy the tuning runs of record read
+# (3a346460b90dc25d, c80d42e9055f8cd5: their records state sha256 0ef0c750…) is
+# LOST. This is the latest surviving copy (bb_formats_2026-10/41ba64df87c084e7):
+# it differs from the lost one only in its provenance run_key; its calibration
+# content (K, lens, calibration block) is byte-identical to the conversion of the
+# export of record (b745b737…, in this tier).
+tier = "bb_absolute_pose_tuning_260521"
+path = "absolute_pose_experiments/260521/images/260521_sony-fx3-iso125_tamron-20mm-f2.8-(set-to-f9.0)_cameras.json"
+provenance = "the 260521 camera (the session's OpenCV calibrateCamera fit, its exact native port); the surviving copy of the store the tuning runs read (theirs, sha256 0ef0c750232f9c0f17caa77bf9fab07a63f7f4e2cf4820af1b9b49d378617e1b, is lost)"
+sha256 = "2a6c050e5ea298bc7a7fe77340d0b63b05d4bb06a390581d383941ef49721a9e"
+
+[inputs.boards]
+# The 30 boards of the panel: 260521 shows the IDENTICAL board set (same uids
+# and definition hashes); the inputs tier's 260527 definitions are read.
+tier = "bb_absolute_pose_inputs"
+path = "absolute_pose_experiments/260527/boards/blobboards"
+provenance = "the printed BlobBoards definitions (blobboards/board/v5)"
+
+[tuning.detector]
+type = "factorial"
+criterion = { type = "mean_average_accuracy", max_error = 10.0 }   # mm, translation of the inter-board relative pose
+
+[tuning.detector.cross_validation]
+scene_split = { type = "registered", name = "blobboards_cross_session" }
+validation = { type = "exhaustive" }
+
+# The index (1-based) into [[settings]].
+[tuning.detector.axes.setting]
+type = "listed"
+values = [1, 2, 3, 4, 5, 6, 7]
+
+[uncertainty]
+# Frame bootstrap of the selection: resample the validation frames with
+# replacement and re-take the argmin over the settings.
+n_resamples = 1000
+seed = 20261122

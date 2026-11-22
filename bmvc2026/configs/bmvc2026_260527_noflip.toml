@@ -161,16 +161,19 @@ min_inliers = 9
 # Reprojection outlier half-width, PIXELS — the support of the uniform outlier
 # component of the Student-t + uniform scorer and LO (guided association is by
 # ellipse overlap alone since 2026-11-11; until then this was also its radius).
-# CROSS-VALIDATED, jointly with [find_boards.detect] peak_threshold and
-# [find_boards] min_similarity: the record of configs/detection_cv.toml,
-# results_root()/tuning/detection_cv-f5a385376eda453e/detection.jld2 (run key
-# f5a385376eda453e), kept this operating point as its incumbent — the joint
-# selection's mAA gain (+0.0018) was not resolved by the paired frame bootstrap
-# (P(gain > 0) = 0.825 < 0.95). The value itself was signed off 2026-10-09 from
-# the one-axis half-width CV (run key 3a346460b90dc25d); it was 5.0.
-# test/operating_points_tests.jl holds all three equal to the record's
-# deployed setting (deployed_setting).
-outlier_halfwidth = 0.9646329181191862
+# CROSS-VALIDATED: the one-axis half-width CV of configs/halfwidth_cv.toml
+# (the 2026-10-09 protocol: split blobboards_cross_session, tune on 260521/bb,
+# the inter-board invariance mAA@10 mm), re-run on the detector of record above
+# (2026-11-22): optimum 1.716 px, frame-bootstrap 90% interval [1.0, 2.84] px;
+# 5 px is 0.0018 mAA below the peak and outside the interval. On the regressed
+# one-upsampling detector the same CV is flat (optimum 13.4, [1.49, 16]), so it
+# was not taken; with this detector it reproduces the 2026-10-09 run's
+# (0.9646 px, [0.965, 2.208]), whose value the configs carried until then.
+# peak_threshold and min_similarity stay the joint CV's (record
+# f5a385376eda453e, which kept them as its incumbent). The paper run used 5.0.
+# test/operating_points_tests.jl holds each equal to its record's deployed
+# setting (deployed_setting).
+outlier_halfwidth = 1.7162036756919732
 # Planar pose ambiguity: a coplanar target admits two pose basins (the normal
 # mirrored about the viewing ray, a PROPER rotation - Schweighofer & Pinz
 # 2006), and they tie on position consensus, so RANSAC's winner is a coin flip

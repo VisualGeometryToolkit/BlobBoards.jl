@@ -101,6 +101,26 @@ gpu = true
 default = false
 
 [[stage]]
+name = "detector_levels"
+what = "the detector's scale-ladder CV on the tuning session (detector_levels-<key>), one GPU; its record is the run configs' [find_boards.detect] upsample, nb_scales, nb_octaves (only with --only)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "-t", "auto", "bmvc2026/scripts/detector_levels.jl"]
+driver = "bmvc2026/scripts/detector_levels.jl"
+config = "bmvc2026/configs/detector_levels.toml"
+gpu = true
+default = false
+
+[[stage]]
+name = "halfwidth_cv"
+what = "the one-axis outlier half-width CV (the 2026-10-09 protocol) on the detector of record (detection_cv-<key>), one GPU; its record is the run configs' outlier_halfwidth (only with --only)"
+after = ["setup"]
+command = ["julia", "--startup-file=no", "--project=bmvc2026", "bmvc2026/scripts/detection_cv.jl", "--config=halfwidth_cv.toml"]
+driver = "bmvc2026/scripts/detection_cv.jl"
+config = "bmvc2026/configs/halfwidth_cv.toml"
+gpu = true
+default = false
+
+[[stage]]
 name = "hand_eye"
 what = "the hand-eye records from the calibration subsets (hand_eye-<key>)"
 after = ["records", "bb", "baselines"]
