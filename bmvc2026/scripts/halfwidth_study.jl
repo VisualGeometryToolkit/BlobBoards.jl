@@ -221,7 +221,7 @@ end
 # One population's residuals (the pose problem's own) and labels.
 # The detection's centre is read off the correspondence's own image side (the detection index of a phase-2
 # board is into that phase's pool); the blob index `src_id` is into the board's world blobs.
-function label_population!(rows, tbl, pop, cam, pose, centres; frame, uid, gate, pitch, weights = nothing)
+function label_population!(rows, tbl, pop, cam, pose, centres, rho; frame, uid, c_gate, weights = nothing)
     length(tbl) == 0 && return rows
     pts = BlobBoards.planar_lift(tbl)
     prob = VgtkEstimation.AbsolutePoseProblem(VgtkCore.model(cam), pts)
@@ -236,7 +236,10 @@ function label_population!(rows, tbl, pop, cam, pose, centres; frame, uid, gate,
         other = minimum((_dist(x, c) for (q, c) in enumerate(centres) if q != j && isfinite(c[1])); init = Inf)
         push!(rows.population, pop); push!(rows.frame, frame); push!(rows.uid, string(uid))
         push!(rows.residual, r[k]); push!(rows.own_px, own); push!(rows.other_px, other)
-        push!(rows.inlier, own <= other); push!(rows.gate, gate); push!(rows.pitch, pitch)
+        # the candidate's own blob: its gate (the IoU gate's centre offset at its radius) and its local pitch
+        # (the distance from its centre to the nearest other blob centre)
+        pitch = minimum((_dist(cj, c) for (q, c) in enumerate(centres) if q != j && isfinite(c[1])); init = Inf)
+        push!(rows.inlier, own <= other); push!(rows.gate, c_gate * rho[j]); push!(rows.pitch, pitch)
         push!(rows.weight, weights === nothing ? NaN : Float64(weights[k]))
     end
     return rows
@@ -339,14 +342,14 @@ function run_residuals()
             gate = c_gate * rho_med; pitch = nn_pitch(centres)
             push!(boards.frame, s); push!(boards.uid, string(uid)); push!(boards.gate, gate); push!(boards.pitch, pitch)
             push!(boards.rho, rho_med); push!(boards.n_final, length(scored))
-            kw = (; frame = s, uid, gate, pitch)
-            label_population!(rows, scored, "final", cam, pose, centres; weights = scored.weights, kw...)
+            kw = (; frame = s, uid, c_gate)
+            label_population!(rows, scored, "final", cam, pose, centres, rho; weights = scored.weights, kw...)
             g = BlobBoards.guided_search(T, bundle, feats; min_iou)
-            label_population!(rows, g, "guided", cam, pose, centres; kw...)
+            label_population!(rows, g, "guided", cam, pose, centres, rho; kw...)
             bf = ctx.feats[uid]
             mm = BlobBoards.match(bf, feats, BlobBoards.MutualNN(); min_similarity = cfg.min_similarity)
             d = BlobBoards._scored_with_ids(bf, feats, mm)
-            label_population!(rows, d, "descriptor", cam, pose, centres; kw...)
+            label_population!(rows, d, "descriptor", cam, pose, centres, rho; kw...)
         end
     end
     em = CFG["em"]
@@ -365,7 +368,9 @@ function run_residuals()
         per_frame[pop] = pf
     end
     H, W = size(load_image(joinpath(ctx.image_dir, first(ctx.frames))))   # Julia images are rows × columns
-    gate = median(boards.gate); pitch = median(boards.pitch)
+    # the grid's gate and pitch: the medians over the candidates the boards were fitted on (their own blobs')
+    fsel = rows.population .== "final"
+    gate = median(rows.gate[fsel]); pitch = median(filter(isfinite, rows.pitch[fsel]))
     named = named_halfwidths(gate, pitch, W, H)
     # The MAP decision boundary (Core's) at each listed half-width, at the pooled final population's ML fit
     # (its s and ν), the label prior 1/2 (the configuration of record) and the fitted π.
@@ -437,12 +442,12 @@ end
 
 function run_report(dir)
     rp = residuals_product()
-    produced(rp) || error("the residuals product is not produced: run --stage=residuals")
+    isfile(product_output(rp)) || error("the residuals product is not produced: run --stage=residuals")
     res = load_jld2(product_output(rp), "record")
     arms = Dict{String, Any}()
     for n in ARM_NAMES
         p = arm_product(n)
-        produced(p) ? (arms[n] = load_jld2(product_output(p), "record")) : @warn "arm not produced: left out" n
+        isfile(product_output(p)) ? (arms[n] = load_jld2(product_output(p), "record")) : @warn "arm not produced: left out" n
     end
     unc = CFG["uncertainty"]; lvl = (1 - unc["interval"]) / 2
     named = res["named"]
@@ -516,7 +521,19 @@ function run_report(dir)
             "outlier_q" => [q(ro, p) for p in (0.1, 0.5, 0.9, 0.99, 1.0)], "inlier_q" => [q(ri, p) for p in (0.5, 0.9, 0.99, 0.999, 1.0)],
             "outlier_within_gate" => isempty(ro) ? NaN : mean(R["residual"][sel .& .!R["inlier"]] .<= R["gate"][sel .& .!R["inlier"]]),
             "outlier_within_pitch" => isempty(ro) ? NaN : mean(R["residual"][sel .& .!R["inlier"]] .<= R["pitch"][sel .& .!R["inlier"]]),
-            "outlier_within_record" => isempty(ro) ? NaN : mean(ro .<= named["record"]))
+            "outlier_within_record" => isempty(ro) ? NaN : mean(ro .<= named["record"]),
+            "gate_q" => [quantile(R["gate"][sel], p) for p in (0.1, 0.5, 0.9)],
+            "pitch_q" => [quantile(filter(isfinite, R["pitch"][sel]), p) for p in (0.1, 0.5, 0.9)],
+            "outlier_own_px_q" => [q(R["own_px"][sel .& .!R["inlier"]], p) for p in (0.1, 0.5, 0.9)],
+            "outlier_other_px_q" => [q(R["other_px"][sel .& .!R["inlier"]], p) for p in (0.1, 0.5, 0.9)])
+        if pop == "final"
+            w = R["weight"][sel]; lab = R["inlier"][sel]
+            pops[pop]["weights"] = Dict{String, Any}(
+                "inliers_rejected" => mean(w[lab] .< 0.5), "outliers_accepted" => any(.!lab) ? mean(w[.!lab] .>= 0.5) : NaN,
+                "n_rejected" => count(w .< 0.5), "n_rejected_inliers" => count((w .< 0.5) .& lab),
+                "rejected_inlier_residual_q" => [q(R["residual"][sel][(w .< 0.5) .& lab], p) for p in (0.1, 0.5, 0.9)],
+                "accepted_residual_q" => [q(R["residual"][sel][w .>= 0.5], p) for p in (0.5, 0.9, 0.99, 1.0)])
+        end
         # the share of each label the MAP rule at each listed half-width keeps as an inlier (γ = 1/2: the configuration of record)
         th = res["thresholds"]
         pops[pop]["kept"] = Dict{String, Any}(k => Dict("boundary" => th[k]["boundary_half"],
