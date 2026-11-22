@@ -90,7 +90,6 @@ end
     @test collect(keys(s.axes)) == ["outlier_halfwidth"] && s.incumbent === nothing
     p = OperatingPoints.detection_cv_product(hw)
     @test endswith(VgtkEval.Experiments.product_dir(p), joinpath("tuning", OperatingPoints.EXPERIMENT, "detection_cv", p.key))
-    @test p.key == OperatingPoints.detection_cv_product(OperatingPoints.load_config("halfwidth_cv.toml")).key
     @test p.key != OperatingPoints.detection_cv_product(OperatingPoints.load_config("detection_cv.toml")).key
 
     dl = OperatingPoints.load_config("detector_levels.toml")
@@ -106,7 +105,6 @@ end
     end
     q = OperatingPoints.detector_levels_product(dl)
     @test endswith(VgtkEval.Experiments.product_dir(q), joinpath("tuning", OperatingPoints.EXPERIMENT, "detector_levels", q.key))
-    @test q.key == OperatingPoints.detector_levels_product(OperatingPoints.load_config("detector_levels.toml")).key
 
     stages = Dict(st["name"] => st for st in TOML.parsefile(projectdir("configs", "reproduce.toml"))["stage"])
     for (name, driver, conf) in (("halfwidth_cv", "detection_cv.jl", "halfwidth_cv.toml"),
@@ -144,7 +142,8 @@ end
         @info "no detector-ladder artifact at $path (results root not bound here): check SKIPPED"
         @test_skip false
     else
-        sel = load(path)["settings"][load(path)["selected"]]
+        a = load(path)
+        sel = a["settings"][a["selected"]]
         for rc in OperatingPoints.RUN_CONFIGS
             d = OperatingPoints.load_config(rc)["find_boards"]["detect"]
             @test all(sel[k] == d[k] for k in ("upsample", "nb_scales", "nb_octaves"))

@@ -69,7 +69,7 @@ using VisualGeometryToolkitEval: cli_option
 if !isdefined(Main, :BlobBoardsEval)
     include(joinpath(@__DIR__, "..", "src", "BlobBoardsEval.jl"))
 end
-using Main.BlobBoardsEval: input_path, config_path, invariance_cv, detection_run, invariance_errors,
+using Main.BlobBoardsEval: config_path, invariance_cv, detection_run, invariance_errors, run_inputs,
     detection_cv_product, detection_cv_artifact, detection_cv_table
 
 const CFG_PATH = config_path(cli_option(ARGS, "config", "detection_cv.toml"))
@@ -147,7 +147,7 @@ function run_cv()
         arm = "pose")
     # the read-side gate, before anything is recorded complete
     @info "selected" deployed_setting(detection_cv_artifact(OUTDIR); context = "joint detection CV") interval
-    return Produced(nothing; inputs = [ctx.image_dir, input_path(CFG, "camera"), input_path(CFG, "boards"), ctx.run_config])
+    return Produced(nothing; inputs = run_inputs(CFG, ctx))
 end
 
 # The curve of each axis and the surface of each pair of axes through the

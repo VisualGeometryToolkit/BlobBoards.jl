@@ -19,8 +19,7 @@ using VisualGeometryToolkitCore: BoundedCamera
 import VisualGeometryToolkitIO as _VgtkIO
 using VisualGeometryToolkitEval.Tuning: CrossValidation, validation_units, validation_scenes
 using VisualGeometryToolkitEval.Evaluation: rigid_invariance_errors
-using BlobBoards: FindBoardsConfig, DescriptorNetwork, BoardGallery, uid_from_hash, find_boards, load_bundle,
-    prepare_image_features
+using BlobBoards: FindBoardsConfig, DescriptorNetwork, BoardGallery, find_boards, prepare_image_features
 using Accessors: @set
 import VisualGeometryToolkitFeatures as _VgtkFeatures
 using Colors: Gray
@@ -62,7 +61,7 @@ function validation_frames(cfg::AbstractDict, cv::CrossValidation)
     dir = joinpath(input_path(cfg, "images"), subset)
     # [inputs.images] is the session's images/ directory: <session>/images/<subset>
     basename(dirname(dirname(dir))) == session || error("the validation scene $(scene) is not in [inputs.images] $(dir)")
-    all_images = sort(filter(f -> lowercase(splitext(f)[2]) in (".jpg", ".jpeg", ".png"), readdir(dir)))
+    all_images = sort(filter(_is_image, readdir(dir)))   # eval_images.jl
     return dir, only(validation_units(cv, Dict(scene => all_images))).second
 end
 
@@ -80,9 +79,7 @@ function invariance_cv(cfg::AbstractDict, cv::CrossValidation; device)
     net = DescriptorNetwork(input_path(load_config(cfg["runs"]["bb"]), "network"))   # the run config's [inputs.network]
     gallery_file = joinpath(results_root(), cfg["gallery"]["path"]); mkpath(dirname(gallery_file))
     gallery = BoardGallery(gallery_file, net)
-    board_paths = filter(endswith(".json"), readdir(input_path(cfg, "boards"); join = true))
-    feats = Dict(uid => f for (uid, f) in [insert!(gallery, bp, net) for bp in board_paths])
-    bundles = Dict(let (b, _, ch) = load_bundle(bp); uid_from_hash(ch) => b end for bp in board_paths)
+    feats, bundles = load_panel(gallery, net, input_path(cfg, "boards"))   # board_panel.jl
     uids = sort!(collect(keys(bundles)))
     panel = cfg["panel"]
     length(uids) == panel["n_boards"] || error("$(length(uids)) boards in [inputs.boards], the config states $(panel["n_boards"])")
@@ -93,36 +90,44 @@ end
 """
     detection_run(ctx, cfg::FindBoardsConfig; on_frame = (stem, seconds) -> nothing) -> Dict{String,Any}
 
-One detection run: the prepared image features of every validation frame
-under `cfg` (its detection and adaptation), by frame stem. `on_frame` is
-called with each frame's stem and its wall time (s).
+One detection run: the image features of every validation frame under `cfg`
+(its detection, adaptation and description), by frame stem; the frames'
+pixels are not kept. `on_frame` is called with each frame's stem and the wall
+time (s) of its `prepare_image_features` (the image's decoding excluded).
 """
 function detection_run(ctx::InvarianceCV, cfg::FindBoardsConfig; on_frame = (stem, seconds) -> nothing)
-    prepared = Dict{String,Any}()
+    features = Dict{String,Any}()
     for (stem, f) in zip(ctx.stems, ctx.frames)
-        t = @elapsed prepared[stem] = prepare_image_features(ctx.net, Gray.(_load_image(joinpath(ctx.image_dir, f)));
-                                                            board_bundles = ctx.bundles, config = cfg, device = ctx.device)
+        img = Gray.(_load_image(joinpath(ctx.image_dir, f)))
+        t = @elapsed features[stem] = prepare_image_features(ctx.net, img; board_bundles = ctx.bundles, config = cfg,
+                                                             device = ctx.device).image_features
         on_frame(stem, t)
     end
-    return prepared
+    return features
 end
 
-"""
-    invariance_errors(ctx, prepared, cfg::FindBoardsConfig) -> (; translation, pairs, poses)
+"What a run on `ctx` read: the validation frames, the camera store, the boards and the run config."
+run_inputs(cfg::AbstractDict, ctx::InvarianceCV) =
+    [ctx.image_dir, input_path(cfg, "camera"), input_path(cfg, "boards"), ctx.run_config]
 
-The boards found in every frame of a detection run (`prepared`) under `cfg`,
+"""
+    invariance_errors(ctx, features, cfg::FindBoardsConfig) -> (; translation, pairs, poses)
+
+The boards found in every frame of a detection run (`features`) under `cfg`,
 and their inter-board invariance errors (`rigid_invariance_errors`): the
 (frame × board pair) translation errors (mm; Inf = a failure) and their
 pairs; `poses` the boards found per frame.
 """
-function invariance_errors(ctx::InvarianceCV, prepared, cfg::FindBoardsConfig)
-    poses = Dict(s => Dict(uid => m for (uid, m, _, _) in find_boards(ctx.feats, prepared[s].image_features;
+function invariance_errors(ctx::InvarianceCV, features, cfg::FindBoardsConfig)
+    poses = Dict(s => Dict(uid => m for (uid, m, _, _) in find_boards(ctx.feats, features[s];
                                                                       config = cfg, device = ctx.device,
                                                                       board_bundles = ctx.bundles))
                  for s in ctx.stems)
     r = rigid_invariance_errors(poses; targets = ctx.uids, units = ctx.stems, min_obs = ctx.min_obs)
     return (; translation = r.translation, pairs = r.pairs, poses)
 end
+
+# ---- the detector's scale ladder (scripts/detector_levels.jl) -------------------------------------------------------
 
 """
     with_ladder(cfg::FindBoardsConfig, setting) -> FindBoardsConfig
@@ -140,13 +145,16 @@ end
     ladder_sigma_range(setting, W, H; seed_sigma = 1.6) -> (lo, hi)
 
 The scales a ladder `setting` searches in a `W`×`H` image, input pixels: the
-interior DoG slices of every octave, `seed_sigma·2^(1.5/S)·2^(−upsample)` …
-`seed_sigma·2^((S + 0.5)/S)·2^(nb_octaves − 1 − upsample)`
-(VisualGeometryToolkitFeatures `AsiftPlan`; `nb_octaves = 0` is its default,
-`sift_nb_octaves`).
+interior DoG slices 1 and S of the finest and coarsest octave, in
+VisualGeometryToolkitFeatures' own spelling (`_slice_sigma`, and `_nb_octaves`
+for the octave count: `nb_octaves = 0` is its default `sift_nb_octaves`, and
+an inadmissible count is refused as `AsiftPlan` refuses it). `seed_sigma` is
+`AsiftPlan`'s default, the one BlobBoards detects with. Features has no public
+accessor for the searched range; these are its internals until it has one.
 """
 function ladder_sigma_range(s::AbstractDict, W::Integer, H::Integer; seed_sigma::Real = 1.6)
     u, S = s["upsample"], s["nb_scales"]
-    n = s["nb_octaves"] == 0 ? _VgtkFeatures.sift_nb_octaves(W, H; upsample = u) : s["nb_octaves"]
-    return seed_sigma * exp2(1.5 / S - u), seed_sigma * exp2((S + 0.5) / S + n - 1 - u)
+    n = _VgtkFeatures._nb_octaves("ladder_sigma_range", W, H, u, s["nb_octaves"] == 0 ? nothing : s["nb_octaves"])
+    return (_VgtkFeatures._slice_sigma(1.0, seed_sigma, S, exp2(-u)),
+            _VgtkFeatures._slice_sigma(Float64(S), seed_sigma, S, exp2(n - 1 - u)))
 end

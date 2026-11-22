@@ -43,6 +43,7 @@ include("calibration.jl")
 # Where the tuned detection operating point lives (scripts/detection_cv.jl writes it).
 include("operating_points.jl")
 # The invariance CV's shared machinery (scripts/detection_cv.jl, scripts/detector_levels.jl).
+include("board_panel.jl")   # `load_panel`, shared with BoardSweep
 include("invariance_cv.jl")
 # Per-image detection exports (the AprilTag/ArUco baselines) → vgio/target_poses/v1.
 include("detections.jl")

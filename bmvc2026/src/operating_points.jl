@@ -118,10 +118,9 @@ configs/detection_cv.toml under its run key of the 0.8 layout,
 search kept its declared incumbent (scripts/detection_cv_replay.jl). A record
 stays where it was made; a later code tree names a new product directory.
 """
-const ADOPTED_OPERATING_POINTS = [
-    (key = ("find_boards", "geometry", "outlier_halfwidth"), axis = :outlier_halfwidth,
-     artifact = joinpath("tuning", EXPERIMENT, "detection_cv", HALFWIDTH_CV_KEY, "detection.jld2")),
-    [(key = k, axis = a, artifact = joinpath("tuning", "detection_cv-f5a385376eda453e", "detection.jld2"))
-     for (k, a) in ((("find_boards", "detect", "peak_threshold"), :peak_threshold),
-                    (("find_boards", "min_similarity"), :min_similarity))]...
-]
+const ADOPTED_OPERATING_POINTS = let joint = joinpath("tuning", "detection_cv-f5a385376eda453e", "detection.jld2")
+    [(key = ("find_boards", "geometry", "outlier_halfwidth"), axis = :outlier_halfwidth,
+      artifact = joinpath("tuning", EXPERIMENT, "detection_cv", HALFWIDTH_CV_KEY, "detection.jld2")),
+     (key = ("find_boards", "detect", "peak_threshold"), axis = :peak_threshold, artifact = joint),
+     (key = ("find_boards", "min_similarity"), axis = :min_similarity, artifact = joint)]
+end

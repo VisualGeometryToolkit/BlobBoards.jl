@@ -122,18 +122,8 @@ function sweep_context(;
     gallery = BoardGallery(gallery_path, network)
     println("descriptor model: $network_path (patch $(BlobBoards.patch_size(network)))")
 
-    board_paths = filter(endswith(".json"), readdir(boards_dir; join = true))
-    board_features = Dict(
-        uid => f for (uid, f) in
-            [insert!(gallery, bp, network) for bp in board_paths]
-    )
-    board_bundles = Dict(
-        let (b, _, ch) = load_bundle(bp)
-            uid_from_hash(ch) => b
-        end
-            for bp in board_paths
-    )
-    println("$(length(board_paths)) boards loaded")
+    board_features, board_bundles = load_panel(gallery, network, boards_dir)
+    println("$(length(board_bundles)) boards loaded")
 
     # One palette authority: stable per board id (sorted) — BlobBoards.board_palette.
     board_colors = BlobBoards.board_palette(keys(board_bundles))
@@ -220,6 +210,7 @@ end
 # mocap↔image pairing is its contract) lives in eval_images.jl, included here
 # and in BlobBoardsEval, so the sweep loads without the evaluation module.
 include(joinpath(@__DIR__, "eval_images.jl"))
+include(joinpath(@__DIR__, "board_panel.jl"))   # `load_panel`, shared with BlobBoardsEval
 
 """
     select_frames(images, limit) -> Vector
