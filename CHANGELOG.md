@@ -90,9 +90,18 @@ unchanged):
 - timing (another machine): BlobBoards mean 2.03 → 1.89 s, median 1.84 → 1.47 s, standard deviation 2.18 → 2.75 s;
 - the settings table: half-width 5 → 1.716 px (interval 1.46–2.84), adaptation IRLS cap 20 → 100 (2026-11-11);
 - **flips (> 10°), BlobBoards without / with the likelihood-ratio test: 45 / 33 (12 corrected) → 22 / 23 (−1)**: the
-  new detector and half-width halve the flips before the test, and the test no longer reduces them. This reverses the
-  paper's claim that the test corrects flips (its text, and the flip table's caption): the release is HELD for the
-  owner's decision.
+  new detector and half-width halve the flips before the test, and the test no longer reduces them. This reversed the
+  paper's claim that the test corrects flips; by the owner's decision (2026-11-24) the claim is reworded to what the
+  record shows (`papers/blob_boards_bmvc.tex`, the planar-ambiguity paragraph and the flip table's caption): the new
+  detector and half-width halve the flips, and the test is neutral at this operating point. FLIP_DIAGNOSTICS
+
+The submitted paper's generated assets are REPLACED by this record's (the owner's approval of 2026-11-24, Eval's
+`replace_submitted`): every number above, the tables and figures under `papers/figures/`, and the images the asset
+stages draw (`papers/images/`: the adapted and pipeline panels, the pattern variations, the validation overlays, the
+intro overlay, the occlusion picks). Until now `papers/` held the published snapshot.
+
+Follow-up (not this release): a cross-validated outlier half-width for the likelihood-ratio test itself, chosen on the
+tuning session 260521 (never tuned on 260527).
 
 Known issue (follow-up): two runs that share a results root race on the board-gallery cache file
 (`results_root()/cache/board_features_*.jld2`, `BoardGallery`): a second process opened the file while the first was

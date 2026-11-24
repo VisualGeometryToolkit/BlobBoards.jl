@@ -56,8 +56,10 @@ run (2026-08-26) and the config of record: `outlier_halfwidth` 5 → 0.9646 px;
 `adapt.cutoff` now from the gallery (v6); `adapt.init` and `store` fixed in
 code; the local optimization stated explicitly (`student_t_uniform`) and
 `undistortion = "global"`; `min_similarity`, `peak_threshold` and the NMS
-cutoff unchanged. The assets under `papers/` are the published snapshot and
-are not replaced.
+cutoff unchanged. Since 0.7.4 the assets under `papers/` are the run of
+record's (BlobBoards `cc2057c`, 2026-11-24; the owner replaced the published
+snapshot, which stays in git history); the CHANGELOG lists every number that
+moved.
 
 ## Inputs and results
 

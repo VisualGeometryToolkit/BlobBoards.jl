@@ -1174,12 +1174,12 @@ poses remain accurate for BlobBoards.
 pose ambiguity~\cite{schweighofer2006robust} of \cref{sec:orientation}, which
 \cref{tab:flips} isolates at $>10^\circ$ rotation error. AprilTag produces
 $\flipApr$ such errors and ArUco $\flipUco$, against $\flipBBraw$ for BlobBoards
-before the mirror test and $\flipBBlrt$ after --- the likelihood-ratio test corrects
-$\flipBBcorrected$ otherwise identical estimates without changing their detections,
-correspondences or calibration. The tag baselines already use the
-state-of-the-art planar solver IPPE~\cite{collins2014ippe}; BlobBoards decide the
-same branch from hundreds of verified correspondences and can therefore still
-improve on it.
+before the mirror test and $\flipBBlrt$ after. With the detector and outlier
+half-width of record, few flips remain to be corrected, and on these otherwise
+identical detections, correspondences and calibration the likelihood-ratio test
+is neutral. The tag baselines already use the state-of-the-art planar solver
+IPPE~\cite{collins2014ippe}; BlobBoards decide the same branch from hundreds of
+verified correspondences.
 
 %-------------------------------------------------------------------------
 \section{Implementation}
@@ -1191,8 +1191,9 @@ improve on it.
 		lower-reprojection-error tag pose from four corners, whereas
 		\cref{sec:orientation} selects between BlobBoard branches using
 		hundreds of verified correspondences. The final two columns use
-		identical detections, correspondences, and calibration; the likelihood-ratio test (LRT)
-		reduces the remaining flips from $\flipBBraw$ to $\flipBBlrt$.}
+		identical detections, correspondences, and calibration; with the likelihood-ratio
+		test (LRT) the count is $\flipBBlrt$ against $\flipBBraw$ without it: the
+		test is neutral at this operating point.}
 	\label{tab:flips}
 \end{table}
 BlobBoards is implemented in Julia, with affine-warp detection, blob
