@@ -26,8 +26,8 @@ fetched and the others install when a stage first reads them.
 ## One command
 
 ```bash
-bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01 --dry-run   # the job graph and every missing input, nothing run
-bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01             # Slurm: every stage, the GPU ones on a GPU each
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=vcai --dry-run   # the job graph and every missing input, nothing run
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=vcai             # Slurm: every stage, the GPU ones on a GPU each
 bash bmvc2026/scripts/reproduce/reproduce.sh --site=desktop           # the desktop: the same stages, in order, here
 cd bmvc2026/papers && make                                              # supplement, then paper
 ```

@@ -193,7 +193,7 @@ silently wrong the moment the config changes.
 dev chain) as path dependencies:
 
 ```sh
-bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01      # every result + the paper's assets (Slurm)
+bash bmvc2026/scripts/reproduce/reproduce.sh --site=vcai      # every result + the paper's assets (Slurm)
 bash bmvc2026/scripts/reproduce/reproduce.sh --site=desktop    # the same here, stage by stage
 julia --project=bmvc2026 bmvc2026/scripts/make_pose_results.jl     # just the result cells (after the detections)
 ```

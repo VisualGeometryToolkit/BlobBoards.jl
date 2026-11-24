@@ -37,10 +37,15 @@ const EXPERIMENT = "bmvc2026"
 The keyed product `name` of the config of record `cfg` (Eval's `Product`):
 filed under `<[experiment] layout…>/bmvc2026`, keyed by `cfg` itself, the code
 it runs and the `upstream` products or keys it reads; `output` is the file (or
-directory) its driver writes.
+directory) its driver writes. A figure config's `[render]` table keys the
+product as `render_files`: Eval's `Product` refuses a top-level `render`
+(a run key excludes it), and the rendering is part of what the product is.
 """
 stage_product(cfg::AbstractDict, name::AbstractString; output::AbstractString, upstream = nothing) =
-    Product(join([String.(cfg["experiment"]["layout"]); EXPERIMENT], "/"), name, cfg; output, upstream)
+    Product(join([String.(cfg["experiment"]["layout"]); EXPERIMENT], "/"), name, _render_keyed(cfg); output, upstream)
+
+_render_keyed(cfg::AbstractDict) = haskey(cfg, "render") ?
+    Dict{String, Any}((k == "render" ? "render_files" : String(k)) => v for (k, v) in cfg) : cfg
 
 """
     config_path(name) -> String

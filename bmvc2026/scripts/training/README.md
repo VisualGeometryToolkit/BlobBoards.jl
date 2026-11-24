@@ -13,7 +13,7 @@ Neither writes into the input tree:
 Both are stages of `configs/reproduce.toml` (`annotations`, `train_descriptor`;
 `default = false`: the paper's network of record is an INPUT, the bb_assets
 tier, trained by the bootstrap chain the descriptor_training tiers publish).
-Run them with `bash bmvc2026/scripts/reproduce/reproduce.sh --site=dgx01
+Run them with `bash bmvc2026/scripts/reproduce/reproduce.sh --site=vcai
 --only=annotations` (or `train_descriptor`), or call a driver directly.
 
 The drivers run under the `bmvc2026` project, which declares everything the

@@ -1,7 +1,7 @@
 # The stage graph of record of the paper: every result and generated asset from the published inputs, in one command
 # (VisualGeometryToolkitEval Reproduce, the runner). This file is data only: which driver runs on which config of record,
 # after what. How a stage runs (Slurm or here, the CPUs, the GPUs) is the site's, a machine profile shipped with
-# VisualGeometryToolkitEval (configs/sites/dgx01.toml, desktop.toml, vcai.toml), and so are this project's data and
+# VisualGeometryToolkitEval (configs/sites/desktop.toml, vcai.toml), and so are this project's data and
 # results roots on it: the profile's [storage] data_root / results_root ("…/{project}", here bmvc2026), else
 # VGTK_DATA_ROOT / VGTK_RESULTS_ROOT or --data-root / --results-root. No machine path is written here: [sites.desktop]
 # below names only this checkout's own directories.

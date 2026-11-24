@@ -5,7 +5,7 @@
 # do not edit; regenerate it. The runner needs the stdlibs only (and Core's Base-only canonical.jl, included by path), so it starts from a bare julia before the environment
 # is instantiated: on a fresh checkout the package sources are fetched here (no precompilation:
 # JULIA_PKG_PRECOMPILE_AUTO=0), and the setup stage instantiates and precompiles inside the scheduler.
-#   bash bmvc2026/scripts/reproduce/reproduce.sh --site=<dgx01 | desktop | path/to/site.toml> [--dry-run] [--only=a,b] [--no-deps] [status]
+#   bash bmvc2026/scripts/reproduce/reproduce.sh --site=<vcai | desktop | path/to/site.toml> [--dry-run] [--only=a,b] [--no-deps] [status]
 set -euo pipefail
 cd "$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 exec "${JULIA:-julia}" --startup-file=no --project=bmvc2026 -e '
