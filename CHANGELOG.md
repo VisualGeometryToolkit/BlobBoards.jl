@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.4
+## 0.7.4 (2026-11-24)
 
 On VisualGeometryToolkitCore 0.13 (`[compat]` in the package, `test/`, `gpu/`, `examples/` and `bmvc2026/`;
 bmvc2026 also VisualGeometryToolkitEval 0.10). Core 0.13 installs every artifact into the ARTIFACT STORE
