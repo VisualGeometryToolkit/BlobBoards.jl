@@ -350,7 +350,7 @@ falling back to the uncalibrated homography path.
 
 The practical consequence is that ONE config serves many cameras. Each capture
 session carries its own intrinsics beside its images (260521 was shot at f/9.0,
-260527 at f/22), so `go_bmvc2026.jl` and `detection_thresholds_cv.jl` both discover the
+260527 at f/22), so `go_bmvc2026.jl` and `detection_cv.jl` both discover the
 camera from the dataset directory and reuse the same config file across
 sessions. A `camera` path in the file would force one near-identical config per
 session, differing in a single line — and they would drift.

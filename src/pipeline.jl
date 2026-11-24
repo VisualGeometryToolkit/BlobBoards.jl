@@ -1941,7 +1941,7 @@ ConstructionBase's generic `setproperties` already handles these structs.
 using Accessors                       # your dep, not BlobBoards'
 cfg = FindBoardsConfig("configs/default.toml"; camera)
 cfg = @set cfg.detect.peak_threshold = 0.02
-cfg = @set cfg.detect.upsample = false
+cfg = @set cfg.detect.upsample = 2          # the count of 2× upsamplings
 ```
 
 This works through ConstructionBase's generic `setproperties`, which is
@@ -1955,7 +1955,7 @@ type parameter).
 
 Sweeps should override rather than re-list: a hand-built `FindBoardsConfig`
 in a driver duplicates the knobs of the config of record, and the two drift.
-See `bmvc2026/scripts/detection_thresholds_cv.jl`.
+See `bmvc2026/scripts/detection_cv.jl` (its `SETTERS`).
 """
 Base.@kwdef struct FindBoardsConfig{G <: GeometryConfig, N}
     # Detection

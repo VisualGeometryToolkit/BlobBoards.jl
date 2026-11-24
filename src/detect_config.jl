@@ -128,9 +128,9 @@ Base.@kwdef struct DetectConfig{N}
                 error("configs/default.toml [find_boards.detect] nms type must be none/ellipse/mxm, got $(repr(n["type"]))")
         end
     end
-    # 2× upsample before building the scale space: starts the pyramid at
-    # octave -1 instead of 0 (VGF `o_first = upsample ? -1 : 0`), adding one
-    # octave and recovering small blobs that vanish at native resolution.
+    # 2× upsamplings before building the scale space: each starts the pyramid
+    # an octave finer (VGF's first octave is -upsample), recovering small blobs
+    # that vanish at native resolution.
     #
     # This used to be UNSETTABLE from BlobBoards: `_detect` simply never
     # forwarded it, so runs inherited VGF's own `upsample = true` default.

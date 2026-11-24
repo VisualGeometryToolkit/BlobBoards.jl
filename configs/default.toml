@@ -112,13 +112,14 @@ max_detections = "unbounded"    # cap: about this many of the strongest, spread 
 ransac_seed = 0x0b10b5eed
 
 [find_boards.detect]
-# 0.01 was tuned against the pre-upsampling detector and is the incumbent;
-# the 3x3 grid in detection_thresholds_cv.jl sweeps {0.005, 0.01, 0.02}.
+# 0.01 is the joint detection CV's incumbent (bmvc2026/scripts/detection_cv.jl,
+# configs/detection_cv.toml: record f5a385376eda453e kept it).
 peak_threshold = 0.01
 edge_threshold = 5.0
-# 2x upsample before the scale space (pyramid starts at octave -1).
-# Recovers small blobs at distance; the shipped 260527 poses were
-# produced with it on, which is what poses/bb.upsample was named for.
+# The count of 2× upsamplings before the scale space (the pyramid starts at
+# octave -upsample): each one reaches an octave finer, recovering small blobs
+# at distance. One is the package default; the bmvc2026 run configs of record
+# use two (their [find_boards.detect] comment says why).
 upsample = 1   # the count of 2× upsamplings (true/false read as 1/0)
 # DoG scales per octave (VisualGeometryToolkitFeatures' nb_scales).
 nb_scales = 3
