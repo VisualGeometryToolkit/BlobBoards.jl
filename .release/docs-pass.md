@@ -1,4 +1,4 @@
-docs-pass: 3ba0341
+docs-pass: c2c51c7
 landing: blobboards/blobboards.github.io 2cbc795 (no hand edit: the site is the Docs workflow's build of docs/src; the release rebuilds it)
 
 # 0.7.4 docs review (the Julia docs skill), on VisualGeometryToolkitCore 0.13.3 / Features 0.9.11 / LODR 0.7.3
