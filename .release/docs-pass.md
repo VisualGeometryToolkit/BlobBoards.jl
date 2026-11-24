@@ -1,6 +1,18 @@
-docs-pass: 4376e2f
-landing: blobboards/blobboards.github.io a5776d8 (no hand edit: the site is the Docs workflow's build of docs/src; 0.7.2 changes no page)
-(a compat-only patch on VisualGeometryToolkitCore 0.12 / VisualGeometryToolkitIO 0.11: no page, docstring, README line or example names a stack version or a moved name — checked by search; the docs build is part of the release gate)
+docs-pass: 5dd4525
+landing: blobboards/blobboards.github.io 2cbc795 (no hand edit: the site is the Docs workflow's build of docs/src; the release rebuilds it)
+
+# 0.7.4 docs review (the Julia docs skill), on VisualGeometryToolkitCore 0.13.3 / Features 0.9.11 / LODR 0.7.3
+
+[x] API diff since 0.7.3 (git diff v0.7.3 -- src ext python README.md docs): no name added or removed. `DetectConfig`
+    gains `nb_scales` and `nb_octaves` and `upsample` becomes a count (Int); its docstring states the three with their
+    defaults and Features' octave rule; `configs/default.toml` and the loader (`config_toml.jl`) carry them.
+[x] Docstrings: `FindBoardsConfig`'s override example set `upsample = false` (a Bool for the old flag): now `= 2` with a
+    comment. The source comments in `detect_config.jl` and `configs/default.toml` describe the count, not the old flag.
+    References to the retired `detection_thresholds_cv.jl` (pipeline.jl, config_toml.jl, default.toml) name
+    `bmvc2026/scripts/detection_cv.jl`.
+[x] Guides, README, Python README: none names the detector's ladder knobs or a stack version (checked by search); the
+    one docs/src change of the cycle (index.md, the artifact store) is current.
+[x] The suite's `docs` item and docs/make.jl (strict) run in the release gate.
 
 # 0.7.2 docs review (the Julia docs skill), on VisualGeometryToolkitCore 0.11 / Estimation 0.12 / IO 0.10.6 / Features 0.9.7 / LODR 0.7.1
 
