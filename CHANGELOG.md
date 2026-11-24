@@ -116,8 +116,9 @@ The submitted paper's generated assets are REPLACED by this record's (the owner'
 stages draw (`papers/images/`: the adapted and pipeline panels, the pattern variations, the validation overlays, the
 intro overlay, the occlusion picks). Until now `papers/` held the published snapshot.
 
-Follow-up (not this release): a cross-validated outlier half-width for the likelihood-ratio test itself, chosen on the
-tuning session 260521 (never tuned on 260527).
+Follow-up (not this release): the likelihood-ratio test is neutral at all three half-widths of the diagnostics,
+because the new detector leaves few flips it could correct; the open question is whether the test is still worth its
+cost at this detector (measured on the tuning session 260521), not a half-width of its own.
 
 Known issue (follow-up): two runs that share a results root race on the board-gallery cache file
 (`results_root()/cache/board_features_*.jld2`, `BoardGallery`): a second process opened the file while the first was
