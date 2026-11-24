@@ -75,6 +75,25 @@ significant digits) and says the value was cross-validated on a separate capture
 its frame-bootstrap interval the record's (`\bbSetHalfwidthCiLoPx`–`\bbSetHalfwidthCiHiPx`, generated from the
 half-width CV record by `make_supp_tables.jl`).
 
+**The run of record of 0.7.4** (2026-11-24): BlobBoards `cc2057c`, a clean clone resolved from General
+(VisualGeometryToolkitCore 0.13.3, Eval 0.11.0, Features 0.9.11, LocalOptimizationDoneRight 0.7.3, Estimation 0.12.2,
+IO 0.11.2; Julia 1.13.4), every stage of `configs/reproduce.toml` on an RTX PRO 6000 of the vcai cluster, results in
+its profile's results root. The numbers that move against the published paper (AprilTag and ArUco: every number
+unchanged):
+- poses on the bb subset (`\bbDetPoses`) 1346 → 1341;
+- unoccluded medians: rotation 0.46 → 0.45°, attitude rotation 0.58 → 0.57°, medium boards 0.43 → 0.42°, small boards
+  0.49 → 0.48°; rotation P90 large 0.98 → 0.99°, medium 0.99 → 1.02°, small 1.76 → 1.51°; small boards' detection
+  78 → 77 %; translation medians unchanged;
+- occlusion: detection at 50 % 69 → 70 %, at 70 % 49 → 51 %; rotation median at 50 % 1.05 → 1.04°, at 70 %
+  0.89 → 0.83°; translation median at 10 % 3.9 → 3.8 mm, at 70 % 3.6 → 3.7 mm, range 3.6–4.0 → 3.5–4.1 mm;
+- hand-eye: BlobBoards' rotation residual 0.27 (table 0.270) → 0.272° (one more digit; the fit is unchanged);
+- timing (another machine): BlobBoards mean 2.03 → 1.89 s, median 1.84 → 1.47 s, standard deviation 2.18 → 2.75 s;
+- the settings table: half-width 5 → 1.716 px (interval 1.46–2.84), adaptation IRLS cap 20 → 100 (2026-11-11);
+- **flips (> 10°), BlobBoards without / with the likelihood-ratio test: 45 / 33 (12 corrected) → 22 / 23 (−1)**: the
+  new detector and half-width halve the flips before the test, and the test no longer reduces them. This reverses the
+  paper's claim that the test corrects flips (its text, and the flip table's caption): the release is HELD for the
+  owner's decision.
+
 Known issue (follow-up): two runs that share a results root race on the board-gallery cache file
 (`results_root()/cache/board_features_*.jld2`, `BoardGallery`): a second process opened the file while the first was
 writing it ("Did not find a Superblock") and failed. The records of 0.7.4 ran their CVs one after the other. The cache
