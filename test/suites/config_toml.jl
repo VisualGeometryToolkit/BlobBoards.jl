@@ -548,7 +548,7 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
 
         @testset "top-level and geometry fields set too" begin
             @test (@set base.min_similarity = 0.8).min_similarity == 0.8
-            @test (@set base.detect.upsample = false).detect.upsample == false
+            @test (@set base.detect.upsample = 2).detect.upsample == 2   # a count since 0.7.4
             @test (@set base.geometry.min_inliers = 12).geometry.min_inliers == 12
             # the camera must survive an override of a sibling geometry knob --
             # losing it downgrades a metric-pose run to the uncalibrated path

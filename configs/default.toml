@@ -119,7 +119,7 @@ edge_threshold = 5.0
 # The count of 2× upsamplings before the scale space (the pyramid starts at
 # octave -upsample): each one reaches an octave finer, recovering small blobs
 # at distance. One is the package default; the bmvc2026 run configs of record
-# use two (their [find_boards.detect] comment says why).
+# use two (their detector comment says why).
 upsample = 1   # the count of 2× upsamplings (true/false read as 1/0)
 # DoG scales per octave (VisualGeometryToolkitFeatures' nb_scales).
 nb_scales = 3

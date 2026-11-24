@@ -448,11 +448,15 @@ const PINNED_PATTERN_V3_JSON = """
 
     # Re-pinned 2026-11-13 for VisualGeometryToolkitIO 0.10's canonical JSON (RFC 8785 numbers: 1.0e-6 is written
     # 0.000001), the stack's one deliberate re-id; the trees are unchanged (checked against 0.6.2's text).
+    # Re-pinned 2026-11-24 (0.7.4) for a CONTENT change, not a serializer one: `[find_boards.detect]` gained the scale
+    # ladder (`upsample` a count, was a Bool; `nb_scales`, `nb_octaves`), so both trees hold three new values and the
+    # hashes move, as they must — the detector they describe changed (VisualGeometryToolkitFeatures 0.9.11's interior
+    # slices), and an annotation run of 0.7.3 is not this one's.
     @testset "annotation and run-config hashes" begin
         @test BlobBoards.config_hash(;
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
-        ) == "beae63bcd83efb6e1983a85db1f4af538115fb17d0fad5cefd7aae2cefd71162"
+        ) == "fbd5d8ccf864b904584b0578e69f59fd9e169ca6637c2a459df4a40e58d9158b"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "2fe33da39ad147966ea25292f5280ad6d1b7613b45f37a0d14abafe3dbd147fa"
+            "759414ed704b996b44f13806ea780649417cceae0b359c95aa1f5252da337c78"
     end
 end
