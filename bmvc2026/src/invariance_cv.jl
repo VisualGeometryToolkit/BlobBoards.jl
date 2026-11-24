@@ -8,8 +8,8 @@
 # scene split (VisualGeometryToolkitEval `CrossValidation`), read from its
 # `[inputs.images]`; the run config of record (`[runs] bb`) is the pipeline
 # every cell runs, the search overriding only its axes. A detection run (the
-# features of every validation frame) costs a GPU pass; the post-detection
-# axes reuse it. The criterion's errors are VisualGeometryToolkitEval
+# features of every validation frame) runs the GPU detector once per frame;
+# the post-detection axes reuse it. The criterion's errors are VisualGeometryToolkitEval
 # `rigid_invariance_errors`: the translation of every (frame, board pair)
 # relative pose against its leave-one-out reference, mm, an undetected pair a
 # failure (Inf).
