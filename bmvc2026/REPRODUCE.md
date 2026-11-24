@@ -45,8 +45,10 @@ previous run by name.
 inputs with the current code and configs of record (2026-10-15) reproduces
 the AprilTag and ArUco results exactly (every detection bit for bit, every
 number at printed precision). The BlobBoards numbers differ slightly from the
-published ones: the detector changed after publication, and the half-width of
-record is now 0.9646 px (5 px when the paper was made). Rerunning at 5 px
+published ones: the detector changed after publication (since 0.7.4 it
+searches two upsamplings and one octave more, setting A of
+`configs/detector_levels.toml`), and the half-width of record is now
+1.716 px (0.9646 px from 2026-10-09; 5 px when the paper was made). Rerunning at 5 px
 attributes the moves: the detector changes account for most (the flip counts,
 the occlusion rotation medians), the half-width for a few detection rates
 (±1 point). The recorded configuration differences between the published
@@ -148,9 +150,26 @@ holds the configs of record to the artifact each value was adopted from
 
 | operating point | tuning step | config of record | criterion | value | feeds |
 |---|---|---|---|---|---|
+| ASIFT scale ladder (`upsample`, `nb_scales`, `nb_octaves`), pose arm | `scripts/detector_levels.jl` (GPU) | `configs/detector_levels.toml` (incumbent A, eligibility σ ⊇ 0.90 … 290 px) | inter-board invariance mAA@10 mm on 260521 | **(2, 3, 10)** — the incumbent A, kept | `configs/bmvc2026_260527.toml` and `_noflip.toml`: `[find_boards.detect] upsample`, `nb_scales`, `nb_octaves` |
+| `outlier_halfwidth` px, pose arm, alone | `scripts/detection_cv.jl --config=halfwidth_cv.toml` (GPU) | `configs/halfwidth_cv.toml` (the 2026-10-09 protocol) | inter-board invariance mAA@10 mm on 260521 | **1.7162036756919732** | `configs/bmvc2026_260527.toml` and `_noflip.toml`: `[find_boards.geometry] outlier_halfwidth` |
 | (`outlier_halfwidth` px, `peak_threshold`, `min_similarity`), pose arm, jointly | `scripts/detection_cv.jl` (GPU); this record by `scripts/detection_cv_replay.jl` (no GPU) | `configs/detection_cv.toml` (incumbent declared) | inter-board invariance mAA@10 mm | **(0.9646329181191862, 0.01, 0.6)** — the incumbent, kept | `configs/bmvc2026_260527.toml` and `_noflip.toml`: `[find_boards.geometry] outlier_halfwidth`, `[find_boards.detect] peak_threshold`, `[find_boards] min_similarity` |
 
-**The record** (deployed; `ADOPTED_OPERATING_POINTS`):
+**The records of 0.7.4** (2026-11-24; the release tree resolved from General — Core 0.13.3, Eval 0.11.0, Features
+0.9.11, LocalOptimizationDoneRight 0.7.3 — on an RTX PRO 6000 of the vcai cluster):
+
+- **the half-width** `results_root()/tuning/bmvc2026/detection_cv/6ec5ea34c5f30021/` (`configs/halfwidth_cv.toml`,
+  BlobBoards `7b3b371`): 1.716 px, frame-bootstrap 90% interval [1.46, 2.84] px; the paper states the value and the
+  interval (`make_supp_tables.jl`: `\bbSetHalfwidthPx`, `\bbSetHalfwidthCiLoPx`, `\bbSetHalfwidthCiHiPx`). The
+  interval's lower end depends on the device and the build (a B200 run of 2026-11-22 gave [1.0, 2.84]): the curve is
+  flat, and detections that differ at the 4th decimal of mAA move the bootstrap argmin of a share of the resamples
+  between neighbouring grid points; the same tree on the same device reproduces it bit for bit.
+- **the scale ladder** `results_root()/tuning/bmvc2026/detector_levels/0ba0995f05da891e/` (`configs/detector_levels.toml`):
+  BlobBoards `7b3b371`: seven ladders, the eligible ones (searched σ ⊇ 0.90 … 290 px) A, B and C; the best eligible
+  challenger C (upsample 1, nb_scales 10, nb_octaves 9: mAA 0.4093, 1756 boards) against the incumbent A (0.4090, 1765
+  boards) gains 0.0003 mAA with paired-bootstrap P(better) 0.568 < 0.95, so A is kept (Eval's incumbent rule, the joint
+  CV's). Table `table_detector_levels.tex` in the product.
+
+**The record of the peak threshold and the similarity gate** (deployed; `ADOPTED_OPERATING_POINTS`):
 
 - **run key** `f5a385376eda453e`; `results_root()/tuning/detection_cv-f5a385376eda453e/`; artifact `detection.jld2` (sha256 `93132e6d5072425c102dd3f29bf931dcf2bdb7361481d817112aff9059c6012a`).
 - **how** `detection_cv_replay.jl` at BlobBoards `4c55c8b` with VisualGeometryToolkitEval `01d1e2e` (its `_provenance.toml` carries `[code]`, `[config]` and `[data]` tables: repository + commit, the config path + commit, each source by results_root-relative path + sha256). The search of `detection_cv.toml` is replayed from (a) the per-frame mAA statistics of every cell of the joint run `c80d42e9055f8cd5` (`detection.jld2`, sha256 `f5d7515e…`) and (b) the incumbent's (frame × pair) errors from the half-width run `3a346460b90dc25d` (`outlier_halfwidth_pose.jld2`, sha256 `2444454e…`) — same 80 frames, same 435 board pairs. Every cell the search asks for is in (a) or is the incumbent; the replayed coarse and fine objectives equal the joint run's.
@@ -161,7 +180,8 @@ holds the configs of record to the artifact each value was adopted from
 
 **The half-width run** `3a346460b90dc25d` (the source of (b); the half-width's 2026-10-09 sign-off): `scripts/outlier_halfwidth_cv.jl` (retired; BlobBoards `869e89d`), BlobBoards `e203694`, VisualGeometryToolkitEval `10fdc8e`; mAA 0.4097 at 0.9646 px, interval [0.965, 2.208] px.
 
-**Where the record is kept.** `results_root()` is `bmvc2026/data/exp_pro` of the checkout (gitignored). The three runs above (`detection_cv-f5a385376eda453e`, `detection_cv-c80d42e9055f8cd5`, `outlier_halfwidth_cv-3a346460b90dc25d`) are kept by the authors, add-only, under those run keys (every file's sha256 checked equal to the original, 2026-10-15).
+**Where the record is kept.** `results_root()` is `bmvc2026/data/exp_pro` of the checkout (gitignored). The three runs above (`detection_cv-f5a385376eda453e`, `detection_cv-c80d42e9055f8cd5`, `outlier_halfwidth_cv-3a346460b90dc25d`) are kept by the authors, add-only, under those run keys (every file's sha256 checked equal to the original, 2026-10-15). The records of 0.7.4 are kept the same way, under their product keys, and on the vcai cluster in its profile's
+results root (`/cluster/projects/vgtk/results/bmvc2026`).
 
 ## Paper asset index
 

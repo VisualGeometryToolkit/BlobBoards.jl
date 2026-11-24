@@ -104,11 +104,11 @@ detector_levels_product(cfg::AbstractDict) =
 
 # The product key of the detector-ladder CV record (configs/detector_levels.toml), and its artifact,
 # whose selected setting the run configs of record detect with.
-const DETECTOR_LEVELS_KEY = "DETECTOR_LEVELS_KEY"
+const DETECTOR_LEVELS_KEY = "0ba0995f05da891e"
 const ADOPTED_DETECTOR_LEVELS = joinpath("tuning", EXPERIMENT, "detector_levels", DETECTOR_LEVELS_KEY, "detector_levels.jld2")
 
 # The product key of the half-width CV record (configs/halfwidth_cv.toml, the run of 2026-11-22).
-const HALFWIDTH_CV_KEY = "HALFWIDTH_CV_KEY"
+const HALFWIDTH_CV_KEY = "6ec5ea34c5f30021"
 
 """
     ADOPTED_OPERATING_POINTS

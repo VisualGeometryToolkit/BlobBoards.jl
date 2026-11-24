@@ -94,6 +94,11 @@ edge_threshold = 5.0
 # seed level is left unblurred (Features' rule) and the finest octave's levels
 # hold slightly more blur than their nominal σ. Cost: twice the GPU pool
 # (≈ 141 GiB peak on a B200, the warps chunked), ≈ 0.2 s more per frame.
+# CROSS-VALIDATED on the tuning session (configs/detector_levels.toml): the
+# record results_root()/tuning/bmvc2026/detector_levels/0ba0995f05da891e/
+# detector_levels.jld2 (2026-11-24) keeps this ladder, its incumbent A: the
+# best eligible challenger (upsample 1, nb_scales 10, nb_octaves 9) gains
+# 0.0003 mAA with bootstrap P(better) 0.568 < 0.95.
 upsample = 2
 nb_scales = 3
 nb_octaves = 10   # Features' default for 4240×2832 at upsample = 2 is 9
@@ -164,8 +169,10 @@ min_inliers = 9
 # CROSS-VALIDATED: the one-axis half-width CV of configs/halfwidth_cv.toml
 # (the 2026-10-09 protocol: split blobboards_cross_session, tune on 260521/bb,
 # the inter-board invariance mAA@10 mm), re-run on the detector of record above
-# (2026-11-22): optimum 1.716 px, frame-bootstrap 90% interval [1.0, 2.84] px;
-# 5 px is 0.0018 mAA below the peak and outside the interval. On the regressed
+# (2026-11-22): optimum 1.716 px, 5 px 0.0018 mAA below the peak. The record:
+# results_root()/tuning/bmvc2026/detection_cv/6ec5ea34c5f30021/detection.jld2
+# (2026-11-24, the release tree from General, RTX PRO 6000): 1.716 px,
+# frame-bootstrap 90% interval [1.46, 2.84] px. On the regressed
 # one-upsampling detector the same CV is flat (optimum 13.4, [1.49, 16]), so it
 # was not taken; with this detector it reproduces the 2026-10-09 run's
 # (0.9646 px, [0.965, 2.208]), whose value the configs carried until then.
