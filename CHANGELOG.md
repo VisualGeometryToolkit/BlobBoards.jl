@@ -47,8 +47,11 @@ gain of 0.0003 mAA that the frame bootstrap does not resolve (C wins 56% of resa
 more poses on the bb subset (1341 at the half-width of record; C 1326 at 0.9646 px against A's 1332), so A is kept.
 Base (0.3758, 1481 boards), E (= A on this session; σ tops out at 230 px), D (finest σ 0.91 px) and F (= C; 212 px)
 are reported, not eligible. The record is `tuning/bmvc2026/detector_levels/0ba0995f05da891e` (2026-11-24, the release tree from General, RTX
-PRO 6000): A kept, P(better) of C 0.568. `[compat]` VisualGeometryToolkitFeatures 0.9.11 and
-VisualGeometryToolkitCore 0.13.1 (Features' floor) everywhere.
+PRO 6000): A kept, P(better) of C 0.568. `[compat]` floors at the gated versions everywhere:
+VisualGeometryToolkitCore 0.13.3, Features 0.9.11, IO 0.11.2, Estimation 0.12.2, LocalOptimizationDoneRight 0.7.3;
+bmvc2026 on VisualGeometryToolkitEval 0.11 (a figure config's `[render]` keys its product as `render_files`; the launch
+examples name the `vcai` profile). The annotation and run-config hashes move (`test/suites/identity_pins.jl`, re-pinned):
+`[find_boards.detect]` holds three new values, so an annotation run of 0.7.3 is not reused by 0.7.4's.
 
 **Outlier half-width 0.9646 → 1.716 px.** The 2026-10-09 one-axis half-width CV (`configs/halfwidth_cv.toml`: split
 `blobboards_cross_session`, tune on 260521/bb, mAA@10 mm of the inter-board relative pose's translation, coarse grid
@@ -93,7 +96,20 @@ unchanged):
   new detector and half-width halve the flips before the test, and the test no longer reduces them. This reversed the
   paper's claim that the test corrects flips; by the owner's decision (2026-11-24) the claim is reworded to what the
   record shows (`papers/blob_boards_bmvc.tex`, the planar-ambiguity paragraph and the flip table's caption): the new
-  detector and half-width halve the flips, and the test is neutral at this operating point. FLIP_DIAGNOSTICS
+  detector and half-width halve the flips, and the test is neutral at this operating point. The diagnostics (scratch runs of
+  the flip table's whole chain at BlobBoards `cc2057c`, the run configs' half-width changed in both, nereus, jobs 10949
+  and 10951), BlobBoards flips without / with the test:
+
+  | half-width | without | with |
+  |---|---|---|
+  | 0.9646 px | 24 | 23 |
+  | 1.716 px (the record) | 22 | 23 |
+  | 5 px (the paper run's) | 26 | 28 |
+
+  The half-width does not explain it: at the paper run's 5 px the test is still neutral (−2 within the run's
+  variation). What moved is the detector: since the paper run the flips before the test halve at every half-width
+  (45 → 22–26), and the few that remain are no longer the ones the test corrects. AprilTag and ArUco: 124 and 152 in
+  every run.
 
 The submitted paper's generated assets are REPLACED by this record's (the owner's approval of 2026-11-24, Eval's
 `replace_submitted`): every number above, the tables and figures under `papers/figures/`, and the images the asset
