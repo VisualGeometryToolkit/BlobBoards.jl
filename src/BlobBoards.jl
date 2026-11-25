@@ -120,10 +120,10 @@ using CoordinateTransformations: CoordinateTransformations,
 # Constants
 # =============================================================================
 
-# Default pixel type of a generated pattern (`blob_pattern`); a board has none
-# (its blobs are vector shadings, its TIFF/PNG 8-bit conversions of the PDF).
-# N0f8 = 8-bit normalized fixed-point, 8 bits per channel
-const DEFAULT_PIXEL_TYPE = Gray{N0f8}
+# The default pixel type of a generated pattern (`blob_pattern`) is `Gray{N0f8}`
+# (8-bit normalized fixed point), spelled where it is used (check_naming R20: no
+# second name for one concrete type); a board has none (its blobs are vector
+# shadings, its TIFF/PNG 8-bit conversions of the PDF).
 
 # Outer radius (in σ) of the log-polar canonical patch: the descriptor's
 # radial range is `inner_extent/outer_extent` (src/canonicalize.jl). Gallery and

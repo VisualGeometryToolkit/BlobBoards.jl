@@ -395,7 +395,7 @@ FindBoardsConfig(path::AbstractString; camera = nothing, image_size = nothing) =
 """
     read_find_boards_table(path; tables = ()) -> AbstractDict
 
-The `[find_boards]` table of the run config at `path`, read by [`read_run_config`](@ref)
+The `[find_boards]` table of the run config at `path`. It is read by [`read_run_config`](@ref)
 (`tables`: the further top-level tables a driver's configs carry beside BlobBoards' own),
 an `ArgumentError` when the file has none. The ONE door of every file loader of a
 `[find_boards]` config — `FindBoardsConfig(path)`, and a driver's config built on it — so a

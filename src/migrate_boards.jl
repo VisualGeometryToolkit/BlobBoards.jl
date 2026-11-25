@@ -163,8 +163,8 @@ function _legacy_pattern_from_points(x, bc::BoardConfig)
         v = get(x, k, nothing)
         v === nothing || (d[k] = stored(v))      # (a v1 config has no max_scale)
     end
-    t = get(d, "pixel_type", _pixel_type_name(DEFAULT_PIXEL_TYPE))
-    t == _pixel_type_name(DEFAULT_PIXEL_TYPE) ||
+    t = get(d, "pixel_type", _pixel_type_name(Gray{N0f8}))
+    t == _pixel_type_name(Gray{N0f8}) ||
         throw(ArgumentError("a point-grid board has no pixel type; this one records $(repr(t))"))
     d["pixel_type"] = t
     a = get(d, "raster_aligned", false)

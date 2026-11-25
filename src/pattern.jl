@@ -828,7 +828,7 @@ Generate a blob pattern with specified resolution.
 - `blob_sizes`: disc diameter range (see the `pixel_type` form)
 - Other arguments same as `blob_pattern(pixel_type, pattern_resolution; kwargs...)`,
   except the pixel type: it is positional, `blob_pattern(T, pattern_resolution)`
-  (a `pixel_type` keyword is an `ArgumentError`; the default is `DEFAULT_PIXEL_TYPE`)
+  (a `pixel_type` keyword is an `ArgumentError`; the default is `Gray{N0f8}`)
 
 Returns `(pattern, blobs, config)`.
 

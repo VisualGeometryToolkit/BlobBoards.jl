@@ -7,7 +7,7 @@
 # =============================================================================
 
 # All basic blob types (AbstractDetection, Disc, DiscDetection,
-# FeaturePolarity, DEFAULT_PIXEL_TYPE) are now imported from VisualGeometryToolkitCore
+# FeaturePolarity) are now imported from VisualGeometryToolkitCore
 
 # =============================================================================
 # Detection Result Types
@@ -72,7 +72,8 @@ end
 
 # JSON: an object {spacing, width}, though a RulerTick is a vector (the
 # style's method is more specific than JSON.jl's AbstractVector one)
-JSON.lower(s::_Style, rt::RulerTick) = _jv_each(s, (; spacing = rt.spacing, width = rt.width))
+JSON.lower(s::_Style, rt::RulerTick) = _jv_object(s, rt)
+_object_keys(::RulerTick) = (:spacing, :width)
 
 JSON.lift(::VgtkIO.VgioStyle, ::Type{<:RulerTick}, x::VgtkIO.Record) =
     RulerTick(_file_quantity(x.spacing, :length), _file_quantity(x.width, :length))
@@ -183,7 +184,7 @@ struct PatternConfig{U <: Quantity, U2, PT}
             pattern_resolution::Size2,
             min_scale = MIN_SIGMA_PX * px,
             seed::Integer = rand(RandomDevice(), UInt64),
-            pixel_type::Type{PT} = DEFAULT_PIXEL_TYPE,
+            pixel_type::Type{PT} = Gray{N0f8},
             max_scale = nothing,
             scales_per_octave::Int = _pattern_dflt("scales_per_octave"),
             max_trials::Int = _pattern_dflt("max_trials"),
@@ -1020,7 +1021,7 @@ JSON.lower(s::_Style, bp::BoardPreamble) =
 # identity.
 _lower_pattern(s::_Style, pc::PatternConfig, ::PixelGrid) = JSON.lower(s, pc)
 function _lower_pattern(s::_Style, pc::PatternConfig, g::PointGrid)
-    pc.pixel_type == DEFAULT_PIXEL_TYPE ||
+    pc.pixel_type == Gray{N0f8} ||
         throw(ArgumentError("a point-grid board has no pixel type; got a pattern config with $(pc.pixel_type)"))
     stored(q) = _lowered(s, q; role = :pattern)
     return Base.structdiff(
@@ -1037,7 +1038,7 @@ function _pattern_from_points(x, bc::BoardConfig)
     d = _object(x)
     p = _board_pattern_points(bc)
     d["pattern_resolution"] = _object("width" => ustrip(px, p.width), "height" => ustrip(px, p.height))
-    d["pixel_type"] = _pixel_type_name(DEFAULT_PIXEL_TYPE)
+    d["pixel_type"] = _pixel_type_name(Gray{N0f8})
     d["raster_aligned"] = false
     return d
 end

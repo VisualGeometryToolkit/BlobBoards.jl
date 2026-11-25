@@ -1840,7 +1840,7 @@ board_rng(seed::Integer, uid::AbstractString) =
 """
     board_solve_keywords(config::FindBoardsConfig, uid, bundle) -> NamedTuple
 
-One board's solve keywords, as `find_boards`' engine builds them: the arm's
+One board's solve keywords, as `find_boards`' engine builds them. They are the arm's
 `outlier_halfwidth` and `local_optimization_strategy` (its `Ransac` scorer and
 local optimization), the RANSAC `config`, the board's world `extent` (the solve's
 context) and its own seeded stream (`rng = board_rng(config.ransac_seed, uid)`). The serial oracle builds them here,

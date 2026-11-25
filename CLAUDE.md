@@ -387,7 +387,7 @@ scenekw=(; camera=campixel!, yreversed=true)
 - Functions: `snake_case` (e.g., `blob_pattern`, `logical_blobs`)
 - Types: `CamelCase` (e.g., `PatternConfig`, `BoardBundle`)
 - **Acronyms in types**: treat as words, not all-caps (e.g., `IrlsLo` not `IRLSLO`, `SvdWorkspace` not `SVDWorkspace`, `GnSolveType` not `GNSolveType`). This prevents unreadable compound acronyms like `IRLSLO`.
-- Constants: `UPPERCASE_SNAKE_CASE` (e.g., `PRINT_SIZES`, `DEFAULT_PIXEL_TYPE`)
+- Constants: `UPPERCASE_SNAKE_CASE` (e.g., `PRINT_SIZES`)
 - Section headers: `# ===...===` dividers
 
 ### Argument Order

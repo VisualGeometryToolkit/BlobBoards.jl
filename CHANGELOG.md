@@ -9,8 +9,8 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
 
 ### Changed (breaking)
 
-- **Renamed** (`fit_` names a kind, check_naming R15): `fit_rng` → `board_rng`, `board_fit_keywords` →
-  `board_solve_keywords`; same values.
+- **Renamed** (`fit_` and `find_` name kinds, check_naming R15): `fit_rng` → `board_rng`, `board_fit_keywords` →
+  `board_solve_keywords`, `find_boards_table` → `read_find_boards_table` (beside `read_run_config`); same values.
 - The models a board fit returns are spelled as their types (check_naming R20): a pose is a `CameraExtrinsics` (was
   `Extrinsics3`), a pinhole lens `Lens(Perspective())` (was `Pinhole()`), a descriptor match
   `Attributed{Correspondence{Int, Int}, NNMatchMeta}` (was `NNMatch`).
