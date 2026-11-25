@@ -70,7 +70,7 @@ BlobBoards.DEFAULT_OUTER_EXTENT
 GeometryConfig
 BlobBoards.geometry_from_toml
 BlobBoards.radial_geometry_from_toml
-BlobBoards.find_boards_table
+BlobBoards.read_find_boards_table
 BlobBoards.geometry_tag
 BlobBoards.CONTRACT_GENERICS
 BlobBoards.TrackConfig

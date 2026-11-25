@@ -81,7 +81,7 @@ using VisualGeometryToolkitCore.SpatialQueries: foreach_intersecting, bulk_load!
 # dimension (values in base units — name the unit at every `ustrip`)
 using FlexUnits: Quantity, Units, dimension
 using VisualGeometryToolkitCore:
-    VisualGeometryToolkitCore, # for qualified access (e.g., VisualGeometryToolkitCore.estimate)
+    VisualGeometryToolkitCore, # for qualified access (e.g., VisualGeometryToolkitCore.found_model)
     px,
     dpi,
     pt,

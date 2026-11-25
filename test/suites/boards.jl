@@ -712,16 +712,16 @@ end
 # `write_tiff` (the stack's one TIFF codec, the io095 port) writes exactly what BlobBoards' own libtiff writer wrote:
 # checked 2026-11-13 on these four boards at 0.7.0 (BlobBoards' writer on w10-bb-tmp 8177304 against IO's on dfe28d5,
 # equal bytes). The sheet prints the package version in its footer and the TIFF's Software tag names it, so these pins
-# are a version's: re-pin at each version bump (0.6.2's differ from 0.7.0's in those two places only; 0.7.1, 0.7.2, 0.7.3 and 0.7.4
+# are a version's: re-pin at each version bump (0.6.2's differ from 0.7.0's in those two places only; 0.7.1, 0.7.2, 0.7.3, 0.7.4 and 0.8.0
 # re-pinned, their only change to these bytes the version).
-const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF at BlobBoards 0.7.4)
-    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "04499ad965b3903e9feb5cdf6ea2750039ecac77f969b9c3d9b754f4dae7feeb"),
-    ("A5", (1mm, 6mm), 0x77, 300dpi, "759dfb92e414fd238a00e4d23b19960575162e1adf890e5b2420bc6ed1c5ace2"),
-    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "d31756c4de8a96169a6eaf42d6ac50269b1ec81f6add0718e3368dad6d4145cc"),
-    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "66f43d61e1c4b67f63d01e39c71de6aa6c29f2aa61ec73e937b0027accc2dcde"),
+const _TIFF_GOLDEN = [   # (size, blob sizes, seed, density, sha256 of the TIFF at BlobBoards 0.8.0)
+    ("A5", (4mm, 0.2short_side), 0x44, 100dpi, "9a07e5fd20af4b7de75b8d6c6e0691d4c7f5e7a380aa356334931a05e607eaf6"),
+    ("A5", (1mm, 6mm), 0x77, 300dpi, "a9690380c55b207c863e776832e0de84bda7486c9d02ab36869d005edf00e989"),
+    ("A4", (4.0mm, 0.2short_side), 0x1234, 150dpi, "46f8aae9bf8eac9b0552d4acf40028a00c0b86364758856f07830d983f8bab29"),
+    ("Letter", (2mm, 0.25short_side), 0x05, 600dpi, "c724f49504c5833a6b121d307e5d1533a6786003e6e1f2b14b40b4e1aecabda9"),
 ]
 @testset "board TIFFs: byte pins (IO's write_tiff, BlobBoards' bytes)" begin
-    @test pkgversion(BlobBoards) == v"0.7.4"   # the pins are this version's (see above)
+    @test pkgversion(BlobBoards) == v"0.8.0"   # the pins are this version's (see above)
     for (sz, bs, seed, d, digest) in _TIFF_GOLDEN
         mktempdir() do dir
             blob_board(sz; blob_sizes = bs, seed, dir, output = Tiff(d; icc_profile = :linear))

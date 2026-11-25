@@ -91,6 +91,9 @@ Julia packages for robust visual geometry from Kiel University.
 
 ## Citing
 
+The paper's experiments (`bmvc2026/`) reproduce with the released BlobBoards 0.7.4
+(`git checkout v0.7.4`), on the stack versions of its record.
+
 If you use BlobBoards in your research, please cite:
 
 ```bibtex

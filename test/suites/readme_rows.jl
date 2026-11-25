@@ -11,7 +11,7 @@
 # Python) need. Each row's line is now checked against what its examples load,
 # and the examples run in an environment made from that line.
 
-using Test
+using Test, TOML
 
 const README_ROOT = pkgdir(BlobBoards)
 
@@ -54,9 +54,14 @@ examples() = VgtkCore.readme_examples(README_ROOT, EXAMPLE_PAGES)
 # own module, so each is shown to be complete on its own. An example whose last
 # line ends `# true` must return `true`. `after` is code run in the same child
 # after the examples (assertions of the row), BlobBoards imported.
+# TEMPORARY: solve branch; remove when Core 0.14 etc. are registered. A package the
+# root Project.toml sources by path (the unregistered stack) is developed from that
+# path, not added from a registry.
+const _SOURCED = Dict{String, String}(name => s["path"] for (name, s) in
+    get(TOML.parsefile(joinpath(README_ROOT, "Project.toml")), "sources", Dict{String, Any}()))
 function run_row(task; setup = "", after = "")
     packages = VgtkCore.install_packages(install_table(joinpath(README_ROOT, "README.md"))[task])
-    env = VgtkCore.readme_environment(README_ROOT, packages; setup)
+    env = VgtkCore.readme_environment(README_ROOT, packages; setup, developed = _SOURCED)
     blocks = unique(e.code for e in examples() if e.lang == "julia" && e.row == row_key(task) && !e.illustrative)
     VgtkCore.test_readme_row(env, task, blocks; preamble = "import BlobBoards    # for `after`; each example loads its packages itself", after)
     return nothing

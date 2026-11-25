@@ -72,7 +72,7 @@ end
 
 # JSON: an object {spacing, width}, though a RulerTick is a vector (the
 # style's method is more specific than JSON.jl's AbstractVector one)
-JSON.lower(s::_Style, rt::RulerTick) = (spacing = _jv(s, rt.spacing), width = _jv(s, rt.width))
+JSON.lower(s::_Style, rt::RulerTick) = _jv_each(s, (; spacing = rt.spacing, width = rt.width))
 
 JSON.lift(::VgtkIO.VgioStyle, ::Type{<:RulerTick}, x::VgtkIO.Record) =
     RulerTick(_file_quantity(x.spacing, :length), _file_quantity(x.width, :length))

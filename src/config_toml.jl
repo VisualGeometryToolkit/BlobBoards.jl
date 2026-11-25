@@ -390,10 +390,10 @@ max_trials = 10_000
 See also [`write_config`](@ref), [`read_run_config`](@ref).
 """
 FindBoardsConfig(path::AbstractString; camera = nothing, image_size = nothing) =
-    _find_boards_from_toml(find_boards_table(path); camera, image_size)
+    _find_boards_from_toml(read_find_boards_table(path); camera, image_size)
 
 """
-    find_boards_table(path; tables = ()) -> AbstractDict
+    read_find_boards_table(path; tables = ()) -> AbstractDict
 
 The `[find_boards]` table of the run config at `path`, read by [`read_run_config`](@ref)
 (`tables`: the further top-level tables a driver's configs carry beside BlobBoards' own),
@@ -401,7 +401,7 @@ an `ArgumentError` when the file has none. The ONE door of every file loader of 
 `[find_boards]` config — `FindBoardsConfig(path)`, and a driver's config built on it — so a
 typo'd table (`[descripter]`) or key (`[descriptor] modle`) fails exactly as it does for a run config.
 """
-function find_boards_table(path::AbstractString; tables = ())
+function read_find_boards_table(path::AbstractString; tables = ())
     rc = read_run_config(path; tables)
     haskey(rc.config_toml, "find_boards") || throw(ArgumentError("$path has no [find_boards] table"))
     return rc.find_boards

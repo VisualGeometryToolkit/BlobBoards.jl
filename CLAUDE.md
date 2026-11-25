@@ -46,7 +46,10 @@ julia --project=authoring -e 'using Pkg; Pkg.instantiate()'
 ### One workspace, one Manifest
 
 The repository is one Pkg workspace (root `[workspace]`: `test`, `docs`, `gpu`,
-`examples`, `authoring`, `bmvc2026`). Each member keeps its own `Project.toml`
+`examples`, `authoring`). `bmvc2026/`, the BMVC 2026 paper project, is not a
+member: it is pinned to its released environment (BlobBoards 0.7.4 on the Core
+0.13 stack, `git checkout v0.7.4`), where it reproduces, and the naming and
+duplication items leave it out. Each member keeps its own `Project.toml`
 — its own deps, and `[sources] BlobBoards = {path = ".."}` — but all of them
 resolve together into the ONE `Manifest.toml` at the root, which is not
 committed (no member has a Manifest; `.gitignore` ignores them all). The test

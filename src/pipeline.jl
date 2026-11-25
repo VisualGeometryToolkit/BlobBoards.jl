@@ -421,7 +421,7 @@ _describe_patches(model, cube) = describe(model, _host_patches(cube))
 # `_find_model`/`_refine` methods live below the GeometryConfig definitions.
 # The LO strategy is the geometry config's `local_optimization_strategy`
 # (`[find_boards.geometry]`, `{ type = "student_t_uniform" }` by default;
-# RVG's own find_* defaults are Welsch-HQ). find_boards threads it through
+# the Estimation class defaults are Welsch-HQ). find_boards threads it through
 # `fit_kw`; the keyword default re-reads the file for a bare `find_board`.
 _default_lo(::Nothing) = _dflt_local_optimization_strategy(:homography)
 _default_lo(::BoundedCamera) = _dflt_local_optimization_strategy(:absolute_pose)
@@ -443,11 +443,12 @@ _fit_context(extent) = (; extent)
 
 # The RANSAC find of an arm: `solve(EstimationProblem(f, (; extent)), Ransac(…);
 # rng)` on the arm's family problem `f`, scored by the arm's Student-t + uniform
-# scorer at its half-width. `config` is the RANSAC configuration, `rng` the
-# board's own stream (`board_rng`).
-_board_find(f, P, outlier_halfwidth, local_optimization_strategy; extent = nothing, config = RansacConfig(), rng) = solve(
+# scorer at its half-width. The other keywords are the `Ransac`'s (`config`, the
+# RANSAC configuration; a width keyword is its refusal), `rng` the board's own
+# stream (`board_rng`).
+_board_find(f, P, outlier_halfwidth, local_optimization_strategy; extent = nothing, rng = Random.default_rng(), kw...) = solve(
     EstimationProblem(f, _fit_context(extent)),
-    Ransac(; scoring = default_student_t_uniform_scoring(P, outlier_halfwidth), local_optimization_strategy, config); rng
+    Ransac(; scoring = default_student_t_uniform_scoring(P, outlier_halfwidth), local_optimization_strategy, kw...); rng
 )
 _find_model(
     cam::Nothing, pt_correspondences; local_optimization_strategy = _default_lo(cam),
@@ -1559,7 +1560,7 @@ abstract type GeometryConfig end
     HomographyGeometry(; outlier_halfwidth=5.0, min_inliers=7, local_optimization_strategy=StudentTUniform())
 
 Homography (no-camera) estimator config. 4 is the geometric minimum for
-`find_homography`; the default 7 leaves three outlier-tolerated points above
+the homography's `Ransac`; the default 7 leaves three outlier-tolerated points above
 the minimal sample — homography is 2 DOF looser than P3P, so it needs more
 support to reject coincidental 4-point matches against a large board gallery.
 (The gate is INCLUSIVE — `nin >= min_inliers` — since 2026-08-11; the default
@@ -1664,7 +1665,7 @@ end
     RadialHomographyGeometry(image_size; outlier_halfwidth=5.0, min_inliers=7, local_optimization_strategy=StudentTUniform())
 
 Uncalibrated radially distorted homography config — the one-sided
-division-model `(H, k)` path (RVG `find_radial_homography`; Wadenbäck et
+division-model `(H, k)` path (Estimation's `Ransac` on `RadialHomographyProblem`; Wadenbäck et
 al., 3DV 2026). For captures with an UNKNOWN camera whose lens bends
 straight lines: the distortion coefficient is estimated jointly with H per
 fit — no calibration, no image undistortion (the detector runs on the raw
@@ -1817,7 +1818,7 @@ _undistort_detect(dev::KA.Backend, img, g::PoseGeometry) =
 # Per-fit RANSAC stream: the config's base seed XOR the board's uid (3 hex
 # chars of its SHA-256 config hash — `uid_from_hash` — unique within any
 # working gallery, since it IS the gallery key). RVG routes every sampler
-# draw through this rng (`rng` kwarg, RVG ≥ 0.15.7), so a fit's result
+# draw through this rng (the `Ransac` solve's `rng`), so a fit's result
 # depends only on its INPUTS — not on thread scheduling, call order, or
 # ambient RNG state. The same derivation serves the engine, the serial
 # oracle, and the warm tracker, which keeps engine ≡ oracle exact. NB CUDA
@@ -1976,7 +1977,7 @@ Base.@kwdef struct FindBoardsConfig{G <: GeometryConfig, N}
     # Geometry estimator — picks homography vs P3P path via dispatch.
     geometry::G = HomographyGeometry()
     # RANSAC trial bounds + success probability — forwarded straight to
-    # `find_homography` / `find_absolute_pose` via the `config=` kwarg.
+    # the find's `Ransac(; config)`.
     # min_trials = 100 floors the adaptive stop; the 10_000 ceiling was
     # raised from 2_000 deliberately in 6fa79a8. The agenda's match-count floor
     # prunes most hopeless boards before a single trial, so the ceiling is

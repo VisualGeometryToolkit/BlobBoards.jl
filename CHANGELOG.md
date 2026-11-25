@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+
+A breaking release on VisualGeometryToolkitCore 0.14 (`[compat]` VisualGeometryToolkitCore `"0.14"`,
+VisualGeometryToolkitEstimation `"0.13"`, VisualGeometryToolkitFeatures `"0.10"`, VisualGeometryToolkitIO `"0.12"`,
+LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algorithm)`. The task verbs `find_boards`,
+`track_boards`, `find_board` and `adapt` are unchanged.
+
+### Changed (breaking)
+
+- **Renamed** (`fit_` names a kind, check_naming R15): `fit_rng` → `board_rng`, `board_fit_keywords` →
+  `board_solve_keywords`; same values.
+- The models a board fit returns are spelled as their types (check_naming R20): a pose is a `CameraExtrinsics` (was
+  `Extrinsics3`), a pinhole lens `Lens(Perspective())` (was `Pinhole()`), a descriptor match
+  `Attributed{Correspondence{Int, Int}, NNMatchMeta}` (was `NNMatch`).
+- `find_board` takes no `refine_workspace` keyword, and its `fit_kw` no `workspace`: each solve owns its RANSAC
+  workspace (Estimation 0.13 has no workspace keyword; its reuse is a cache, `init`/`solve!`/`reinit!`, which takes
+  no new `rng`, and each board fit draws from its own).
+
+### Changed
+
+- The board fits are Estimation 0.13's algorithms: the find `solve(EstimationProblem(f, (; extent)), Ransac(;
+  scoring, local_optimization_strategy, config); rng = board_rng(seed, uid))` on `HomographyProblem`,
+  `AbsolutePoseProblem` or `RadialHomographyProblem` (was `find_homography`, `find_absolute_pose`,
+  `find_radial_homography`), and the guided refit and the pose-ambiguity branches `solve(RefineProblem(f, θ₀, (;
+  extent)), LocalOptimization(strategy; scoring))` (was `locally_optimize`). Results are read by field (`r.u`,
+  `r.metadata.quality`) and `weights(r)`.
+- `bmvc2026/`, the paper project, stays on its released environment: it reproduces with BlobBoards 0.7.4 on the Core
+  0.13 stack, and is no longer a member of the workspace nor in the naming and duplication gates.
+
 ## 0.7.4 (2026-11-24)
 
 On VisualGeometryToolkitCore 0.13 (`[compat]` in the package, `test/`, `gpu/`, `examples/` and `bmvc2026/`;

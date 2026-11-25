@@ -161,8 +161,10 @@ end
 
 # A field's value as the style writes it.
 _jv(s::_Style, q::Quantity) = _lowered(s, q)
-_jv(s::_Style, z::Size2) = (width = _jv(s, z.width), height = _jv(s, z.height))
+_jv(s::_Style, z::Size2) = _jv_each(s, (; width = z.width, height = z.height))
 _jv(::_Style, x) = x
+# Each value of a named tuple as the style writes it (an object of a record's fields).
+_jv_each(s::_Style, fields::NamedTuple) = map(v -> _jv(s, v), fields)
 
 # A quantity or a size left in an identity tree (a run configuration's,
 # `config_dict`) lowers in the identity's form. (A file's lowerings convert
