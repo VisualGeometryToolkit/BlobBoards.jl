@@ -130,8 +130,8 @@ public prepare_image_features       # detect-once seam (sweeps, annotate, track)
 public find_board                          # single-board match+estimate
 public match_boards                        # one image's features against the board gallery, global mutual-NN, keyed per board
 public guided_search, detection_rtree      # a board's printed blobs transferred through a map and associated by IoU; the detection index it queries
-public fit_rng                             # one board's RANSAC stream (config.ransac_seed ⊻ uid)
-public board_fit_keywords, board_endpoints # one board's fit keywords; a scored set as a 2D fit's endpoints (board side exact)
+public board_rng                           # one board's RANSAC stream (config.ransac_seed ⊻ uid)
+public board_solve_keywords, board_endpoints # one board's solve keywords; a scored set as a 2D fit's endpoints (board side exact)
 public distortion_center                   # a radial arm's distortion centre (the sensor's middle)
 public load_descriptor_network             # a descriptor network as given, or read from a path (.jld2 → Lux, else ONNX)
 public geometry_local_optimization_strategy         # a [find_boards.geometry] local_optimization_strategy table → its strategy

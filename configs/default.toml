@@ -37,7 +37,7 @@
 # derives the radius from the half-width and the solve's own residual scale.
 #
 # They need fitting because the detection-stage E-step holds the inlier prior
-# at ½ (`soft_posterior_weights!`'s default `inlier_prior`; it is not estimated
+# at ½ (the soft posterior's default `inlier_prior`, `mixture_ecm!`'s; it is not estimated
 # here), so the half-width is the ONLY knob setting the inlier/outlier balance. The scale and nu ARE fitted (VisualGeometryToolkitCore's
 # `update_scale!` writes the scale, `update_nu!` the nu, each its own M-step),
 # which is why those are absent here.
@@ -181,7 +181,7 @@ min_inliers = 7
 # NOT the residual scale. The estimators here are Student-t/uniform mixtures:
 # this number is the support the outlier hypothesis spreads its unit mass over,
 # so its density is 1/(2r). The inlier component wins near zero residual only
-# BECAUSE that uniform is thin, and RVG's `fit_division_camera` records the
+# BECAUSE that uniform is thin, and Estimation's `DivisionCameraFit` records the
 # failure verbatim — "a half-width at the median residual makes the outlier
 # component as dense as the inliers and zeroes every weight — measured".
 #

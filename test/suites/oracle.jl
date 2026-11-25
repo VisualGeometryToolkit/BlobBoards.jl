@@ -110,7 +110,7 @@ using VisualGeometryToolkitCore: is_map_inlier
 
     # Seeded fits: identical calls give identical results, independent of
     # ambient RNG state — RVG (≥ 0.15.7) routes every sampler draw through
-    # the per-board stream `fit_rng(config.ransac_seed, uid)`, so nothing
+    # the per-board stream `board_rng(config.ransac_seed, uid)`, so nothing
     # in the fit consults the task-local RNG. EXACT equality on quality is
     # deliberate: same inputs + same streams + same workspace sizes must be
     # the same bits.

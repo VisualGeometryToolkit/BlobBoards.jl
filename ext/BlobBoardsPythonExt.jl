@@ -643,7 +643,7 @@ function BlobBoards.find_boards_python(
                     "R" => np.array(collect(Float64.(SMatrix{3, 3}(m.R)))),
                     "t" => np.array(collect(Float64, m.t))
                 )
-            )  # Extrinsics3.t is bare (canonical mm)
+            )  # CameraExtrinsics.t is bare (canonical mm)
         end
         out[i] = pydict(
             Dict(

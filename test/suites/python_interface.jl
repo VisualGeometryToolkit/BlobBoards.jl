@@ -290,7 +290,7 @@
             dir = mktempdir()
             ids = two_targets ? (:b1, :b2) : (:b1,)
             save_run(dir, VGC.Rig{VGC.TargetFrame{:b1}}(Dict(id => VGC.PosedTarget(VGC.PlanarTarget(plane), idpose) for id in ids)), ids)
-            cam = VGC.CameraModel(VGC.LogicalIntrinsics(VGC.CameraCalibrationMat(f * px, [cx * px, cy * px])), VGC.Pinhole())
+            cam = VGC.CameraModel(VGC.LogicalIntrinsics(VGC.CameraCalibrationMat(f * px, [cx * px, cy * px])), VGC.Lens(VGC.Perspective()))
             VgtkIO.save(joinpath(dir, "camera_mocap.json"), Dict(:cam => VGC.BoundedCamera(cam, VGC.Size2(W, H))))
             return dir
         end

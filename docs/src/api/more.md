@@ -83,7 +83,7 @@ BlobDetection
 BlobBoards.BoardObservation
 BlobBoards.filter_blobs
 BlobBoards.find_board
-BlobBoards.board_fit_keywords
+BlobBoards.board_solve_keywords
 BlobBoards.board_endpoints
 BlobBoards.distortion_center
 BlobBoards.geometry_local_optimization_strategy
@@ -91,7 +91,7 @@ BlobBoards.load_descriptor_network
 BlobBoards.match_boards
 BlobBoards.guided_search
 BlobBoards.detection_rtree
-BlobBoards.fit_rng
+BlobBoards.board_rng
 extract_board_features
 extract_image_features
 BlobBoards.Telemetry

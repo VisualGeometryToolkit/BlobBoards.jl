@@ -12,26 +12,26 @@
 
 using VisualGeometryToolkitCore:
     centroid, feature_frame,
-    Extrinsics3, CameraModel, BoundedCamera, AbstractIntrinsics, Pinhole, AbstractLensModel,
+    CameraExtrinsics, CameraModel, BoundedCamera, AbstractIntrinsics, Lens, Perspective, AbstractLensModel,
     undistort!, PosedCamera, HomographyMat, HomographyMap, EllipticFrame,
     region, Ellipse, project, pinhole, transfer_ellipse,
-    sources, Attributed, withattrs, planar_lift, lift, exact,  # #21 correspondence layer; `exact`: the board side of a 2D fit
-    correspondences                                                    # the columnar correspondence set (Core's; Features no longer re-exports it)
+    sources, Attributed, Correspondence, withattrs, planar_lift, lift, exact,  # #21 correspondence layer; `exact`: the board side of a 2D fit
+    correspondences,                                                   # the columnar correspondence set (Core's; Features no longer re-exports it)
+    solve, EstimationProblem, RefineProblem, NullParameters             # the estimation interface: every fit is solve(problem, algorithm)
 
 using VisualGeometryToolkitFeatures:
-    MutualNN, KnnMatch, NNStrategy,
+    MutualNN, KnnMatch, NNStrategy, NNMatchMeta,
     described_features,
     match,
     # Hoisted to VGF 0.5: the stacked multi-gallery matcher and the greedy
     # one-to-one reduction. BB owned both until they proved general.
     StackedDescriptorIndex, nn_match_stacked, resolve_one_to_one, resolve_one_to_one!
 
-using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, find_homography, find_absolute_pose, RansacConfig,
-    locally_optimize,
-    AbsolutePoseProblem, HomographyProblem,
-    # The radial arm's OWN search. `find_*` is RANSAC and lives here by the
-    # verb table; `fit_*` (inliers given) lives in VisualGeometryToolkitCore.
-    find_radial_homography, RadialHomographyProblem
+using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, RansacConfig,
+    # The RANSAC find and the seeded local optimization, as algorithms on the
+    # family problems (the homography, the absolute pose and the radial arm's).
+    Ransac, LocalOptimization,
+    AbsolutePoseProblem, HomographyProblem, RadialHomographyProblem
 # The constraint-problem protocol is VisualGeometryToolkitCore's; RVG's problems add
 # methods to it.
 using VisualGeometryToolkitCore: mahalanobis_distances!, distortion_map
@@ -41,7 +41,6 @@ using VisualGeometryToolkitCore: iou_below   # the guided search's IoU prune (a 
 # threshold. The scorer is VisualGeometryToolkitCore's, built by
 # VisualGeometryToolkitEstimation's one scorer-table reader (`_scoring` below).
 using VisualGeometryToolkitEstimation: default_student_t_uniform_scoring   # the scorer of record at a half-width
-using VisualGeometryToolkitEstimation: with_extent   # a problem bounded by an image extent (`nothing`: unbounded)
 
 # =============================================================================
 # load_board — parse JSON metadata only (no rasterization)
@@ -436,48 +435,60 @@ _default_lo(::BoundedCamera) = _dflt_local_optimization_strategy(:absolute_pose)
 # path supplies the geometry's own value; the radial arm, which holds its
 # geometry, falls back to that geometry's value.
 _dflt_outlier_halfwidth() = Float64(_dflt("geometry", "outlier_halfwidth"))
+
+# A board fit's solve context: the board's world extent, whose consensus hook
+# rejects a model that folds the board's outer corners, or none.
+_fit_context(::Nothing) = NullParameters()
+_fit_context(extent) = (; extent)
+
+# The RANSAC find of an arm: `solve(EstimationProblem(f, (; extent)), Ransac(…);
+# rng)` on the arm's family problem `f`, scored by the arm's Student-t + uniform
+# scorer at its half-width. `config` is the RANSAC configuration, `rng` the
+# board's own stream (`board_rng`).
+_board_find(f, P, outlier_halfwidth, local_optimization_strategy; extent = nothing, config = RansacConfig(), rng) = solve(
+    EstimationProblem(f, _fit_context(extent)),
+    Ransac(; scoring = default_student_t_uniform_scoring(P, outlier_halfwidth), local_optimization_strategy, config); rng
+)
 _find_model(
     cam::Nothing, pt_correspondences; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
-) = find_homography(
-    pt_correspondences; scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), local_optimization_strategy, kw...
-)
+) = _board_find(HomographyProblem(pt_correspondences), HomographyProblem{Float64}, outlier_halfwidth, local_optimization_strategy; kw...)
 _find_model(
     cam::BoundedCamera, pt_correspondences; local_optimization_strategy = _default_lo(cam),
     outlier_halfwidth = _dflt_outlier_halfwidth(), kw...
-) = find_absolute_pose(
-    VgtkCore.model(cam), pt_correspondences; scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), local_optimization_strategy, kw...
+) = _board_find(
+    AbsolutePoseProblem(VgtkCore.model(cam), pt_correspondences), AbsolutePoseProblem, outlier_halfwidth,
+    local_optimization_strategy; kw...
 )
 
-# Seeded warm local-optimization refine (no second RANSAC) for the guided final
-# fit — the estimator's `refine_*` (its `find_*`'s local optimization alone, from
-# `θ₀`) on the guided correspondences. Mirrors `_find_model`'s camera dispatch
-# (incl. the LO choice and the scorer). `workspace` is an optional pre-allocated
-# RansacWorkspace (sized ≥ the guided set; the refine trims it) — the driver
-# supplies per-thread warm workspaces so the guided refit stops allocating one
-# per candidate fit. `nothing` below a minimal sample.
+# Seeded warm local optimization (no second RANSAC) for the guided final fit:
+# the find's local optimization alone, from `θ₀`, on the guided correspondences,
+# `solve(RefineProblem(f, θ₀, (; extent)), LocalOptimization(strategy; scoring))`.
+# Mirrors `_find_model`'s camera dispatch (incl. the LO choice and the scorer).
+# `nothing` below a minimal sample.
 #
-# Every arm runs `locally_optimize`, the RANSAC family's local optimization from
-# a seed: the arm's scorer, its consensus set and the strategy anchored on it,
-# so the guided refit and the pose-ambiguity LRT compare scorer qualities. It is
-# not a `refine_*`: a refine runs no scorer (it estimates no scale and forms no
-# consensus set; the robust-estimation contract, B1). Until B1 the plain and
-# radial homography arms called `refine_homography`/`refine_radial_homography`,
-# which were this same `locally_optimize` on the same (bounded) problem, so the
-# switch moves no number.
+# Every arm runs the RANSAC family's local optimization from a seed: the arm's
+# scorer, its consensus set and the strategy anchored on it, so the guided refit
+# and the pose-ambiguity LRT compare scorer qualities. It is not a
+# `LevenbergMarquardt` refine: a refine runs no scorer (it estimates no scale and
+# forms no consensus set; the robust-estimation contract, B1).
+_local_optimization(f, P, θ₀, outlier_halfwidth, local_optimization_strategy, extent) = solve(
+    RefineProblem(f, θ₀, _fit_context(extent)),
+    LocalOptimization(local_optimization_strategy; scoring = default_student_t_uniform_scoring(P, outlier_halfwidth))
+)
 _refine(
     cam::Nothing, pt_correspondences, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
-    extent = nothing, workspace = nothing
-) = length(pt_correspondences) < 4 ? nothing : locally_optimize(
-    with_extent(HomographyProblem(pt_correspondences), extent), θ₀;
-    scoring = default_student_t_uniform_scoring(HomographyProblem{Float64}, outlier_halfwidth), workspace, local_optimization_strategy
+    extent = nothing
+) = length(pt_correspondences) < 4 ? nothing : _local_optimization(
+    HomographyProblem(pt_correspondences), HomographyProblem{Float64}, θ₀, outlier_halfwidth,
+    local_optimization_strategy, extent
 )
 _refine(
     cam::BoundedCamera, pt_correspondences, θ₀; outlier_halfwidth, local_optimization_strategy = _default_lo(cam),
-    extent = nothing, workspace = nothing
-) = locally_optimize(
-    with_extent(AbsolutePoseProblem(VgtkCore.model(cam), pt_correspondences), extent), θ₀;
-    scoring = default_student_t_uniform_scoring(AbsolutePoseProblem, outlier_halfwidth), workspace, local_optimization_strategy
+    extent = nothing
+) = _local_optimization(
+    AbsolutePoseProblem(VgtkCore.model(cam), pt_correspondences), AbsolutePoseProblem, θ₀, outlier_halfwidth,
+    local_optimization_strategy, extent
 )
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
@@ -520,7 +531,7 @@ using KernelAbstractions: KernelAbstractions
 using LinearAlgebra: dot
 
 _undistort_detect(::KA.Backend, img, ::Nothing) = img
-_undistort_detect(::KA.Backend, img, ::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, <:Pinhole}}) = img
+_undistort_detect(::KA.Backend, img, ::BoundedCamera{<:CameraModel{<:AbstractIntrinsics, Lens{Perspective, Nothing}}}) = img
 
 # Host UInt8 view of an image: N0f8 storage reinterprets, anything else
 # quantizes through Gray{N0f8} — the same coercion VGF's `_asift_input`
@@ -530,7 +541,7 @@ using VisualGeometryToolkitFeatures: gray_u8
 
 # Any lens with a distortion map — OpenCV's model (the metadata calibration) or
 # the division model:
-# VGC's fused warp is generic over `AbstractLensModel`, and Pinhole keeps its
+# VGC's fused warp is generic over `AbstractLensModel`, and the perspective lens keeps its
 # identity method above.
 function _undistort_detect(
         dev::KA.Backend, img,
@@ -605,7 +616,7 @@ _float_rect(r::SpatialIndexing.Rect) =
 The board-plane → image transfer to project through, from an estimator result.
 Dispatches on the MODEL, the honest discriminator:
 
-- an `Extrinsics3` is a metric board → camera pose that needs the camera to
+- a `CameraExtrinsics` is a metric board → camera pose that needs the camera to
   reach the image: the posed camera `PosedCamera(model(cam), pose)`, whose
   plane map is Core's `plane_map` for every lens (the pinhole twin's plane
   homography exactly, then the lens's `distortion_map`). Its centres go through
@@ -620,10 +631,10 @@ Dispatches on the MODEL, the honest discriminator:
 - the radial arm forwards its MODEL: the guided transfer needs (H, k, centre)
   together — the conic goes through H exactly, only the undistortion is linearised.
 """
-_world_to_image(pose::Extrinsics3, cam::BoundedCamera) = PosedCamera(VgtkCore.model(cam), pose)
+_world_to_image(pose::CameraExtrinsics, cam::BoundedCamera) = PosedCamera(VgtkCore.model(cam), pose)
 # Untyped on purpose: RadialHomographyGeometry is defined further down this
 # file, and a signature naming it here would not precompile.
-_world_to_image(::Extrinsics3, cam) = throw(
+_world_to_image(::CameraExtrinsics, cam) = throw(
     ArgumentError("a pose model needs a BoundedCamera to project; got $(typeof(cam))")
 )
 _world_to_image(H::HomographyMat, _) = HomographyMap(H)
@@ -793,7 +804,7 @@ function guided_search(
         # `on_read(j::Int32)` once per candidate of each projected blob (see
         # `_guided_accept!`). Nothing to do with the returned correspondences.
         on_read = nothing,
-        # Write-only out-parameter: the `NNMatch`es the returned table was built
+        # Write-only out-parameter: the matches the returned table was built
         # from, in row order — for a caller that appends to them (`find_board`
         # hands back the arm's rejected descriptor matches beside them) without
         # decompiling the table.
@@ -821,17 +832,17 @@ function guided_search(
     # claim their correspondences first, unconditionally (no IoU gate); the IoU
     # candidates then fill in around them, best overlap first, one-to-one.
     used_d = falses(length(image_features)); used_w = falses(length(wdiscs))
-    matches = NNMatch[]
+    matches = Attributed{Correspondence{Int, Int}, NNMatchMeta}[]
     sizehint!(matches, length(keep) + length(cands))
     for k in resolve_one_to_one!(used_w, used_d, keep)
         wi, di = keep[k]
-        push!(matches, NNMatch(wi, di, 1.0f0, 0.0f0))
+        push!(matches, Attributed(Correspondence{Int, Int}(wi, di), NNMatchMeta(1.0f0, 0.0f0)))
     end
     sort!(cands; by = first, rev = true)
     for k in resolve_one_to_one!(used_w, used_d, cands; a = c -> c[2], b = c -> c[3])
         v, wi, di = cands[k]
         # score by overlap (higher = better); ratio unused for geometric matches
-        push!(matches, NNMatch(wi, di, Float32(v), 0.0f0))
+        push!(matches, Attributed(Correspondence{Int, Int}(wi, di), NNMatchMeta(Float32(v), 0.0f0)))
     end
     # Let the VGF intrinsic build the columnar ScoredCorrespondence set — same path
     # `find_board` uses for descriptor matches, so the layout is identical.
@@ -1126,7 +1137,7 @@ end
 # (possibly the alternative branch) — the caller's downstream is unchanged.
 function _resolve_pose_ambiguity(
         camera, scored, pt_correspondences, res;
-        outlier_halfwidth, local_optimization_strategy, extent, workspace, telemetry = nothing
+        outlier_halfwidth, local_optimization_strategy, extent, telemetry = nothing
     )
     bs = sources(scored)
     # Bare strip (audited): `sources` are board-frame blobs, unitless mm by the
@@ -1141,8 +1152,8 @@ function _resolve_pose_ambiguity(
 
     # VGC mirror_pose is total; a near-frontal view returns ~the same pose —
     # gate on the branch separation (= twice the viewing tilt)
-    θm = VgtkCore.mirror(res.estimate, sum(Xw) / length(Xw))
-    sep = rad2deg(Rotations.rotation_angle(Rotations.RotMatrix{3}(θm.R' * res.estimate.R)))
+    θm = VgtkCore.mirror(res.u, sum(Xw) / length(Xw))
+    sep = rad2deg(Rotations.rotation_angle(Rotations.RotMatrix{3}(θm.R' * res.u.R)))
     sep > 4.0 ||
         (_log_branch_bail(telemetry, :separation_below_gate; sep_deg = sep, n = length(Xw)); return res)
     # SYMMETRIC LRT: both branches through the IDENTICAL seeded-LO call —
@@ -1151,8 +1162,8 @@ function _resolve_pose_ambiguity(
     # RANSAC's quality against a refine's is a units error:
     # different scoring objects — measured to flip healthy boards.)
     inc = _refine(
-        camera, pt_correspondences, res.estimate;
-        outlier_halfwidth, local_optimization_strategy, extent, workspace
+        camera, pt_correspondences, res.u;
+        outlier_halfwidth, local_optimization_strategy, extent
     )
     if isnothing(inc) || !VgtkCore.found_model(inc)
         # Returns the UNREFINED incumbent and never refines the mirror at all.
@@ -1166,7 +1177,7 @@ function _resolve_pose_ambiguity(
         )
         return res
     end
-    alt = _refine(camera, pt_correspondences, θm; outlier_halfwidth, local_optimization_strategy, extent, workspace)
+    alt = _refine(camera, pt_correspondences, θm; outlier_halfwidth, local_optimization_strategy, extent)
     if isnothing(alt) || !VgtkCore.found_model(alt)
         _log_branch_bail(
             telemetry, :alt_not_converged; sep_deg = sep, inc_conv = true,
@@ -1176,7 +1187,7 @@ function _resolve_pose_ambiguity(
     end
     # slide-back: the reflection refined into the incumbent's basin —
     # geometry unambiguous
-    if Rotations.rotation_angle(Rotations.RotMatrix{3}(alt.estimate.R' * inc.estimate.R)) < deg2rad(1.0)
+    if Rotations.rotation_angle(Rotations.RotMatrix{3}(alt.u.R' * inc.u.R)) < deg2rad(1.0)
         _log_branch_bail(
             telemetry, :slide_back; sep_deg = sep, inc_conv = true, alt_conv = true,
             n = length(Xw)
@@ -1198,7 +1209,7 @@ function _resolve_pose_ambiguity(
     # so do not convert it to a probability without fitting one. Separating
     # the branches when d is small needs information from OUTSIDE the frame
     # (temporal accumulation in `track_boards`), not a better rule here.
-    margin = inc.quality - alt.quality
+    margin = inc.metadata.quality - alt.metadata.quality
 
     blog = telemetry === nothing ? "" : telemetry.branch_log
     if !isempty(blog)
@@ -1206,19 +1217,19 @@ function _resolve_pose_ambiguity(
         prob = VgtkEstimation.AbsolutePoseProblem(VgtkCore.model(camera), pt_correspondences)   # the problem takes the model (BoundedCamera is the pixel bound)
         n = length(pt_correspondences)
         rA = zeros(n); rB = zeros(n)
-        mahalanobis_distances!(rA, prob, inc.estimate)
-        mahalanobis_distances!(rB, prob, alt.estimate)
+        mahalanobis_distances!(rA, prob, inc.u)
+        mahalanobis_distances!(rB, prob, alt.u)
         inl = VgtkCore.inlier_mask(inc)      # the scorer's MAP set (posterior weights)
         gap = sqrt(sum(i -> inl[i] ? abs2(rA[i] - rB[i]) : 0.0, 1:n))
         d = gap / max(VgtkCore.noise_scale(inc), 0.3)   # the scorer's ŝ (was `inc.scale`, not a field: the branch log threw)
-        RA = inc.estimate.R; RB = alt.estimate.R
+        RA = inc.u.R; RB = alt.u.R
         _append_jsonl(
             blog, (
                 tag = telemetry.tag,
-                q_inc = inc.quality, q_alt = alt.quality,
+                q_inc = inc.metadata.quality, q_alt = alt.metadata.quality,
                 d = d, n_inl = sum(inl),
                 R_inc = collect(vec(Matrix(RA))), R_alt = collect(vec(Matrix(RB))),
-                t_inc = collect(inc.estimate.t),
+                t_inc = collect(inc.u.t),
                 # WHICH BRANCH WON, and the alternative's translation.
                 # Without these a consumer can only join on `t_inc`, so
                 # every board the LRT OVERRODE looks like a board the
@@ -1228,7 +1239,7 @@ function _resolve_pose_ambiguity(
                 # failure — see the BRANCH_LOG comment), it only removed
                 # one of the two ways it was wrong.
                 chose = margin >= 0 ? "inc" : "alt",
-                t_alt = collect(alt.estimate.t),
+                t_alt = collect(alt.u.t),
             )
         )
     end
@@ -1242,7 +1253,7 @@ Match image features against a single board's features and estimate geometry.
 
 Returns `(model, quality, scored)` or `nothing` if fewer than 4 matches;
 the IRLS weights ride `scored` as its `weights` attribute column.
-`model` is a `HomographyMat` or `Extrinsics3` depending on `camera`.
+`model` is a `HomographyMat` or `CameraExtrinsics` depending on `camera`.
 """
 function find_board(
         # Typed so a call in the retired order (`image_features, board_features,
@@ -1263,7 +1274,6 @@ function find_board(
         guided_det_ells = nothing,
         guided_wdiscs = nothing,
         guided_wregions = nothing,
-        refine_workspace = nothing,
         resolve_pose_ambiguity::Bool = false,
         # Sink for the detection indices the GUIDED association read: called
         # `on_guided_read(j::Int32)` once per read (see `guided_search`). A
@@ -1300,8 +1310,7 @@ function find_board(
         res = _resolve_pose_ambiguity(
             camera, scored, pt_correspondences, res;
             outlier_halfwidth = get(_dflt_outlier_halfwidth, fit_kw, :outlier_halfwidth), local_optimization_strategy,
-            extent = get(fit_kw, :extent, nothing),
-            workspace = refine_workspace, telemetry
+            extent = get(fit_kw, :extent, nothing), telemetry
         )
     end
 
@@ -1309,8 +1318,7 @@ function find_board(
     # model, re-associate every blob with the detection it overlaps best (ellipse
     # IoU, the one acceptance criterion), and refit with posterior-weighted IRLS. Recovers pattern blobs the descriptor matcher
     # missed; falls back to the RANSAC fit if the guided set is too small or
-    # the refit fails to converge. Drop `workspace` from fit_kw — the guided
-    # set can exceed the descriptor-match count the workspace was sized for.
+    # the refit fails to converge.
     if !isnothing(bundle) && _guided_enabled(camera)
         # The guided refit's scorer half-width (fallback matches the
         # PoseGeometry/HomographyGeometry default of 5 px). It is the scorer's
@@ -1319,27 +1327,26 @@ function find_board(
         # RANSAC inliers are already certified (descriptor match + spatial
         # consensus): guided search keeps them unconditionally and only ADDS
         # IoU-certified correspondences — the union, per-board support can't shrink.
-        w = res.weights
+        w = VgtkCore.weights(res)
         keep = [m.value for (k, m) in enumerate(matches) if is_map_inlier(w[k])]
         # Compose the world->image map HERE, so guided_search receives one
         # concrete HomographyMap instead of a Union to defend against.
         # The world discs the guided search runs on, resolved HERE so the
         # table returned below has the same sources the guided fit used.
         wd = @something guided_wdiscs blobs(bundle, :world)
-        g_matches = NNMatch[]
+        g_matches = Attributed{Correspondence{Int, Int}, NNMatchMeta}[]
         g_scored = guided_search(
-            _world_to_image(res.estimate, camera), bundle, image_features;
+            _world_to_image(res.u, camera), bundle, image_features;
             min_iou, keep, rtree = guided_rtree, skip = guided_skip,
             det_ells = guided_det_ells, wdiscs = wd,
             wregions = guided_wregions, on_read = on_guided_read, matches_out = g_matches
         )
         if length(g_scored) >= 4
             g_pt = _fit_endpoints(camera, g_scored)
-            # Warm LM-guarded local optimization from res.estimate — no second RANSAC.
+            # Warm LM-guarded local optimization from res.u — no second RANSAC.
             res2 = _refine(
-                camera, g_pt, res.estimate;
-                outlier_halfwidth, local_optimization_strategy, extent = get(fit_kw, :extent, nothing),
-                workspace = refine_workspace
+                camera, g_pt, res.u;
+                outlier_halfwidth, local_optimization_strategy, extent = get(fit_kw, :extent, nothing)
             )
             if !isnothing(res2) && VgtkCore.found_model(res2)
                 # EVERY correspondence the board was fitted on comes back,
@@ -1352,9 +1359,9 @@ function find_board(
                 rej = findall(!is_map_inlier, w)
                 full = withattrs(
                     _scored_with_ids(wd, image_features, vcat(g_matches, matches[rej]));
-                    weights = vcat(res2.weights, w[rej])
+                    weights = vcat(VgtkCore.weights(res2), w[rej])
                 )
-                return (res2.estimate, res2.quality, full)
+                return (res2.u, res2.metadata.quality, full)
             end
         end
     end
@@ -1363,14 +1370,15 @@ function find_board(
     # subset in lockstep with the correspondences from here on — no parallel
     # weights vector to keep aligned by hand. Every match comes back, the
     # rejected ones at their (≤ ½) weight.
-    full = withattrs(scored; weights = res.weights)
-    return (res.estimate, res.quality, full)
+    full = withattrs(scored; weights = VgtkCore.weights(res))
+    return (res.u, res.metadata.quality, full)
 end
 
-# NNMatch is used for the guided-search correspondences below and rides the agenda's
-# `resolved` field. The stacked gallery matcher that used to build these
-# dictionaries here now lives in VGF (`nn_match_stacked`).
-using VisualGeometryToolkitFeatures: NNMatch
+# A descriptor match, `Attributed{Correspondence{Int, Int}, NNMatchMeta}` (built
+# `Attributed(Correspondence{Int, Int}(i, j), NNMatchMeta(score, ratio))`), is the
+# guided-search correspondences' type below and rides the agenda's `resolved`
+# field. The stacked gallery matcher that used to build these dictionaries here
+# now lives in VGF (`nn_match_stacked`).
 
 # The gallery, concatenated ONCE: the board set is ONE gallery, not 51.
 #
@@ -1463,7 +1471,7 @@ end
 
 """
     match_boards(strategy, galleries, features; index, backend, min_similarity)
-        -> Dict{uid, Vector{NNMatch}}
+        -> Dict{uid, Vector{Attributed{Correspondence{Int, Int}, NNMatchMeta}}}
 
 Descriptor matching of one image's `features` against a board gallery
 (`uid => board features`), keyed per board: one entry per gallery key, empty
@@ -1518,7 +1526,7 @@ function _split_stacked_matches(sg::StackedGallery, md, galleries::AbstractDict)
     # makes the empty case the COMMON one (a 51-board gallery on a frame
     # showing five boards leaves ~46 with nothing), so returning only the
     # boards that matched turns an ordinary frame into a `KeyError`.
-    out = Dict{keytype(galleries), Vector{NNMatch}}(uid => NNMatch[] for uid in keys(galleries))
+    out = Dict{keytype(galleries), Vector{Attributed{Correspondence{Int, Int}, NNMatchMeta}}}(uid => Attributed{Correspondence{Int, Int}, NNMatchMeta}[] for uid in keys(galleries))
     all_matches = get(md, _STACK_KEY, nothing)
     all_matches === nothing && return out
     for m in all_matches
@@ -1696,7 +1704,7 @@ RadialHomographyGeometry(
 
 One board observed in one frame (a board associated with its detections and
 fitted: the observation; a board's `Vector{BoardObservation}` from
-[`track_boards`](@ref) is its track): its estimated model (`Extrinsics3`,
+[`track_boards`](@ref) is its track): its estimated model (`CameraExtrinsics`,
 `HomographyMat` or `RadialHomography`; every map is derived from it), its
 quality and inlier count, and how the frame was won (`:detect`, `:init` or
 `:track`).
@@ -1704,7 +1712,7 @@ quality and inlier count, and how the frame was won (`:detect`, `:init` or
 struct BoardObservation{M}
     board::String
     frame::Int
-    # The arm's OWN estimate, and the only geometry stored: an `Extrinsics3`
+    # The arm's OWN estimate, and the only geometry stored: a `CameraExtrinsics`
     # pose (P3P + lifted LO), a `HomographyMat` or a `RadialHomography` — or
     # whatever model a caller's own arm estimates. Every map a consumer needs
     # is derived from it (`_world_to_image` for projection). Caching a
@@ -1760,19 +1768,19 @@ board_quad(::RadialHomographyGeometry, m::VgtkCore.RadialHomography, bundle::Boa
     board_quad(nothing, m, bundle)
 
 # Radially distorted homography: the one-sided division model (H, k), k free
-# per fit (RVG `find_radial_homography`; Wadenbäck et al., 3DV 2026).
+# per fit (Estimation's `Ransac` on `RadialHomographyProblem`; Wadenbäck et al., 3DV 2026).
 #
 # `pt_correspondences` arrives from `_fit_endpoints` already in point form, so it is
 # not re-converted.
 _find_model(
     g::RadialHomographyGeometry, pt_correspondences; local_optimization_strategy = g.local_optimization_strategy,
     outlier_halfwidth = g.outlier_halfwidth, kw...
-) = find_radial_homography(
-    pt_correspondences; center = distortion_center(g),
-    scoring = default_student_t_uniform_scoring(_RadialProblem5, outlier_halfwidth), local_optimization_strategy, kw...
+) = _board_find(
+    RadialHomographyProblem(pt_correspondences; center = distortion_center(g)), _RadialProblem5, outlier_halfwidth,
+    local_optimization_strategy; kw...
 )
 
-# The arm's problem type: the radial 5-point kernel's (`find_radial_homography`'s
+# The arm's problem type: the radial 5-point kernel's (`RadialHomographyProblem`'s
 # default `minimal = :radial`, minimal sample 5) — the scorer reads its minimal
 # sample size and codimension off it.
 const _RadialProblem5 = RadialHomographyProblem{Float64, 5}
@@ -1795,10 +1803,10 @@ _refine(g::RadialHomographyGeometry, pt_correspondences, θ₀::HomographyMat; l
 _refine(
     g::RadialHomographyGeometry, pt_correspondences, θ₀::VgtkCore.RadialHomography;
     outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy,
-    extent = nothing, workspace = nothing,
-) = length(pt_correspondences) < 5 ? nothing : locally_optimize(
-    with_extent(RadialHomographyProblem(pt_correspondences; center = VgtkCore.center(θ₀)), extent), θ₀;
-    scoring = default_student_t_uniform_scoring(_RadialProblem5, outlier_halfwidth), workspace, local_optimization_strategy
+    extent = nothing,
+) = length(pt_correspondences) < 5 ? nothing : _local_optimization(
+    RadialHomographyProblem(pt_correspondences; center = VgtkCore.center(θ₀)), _RadialProblem5, θ₀, outlier_halfwidth,
+    local_optimization_strategy, extent
 )
 
 # The pose arm: undistort the image under :global, detect raw under :none
@@ -1817,7 +1825,7 @@ _undistort_detect(dev::KA.Backend, img, g::PoseGeometry) =
 # assignment): end-to-end runs are reproducible GIVEN features; the fit
 # stage is bit-reproducible.
 """
-    fit_rng(seed, uid) -> Xoshiro
+    board_rng(seed, uid) -> Xoshiro
 
 The RANSAC stream of one board's fit: `Xoshiro(seed ⊻ uid)`, the board's uid
 read as hexadecimal. `find_boards`, `find_board`'s callers and `track_boards`
@@ -1825,25 +1833,25 @@ all draw from it with `seed = config.ransac_seed`, so a fit's result depends
 only on its inputs; a caller that fits boards itself and wants its fits
 comparable with the engine's derives its streams here.
 """
-fit_rng(seed::Integer, uid::AbstractString) =
+board_rng(seed::Integer, uid::AbstractString) =
     Xoshiro(reinterpret(UInt64, Int64(seed)) ⊻ parse(UInt64, uid; base = 16))
 
 """
-    board_fit_keywords(config::FindBoardsConfig, uid, bundle) -> NamedTuple
+    board_solve_keywords(config::FindBoardsConfig, uid, bundle) -> NamedTuple
 
-One board's fit keywords, as `find_boards`' engine builds them. They are (less its
-per-thread workspace) the arm's `outlier_halfwidth` and `local_optimization_strategy`,
-the RANSAC `config`, the board's world `extent` and its own seeded stream
-(`rng = fit_rng(config.ransac_seed, uid)`). The serial oracle builds them here,
+One board's solve keywords, as `find_boards`' engine builds them: the arm's
+`outlier_halfwidth` and `local_optimization_strategy` (its `Ransac` scorer and
+local optimization), the RANSAC `config`, the board's world `extent` (the solve's
+context) and its own seeded stream (`rng = board_rng(config.ransac_seed, uid)`). The serial oracle builds them here,
 and so does a downstream arm (CaliBlobs'), so their fits stay comparable with
 the engine's by construction.
 """
-board_fit_keywords(config, uid, bundle) = (;
+board_solve_keywords(config, uid, bundle) = (;
     outlier_halfwidth = config.geometry.outlier_halfwidth,
     local_optimization_strategy = config.geometry.local_optimization_strategy,
     config = config.ransac_config,
     extent = Rect(bundle, :world),
-    rng = fit_rng(config.ransac_seed, uid),
+    rng = board_rng(config.ransac_seed, uid),
 )
 
 """
@@ -1916,7 +1924,7 @@ loosening this bar re-admits flipped poses along with good ones.
 
 # Reproducibility
 - `ransac_seed=0x0b10b5eed`: base seed for the per-fit RANSAC streams
-  (`Xoshiro(ransac_seed ⊻ board uid)` — see `fit_rng`). Identical inputs
+  (`Xoshiro(ransac_seed ⊻ board uid)` — see `board_rng`). Identical inputs
   give identical results, independent of thread scheduling, call order, and
   ambient RNG state; sweep it only to MEASURE fit-stage RNG sensitivity.
   CUDA feature extraction remains nondeterministic (adapt's atomic pixel
@@ -1980,7 +1988,7 @@ Base.@kwdef struct FindBoardsConfig{G <: GeometryConfig, N}
         success_prob = _dflt("ransac", "success_prob")
     )
     # Base seed for the per-fit RANSAC streams: every board's fit draws from
-    # `Xoshiro(ransac_seed ⊻ uid)` (see `fit_rng`), so identical inputs give
+    # `Xoshiro(ransac_seed ⊻ uid)` (see `board_rng`), so identical inputs give
     # identical results regardless of thread scheduling, call order, or
     # ambient RNG state. Recorded like every other knob so a run's sidecar
     # names the streams it used; sweep it to MEASURE fit-stage RNG
@@ -2125,7 +2133,7 @@ _detect_config_for_boards(config, polarity::Symbol) =
 )
 
 # Undistort for the detector: the geometry decides (KA kernel on `device`
-# for the pose arm under :global; identity for Pinhole/no camera, for the
+# for the pose arm under :global; identity for the perspective lens/no camera, for the
 # raw-detecting arms, and for the pose arm under :none). The detector
 # consumes host UInt8; the adaptation and the descriptor read the same pixels as
 # a Float32 image on `device`, uploaded once (`_device_image`: a storage
@@ -2551,39 +2559,6 @@ function find_boards(
     return all_accepted
 end
 
-# Per-thread RANSAC workspace pools, BOTH estimator paths — `(fit, refine)`,
-# either `nothing` when its size is below the minimal sample. `set_n!` inside
-# ransac() and the refine_* trim a bigger buffer to the problem's data_size,
-# so one workspace sized to the largest set serves every board.
-# `fit` serves the initial RANSAC (sized by the largest match list);
-# `refine` the guided refit, whose set is bounded by the board's world-blob
-# count and can exceed the match count.
-#
-# Sizing: `Threads.maxthreadid()` (not `nthreads()`) — Julia ≥ 1.10
-# separates the default + interactive threadpools, and `threadid()` is
-# the GLOBAL id, so a call from the interactive pool can return an id
-# above `nthreads(:default)`. `maxthreadid()` is the safe upper bound.
-# A workspace is built for the scorer and the local optimizer it serves
-# (`outlier_halfwidth`, `local_optimization_strategy`: the geometry's).
-_fit_workspace_builder(::Nothing, a, lo) =
-    n -> VgtkEstimation.RansacWorkspace(HomographyProblem{Float64}, n, default_student_t_uniform_scoring(HomographyProblem{Float64}, a), lo)
-_fit_workspace_builder(::BoundedCamera, a, lo) =
-    n -> VgtkEstimation.RansacWorkspace(AbsolutePoseProblem, n, default_student_t_uniform_scoring(AbsolutePoseProblem, a), lo)
-# Radial arm: no pooled workspace yet (it would need K=5 /
-# RadialHomography-shaped buffers) — RVG sizes fresh ones per fit.
-_fit_workspace_builder(::RadialHomographyGeometry, _a, _lo) = nothing
-
-_pool_kw(g) = (; outlier_halfwidth = g.outlier_halfwidth, local_optimization_strategy = g.local_optimization_strategy)
-function _workspace_pools(cam, max_match::Int, max_blobs::Int; outlier_halfwidth, local_optimization_strategy)
-    builder = _fit_workspace_builder(cam, outlier_halfwidth, local_optimization_strategy)
-    builder === nothing && return nothing, nothing
-    fit = max_match >= 4 ?
-        [builder(max_match) for _ in 1:Threads.maxthreadid()] : nothing
-    refine = max_blobs >= 4 ?
-        [builder(max_blobs) for _ in 1:Threads.maxthreadid()] : nothing
-    return fit, refine
-end
-
 # One PHASE of the spatial-claiming engine under a given matching config.
 # Mutates `gallery_pool` (deletes accepted) and `all_accepted` (appends); returns
 # the (shrunken) feature pool so a subsequent phase can continue from it.
@@ -2656,22 +2631,11 @@ function _run_matching_phase!(
         matching_strategy, gallery_pool, feat_pool;
         backend = device, index = gpu_index, min_similarity
     )
-    # Per-thread RANSAC workspace pools, one per PHASE: raw match-list lengths
-    # upper-bound the one-to-one-resolved sets the fits actually see, and
-    # RVG's set_n! trims an oversized buffer to each problem's data_size, so
-    # one pool sized here serves every round.
-    fit_workspaces, refine_workspaces = _workspace_pools(
-        cam,
-        isempty(match_dict) ? 0 : maximum(length, values(match_dict)),
-        isempty(gallery_pool) ? 0 :
-            maximum(length(bf) for bf in values(gallery_pool));
-        _pool_kw(config.geometry)...
-    )
     accepted, claimed = _claim_boards(
         feat_pool, gallery_pool;
         board_bundles, gpu_index, config,
         device, matching_strategy, min_similarity,
-        match_dict, fit_workspaces, refine_workspaces, telemetry
+        match_dict, telemetry
     )
     append!(all_accepted, accepted)
     for (uid, _, _, _) in accepted
@@ -2769,7 +2733,7 @@ function _find_boards_serial(
                         guided_rtree = rt_at(Float64(cutoff(bdl))), guided_skip = claimed,
                         guided_det_ells = ells_at(Float64(cutoff(bdl))),
                         resolve_pose_ambiguity = _pose_ambiguity_enabled(config.geometry),
-                        fit_kw = board_fit_keywords(config, uid, bdl),
+                        fit_kw = board_solve_keywords(config, uid, bdl),
                     )
                 catch err
                     @warn "find_board failed for board $uid (serial reference)" exception = (err, catch_backtrace())
@@ -2820,7 +2784,7 @@ floor.
 """
 mutable struct _AgendaEntry
     uid::String
-    resolved::Vector{NNMatch}
+    resolved::Vector{Attributed{Correspondence{Int, Int}, NNMatchMeta}}
     n_matches::Int
     # Detection indices this entry's LAST fit read: its match set (RANSAC
     # input, rebuilt by the round-top re-resolution) plus the nearest
@@ -2912,10 +2876,6 @@ function _claim_boards(
         matching_strategy::NNStrategy = MutualNN(),
         min_similarity = config.min_similarity,
         match_dict = nothing,
-        # Phase-hoisted per-thread RANSAC workspace pools (see
-        # _run_matching_phase!); standalone callers get per-call pools below.
-        fit_workspaces = nothing,
-        refine_workspaces = nothing,
         telemetry::Union{Nothing, Telemetry} = nothing,
     )
     cfg = config
@@ -2949,7 +2909,7 @@ function _claim_boards(
     # decisive on 260527 (2026-08-17): board c4f@DSC04564, a real 3 m board at
     # the min_inliers frontier, is recovered ONLY via this claim-freed
     # fallback; resolve-once-per-phase (filter-only) loses it at every seed.
-    agenda = [_AgendaEntry(uid, NNMatch[], 0, Int32[]) for uid in uids]
+    agenda = [_AgendaEntry(uid, Attributed{Correspondence{Int, Int}, NNMatchMeta}[], 0, Int32[]) for uid in uids]
     # Agenda floor: a board with too few resolved matches gets no trial THIS
     # ROUND — the hopeless tail of the gallery is skipped before any RANSAC
     # runs. Applied per round (the entry stays on the agenda, mirroring the
@@ -2966,8 +2926,7 @@ function _claim_boards(
     # min_inliers". That comparison looks right — inliers are a subset of
     # correspondences, so `n_matches >= min_inliers` would seem lossless — and
     # it is WRONG here: the guided refit associates by GEOMETRY, and its set is
-    # bounded by the board's world-blob count, not by the match count (see the
-    # `refine_workspaces` sizing below). A board admitted with `min_inliers-1`
+    # bounded by the board's world-blob count, not by the match count. A board admitted with `min_inliers-1`
     # matches can finish above the accept gate on correspondences that were
     # never matched. So no floor derived from `min_inliers` is logically
     # justified; the only invariant that matters is that this floor stays
@@ -2984,19 +2943,6 @@ function _claim_boards(
     # against. It has no telemetry (see the `211@DSC04555` open item) — add a
     # counter before re-tuning it.
     n_min = cfg.geometry.min_inliers - 1
-
-    # Per-thread RANSAC workspaces (see _workspace_pools). Normally hoisted by
-    # `_run_matching_phase!` (one pool per PHASE); this fallback serves
-    # standalone callers only.
-    if fit_workspaces === nothing && refine_workspaces === nothing
-        fit_workspaces, refine_workspaces = _workspace_pools(
-            cam,
-            isempty(agenda) ? 0 : maximum(length(e.resolved) for e in agenda),
-            isempty(agenda) ? 0 :
-                maximum(length(board_feature_dict[e.uid]) for e in agenda);
-            _pool_kw(cfg.geometry)...
-        )
-    end
 
     # Guided-search context, hoisted per phase — pure functions of the fixed
     # feature pool and the immutable bundles, so caching them is
@@ -3075,9 +3021,8 @@ function _claim_boards(
             e.n_matches = _n_resolved_matches(e.resolved)
         end
         # ---- Parallel fit of every live agenda entry ------------------------
-        # Each fit is independent (read-only image_features, per-thread
-        # workspace); static scheduling pins iterations to threads so
-        # `threadid()` indexing is stable. Only the best candidate commits;
+        # Each fit is independent (read-only image_features; each solve owns
+        # its RANSAC workspace). Only the best candidate commits;
         # the rest are recomputed next round on the updated claim state, so
         # no fit is ever accepted on inputs a commit has since invalidated.
         # The sort is priority order only — NOT selective: every entry above
@@ -3087,23 +3032,18 @@ function _claim_boards(
         slots = Vector{Union{Nothing, Tuple}}(undef, length(batch))
         Threads.@threads :static for i in eachindex(batch)
             e = batch[i]
-            ws = fit_workspaces === nothing ? nothing : fit_workspaces[Threads.threadid()]
-            rws = refine_workspaces === nothing ? nothing : refine_workspaces[Threads.threadid()]
-            # Per-board extent: RVG wraps the problem in `BoundedProblem(_, rect)`
-            # so the post-IRLS extent-consensus hook rejects bow-tie fits that
+            # Per-board extent: the solve's context `(; extent)` bounds the
+            # problem (`BoundedProblem(_, rect)`), so the post-IRLS extent-consensus hook rejects bow-tie fits that
             # fold the board's outer corners.
             extent_i = isnothing(board_bundles) ? nothing :
                 Rect(board_bundles[e.uid], :world)
             bdl = isnothing(board_bundles) ? nothing : board_bundles[e.uid]
             geom = board_geom === nothing ? nothing : board_geom[e.uid]
-            # ONE NamedTuple shape — RVG's find_* declare `workspace = nothing`
-            # as their default, so supplying nothing explicitly is identical and
-            # keeps fit_kw type-stable across the ws/no-ws cases.
             fit_kw = (;
-                outlier_halfwidth, workspace = ws,
+                outlier_halfwidth,
                 local_optimization_strategy = cfg.geometry.local_optimization_strategy,
                 config = cfg.ransac_config, extent = extent_i,
-                rng = fit_rng(cfg.ransac_seed, e.uid),
+                rng = board_rng(cfg.ransac_seed, e.uid),
             )
             # Dependency capture: seed with the RANSAC input — the match set,
             # inliers AND outliers, since the round-top re-resolution rebuilds
@@ -3132,7 +3072,6 @@ function _claim_boards(
                         det_ells_by_cutoff[Float64(cutoff(bdl))],
                     guided_wdiscs = geom === nothing ? nothing : geom.wdiscs,
                     guided_wregions = geom === nothing ? nothing : geom.wregions,
-                    refine_workspace = rws,
                     resolve_pose_ambiguity = _pose_ambiguity_enabled(cfg.geometry),
                     fit_kw
                 )

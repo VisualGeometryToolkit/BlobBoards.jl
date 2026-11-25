@@ -501,7 +501,7 @@ it), as it lands here:
 | term | what it is here |
 |------|-----------------|
 | detection | a detector's output in one image, unassociated: `BlobDetection`, the adapted `EllipticFrame`s, `image_features` (with a descriptor, `DescribedFeature`) |
-| `matches` | the RAW descriptor matches, BEFORE verification (VisualGeometryToolkitFeatures `match`, `NNMatch`) |
+| `matches` | the RAW descriptor matches, BEFORE verification (VisualGeometryToolkitFeatures `match`: `Attributed{Correspondence{Int, Int}, NNMatchMeta}`) |
 | `correspondences` | the board-disc ↔ detection pairings a fit scores: Core's columnar `Correspondences` (`ScoredCorrespondence` rows); an **inlier** is one the fit kept (`is_map_inlier` of its weight) |
 | observation | a detection associated with a board point (the target entity), as an estimator or a training record consumes it; a **track** is the observations of one board blob |
 

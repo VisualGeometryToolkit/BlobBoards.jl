@@ -10,11 +10,11 @@ using StaticArrays: SVector, SMatrix
 using StructArrays: StructArray
 using Rotations: RotMatrix, RotXYZ, rotation_angle
 import VisualGeometryToolkitCore
-using VisualGeometryToolkitCore: CameraModel, Extrinsics3, LogicalIntrinsics, CameraCalibrationMat, Division, Pinhole, px,
+using VisualGeometryToolkitCore: CameraModel, CameraExtrinsics, LogicalIntrinsics, CameraCalibrationMat, Division, px,
     EuclideanMap, EllipticFrame, Point2, Point3, Circle, Ellipse, PosedCamera, HomographyMap,
     centroid, shape_matrix, project, pinhole, transfer_ellipse, Vec3, boundary_points,
-    BoundedCamera, Size2, Rect, SplineLens, estimate
-using VisualGeometryToolkitEstimation: AbsolutePoseProblem, scoring_from_toml, fit_camera
+    BoundedCamera, Size2, Rect, SplineLens, solve, EstimationProblem
+using VisualGeometryToolkitEstimation: AbsolutePoseProblem, scoring_from_toml, Ransac, CameraRegressionProblem, CameraRegression
 using LocalOptimizationDoneRight: HQ, tuning_constant
 using VisualGeometryToolkitCore: WelschShape
 using BlobBoards: PoseGeometry, HomographyGeometry, RadialHomographyGeometry, _estimation_camera,
@@ -46,7 +46,7 @@ end
 end
 
 @testset "the transfer object: the posed camera, whose plane map is Core's plane_map" begin
-    pose = Extrinsics3(_POSE.R, _POSE.t)
+    pose = CameraExtrinsics(_POSE)
     @test _world_to_image(pose, _PIN) isa PosedCamera                                  # :global — the pinhole twin, posed
     @test _world_to_image(pose, _CAM) isa PosedCamera                                  # :none — the full camera, posed
     @test_throws ArgumentError _world_to_image(pose, nothing)                          # a pose needs a BoundedCamera
@@ -90,15 +90,17 @@ end
     # The recipe this test pinned, stated (RVG's own default is now MSAC at a
     # threshold with least squares on the inliers): the Student-t + uniform
     # marginal at a 5 px half-width and the cross-validated Welsch-HQ lift.
-    est = BlobBoards.VisualGeometryToolkitEstimation.find_absolute_pose(
-        _MODEL, src .=> dst; rng = MersenneTwister(1),
-        scoring = scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => 5.0); problem = AbsolutePoseProblem),
-        local_optimization_strategy = HQ{WelschShape}(; efficiency_constant = tuning_constant(:absolute_pose, "welsch").efficiency_constant)
+    est = solve(
+        EstimationProblem(AbsolutePoseProblem(_MODEL, src .=> dst)),
+        Ransac(;
+            scoring = scoring_from_toml(Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => 5.0); problem = AbsolutePoseProblem),
+            local_optimization_strategy = HQ{WelschShape}(; efficiency_constant = tuning_constant(:absolute_pose, "welsch").efficiency_constant)
+        ); rng = MersenneTwister(1)
     )
     @test VisualGeometryToolkitCore.found_model(est)   # a failed search is a :no_model result, not `nothing` (Estimation 0.5)
     if VisualGeometryToolkitCore.found_model(est)      # a failed search has no estimate to read
-        @test rad2deg(rotation_angle(RotMatrix{3}(est.estimate.R' * _POSE.R))) < 0.05
-        @test norm(est.estimate.t - _POSE.t) < 1.0
+        @test rad2deg(rotation_angle(RotMatrix{3}(est.u.R' * _POSE.R))) < 0.05
+        @test norm(est.u.t - _POSE.t) < 1.0
         @test count(VisualGeometryToolkitCore.inlier_mask(est) .& (radius .> 1100)) == count(radius .> 1100)   # the rim is kept
     end
 end
@@ -114,20 +116,23 @@ end
         push!(dst, Point2{Float64}(u[1] + 0.3randn(rng), u[2] + 0.3randn(rng)))
     end
     @test length(src) >= 30
-    spline = BoundedCamera(estimate(fit_camera(SplineLens, _CAM, inner; tolerance = 1.0e-2)), Size2(4240, 2832))
+    spline = BoundedCamera(
+        solve(EstimationProblem(CameraRegressionProblem(SplineLens, _CAM, inner)), CameraRegression(; tolerance = 1.0e-2)).u,
+        Size2(4240, 2832)
+    )
     res = BlobBoards._find_model(_CAM, src .=> dst; rng = MersenneTwister(1))   # the pose arm's fit, as find_boards runs it
     @test VisualGeometryToolkitCore.found_model(res)
     if VisualGeometryToolkitCore.found_model(res)
-        @test rad2deg(rotation_angle(RotMatrix{3}(res.estimate.R' * _POSE.R))) < 0.1
-        @test norm(res.estimate.t - _POSE.t) < 2.0
+        @test rad2deg(rotation_angle(RotMatrix{3}(res.u.R' * _POSE.R))) < 0.1
+        @test norm(res.u.t - _POSE.t) < 2.0
     end
     # The spline camera, the same way: the Student-t LO differentiates its projection
     # (a Dual ray through the spline's implicit Jacobian, VisualGeometryToolkitCore).
     spline_fit = BlobBoards._find_model(spline, src .=> dst; rng = MersenneTwister(1))
     @test VisualGeometryToolkitCore.found_model(spline_fit)
     if VisualGeometryToolkitCore.found_model(spline_fit)
-        @test rad2deg(rotation_angle(RotMatrix{3}(spline_fit.estimate.R' * _POSE.R))) < 0.1
-        @test norm(spline_fit.estimate.t - _POSE.t) < 2.0
+        @test rad2deg(rotation_angle(RotMatrix{3}(spline_fit.u.R' * _POSE.R))) < 0.1
+        @test norm(spline_fit.u.t - _POSE.t) < 2.0
     end
     @test hasmethod(BlobBoards.board_quad, Tuple{BoundedCamera, Any, BlobBoards.BoardBundle})
     @test !hasmethod(BlobBoards.board_quad, Tuple{CameraModel, Any, BlobBoards.BoardBundle})
@@ -142,7 +147,7 @@ end
 # pinhole that is the plane homography's projection; through the lens, the
 # camera's own projection of the z = 0 lift.
 @testset "blob centres through the full camera (track_boards, :none)" begin
-    pose = Extrinsics3(_POSE.R, _POSE.t)
+    pose = CameraExtrinsics(_POSE)
     wd = [EllipticFrame(Point2(x, y), 2.0) for x in -60.0:30.0:60.0 for y in -40.0:40.0:40.0]
     through_cam = _project_blob_centers(_world_to_image(pose, _CAM), wd)
     @test through_cam isa Vector{Point2{Float64}} && length(through_cam) == length(wd)

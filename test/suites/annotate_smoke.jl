@@ -390,6 +390,6 @@ end
     )
     @test !isempty(trks)
     ds = first(values(trks))
-    @test all(d -> d.model isa BlobBoards.Extrinsics3, ds)
+    @test all(d -> d.model isa BlobBoards.CameraExtrinsics, ds)
     @test count(d -> d.source === :track, ds) >= 1
 end

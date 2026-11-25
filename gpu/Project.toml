@@ -24,15 +24,20 @@ VisualGeometryToolkitIO = "0a7ae7e7-e931-45f8-9bba-03d07899cebc"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [sources]
+# TEMPORARY: solve branch; remove when Core 0.14 etc. are registered
+VisualGeometryToolkitCore = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitCore"}
+VisualGeometryToolkitEstimation = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitEstimation"}
+VisualGeometryToolkitIO = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitIO"}
+VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitFeatures"}
 BlobBoards = { path = ".." }
 
 [compat]
-BlobBoards = "0.7"
+BlobBoards = "0.8"
 CUDA = "5.11.0"
 CUDA_Runtime_jll = "0.21"
 GLMakie = "0.13"
-VisualGeometryToolkitCore = "0.13.3"
-VisualGeometryToolkitIO = "0.11.2"
+VisualGeometryToolkitCore = "0.14"
+VisualGeometryToolkitIO = "0.12"
 cuDNN = "1.4.7"
 julia = "1.13"
 

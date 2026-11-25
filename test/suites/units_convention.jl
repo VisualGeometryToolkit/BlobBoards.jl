@@ -11,7 +11,7 @@
 # Convention (matches VisualGeometryToolkitIO): every dimension-boundary crossing
 # uses the target-unit form `ustrip(u, x)` — frames, Size2 and Rects included.
 # Bare strips are allowed only for audited cases — defensive identity-or-strip
-# over bare-by-contract or px data (:world rects and blobs, Extrinsics3.t,
+# over bare-by-contract or px data (:world rects and blobs, CameraExtrinsics.t,
 # adapted frames, shape matrices), and "magnitudes in caller-chosen units"
 # export loops — each carrying an `(audited)` comment at the call site.
 #

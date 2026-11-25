@@ -7,13 +7,15 @@ DocumenterLandingPage = "1c52b33b-3e2f-4e99-b3b5-a6ad63f0d6d2"
 VisualGeometryToolkitFeatures = "9487290e-790c-4faa-aa87-bc3b5f18b9f7"
 
 [sources]
+# TEMPORARY: solve branch; remove when Core 0.14 etc. are registered
+VisualGeometryToolkitFeatures = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitFeatures"}
 BlobBoards = {path = ".."}
 
 [compat]
-BlobBoards = "0.7"
+BlobBoards = "0.8"
 CairoMakie = "0.15"
 Documenter = "1.20"
 DocumenterCodeBlocks = "1.5.1"
 DocumenterLandingPage = "0.2.2"
 julia = "1.13"
-VisualGeometryToolkitFeatures = "0.9.11"
+VisualGeometryToolkitFeatures = "0.10"

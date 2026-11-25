@@ -18,7 +18,10 @@ const OPEN = Set([
 _key(v) = v.check === :name ? "name $(v.text)" :
     v.check === :pattern ? "pattern $(v.file)" : "$(v.check) $(v.file)"
 
-found = VgtkCore.check_duplication(BlobBoards)
+# bmvc2026/ is the BMVC 2026 paper project, pinned to its released environment
+# (BlobBoards 0.7.4 on the Core 0.13 stack, where it reproduces): out of scope.
+_paper_file(f) = f isa AbstractString && startswith(f, "bmvc2026/")
+found = filter(v -> !(_paper_file(v.file) || _paper_file(v.other)), VgtkCore.check_duplication(BlobBoards))
 keys_found = Set(_key(v) for v in found)
 foreach(v -> _key(v) in OPEN || println(stderr, v), found)
 @test keys_found ⊆ OPEN

@@ -37,7 +37,7 @@ using StaticArrays: SVector, SMatrix
 using CUDA          # triggers GPU extensions
 import cuDNN        # ONNXRunTime :cuda execution provider
 using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
-    HomographyMap, HomographyMat, PosedCamera, undistort, CameraModel, BoundedCamera, Pinhole, intrinsics,
+    HomographyMap, HomographyMat, PosedCamera, undistort, CameraModel, BoundedCamera, Lens, Perspective, intrinsics,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 using CUDA: CUDABackend   # the KA device token
@@ -154,7 +154,7 @@ for (label, geometry) in (
         # Calibrated poses live in undistorted-image coordinates, so that
         # variant displays the undistorted image; homography uses the raw one.
         disp_img = calibrated ? undistort(cam, img) : img
-        cam_pinhole = calibrated ? CameraModel(intrinsics(cam), Pinhole()) : nothing
+        cam_pinhole = calibrated ? CameraModel(intrinsics(cam), Lens(Perspective())) : nothing
         global screen = plot_results(disp_img, accepted, board_bundles, cam_pinhole, label)
     end
 end

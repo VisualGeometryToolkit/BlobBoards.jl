@@ -42,7 +42,7 @@
 # =============================================================================
 
 using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, PosedCamera, transfer_ellipse,
-    Extrinsics3, Ellipse, region, centroid, feature_frame,
+    Ellipse, region, centroid, feature_frame,
     EllipticFrame, planar_lift,  # #21 lazy endpoint lifts
     plane_map   # the pose arms project blob centres through it (`_project_blob_centers`)
 
@@ -446,7 +446,9 @@ function _warm_track_frame(
     # gated set inherits the gate's selection bias. RANSAC hypotheses don't:
     # on a ~95%-pure set it terminates in a handful of trials, sampling
     # in the lexicographic association order. Same estimator path as discovery.
-    matches = NNMatch[NNMatch(wi, di, sims[k], 0.0f0) for (k, (wi, di)) in enumerate(assoc)]
+    matches = Attributed{Correspondence{Int, Int}, NNMatchMeta}[
+        Attributed(Correspondence{Int, Int}(wi, di), NNMatchMeta(sims[k], 0.0f0)) for (k, (wi, di)) in enumerate(assoc)
+    ]
     scored = correspondences(wdiscs, image_features, matches)
     pt = _fit_endpoints(camera, scored)
     # Rank scores REPLACE the :score column here — the warm-track prior is
@@ -457,12 +459,12 @@ function _warm_track_frame(
         local_optimization_strategy = config.geometry.local_optimization_strategy,
         config = config.ransac_config,
         extent = Rect(bundle, :world),
-        rng = fit_rng(config.ransac_seed, tr.uid)
+        rng = board_rng(config.ransac_seed, tr.uid)
     )
     (res !== nothing && VgtkCore.found_model(res)) || return (nothing, _finish_diag(diag))
 
     # ---- verify with find_boards' gates
-    w = res.weights
+    w = VgtkCore.weights(res)
     nin = count(is_map_inlier, w)
     # >= : inclusive, in lockstep with find_boards' gates and the bumped
     # defaults (2026-08-11) — with `>` this site would have silently
@@ -497,7 +499,7 @@ function _warm_track_frame(
 
     return (
         BoardObservation(
-            tr.uid, frame_idx, res.estimate, Float64(res.quality), nin, :track
+            tr.uid, frame_idx, res.u, Float64(res.metadata.quality), nin, :track
         ),
         _finish_diag(diag),
     )

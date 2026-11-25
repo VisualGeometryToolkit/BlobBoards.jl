@@ -44,7 +44,7 @@ using CUDA          # triggers GPU extensions (CPU works too — see DEVICE)
 import cuDNN        # ONNXRunTime :cuda execution provider
 using VisualGeometryToolkitCore: is_map_inlier, imshow, matches!, window!, ustrip, centroid,
     HomographyMap, HomographyMat, RadialHomography, radial_transfer,
-    PosedCamera, CameraModel, BoundedCamera, Pinhole, undistort, division_bounded, intrinsics, model, with_model,
+    PosedCamera, CameraModel, BoundedCamera, Lens, Perspective, undistort, division_bounded, intrinsics, model, with_model,
     sources, targets
 using CoordinateTransformations: PerspectiveMap
 import VisualGeometryToolkitIO as VgtkIO   # the vgio/cameras camera stores
@@ -163,7 +163,7 @@ for (label, geometry) in (
     if !isempty(accepted)
         # Calibrated poses live in undistorted-image coordinates.
         disp_img = calibrated ? undistort(cam, img) : img
-        cam_quad = calibrated ? with_model(cam, CameraModel(intrinsics(cam), Pinhole())) : nothing
+        cam_quad = calibrated ? with_model(cam, CameraModel(intrinsics(cam), Lens(Perspective()))) : nothing
         global screen = plot_results(disp_img, accepted, board_bundles, cam_quad, label)
     end
 end

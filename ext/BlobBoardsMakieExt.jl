@@ -385,7 +385,7 @@ end
 # 0.03 px of its detection, the OpenCV-model camera to 72 px.
 # Core's plane-induced homography of the pinhole camera (`HomographyMap` of a
 # `PosedCamera`); plotting may receive a quantity-carrying pose, which strips
-# in mm first (Extrinsics3.t is bare mm by convention).
+# in mm first (CameraExtrinsics.t is bare mm by convention).
 function _board_proj(camera::VgtkCore.BoundedCamera, pose; lens::Bool = true)
     camera_model = VgtkCore.model(camera)   # the projection is the model's; the bound is the image extent
     # `lens = true` (the default): the FULL camera, raw pixels — what a board

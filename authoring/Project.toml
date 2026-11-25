@@ -25,10 +25,12 @@ VisualGeometryToolkitCore = "96820d6b-1dad-4e77-ad4a-8276f2ec1ce7"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [sources]
+# TEMPORARY: solve branch; remove when Core 0.14 etc. are registered
+VisualGeometryToolkitCore = {path = "/home/jbpritts/src/_wt-solve-core014/VisualGeometryToolkitCore"}
 BlobBoards = { path = ".." }
 
 [compat]
-BlobBoards = "0.7"
+BlobBoards = "0.8"
 CUDA = "5.11.0"
 CUDA_Runtime_jll = "0.21"
 CairoMakie = "0.15"
