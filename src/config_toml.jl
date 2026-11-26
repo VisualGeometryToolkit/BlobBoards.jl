@@ -48,7 +48,7 @@ using TOML: TOML
 # lookup and the sorted writer. What stays here is BlobBoards': the retired-key
 # set, the tag registries and the hook methods for its own types.
 using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table, read_table,
-    allowed_keys, write_toml, TagRegistry, tag_of, CONFIG_VERSION_KEY, current_config_version
+    allowed_keys, write_toml, TagRegistry, tag_of, CONFIG_VERSION_KEY, CONFIG_VERSIONS_KEY, current_config_version, ConfigVersions
 import VisualGeometryToolkitCore: toml_skip_fields, toml_field
 # A run configuration's TOML table is VisualGeometryToolkitEstimation's `config_dict`
 # (one of its CONTRACT_GENERICS): BlobBoards adds the methods of its configs.
@@ -521,8 +521,17 @@ toml_field(c::DetectConfig, ::Val{:tilts}) = [[t[1], t[2]] for t in c.tilts]
 # Estimation's tagged tables (`{ type = ..., ... }`, the same shape its loaders read — Estimation owns that round
 # trip), beside the RansacConfig fields. A board arm's find carries no hooks and no score guard (`find_board`'s
 # own algorithms), so the table holds every field it has.
-toml_field(g::GeometryConfig, ::Val{:ransac}) = _ransac_toml(g.ransac)
-function _ransac_toml(r::Ransac)
+toml_field(g::GeometryConfig, ::Val{:ransac}) = board_ransac_toml(g.ransac)
+"""
+    board_ransac_toml(r::Ransac) -> Dict{String, Any}
+
+The TOML table of a board fit's `Ransac`, [`board_ransac_from_toml`](@ref)'s inverse: its scorer and its
+local-optimization strategy as VisualGeometryToolkitEstimation's tagged tables (`{ type = ..., ... }`, the shape its
+readers take), beside the `RansacConfig` fields. A geometry arm's `[find_boards.geometry.ransac]` is written by it, and so
+is a downstream package's board fit (CaliBlobs' pose fits). A `Ransac` with a score guard or a trace hook has no table
+(an `ArgumentError`).
+"""
+function board_ransac_toml(r::Ransac)
     (r.score_guard || r.on_improvement !== nothing || r.on_hypothesis !== nothing) && throw(ArgumentError(
         "a board arm's `ransac` with a score guard or a trace hook has no TOML table"))
     return merge(
@@ -565,23 +574,32 @@ config_dict(c::FindBoardsConfig) = toml_table(c)
 _allowed_keys(::Type{T}, extra::Symbol...) where {T} = allowed_keys(T, extra...)
 
 """
-    write_config(path, config; extra = Dict())
+    write_config(path, config; extra = Dict(), versions = BB_CONFIG_VERSIONS,
+                 tables = Dict("find_boards" => config_dict(config)))
 
 Write `config` — a [`FindBoardsConfig`](@ref), or any config with a [`config_dict`](@ref)
 method (a driver's config built on it) — as a TOML file of the current `config_version` with a `[find_boards]` table
 (`config_dict(config)`), merging any `extra` top-level tables (`experiment`, `descriptor`,
-…); the header names the config's type as its reloading constructor. A `FindBoardsConfig`
+…); the header names the config's type as its reloading constructor.
+
+A host package whose run config holds BlobBoards' tables beside its own (CaliBlobs) hands its converter over as
+`versions` (a VisualGeometryToolkitCore `ConfigVersions` that delegates `find_boards` and `descriptor` to
+[`BB_CONFIG_VERSIONS`](@ref)) and its file's top-level tables as `tables`: the file states the host's `config_version`
+and each delegated owner's under `[config_versions]`, as [`read_run_config`](@ref)`(path; versions)` reads it. A `FindBoardsConfig`
 round-trips through [`FindBoardsConfig(path)`](@ref) — which the test suite asserts — so a
 config recorded beside an artifact reproduces the run that made it.
 
 `max_detections = typemax(Int)` is emitted as the string `"unbounded"`, since
 TOML integers are 64-bit signed and the literal round-trips confusingly.
 """
-function write_config(path::AbstractString, config; extra::AbstractDict = Dict{String, Any}())
-    body = merge(
-        Dict{String, Any}(string(k) => v for (k, v) in extra),
-        Dict(CONFIG_VERSION_KEY => current_config_version(BB_CONFIG_VERSIONS), "find_boards" => config_dict(config))
-    )
+function write_config(path::AbstractString, config; extra::AbstractDict = Dict{String, Any}(),
+        versions::ConfigVersions = BB_CONFIG_VERSIONS,
+        tables::AbstractDict = Dict{String, Any}("find_boards" => config_dict(config)))
+    _check_host(versions)
+    stamps = Dict{String, Any}(CONFIG_VERSION_KEY => current_config_version(versions))
+    versions === BB_CONFIG_VERSIONS || (stamps[CONFIG_VERSIONS_KEY] = Dict{String, Any}(
+        o.package => current_config_version(o) for o in unique(last.(versions.delegates))))
+    body = merge(Dict{String, Any}(string(k) => v for (k, v) in extra), Dict{String, Any}(string(k) => v for (k, v) in tables), stamps)
     T = nameof(typeof(config))
     return write_toml(
         path, body;
@@ -714,7 +732,8 @@ descriptor_network_path(path::AbstractString) = descriptor_network_path(read_run
 descriptor_network_path() = descriptor_network_path(run_config_path())
 
 """
-    read_run_config(path; tables = ()) -> (; config_toml, find_boards, experiment, gallery, descriptor)
+    read_run_config(path; tables = (), versions = BB_CONFIG_VERSIONS)
+        -> (; config_toml, tables, find_boards, experiment, gallery, descriptor)
 
 Read the whole run config, not just the `[find_boards]` table: `config_toml`
 is the raw parsed file (for a provenance sidecar), and the named fields are
@@ -734,32 +753,57 @@ further top-level tables of its own names them in `tables`; they are admitted,
 not checked, and read from `config_toml`. BlobBoards' own tables are read at the current
 version: a file stating an earlier `config_version` (or none: version 1, the files before
 versioning) is migrated by [`BB_CONFIG_VERSIONS`](@ref), and `find_boards`/`descriptor` are the
-migrated tables (`config_toml` stays the file as written). (The board and pattern authoring
-defaults are configs/authoring.toml's, never a run config's: `[blob_board]`
-there is refused.)
+migrated tables (`config_toml` stays the file as written; `tables` is the whole file at the current
+version). (The board and pattern authoring defaults are configs/authoring.toml's, never a run config's:
+`[blob_board]` there is refused.)
+
+A host package's run config (CaliBlobs': its own tables beside BlobBoards') is read with the host's converter as
+`versions`, a VisualGeometryToolkitCore `ConfigVersions` that delegates `find_boards` and `descriptor` to
+[`BB_CONFIG_VERSIONS`](@ref): the whole file is migrated through it (its `config_version` the host's, BlobBoards'
+tables from the version `[config_versions] BlobBoards` states), its tables are the host's to admit (`tables` is
+refused beside `versions`), and `[descriptor]` is key-checked as above.
 """
-function read_run_config(path::AbstractString; tables = ())
+function read_run_config(path::AbstractString; tables = (), versions::ConfigVersions = BB_CONFIG_VERSIONS)
     isfile(path) || throw(ArgumentError("no such config file: $path"))
     root = TOML.parsefile(path)
-    _check_run_keys(
-        root,
-        vcat([CONFIG_VERSION_KEY, "find_boards", "experiment", "gallery", "descriptor", "inputs"], String[String(t) for t in tables]),
-        "top level"
-    )
-    # BlobBoards' own tables at the current version (`BB_CONFIG_VERSIONS`): a stored file of an earlier one reads
-    # through its version steps.
-    own = migrate_config(
-        Dict{String, Any}(k => root[k] for k in (CONFIG_VERSION_KEY, "descriptor", "find_boards") if haskey(root, k)),
-        BB_CONFIG_VERSIONS; source = path
-    )
-    descriptor = get(own, "descriptor", Dict{String, Any}())
+    _check_host(versions)
+    if versions === BB_CONFIG_VERSIONS
+        _check_run_keys(
+            root,
+            vcat([CONFIG_VERSION_KEY, "find_boards", "experiment", "gallery", "descriptor", "inputs"], String[String(t) for t in tables]),
+            "top level"
+        )
+        # BlobBoards' own tables at the current version (`BB_CONFIG_VERSIONS`): a stored file of an earlier one reads
+        # through its version steps.
+        own = migrate_config(
+            Dict{String, Any}(k => root[k] for k in (CONFIG_VERSION_KEY, "descriptor", "find_boards") if haskey(root, k)),
+            BB_CONFIG_VERSIONS; source = path
+        )
+        current = merge(Dict{String, Any}(root), own)
+    else
+        isempty(tables) || throw(ArgumentError(
+            "read_run_config: a host's tables are its converter's ($(versions.package)'s ConfigVersions), not `tables`"))
+        current = migrate_config(root, versions; source = path)   # BlobBoards' tables by BB_CONFIG_VERSIONS, delegated
+    end
+    descriptor = get(current, "descriptor", Dict{String, Any}())
     _check_run_keys(descriptor, ["model"], "descriptor")
     empty_ = Dict{String, Any}()
     return (;
         config_toml = root,
-        find_boards = get(own, "find_boards", empty_),
-        experiment = get(root, "experiment", empty_),
-        gallery = get(root, "gallery", empty_),
+        tables = current,
+        find_boards = get(current, "find_boards", empty_),
+        experiment = get(current, "experiment", empty_),
+        gallery = get(current, "gallery", empty_),
         descriptor,
     )
+end
+
+# A host's converter delegates BlobBoards' tables to BlobBoards' own (`BB_CONFIG_VERSIONS`), or it cannot read them.
+function _check_host(versions::ConfigVersions)
+    versions === BB_CONFIG_VERSIONS && return nothing
+    for t in ("find_boards", "descriptor")
+        any(d -> first(d) == t && last(d) === BB_CONFIG_VERSIONS, versions.delegates) || throw(ArgumentError(
+            "$(versions.package)'s ConfigVersions does not delegate [$t] to BlobBoards' BB_CONFIG_VERSIONS"))
+    end
+    return nothing
 end

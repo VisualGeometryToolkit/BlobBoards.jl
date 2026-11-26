@@ -89,6 +89,7 @@ BlobBoards.GlobalUndistortion
 BlobBoards.board_endpoints
 BlobBoards.distortion_center
 BlobBoards.board_ransac_from_toml
+BlobBoards.board_ransac_toml
 BlobBoards.load_descriptor_network
 BlobBoards.match_boards
 BlobBoards.guided_search

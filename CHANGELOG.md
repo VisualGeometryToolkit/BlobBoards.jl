@@ -60,6 +60,18 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   warm frame, then `solve!(reinit!(cache; f, p, rng = board_rng(seed, uid)))` per frame (was a fresh solve per frame):
   the same draws, the same bits, the workspace kept.
 
+### Added
+
+- `board_ransac_toml(r::Ransac)` (public): a board fit's `Ransac` as its TOML table, the inverse of
+  `board_ransac_from_toml` (was the private `_ransac_toml`). A downstream package writes its own board fits with it
+  (CaliBlobs' `[board_refinement.ransac]`).
+- A host package's run config: `read_run_config(path; versions)` and `write_config(path, config; extra, versions,
+  tables)` take the host's converter (a VisualGeometryToolkitCore `ConfigVersions` that delegates `find_boards` and
+  `descriptor` to `BB_CONFIG_VERSIONS`). The reader migrates the whole file through it and key-checks `[descriptor]`
+  as for BlobBoards' own files; the writer stamps the host's `config_version` and each delegated owner's under
+  `[config_versions]`. `read_run_config` also returns the whole file at the current version (`tables`). Without
+  `versions`, both behave as before.
+
 ### Changed
 
 - The board fits are Estimation 0.13's algorithms: the find `solve(EstimationProblem(f, (; extent)), Ransac(;

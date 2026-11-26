@@ -138,6 +138,7 @@ public board_endpoints                     # a scored set as a 2D fit's endpoint
 public distortion_center                   # a radial arm's distortion centre (the sensor's middle)
 public load_descriptor_network             # a descriptor network as given, or read from a path (.jld2 → Lux, else ONNX)
 public board_ransac_from_toml              # a [find_boards.geometry.ransac] table → the arm's Ransac
+public board_ransac_toml                   # …and back: a board fit's Ransac → its table
 public BoardObservation                      # one board in one frame: track_boards' record
 public GalleryIndex                        # the staged board gallery; the type of every `gpu_index` keyword
 public board_palette                       # one stable color per board id (sorted) — every overlay uses it

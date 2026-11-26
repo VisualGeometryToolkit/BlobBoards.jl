@@ -788,6 +788,51 @@ end
     @test_throws ArgumentError read_run_config(path)
 end
 
+# A host package's run config (CaliBlobs'): its own converter delegates BlobBoards' tables to BB_CONFIG_VERSIONS; the
+# reader migrates the whole file through it and key-checks [descriptor] as for BlobBoards' files, the writer stamps both
+# versions; a board fit's Ransac round-trips through board_ransac_toml.
+@testset "read_run_config / write_config: a host's ConfigVersions; board_ransac_toml (2026-11)" begin
+    host = VgtkCore.ConfigVersions("Host",
+        VgtkCore.ConfigMigration(; tables = ["descriptor", "find_boards", "old_host"], renames = ["old_host" => "host"]);
+        tables = ["descriptor", "find_boards", "host"],
+        delegates = ["descriptor" => BlobBoards.BB_CONFIG_VERSIONS, "find_boards" => BlobBoards.BB_CONFIG_VERSIONS])
+    dir = mktempdir()
+    # a version-1 host file holding BlobBoards' version-1 tree: both migrated
+    p1 = _write(dir, "v1.toml", "[old_host]\nk = 2\n\n[descriptor]\nmodel = \"m.onnx\"\n\n[find_boards.ransac]\nmax_trials = 1500\n")
+    rc = read_run_config(p1; versions = host)
+    @test rc.tables["host"]["k"] == 2 && rc.tables["config_version"] == 2
+    @test rc.find_boards["geometry"]["ransac"]["max_trials"] == 1500 && rc.descriptor["model"] == "m.onnx"
+    @test rc.config_toml["old_host"]["k"] == 2                                  # the file as written
+    # BlobBoards' [descriptor] check runs for the host: an unknown key is refused, the retired one warns
+    @test_throws ArgumentError read_run_config(_write(dir, "d.toml", "[descriptor]\nmodle = \"m.onnx\"\n"); versions = host)
+    @test_logs (:warn, r"retired") match_mode = :any read_run_config(
+        _write(dir, "r.toml", "[descriptor]\nmodel = \"m.onnx\"\npatch_size = 96\n"); versions = host)
+    # the host's tables are its converter's: an unknown one refused, `tables` refused beside `versions`
+    @test_throws ArgumentError read_run_config(_write(dir, "u.toml", "[nope]\nk = 1\n"); versions = host)
+    @test_throws ArgumentError read_run_config(p1; versions = host, tables = ("host",))
+    # a converter that does not delegate BlobBoards' tables cannot read them
+    lone = VgtkCore.ConfigVersions("Lone"; tables = ["find_boards", "descriptor"])
+    @test_throws r"delegate" read_run_config(p1; versions = lone)
+    # the writer: the host's version and BlobBoards' under [config_versions], the host's tables
+    out = joinpath(dir, "out.toml")
+    cfg = FindBoardsConfig()
+    write_config(out, cfg; versions = host, tables = Dict("find_boards" => config_dict(cfg), "host" => Dict("k" => 3)),
+                 extra = Dict("descriptor" => Dict("model" => "m.onnx")))
+    w = TOML.parsefile(out)
+    @test w["config_version"] == 2 && w["config_versions"] == Dict("BlobBoards" => VgtkCore.current_config_version(BlobBoards.BB_CONFIG_VERSIONS))
+    back = read_run_config(out; versions = host)
+    @test back.tables["host"]["k"] == 3 && config_dict(FindBoardsConfig(back.find_boards)) == config_dict(cfg)
+    @test_throws r"delegate" write_config(joinpath(dir, "x.toml"), cfg; versions = lone)
+    # without `versions`, BlobBoards' own file as before
+    @test !haskey(TOML.parsefile(write_config(joinpath(dir, "bb.toml"), cfg)), "config_versions")
+    # board_ransac_toml: the twin of board_ransac_from_toml
+    r = cfg.geometry.ransac
+    t = BlobBoards.board_ransac_toml(r)
+    @test BlobBoards.board_ransac_toml(board_ransac_from_toml(VgtkEstimation.HomographyProblem{Float64}, :homography, t)) == t
+    @test t == config_dict(cfg)["geometry"]["ransac"]
+    @test !isdefined(BlobBoards, :_ransac_toml)
+end
+
 # The Student-t keyword rule (owner ruling 2026-11-11): the geometry's scorer is the Student-t + uniform marginal, which
 # takes its outlier half-width (`outlier_halfwidth`) and never a `threshold`. A geometry table carrying `threshold` is
 # refused, the table's `outlier_halfwidth` reaches the scorer exactly, and the fit path refuses a `threshold` beside it.
