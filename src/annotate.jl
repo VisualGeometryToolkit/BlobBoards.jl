@@ -47,6 +47,12 @@ using VisualGeometryToolkitCore: bbox
 # only so a caller can be explicit, and a mismatch fails in `describe`.
 _declared_patch_size(network) = patch_size(network)
 
+# The world → image transfer annotation projects GT blobs through: a homography's or a pose's (`_world_to_image`); the
+# radial arm's model is refused, by dispatch, so nothing past it sees a radial transfer.
+_annotation_transfer(model::Union{HomographyMat, CameraExtrinsics}, cam) = _world_to_image(model, cam)
+_annotation_transfer(model, _) =
+    throw(ArgumentError("annotate_blobs: the radial arm is not wired into annotation ($(nameof(typeof(model))))"))
+
 """
     config_hash(; config::FindBoardsConfig, cutoff, patch_size, outer_extent, min_iou)
 
@@ -54,9 +60,9 @@ Hash the annotation-pipeline *extraction* settings into a string stored in
 `_config.jld2` so the build_annotations driver can detect config drift across
 runs.
 
-`config.geometry` is intentionally EXCLUDED: it carries the per-source camera
-(`PoseGeometry`) and the homography-vs-P3P choice, both of which legitimately
-vary across sources written into the same output directory. EVERY other field
+`config.geometry` is intentionally EXCLUDED but for its RANSAC budget (`geometry.ransac.config`, hashed as
+`ransac`): it carries the per-source camera (`PoseGeometry`) and the homography-vs-P3P choice, both of which
+legitimately vary across sources written into the same output directory. EVERY other field
 participates: the hash is taken over `config_dict(config)` minus the geometry
 table — the same fieldnames-derived serializer the run sidecars use — so a
 field added to `FindBoardsConfig` is hashed without anyone remembering to
@@ -74,6 +80,10 @@ does that once for every existing annotation directory.
 """
 function config_hash(; config::FindBoardsConfig, cutoff, patch_size, outer_extent, min_iou)
     fb = Dict{String, Any}(k => v for (k, v) in config_dict(config) if k != "geometry")
+    # The arm's RANSAC budget decides which boards get annotated, whatever the source's camera: it is hashed under
+    # the key it was hashed under before it moved into the arm (`[find_boards.geometry.ransac]`, version 2), so an
+    # annotation directory's identity does not move with the table's.
+    fb["ransac"] = VgtkEstimation.config_dict(config.geometry.ransac.config)
     tree = Dict{String, Any}(
         "find_boards" => fb,
         "cutoff" => Float64(cutoff), "patch_size" => Int(patch_size),
@@ -154,7 +164,8 @@ function annotate_blobs(
     all_patches = Matrix{Gray{Float32}}[]
     matched_ids = Set{Int}()   # .id of image features assigned to a GT blob
 
-    for (uid, model, quality, scored) in boards
+    for (uid, board) in boards
+        model, scored = board.fit.u, board.correspondences
         bundle = board_bundles[uid]
         board_cutoff = BlobBoards.cutoff(bundle)
 
@@ -166,9 +177,7 @@ function annotate_blobs(
         # world → image through the ONE spelling (`_world_to_image`,
         # pipeline.jl). The radial arm hands back a guided TRANSFER, not a map,
         # and annotation has no wiring for it — refuse before dispatch.
-        model isa VgtkCore.RadialHomography &&
-            throw(ArgumentError("annotate_blobs: the radial arm is not wired into annotation"))
-        H = _world_to_image(model, cam)
+        H = _annotation_transfer(model, cam)
 
         # Project each GT blob and collect visible ones
         world_discs = blobs(bundle, :world)

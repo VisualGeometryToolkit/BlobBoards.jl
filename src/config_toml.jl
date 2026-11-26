@@ -48,8 +48,8 @@ using TOML: TOML
 # lookup and the sorted writer. What stays here is BlobBoards': the retired-key
 # set, the tag registries and the hook methods for its own types.
 using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table, read_table,
-    allowed_keys, write_toml, TagRegistry, tag_of
-import VisualGeometryToolkitCore: toml_key, toml_skip_fields, toml_field
+    allowed_keys, write_toml, TagRegistry, tag_of, CONFIG_VERSION_KEY, current_config_version
+import VisualGeometryToolkitCore: toml_skip_fields, toml_field
 # A run configuration's TOML table is VisualGeometryToolkitEstimation's `config_dict`
 # (one of its CONTRACT_GENERICS): BlobBoards adds the methods of its configs.
 import VisualGeometryToolkitEstimation: config_dict
@@ -204,22 +204,26 @@ function _geometry_from_toml(d, camera, image_size = nothing)
     return _geometry_arm(GEOMETRY_TAGS[t], d, camera, image_size)
 end
 
+# An arm's `ransac` table (absent: every key the defaults').
+_ransac_table(d) = get(d, "ransac", Dict{String, Any}())
+
 _geometry_arm(::Type{RadialHomographyGeometry}, d, camera, image_size) =
-    radial_geometry_from_toml(RadialHomographyGeometry, :radial_homography, d; camera, image_size)
+    radial_geometry_from_toml(RadialHomographyGeometry, _RadialProblem5, :radial_homography, d; camera, image_size)
 
 """
-    radial_geometry_from_toml(G, tag::Symbol, d; camera = nothing, image_size) -> G
+    radial_geometry_from_toml(G, P, tag::Symbol, d; camera = nothing, image_size, ransac_defaults = Dict()) -> G
 
 A radial arm's geometry from its `[find_boards.geometry]` table `d` (`type = "<tag>"`):
 the table's keys checked against `G`'s fields, the image size REQUIRED (data, like the
 pose arm's camera: the sensor extent that fixes the distortion centre, which differs per
 capture session — a value in the file would drift), a `camera` ignored with a warning, and
-`G(image_size; outlier_halfwidth, min_inliers, local_optimization_strategy)` built from the
-keys present (the strategy table read by [`geometry_local_optimization_strategy`](@ref)
-for `tag`). BlobBoards' `RadialHomographyGeometry` reads through it, and so does a radial
+`G(image_size; ransac, min_inliers)` built from the keys present (the `[find_boards.geometry.ransac]` table read by
+[`board_ransac_from_toml`](@ref) for the arm's problem type `P` and pipeline class `tag`, its absent keys
+`ransac_defaults`', a downstream arm's own defaults of record, then the package's). BlobBoards' `RadialHomographyGeometry` reads through it, and so does a radial
 arm another package registers (its [`geometry_from_toml`](@ref) method is one call).
 """
-function radial_geometry_from_toml(::Type{G}, tag::Symbol, d; camera = nothing, image_size) where {G}
+function radial_geometry_from_toml(::Type{G}, ::Type{P}, tag::Symbol, d; camera = nothing, image_size,
+        ransac_defaults::AbstractDict = Dict{String, Any}()) where {G, P}
     _check_run_keys(d, _allowed_keys(G, :type), "find_boards.geometry")
     image_size === nothing && throw(
         ArgumentError("[find_boards.geometry] type = \"$(tag)\" needs the image size: `image_size = (width, height)` beside the config")
@@ -227,24 +231,20 @@ function radial_geometry_from_toml(::Type{G}, tag::Symbol, d; camera = nothing, 
     camera === nothing || @warn "geometry type = \"$(tag)\" ignores the `camera` keyword"
     return G(
         image_size;
-        present_kwargs(
-            d,
-            "outlier_halfwidth" => Float64,
-            "min_inliers" => Int,
-            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, tag)
-        )...
+        ransac = board_ransac_from_toml(P, tag, _ransac_table(d); defaults = ransac_defaults),
+        present_kwargs(d, "min_inliers" => Int)...
     )
 end
 
 function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
-    # `resolve_pose_ambiguity` is not merely unknown here, it is
+    # The pose arm's keys are not merely unknown here, they are
     # inapplicable, and "unknown key" would send the reader hunting for a
     # typo. The plane-induced H is a unique 8-DOF map; the two-fold
     # ambiguity belongs to its decomposition into (R, t, n) given K, so
     # with no camera there is no second branch to select.
-    haskey(d, "resolve_pose_ambiguity") && throw(
+    haskey(d, "pose_disambiguation") && throw(
         ArgumentError(
-            "[find_boards.geometry] resolve_pose_ambiguity applies only to " *
+            "[find_boards.geometry] pose_disambiguation applies only to " *
                 "type = \"pose\" — the planar pose ambiguity arises when a " *
                 "homography is DECOMPOSED into a pose, which needs a camera; the " *
                 "uncalibrated arm estimates H directly and has no second branch"
@@ -253,12 +253,8 @@ function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
     _check_run_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
     camera === nothing || @warn "geometry type = \"homography\" ignores the `camera` keyword"
     return HomographyGeometry(;
-        present_kwargs(
-            d,
-            "outlier_halfwidth" => Float64,
-            "min_inliers" => Int,
-            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, :homography)
-        )...
+        ransac = board_ransac_from_toml(HomographyProblem{Float64}, :homography, _ransac_table(d)),
+        present_kwargs(d, "min_inliers" => Int)...
     )
 end
 
@@ -270,15 +266,12 @@ function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
                 "FindBoardsConfig(path; camera = VisualGeometryToolkitIO.load(BoundedCamera, ...))"
         )
     )
+    ransac = board_ransac_from_toml(AbsolutePoseProblem, :absolute_pose, _ransac_table(d))
     return PoseGeometry(
-        camera; present_kwargs(
-            d,
-            "outlier_halfwidth" => Float64,
-            "min_inliers" => Int,
-            "resolve_pose_ambiguity" => Bool,
-            "local_optimization_strategy" => t -> geometry_local_optimization_strategy(t, :absolute_pose),
-            "undistortion" => Symbol
-        )...
+        camera; ransac,
+        pose_disambiguation = _pose_disambiguation_from_toml(get(d, "pose_disambiguation", "none"), ransac),
+        undistortion = _undistortion_from_toml(UNDISTORTION_TAGS[get(d, "undistortion", "none")]),
+        present_kwargs(d, "min_inliers" => Int)...
     )
 end
 
@@ -290,6 +283,32 @@ const GEOMETRY_TAGS = TagRegistry(
     "pose" => PoseGeometry, "homography" => HomographyGeometry, "radial_homography" => RadialHomographyGeometry;
     paths = [r"find_boards\.geometry\.type"],
 )
+
+# The pose arm's `undistortion` policy (a tag that selects nothing is `none`: the raw image).
+const UNDISTORTION_TAGS = TagRegistry(
+    :undistortion, "Undistortion", "none" => nothing, "global" => GlobalUndistortion;
+    paths = [r"find_boards\.geometry\.undistortion"],
+)
+_undistortion_from_toml(::Nothing) = nothing
+_undistortion_from_toml(::Type{GlobalUndistortion}) = GlobalUndistortion()
+# The pose arm's disambiguation: `"none"`, or `{ type = "planar_pose_disambiguation", min_separation, same_basin }`
+# (radians), its refine the arm's own seeded local optimization.
+const POSE_DISAMBIGUATION_TAGS = TagRegistry(
+    :pose_disambiguation, "", "none" => nothing, "planar_pose_disambiguation" => PlanarPoseDisambiguation;
+    paths = [r"find_boards\.geometry\.pose_disambiguation(\.type)?"],
+)
+_pose_disambiguation_from_toml(t::AbstractString, _) = POSE_DISAMBIGUATION_TAGS[t] === nothing ? nothing : throw(ArgumentError(
+    "[find_boards.geometry] pose_disambiguation = $(repr(t)): a disambiguation is a table, `{ type = $(repr(t)) }`"))
+function _pose_disambiguation_from_toml(d::AbstractDict, ransac)
+    t = get(d, "type", nothing)
+    t isa AbstractString || throw(ArgumentError("[find_boards.geometry.pose_disambiguation] needs a `type`; one of $(keys(POSE_DISAMBIGUATION_TAGS))"))
+    POSE_DISAMBIGUATION_TAGS[t] === nothing && throw(ArgumentError("[find_boards.geometry] pose_disambiguation = \"none\" is a string, not a table"))
+    _check_run_keys(d, ["type", "min_separation", "same_basin"], "find_boards.geometry.pose_disambiguation")
+    return PlanarPoseDisambiguation(
+        LocalOptimization(ransac.local_optimization_strategy; scoring = ransac.scoring);
+        present_kwargs(d, "min_separation" => Float64, "same_basin" => Float64)...
+    )
+end
 
 """
     geometry_from_toml(::Val{tag}, table; camera, image_size) -> GeometryConfig
@@ -365,6 +384,8 @@ Unknown keys in any section are an error. A typo'd knob that silently runs at
 its default is the failure mode this loader exists to prevent.
 
 ```toml
+config_version = 2
+
 [find_boards]
 min_similarity = 0.6
 verify_similarity = 0.6
@@ -380,9 +401,10 @@ nms = { type = "ellipse", cutoff = 2.0 }
 [find_boards.geometry]
 type = "pose"
 min_inliers = 9
-resolve_pose_ambiguity = true
+pose_disambiguation = { type = "planar_pose_disambiguation" }
 
-[find_boards.ransac]
+[find_boards.geometry.ransac]
+scoring = { type = "student_t_uniform", outlier_halfwidth = 1.716 }
 min_trials = 100
 max_trials = 10_000
 ```
@@ -412,11 +434,19 @@ end
 
 Build a [`FindBoardsConfig`](@ref) from a parsed `[find_boards]` table — the
 inverse of [`config_dict`](@ref), with the same key checking as the file
-loader. For a driver that reads its own run config and hands the package its
+loader. A table of the run configuration's version 1 (a stored driver's, with the arm's
+`outlier_halfwidth` and `local_optimization_strategy` and a `ransac` table) is migrated
+([`BB_CONFIG_VERSIONS`](@ref)); a current one is read as it is. For a driver that reads its own run config and hands the package its
 `[find_boards]` table.
 """
 FindBoardsConfig(table::AbstractDict; camera = nothing, image_size = nothing) =
-    _find_boards_from_toml(table; camera, image_size)
+    _find_boards_from_toml(_current_find_boards(table); camera, image_size)
+
+# A `[find_boards]` table handed over on its own carries no `config_version` (the version is its file's, a key of the
+# file's top level): it is read through BB_CONFIG_VERSIONS from version 1, whose steps leave a current table as it is,
+# so a stored table of either version loads (a driver's own file, RadiometricCamera's experiments' `[poses.find_boards]`).
+_current_find_boards(table::AbstractDict) =
+    migrate_config(Dict{String, Any}("find_boards" => table), BB_CONFIG_VERSIONS; source = "a [find_boards] table")["find_boards"]
 
 function _track_from_toml(d::AbstractDict)
     _check_run_keys(d, _allowed_keys(TrackConfig), "find_boards.track")
@@ -425,12 +455,12 @@ end
 
 function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size = nothing)
     _check_run_keys(fb, _allowed_keys(FindBoardsConfig), "find_boards")
-    ransac = get(fb, "ransac", Dict{String, Any}())
-    _check_run_keys(ransac, _allowed_keys(RansacConfig), "find_boards.ransac")
     return FindBoardsConfig(;
         detect = _detect_from_toml(get(fb, "detect", Dict{String, Any}())),
         adapt = _adapt_from_toml(get(fb, "adapt", Dict{String, Any}())),
         track = _track_from_toml(get(fb, "track", Dict{String, Any}())),
+        # The arm and its find (`[find_boards.geometry.ransac]`): absent keys inherit configs/default.toml (the ONE
+        # default authority, as the arms' own constructors do).
         geometry = _geometry_from_toml(
             get(
                 fb, "geometry",
@@ -438,17 +468,6 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
                 # restated literal that could drift from it.
                 Dict{String, Any}("type" => toml_default(_TOML_DEFAULTS, "geometry", "type"))
             ), camera, image_size
-        ),
-        # Absent keys inherit configs/default.toml (the ONE default authority, as
-        # FindBoardsConfig's own field default does) — not RVG's @kwdef literals.
-        # Derived from RansacConfig's OWN fieldnames, like the writer
-        # (`_toml_field`) and the validator (`_allowed_keys`): a field RVG adds
-        # is written, accepted and READ, not silently dropped on reload.
-        ransac_config = RansacConfig(;
-            (
-                f => convert(fieldtype(RansacConfig, f), get(() -> toml_default(_TOML_DEFAULTS, "ransac", String(f)), ransac, String(f)))
-                    for f in fieldnames(RansacConfig)
-            )...
         ),
         max_detections = haskey(fb, "max_detections") ?
             _max_detections(fb["max_detections"]) : _dflt_max_detections(),
@@ -489,25 +508,37 @@ toml_skip_fields(::Type{<:RadialHomographyGeometry}) = (:image_size,)  # data, s
 toml_skip_fields(::Type{<:DetectConfig}) = (:polarity,)  # derived from the bundles
 toml_skip_fields(::Type{<:AdaptConfig}) = (:cutoff,)     # data, from the gallery
 
-# Key names, where the field name is not the TOML name. Dispatched on the TYPE
-# so the reader's allowed-key list and the writer share one mapping.
-toml_key(::Type{<:FindBoardsConfig}, f::Symbol) =
-    f === :ransac_config ? "ransac" : String(f)
-
 # Per-field overrides for the four non-mechanical cases.
 toml_field(c::FindBoardsConfig, ::Val{:max_detections}) =
     c.max_detections == typemax(Int) ? "unbounded" : c.max_detections
 toml_field(c::FindBoardsConfig, ::Val{:detect}) = toml_table(c.detect)
 toml_field(c::FindBoardsConfig, ::Val{:adapt}) = toml_table(c.adapt)
 toml_field(c::FindBoardsConfig, ::Val{:geometry}) = _geometry_toml(c.geometry)
-toml_field(c::FindBoardsConfig, ::Val{:ransac_config}) = toml_table(c.ransac_config)
 toml_field(c::FindBoardsConfig, ::Val{:track}) = toml_table(c.track)
 toml_field(c::DetectConfig, ::Val{:nms}) = _nms_toml(c.nms)
 toml_field(c::DetectConfig, ::Val{:tilts}) = [[t[1], t[2]] for t in c.tilts]
-# The LO strategy writes as RVG's tagged table (`{ type = ..., ... }`), the
-# same shape its loader reads — RVG owns that round trip.
-toml_field(g::GeometryConfig, ::Val{:local_optimization_strategy}) =
-    VgtkEstimation.config_dict(g.local_optimization_strategy)
+# An arm's find writes as its `[find_boards.geometry.ransac]` table: the scorer and the LO strategy as
+# Estimation's tagged tables (`{ type = ..., ... }`, the same shape its loaders read — Estimation owns that round
+# trip), beside the RansacConfig fields. A board arm's find carries no hooks and no score guard (`find_board`'s
+# own algorithms), so the table holds every field it has.
+toml_field(g::GeometryConfig, ::Val{:ransac}) = _ransac_toml(g.ransac)
+function _ransac_toml(r::Ransac)
+    (r.score_guard || r.on_improvement !== nothing || r.on_hypothesis !== nothing) && throw(ArgumentError(
+        "a board arm's `ransac` with a score guard or a trace hook has no TOML table"))
+    return merge(
+        Dict{String, Any}(
+            "scoring" => VgtkEstimation.config_dict(r.scoring),
+            "local_optimization_strategy" => VgtkEstimation.config_dict(r.local_optimization_strategy),
+        ),
+        VgtkEstimation.config_dict(r.config)
+    )
+end
+toml_field(g::PoseGeometry, ::Val{:undistortion}) = tag_of(UNDISTORTION_TAGS, g.undistortion)
+toml_field(g::PoseGeometry, ::Val{:pose_disambiguation}) = _pose_disambiguation_toml(g.pose_disambiguation)
+# The gates only: the loader's refine is the arm's own seeded local optimization (`_pose_disambiguation_from_toml`).
+_pose_disambiguation_toml(::Nothing) = tag_of(POSE_DISAMBIGUATION_TAGS, nothing)
+_pose_disambiguation_toml(d::PlanarPoseDisambiguation) = Dict{String, Any}(
+    "type" => tag_of(POSE_DISAMBIGUATION_TAGS, d), "min_separation" => d.min_separation, "same_basin" => d.same_basin)
 
 # Tagged unions: the discriminator plus the type's own fields, so a new field
 # on either NMS strategy or either geometry is picked up automatically.
@@ -537,7 +568,7 @@ _allowed_keys(::Type{T}, extra::Symbol...) where {T} = allowed_keys(T, extra...)
     write_config(path, config; extra = Dict())
 
 Write `config` — a [`FindBoardsConfig`](@ref), or any config with a [`config_dict`](@ref)
-method (a driver's config built on it) — as a TOML file with a `[find_boards]` table
+method (a driver's config built on it) — as a TOML file of the current `config_version` with a `[find_boards]` table
 (`config_dict(config)`), merging any `extra` top-level tables (`experiment`, `descriptor`,
 …); the header names the config's type as its reloading constructor. A `FindBoardsConfig`
 round-trips through [`FindBoardsConfig(path)`](@ref) — which the test suite asserts — so a
@@ -549,7 +580,7 @@ TOML integers are 64-bit signed and the literal round-trips confusingly.
 function write_config(path::AbstractString, config; extra::AbstractDict = Dict{String, Any}())
     body = merge(
         Dict{String, Any}(string(k) => v for (k, v) in extra),
-        Dict("find_boards" => config_dict(config))
+        Dict(CONFIG_VERSION_KEY => current_config_version(BB_CONFIG_VERSIONS), "find_boards" => config_dict(config))
     )
     T = nameof(typeof(config))
     return write_toml(
@@ -700,7 +731,10 @@ and the package deliberately has no opinion on them. So is `[inputs]`, the
 paper projects' `[inputs.<id>]` statement of what a run reads
 (VisualGeometryToolkitEval's convention: tier, path, provenance, sha256). A driver that keeps
 further top-level tables of its own names them in `tables`; they are admitted,
-not checked, and read from `config_toml`. (The board and pattern authoring
+not checked, and read from `config_toml`. BlobBoards' own tables are read at the current
+version: a file stating an earlier `config_version` (or none: version 1, the files before
+versioning) is migrated by [`BB_CONFIG_VERSIONS`](@ref), and `find_boards`/`descriptor` are the
+migrated tables (`config_toml` stays the file as written). (The board and pattern authoring
 defaults are configs/authoring.toml's, never a run config's: `[blob_board]`
 there is refused.)
 """
@@ -709,15 +743,21 @@ function read_run_config(path::AbstractString; tables = ())
     root = TOML.parsefile(path)
     _check_run_keys(
         root,
-        vcat(["find_boards", "experiment", "gallery", "descriptor", "inputs"], String[String(t) for t in tables]),
+        vcat([CONFIG_VERSION_KEY, "find_boards", "experiment", "gallery", "descriptor", "inputs"], String[String(t) for t in tables]),
         "top level"
     )
-    descriptor = get(root, "descriptor", Dict{String, Any}())
+    # BlobBoards' own tables at the current version (`BB_CONFIG_VERSIONS`): a stored file of an earlier one reads
+    # through its version steps.
+    own = migrate_config(
+        Dict{String, Any}(k => root[k] for k in (CONFIG_VERSION_KEY, "descriptor", "find_boards") if haskey(root, k)),
+        BB_CONFIG_VERSIONS; source = path
+    )
+    descriptor = get(own, "descriptor", Dict{String, Any}())
     _check_run_keys(descriptor, ["model"], "descriptor")
     empty_ = Dict{String, Any}()
     return (;
         config_toml = root,
-        find_boards = get(root, "find_boards", empty_),
+        find_boards = get(own, "find_boards", empty_),
         experiment = get(root, "experiment", empty_),
         gallery = get(root, "gallery", empty_),
         descriptor,

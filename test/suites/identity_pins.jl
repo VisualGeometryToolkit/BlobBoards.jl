@@ -452,11 +452,15 @@ const PINNED_PATTERN_V3_JSON = """
     # ladder (`upsample` a count, was a Bool; `nb_scales`, `nb_octaves`), so both trees hold three new values and the
     # hashes move, as they must — the detector they describe changed (VisualGeometryToolkitFeatures 0.9.11's interior
     # slices), and an annotation run of 0.7.3 is not this one's.
+    # Re-pinned 2026-11-26 (0.8.0) for a LAYOUT change, the run configuration's version 2: the arm's find is one
+    # `Ransac` under `[find_boards.geometry.ransac]` (its scorer written with both priors), so the run-config tree moves;
+    # the values are unchanged. The annotation hash does NOT move: it hashes the arm's RANSAC budget under the key it
+    # always did (`config_hash`).
     @testset "annotation and run-config hashes" begin
         @test BlobBoards.config_hash(;
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
         ) == "fbd5d8ccf864b904584b0578e69f59fd9e169ca6637c2a459df4a40e58d9158b"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "759414ed704b996b44f13806ea780649417cceae0b359c95aa1f5252da337c78"
+            "ba8e5b8a0003b1e601da2834c0daebfadaf2ddbe910e24543adce826e7019562"
     end
 end

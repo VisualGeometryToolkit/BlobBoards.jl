@@ -5,8 +5,8 @@
 # BlobBoards exposes TWO workflows to end users:
 #
 #   GENERATION:  blob_board / blob_pattern  →  bundle JSON + printable output
-#   DETECTION:   find_boards               →  per-board (uid, model, quality,
-#                                              correspondences)  # weights in correspondences.weights
+#   DETECTION:   find_boards               →  per-board `uid => FoundBoard` (the board's
+#                                              FitResult and its correspondences)  # weights in correspondences.weights
 #
 # Everything else — the pipeline stages (detect_blobs, adapt, canonicalize,
 # describe), verification internals, annotation/training tooling, and ruler
@@ -47,6 +47,9 @@ public DEFAULT_OUTER_EXTENT               # log-polar outer sampling radius (σ)
 export find_boards                         # THE detection entry point
 export FindBoardsConfig                    # All pipeline knobs in one struct
 export GeometryConfig, HomographyGeometry, PoseGeometry, RadialHomographyGeometry  # config.geometry selects H vs P3P vs radial (H, k)
+export FoundBoard                          # one board found: its FitResult and its correspondences (find_board, find_boards)
+public PlanarPoseDisambiguation, GlobalUndistortion   # the pose arm's disambiguation (a refine) and its undistortion policy
+public BB_CONFIG_VERSIONS                  # the run-configuration converter (read_run_config migrates a stored file)
 public geometry_from_toml, geometry_tag    # the TOML tag of a GeometryConfig defined outside this package
 public radial_geometry_from_toml, read_find_boards_table   # a radial arm from its table; the [find_boards] table of a run config file (a driver's config builds on both)
 public CONTRACT_GENERICS                  # the functions another stack package may add methods to (geometry_tag, geometry_from_toml, write_config; config_dict is Estimation's)
@@ -131,10 +134,10 @@ public find_board                          # single-board match+estimate
 public match_boards                        # one image's features against the board gallery, global mutual-NN, keyed per board
 public guided_search, detection_rtree      # a board's printed blobs transferred through a map and associated by IoU; the detection index it queries
 public board_rng                           # one board's RANSAC stream (config.ransac_seed ⊻ uid)
-public board_solve_keywords, board_endpoints # one board's solve keywords; a scored set as a 2D fit's endpoints (board side exact)
+public board_endpoints                     # a scored set as a 2D fit's endpoints (board side exact)
 public distortion_center                   # a radial arm's distortion centre (the sensor's middle)
 public load_descriptor_network             # a descriptor network as given, or read from a path (.jld2 → Lux, else ONNX)
-public geometry_local_optimization_strategy         # a [find_boards.geometry] local_optimization_strategy table → its strategy
+public board_ransac_from_toml              # a [find_boards.geometry.ransac] table → the arm's Ransac
 public BoardObservation                      # one board in one frame: track_boards' record
 public GalleryIndex                        # the staged board gallery; the type of every `gpu_index` keyword
 public board_palette                       # one stable color per board id (sorted) — every overlay uses it

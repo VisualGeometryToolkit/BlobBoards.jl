@@ -7,7 +7,7 @@ using TOML
 using Accessors: @set
 using BlobBoards: FindBoardsConfig, write_config, read_run_config, config_dict,
     DetectConfig, EllipseNms, MxmNms, PoseGeometry, HomographyGeometry,
-    AdaptConfig, DetectConfig
+    AdaptConfig, DetectConfig, PlanarPoseDisambiguation, GlobalUndistortion, board_ransac_from_toml
 using VisualGeometryToolkitEstimation: RansacConfig
 import VisualGeometryToolkitEstimation as VgtkEstimation
 using VisualGeometryToolkitCore: StudentTUniformScoring
@@ -25,6 +25,9 @@ const _CAM = VisualGeometryToolkitCore.BoundedCamera(
 )
 
 _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
+# The pose arm's find from a `[find_boards.geometry.ransac]` table, and the disambiguation of its own local optimization.
+_pose_ransac(t = Dict{String, Any}()) = board_ransac_from_toml(VgtkEstimation.AbsolutePoseProblem, :absolute_pose, t)
+_disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r.local_optimization_strategy; scoring = r.scoring))
 
 @testset "FindBoardsConfig from TOML" begin
 
@@ -55,9 +58,9 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
                 """
             )
             from_toml = FindBoardsConfig(p; camera = _CAM)
+            ransac = _pose_ransac(Dict{String, Any}("min_trials" => 100, "max_trials" => 10_000))
             handbuilt = FindBoardsConfig(
-                geometry = PoseGeometry(_CAM; min_inliers = 8, resolve_pose_ambiguity = true),
-                ransac_config = RansacConfig(min_trials = 100, max_trials = 10_000),
+                geometry = PoseGeometry(_CAM; ransac, min_inliers = 8, pose_disambiguation = _disambiguation(ransac)),
                 detect = DetectConfig(
                     peak_threshold = 0.01,
                     edge_threshold = 5.0, nms = EllipseNms(cutoff = 2.0f0)
@@ -71,7 +74,8 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
     @testset "round trip" begin
         mktempdir() do dir
             for (geom, cam) in (
-                        (PoseGeometry(_CAM; min_inliers = 8, resolve_pose_ambiguity = true), _CAM),
+                        (PoseGeometry(_CAM; min_inliers = 8, pose_disambiguation = _disambiguation(_pose_ransac())), _CAM),
+                        (PoseGeometry(_CAM; undistortion = GlobalUndistortion()), _CAM),
                         (HomographyGeometry(min_inliers = 6), nothing),
                     ),
                     nms in (nothing, EllipseNms(cutoff = 2.5f0), MxmNms(window_half = 4))
@@ -104,14 +108,15 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
 
     @testset "local_optimization_strategy: the file's tag on every arm, overridable, round-trips" begin
         # The four Student-t + uniform IRLS literals that pipeline.jl carried
-        # until 2026-09-04 are now `[find_boards.geometry] local_optimization_strategy`,
-        # read through RVG's tagged loader over LocalOptimizationDoneRight's tags
-        # (its `StudentTUniform`). The default names ONE thing.
+        # until 2026-09-04 are now `[find_boards.geometry.ransac] local_optimization_strategy`
+        # (the arm's `Ransac`), read through Estimation's tagged loader over LocalOptimizationDoneRight's tags
+        # (its `StudentTUniform`). The default names ONE thing. The test files below are
+        # version-1 layouts (no `config_version`): they read through BB_CONFIG_VERSIONS.
         toml = TOML.parsefile(joinpath(pkgdir(BlobBoards), "configs", "default.toml"))["find_boards"]
-        @test toml["geometry"]["local_optimization_strategy"] == Dict("type" => "student_t_uniform")
-        @test HomographyGeometry().local_optimization_strategy isa StudentTUniform
-        @test PoseGeometry(_CAM).local_optimization_strategy isa StudentTUniform
-        @test BlobBoards.RadialHomographyGeometry((4240, 2832)).local_optimization_strategy isa StudentTUniform
+        @test toml["geometry"]["ransac"]["local_optimization_strategy"] == Dict("type" => "student_t_uniform")
+        @test HomographyGeometry().ransac.local_optimization_strategy isa StudentTUniform
+        @test PoseGeometry(_CAM).ransac.local_optimization_strategy isa StudentTUniform
+        @test BlobBoards.RadialHomographyGeometry((4240, 2832)).ransac.local_optimization_strategy isa StudentTUniform
         @test isconcretetype(typeof(HomographyGeometry())) && isconcretetype(typeof(PoseGeometry(_CAM)))
         mktempdir() do dir
             # A different strategy by tag; `efficiency_constant = "cross_validated"` resolves per ARM.
@@ -120,15 +125,15 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
                 "[find_boards.geometry]\ntype = \"pose\"\nlocal_optimization_strategy = { type = \"hq\", loss = \"welsch\", efficiency_constant = \"cross_validated\", max_iter = 7 }\n"
             )
             g = FindBoardsConfig(p; camera = _CAM).geometry
-            @test g.local_optimization_strategy isa HQ{WelschShape}
-            @test g.local_optimization_strategy.width.value == tuning_constant(:absolute_pose, "welsch").efficiency_constant   # an EfficiencyConstant width
-            @test g.local_optimization_strategy.max_iter == 7
+            @test g.ransac.local_optimization_strategy isa HQ{WelschShape}
+            @test g.ransac.local_optimization_strategy.width.value == tuning_constant(:absolute_pose, "welsch").efficiency_constant   # an EfficiencyConstant width
+            @test g.ransac.local_optimization_strategy.max_iter == 7
             @test g.min_inliers == PoseGeometry(_CAM).min_inliers          # siblings inherit
             # It is part of the run record and reloads to the same strategy.
-            d = config_dict(FindBoardsConfig(p; camera = _CAM))["geometry"]["local_optimization_strategy"]
+            d = config_dict(FindBoardsConfig(p; camera = _CAM))["geometry"]["ransac"]["local_optimization_strategy"]
             @test d["type"] == "hq" && d["loss"] == "welsch" && d["max_iter"] == 7
             q = write_config(joinpath(dir, "back.toml"), FindBoardsConfig(p; camera = _CAM))
-            @test FindBoardsConfig(q; camera = _CAM).geometry.local_optimization_strategy == g.local_optimization_strategy
+            @test FindBoardsConfig(q; camera = _CAM).geometry.ransac.local_optimization_strategy == g.ransac.local_optimization_strategy
             # Unknown tags and knobs are refused, never defaulted.
             @test_throws ArgumentError FindBoardsConfig(
                 _write(dir, "bad.toml", "[find_boards.geometry]\ntype = \"homography\"\nlocal_optimization_strategy = { type = \"student_t\" }\n")
@@ -231,7 +236,7 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
                 _write(dir, "cut.toml", "[find_boards.adapt]\ncutoff = 2.5\n")
             )
 
-            # resolve_pose_ambiguity is calibrated-only: the two-fold ambiguity is
+            # The pose disambiguation is calibrated-only: the two-fold ambiguity is
             # a property of decomposing H into (R, t, n) given K, so the
             # uncalibrated arm has no second branch. Refused with a message that
             # says INAPPLICABLE, not "unknown key" -- the latter sends the reader
@@ -240,7 +245,7 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
                 FindBoardsConfig(
                     _write(
                         dir, "hamb.toml",
-                        "[find_boards.geometry]\ntype = \"homography\"\nresolve_pose_ambiguity = true\n"
+                        "config_version = 2\n[find_boards.geometry]\ntype = \"homography\"\npose_disambiguation = { type = \"planar_pose_disambiguation\" }\n"
                     )
                 )
                 nothing
@@ -314,8 +319,8 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
         @test cfg.adapt.max_scale_fraction == toml["adapt"]["max_scale_fraction"]
         @test cfg.adapt.max_scale_ratio == toml["adapt"]["max_scale_ratio"]
         @test cfg.geometry.min_inliers == toml["geometry"]["min_inliers"]
-        @test cfg.geometry.outlier_halfwidth == toml["geometry"]["outlier_halfwidth"]
-        @test cfg.ransac_config.max_trials == toml["ransac"]["max_trials"]
+        @test VgtkCore.outlier_halfwidth(cfg.geometry.ransac.scoring) == toml["geometry"]["ransac"]["scoring"]["outlier_halfwidth"]
+        @test cfg.geometry.ransac.config.max_trials == toml["geometry"]["ransac"]["max_trials"]
         # Route 1: partial keyword construction inherits the FILE for every
         # field it does not name.
         one_off = FindBoardsConfig(min_similarity = 0.71)
@@ -350,10 +355,10 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
             Set(fieldnames(PoseGeometry)), sub("geometry"),
             Set([:camera, :type])
         ) == Set{Symbol}()
-        @test setdiff(Set(fieldnames(RansacConfig)), sub("ransac")) == Set{Symbol}()
+        @test setdiff(Set(fieldnames(RansacConfig)), Set(Symbol.(keys(cd_["geometry"]["ransac"])))) == Set{Symbol}()
         @test setdiff(
             Set(fieldnames(FindBoardsConfig)), Set(Symbol.(keys(cd_))),
-            Set([:detect, :adapt, :geometry, :ransac_config])
+            Set([:detect, :adapt, :geometry])
         ) == Set{Symbol}()
     end
 
@@ -383,7 +388,8 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
                     ), (; camera = _CAM),
                 ),
             )
-            authored = get(TOML.parsefile(f), "find_boards", Dict{String, Any}())
+            # The authored tables at the current layout (a paper's file of record is version 1).
+            authored = read_run_config(f).find_boards
             effective = config_dict(FindBoardsConfig(f; kw...))
             unstated = String[]
             for (k, v) in effective
@@ -542,7 +548,6 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
             # siblings in the outer struct
             @test c.min_similarity == base.min_similarity
             @test c.geometry === base.geometry
-            @test c.ransac_config === base.ransac_config
             @test typeof(c) === typeof(base)
         end
 
@@ -711,8 +716,7 @@ end
     for f in fieldnames(FindBoardsConfig)
         f === :geometry && continue
         d = config_dict(FindBoardsConfig())
-        key = f === :ransac_config ? "ransac" : String(f)
-        @test haskey(d, key)
+        @test haskey(d, String(f))
     end
     @test h(FindBoardsConfig(verify_similarity = 0.71)) != base
     @test h(FindBoardsConfig(min_appearance_support = 0.31)) != base
@@ -720,6 +724,9 @@ end
     @test h(FindBoardsConfig(min_similarity = 0.61)) != base
     # geometry is the per-source part and must NOT participate
     @test h(FindBoardsConfig(geometry = HomographyGeometry(min_inliers = 12))) == base
+    # …but for its RANSAC budget, which decides which boards get annotated
+    @test h(FindBoardsConfig(geometry = HomographyGeometry(;
+        ransac = board_ransac_from_toml(VgtkEstimation.HomographyProblem{Float64}, :homography, Dict{String, Any}("max_trials" => 2000))))) != base
     # the annotation parameters do
     @test config_hash(; config = FindBoardsConfig(), cutoff = 2.5, patch_size = 64, outer_extent = 96.0, min_iou = 0.5) != base
 end
@@ -730,30 +737,30 @@ end
 # reads its own run config hands over the `[find_boards]` table as a Dict.
 struct _ForeignArm <: BlobBoards.GeometryConfig
     image_size::Tuple{Int, Int}
-    outlier_halfwidth::Float64
+    spread::Float64
     min_inliers::Int
 end
 VgtkCore.toml_skip_fields(::Type{_ForeignArm}) = (:image_size,)
 BlobBoards.geometry_tag(::_ForeignArm) = "foreign_arm"
 function BlobBoards.geometry_from_toml(::Val{:foreign_arm}, d; camera = nothing, image_size = nothing)
-    VgtkCore.check_keys(d, ["type", "outlier_halfwidth", "min_inliers"], "find_boards.geometry")
-    return _ForeignArm(image_size, Float64(d["outlier_halfwidth"]), Int(d["min_inliers"]))
+    VgtkCore.check_keys(d, ["type", "spread", "min_inliers"], "find_boards.geometry")
+    return _ForeignArm(image_size, Float64(d["spread"]), Int(d["min_inliers"]))
 end
 
 struct _UntaggedArm <: BlobBoards.GeometryConfig end
 
 @testset "a geometry arm defined outside the package (2026-10)" begin
     path = joinpath(mktempdir(), "fa.toml")
-    write(path, "[find_boards.geometry]\ntype = \"foreign_arm\"\noutlier_halfwidth = 3.0\nmin_inliers = 8\n")
+    write(path, "[find_boards.geometry]\ntype = \"foreign_arm\"\nspread = 3.0\nmin_inliers = 8\n")
     c = FindBoardsConfig(path; image_size = (640, 480))
     @test c.geometry === _ForeignArm((640, 480), 3.0, 8)
     t = config_dict(c)
-    @test t["geometry"] == Dict("type" => "foreign_arm", "outlier_halfwidth" => 3.0, "min_inliers" => 8)
+    @test t["geometry"] == Dict("type" => "foreign_arm", "spread" => 3.0, "min_inliers" => 8)
     # the parsed table round-trips through the Dict constructor
     c2 = FindBoardsConfig(t; image_size = (640, 480))
     @test c2.geometry === c.geometry && config_dict(c2) == t
     # an unknown key inside the foreign table is the foreign loader's refusal
-    write(path, "[find_boards.geometry]\ntype = \"foreign_arm\"\noutlier_halfwidth = 3.0\nmin_inliers = 8\nmin_inlers = 9\n")
+    write(path, "[find_boards.geometry]\ntype = \"foreign_arm\"\nspread = 3.0\nmin_inliers = 8\nmin_inlers = 9\n")
     @test_throws ArgumentError FindBoardsConfig(path; image_size = (640, 480))
     # a tag nobody registered is refused with the valid set
     write(path, "[find_boards.geometry]\ntype = \"radial_camera\"\n")
@@ -793,10 +800,18 @@ end
     a = 0.9646329181191862   # bmvc2026's half-width of record
     for (arm, P, kw) in (("homography", VgtkEstimation.HomographyProblem{Float64}, (;)),
                          ("pose", VgtkEstimation.AbsolutePoseProblem, (; camera = _CAM)))
+        # a version-1 file: its `outlier_halfwidth` becomes the arm's scorer (BB_CONFIG_VERSIONS)
         c = FindBoardsConfig(_write(dir, "a_$arm.toml", "[find_boards.geometry]\ntype = \"$arm\"\noutlier_halfwidth = $a\n"); kw...)
-        @test c.geometry.outlier_halfwidth === a
-        sc = VgtkEstimation.default_student_t_uniform_scoring(P, c.geometry.outlier_halfwidth)
+        sc = c.geometry.ransac.scoring
         @test sc isa StudentTUniformScoring && VgtkCore.outlier_halfwidth(sc) === a
+        @test sc == VgtkEstimation.default_student_t_uniform_scoring(P, a)
+        # a version-2 file states the scorer itself
+        c2 = FindBoardsConfig(_write(dir, "b_$arm.toml",
+            "config_version = 2\n[find_boards.geometry]\ntype = \"$arm\"\nransac = { scoring = { type = \"student_t_uniform\", outlier_halfwidth = $a } }\n"); kw...)
+        @test c2.geometry.ransac.scoring == sc
+        # …and the version-1 key in it is refused, naming the current form
+        @test_throws ArgumentError FindBoardsConfig(_write(dir, "c_$arm.toml",
+            "config_version = 2\n[find_boards.geometry]\ntype = \"$arm\"\noutlier_halfwidth = $a\n"); kw...)
     end
     HP = VgtkEstimation.HomographyProblem{Float64}
     # The refused width word, as a TOML key and as a keyword, is spelt apart from
@@ -807,13 +822,88 @@ end
     refused_key["type"] = "student_t_uniform"
     @test_throws ArgumentError VgtkEstimation.scoring_from_toml(refused_key; problem = HP)
     @test_throws MethodError StudentTUniformScoring(HP, a; refused_kw..., priors...)
-    pts = [VgtkCore.Point2(x, y) => VgtkCore.Point2(x + 1.0, y + 2.0) for x in 0.0:10:40 for y in 0.0:10:40]
-    @test_throws ArgumentError BlobBoards._find_model(nothing, pts; threshold = 3.0)
-    # A bare fit's half-width is the configuration's, never a code literal (the
-    # owner's TOML-literals rule): the homography and pose arms fall back to
-    # `[find_boards.geometry] outlier_halfwidth` of the package defaults, the
-    # radial arm to its geometry's own value. No literal table remains.
-    @test !isdefined(BlobBoards, :_FIT_HALFWIDTH_FALLBACK)
-    @test BlobBoards._dflt_outlier_halfwidth() ===
-        Float64(TOML.parsefile(joinpath(pkgdir(BlobBoards), "configs", "default.toml"))["find_boards"]["geometry"]["outlier_halfwidth"])
+    # An arm's half-width is the configuration's, never a code literal (the owner's TOML-literals rule): every arm's
+    # default `ransac` reads `[find_boards.geometry.ransac] scoring` of the package defaults. No literal table remains.
+    @test !isdefined(BlobBoards, :_FIT_HALFWIDTH_FALLBACK) && !isdefined(BlobBoards, :_dflt_outlier_halfwidth)
+    h = TOML.parsefile(joinpath(pkgdir(BlobBoards), "configs", "default.toml"))["find_boards"]["geometry"]["ransac"]["scoring"]["outlier_halfwidth"]
+    @test VgtkCore.outlier_halfwidth(HomographyGeometry().ransac.scoring) === Float64(h)
+    @test VgtkCore.outlier_halfwidth(PoseGeometry(_CAM).ransac.scoring) === Float64(h)
+    # A board arm states its scorer and strategy (the guided fit runs both from the seed): ClassDefault is refused.
+    @test_throws ArgumentError HomographyGeometry(; ransac = VgtkEstimation.Ransac())
+    @test_throws ArgumentError HomographyGeometry(; ransac = VgtkEstimation.Ransac(; scoring = HomographyGeometry().ransac.scoring))
+end
+
+# The versioned converter (decision 11): the configs of record of the paper (bmvc2026, version 1, no
+# `config_version`) read through BB_CONFIG_VERSIONS to the same settings, now as the arm's algorithms.
+@testset "BB_CONFIG_VERSIONS: the configs of record keep loading (2026-11)" begin
+    @test VgtkCore.current_config_version(BlobBoards.BB_CONFIG_VERSIONS) == 2
+    @test TOML.parsefile(BlobBoards.run_config_path())["config_version"] == 2
+    root = joinpath(pkgdir(BlobBoards), "bmvc2026", "configs")
+    for (name, disambiguated) in (("bmvc2026_260527.toml", true), ("bmvc2026_260527_noflip.toml", false))
+        f = joinpath(root, name)
+        v1 = TOML.parsefile(f)["find_boards"]
+        @test !haskey(TOML.parsefile(f), "config_version")                     # a version-1 file
+        g = FindBoardsConfig(f; camera = _CAM).geometry
+        @test g isa PoseGeometry && g.min_inliers == v1["geometry"]["min_inliers"]
+        @test g.undistortion === GlobalUndistortion()                         # "global"
+        @test VgtkCore.outlier_halfwidth(g.ransac.scoring) === v1["geometry"]["outlier_halfwidth"]
+        @test g.ransac.scoring == VgtkEstimation.default_student_t_uniform_scoring(VgtkEstimation.AbsolutePoseProblem, v1["geometry"]["outlier_halfwidth"])
+        @test g.ransac.config == RansacConfig(; (Symbol(k) => v for (k, v) in v1["ransac"])...)
+        @test (g.pose_disambiguation isa PlanarPoseDisambiguation) == disambiguated
+        if disambiguated
+            @test g.pose_disambiguation.refine.strategy == g.ransac.local_optimization_strategy
+            @test g.pose_disambiguation.refine.scoring == g.ransac.scoring
+        end
+        # the migrated config is written at version 2 and reads back the same
+        mktempdir() do dir
+            p = write_config(joinpath(dir, "v2.toml"), FindBoardsConfig(f; camera = _CAM))
+            @test TOML.parsefile(p)["config_version"] == 2
+            @test config_dict(FindBoardsConfig(p; camera = _CAM)) == config_dict(FindBoardsConfig(f; camera = _CAM))
+        end
+    end
+    # version 1's tables in a version-2 file are refused, naming the current one
+    dir = mktempdir()
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "r.toml", "config_version = 2\n[find_boards.ransac]\nmax_trials = 9\n"))
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "p.toml",
+        "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\nresolve_pose_ambiguity = true\n"); camera = _CAM)
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "f.toml", "config_version = 3\n"))   # newer than the package
+    # a pose disambiguation's gates are radians, and round-trip
+    t = "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\npose_disambiguation = { type = \"planar_pose_disambiguation\", min_separation = 0.1, same_basin = 0.01 }\n"
+    g = FindBoardsConfig(_write(dir, "d.toml", t); camera = _CAM).geometry
+    @test g.pose_disambiguation.min_separation === 0.1 && g.pose_disambiguation.same_basin === 0.01
+    @test PlanarPoseDisambiguation(BlobBoards._board_local_optimization(g)).min_separation === deg2rad(4.0)
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "e.toml",
+        "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\npose_disambiguation = \"planar_pose_disambiguation\"\n"); camera = _CAM)
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "u.toml",
+        "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\nundistortion = \"local\"\n"); camera = _CAM)
+end
+
+# A `[find_boards]` table handed over on its own (a driver's file: RadiometricCamera's experiments'
+# `[poses.find_boards]`) carries no version: a stored version-1 table is migrated, a current one read as it is.
+@testset "FindBoardsConfig(table): a stored version-1 table loads (2026-11)" begin
+    # RadiometricCamera experiments' configs/experiments/texture_recovery_14mm_small.toml, [poses.find_boards]
+    v1 = TOML.parse("""
+        [geometry]
+        type = "pose"
+        outlier_halfwidth = 5.0
+        min_inliers = 6
+        resolve_pose_ambiguity = false
+        local_optimization_strategy = { type = "student_t_uniform" }
+        undistortion = "none"
+        """)
+    c = FindBoardsConfig(v1; camera = _CAM)
+    g = c.geometry
+    @test g isa PoseGeometry && g.min_inliers == 6 && g.pose_disambiguation === nothing && g.undistortion === nothing
+    @test g.ransac.scoring == VgtkEstimation.default_student_t_uniform_scoring(VgtkEstimation.AbsolutePoseProblem, 5.0)
+    @test config_dict(c) == config_dict(FindBoardsConfig(geometry = PoseGeometry(_CAM; min_inliers = 6)))
+    @test v1["geometry"]["outlier_halfwidth"] == 5.0                                   # the caller's table is not modified
+    # the current form of the same table reads to the same config, and so does a written one
+    @test config_dict(FindBoardsConfig(config_dict(c); camera = _CAM)) == config_dict(c)
+    v2 = TOML.parse("""
+        [geometry]
+        type = "pose"
+        min_inliers = 6
+        ransac = { scoring = { type = "student_t_uniform", outlier_halfwidth = 5.0 } }
+        """)
+    @test config_dict(FindBoardsConfig(v2; camera = _CAM)) == config_dict(c)
 end

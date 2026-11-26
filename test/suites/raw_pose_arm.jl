@@ -1,5 +1,5 @@
 # =============================================================================
-# The pose arm's `:none` policy: nothing is undistorted anywhere. Detections
+# The pose arm's raw policy (`undistortion = nothing`): nothing is undistorted anywhere. Detections
 # are raw pixels, the estimator verifies through the FULL camera (the residual
 # currency is the pixels the detector produced), and guided association
 # transfers each blob's conic through the camera — the plane homography
@@ -17,7 +17,7 @@ using VisualGeometryToolkitCore: CameraModel, CameraExtrinsics, LogicalIntrinsic
 using VisualGeometryToolkitEstimation: AbsolutePoseProblem, scoring_from_toml, Ransac, CameraRegressionProblem, CameraRegression
 using LocalOptimizationDoneRight: HQ, tuning_constant
 using VisualGeometryToolkitCore: WelschShape
-using BlobBoards: PoseGeometry, HomographyGeometry, RadialHomographyGeometry, _estimation_camera,
+using BlobBoards: PoseGeometry, HomographyGeometry, RadialHomographyGeometry, GlobalUndistortion, _estimation_camera,
     _world_to_image, _guided_transfer, _undistort_detect, _camera, _project_blob_centers
 
 # Pixel operations take a BoundedCamera (the stack's rule): the pose arm's camera is
@@ -28,27 +28,27 @@ const _PIN = VisualGeometryToolkitCore.with_model(_CAM, pinhole(_MODEL))
 const _POSE = EuclideanMap(RotMatrix(RotXYZ(0.35, -0.35, 0.2)), Vec3{Float64}(850.0, 250.0, 350.0))   # far off-axis: the board reaches the rim
 
 @testset "PoseGeometry.undistortion" begin
-    @test PoseGeometry(_CAM).undistortion === :none                       # raw pixels by default
-    @test PoseGeometry(_CAM; undistortion = :global).undistortion === :global
-    @test_throws ArgumentError PoseGeometry(_CAM; undistortion = :local)  # retired with the undistorted-plane residual
-    @test_throws ArgumentError PoseGeometry(_CAM; undistortion = :resample)
+    @test PoseGeometry(_CAM).undistortion === nothing                         # raw pixels by default
+    @test PoseGeometry(_CAM; undistortion = GlobalUndistortion()).undistortion === GlobalUndistortion()
+    @test_throws TypeError PoseGeometry(_CAM; undistortion = :global)         # a policy is a value, never a Symbol
+    @test BlobBoards.UNDISTORTION_TAGS["none"] === nothing && BlobBoards.UNDISTORTION_TAGS["global"] === GlobalUndistortion
 end
 
 @testset "_estimation_camera follows the policy" begin
-    @test _estimation_camera(PoseGeometry(_CAM)) === _CAM                             # :none — the FULL camera
-    @test _estimation_camera(PoseGeometry(_CAM; undistortion = :global)) == _PIN      # :global — the pinhole twin
+    @test _estimation_camera(PoseGeometry(_CAM)) === _CAM                             # raw — the FULL camera
+    @test _estimation_camera(PoseGeometry(_CAM; undistortion = GlobalUndistortion())) == _PIN   # global — the pinhole twin
     @test _estimation_camera(HomographyGeometry()) === nothing
     g = RadialHomographyGeometry((4240, 2832))
     @test _estimation_camera(g) === g                                                 # the radial token survives
-    # and the detector sees the raw image under :none, the warp only under :global
+    # and the detector sees the raw image when raw, the warp only under GlobalUndistortion()
     img = zeros(UInt8, 8, 8)
     @test _undistort_detect(BlobBoards.default_device(), img, PoseGeometry(_CAM)) === img
 end
 
 @testset "the transfer object: the posed camera, whose plane map is Core's plane_map" begin
     pose = CameraExtrinsics(_POSE)
-    @test _world_to_image(pose, _PIN) isa PosedCamera                                  # :global — the pinhole twin, posed
-    @test _world_to_image(pose, _CAM) isa PosedCamera                                  # :none — the full camera, posed
+    @test _world_to_image(pose, _PIN) isa PosedCamera                                  # global — the pinhole twin, posed
+    @test _world_to_image(pose, _CAM) isa PosedCamera                                  # raw — the full camera, posed
     @test_throws ArgumentError _world_to_image(pose, nothing)                          # a pose needs a BoundedCamera
     # under :global the pinhole twin's conic transfer is the plane homography's, exactly
     wpin = Circle(Point2(60.0, -40.0), 2.5)
@@ -120,7 +120,7 @@ end
         solve(EstimationProblem(CameraRegressionProblem(SplineLens, _CAM, inner)), CameraRegression(; tolerance = 1.0e-2)).u,
         Size2(4240, 2832)
     )
-    res = BlobBoards._find_model(_CAM, src .=> dst; rng = MersenneTwister(1))   # the pose arm's fit, as find_boards runs it
+    res = BlobBoards._board_find(_CAM, PoseGeometry(_CAM).ransac, src .=> dst; rng = MersenneTwister(1))   # the pose arm's fit, as find_boards runs it
     @test VisualGeometryToolkitCore.found_model(res)
     if VisualGeometryToolkitCore.found_model(res)
         @test rad2deg(rotation_angle(RotMatrix{3}(res.u.R' * _POSE.R))) < 0.1
@@ -128,7 +128,7 @@ end
     end
     # The spline camera, the same way: the Student-t LO differentiates its projection
     # (a Dual ray through the spline's implicit Jacobian, VisualGeometryToolkitCore).
-    spline_fit = BlobBoards._find_model(spline, src .=> dst; rng = MersenneTwister(1))
+    spline_fit = BlobBoards._board_find(spline, PoseGeometry(spline).ransac, src .=> dst; rng = MersenneTwister(1))
     @test VisualGeometryToolkitCore.found_model(spline_fit)
     if VisualGeometryToolkitCore.found_model(spline_fit)
         @test rad2deg(rotation_angle(RotMatrix{3}(spline_fit.u.R' * _POSE.R))) < 0.1

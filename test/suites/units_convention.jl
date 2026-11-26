@@ -23,7 +23,7 @@
     pkg_root = dirname(dirname(@__DIR__))        # test/suites/ → the package root
 
     allowed = Dict(
-        # the _resolve_pose_ambiguity line: board-side blobs are unitless mm by
+        # the pose disambiguation's mirror centre (`_disambiguate`): board-side blobs are unitless mm by
         # the :world contract, so the bare strip is an identity there
         # (re-audited 2026-08-08; the FlexUnits migration retired the other
         # pipeline strip and every whole-Disc strip in pattern/adapt/coordinates).

@@ -16,7 +16,7 @@
 #   3. GATE     — spatial support: ≥ `support_fraction` of the predicted
 #      blobs must associate, or the bet is off (no fit attempted).
 #   4. ESTIMATE — RANSAC every frame over the guided associations
-#      (`_find_model`, association IoUs as PROSAC scores). The track's warm
+#      (`_board_find`, the arm's `ransac`, association IoUs as PROSAC scores). The track's warm
 #      information is confined to data association; the MODEL never
 #      conditions on the previous fit — a seeded refit collapses when
 #      inter-frame motion exceeds the outlier halfwidth and inherits the
@@ -55,13 +55,17 @@ using VisualGeometryToolkitCore: iou, HomographyMat, HomographyMap, PosedCamera,
 # the point field the predictor extrapolates. An EMPTY `xs_prev` is "no
 # previous frame yet" (the first accepted frame of a track): a sentinel rather
 # than `nothing`, so the field is concrete and the per-frame predictor below
-# reads it without a union to split.
+# reads it without a union to split. `ransac` is the track's find cache
+# (`init` on its first warm frame, `reinit!` with each frame's associations
+# after): `nothing` until then, its type the arm's problem's, read behind the
+# `_warm_find!` barrier.
 mutable struct _BoardTrack{M}
     uid::String
     last::BoardObservation{M}
     xs_curr::Vector{Point2{Float64}}
     xs_prev::Vector{Point2{Float64}}
     misses::Int
+    ransac::Any
 end
 
 """
@@ -197,7 +201,6 @@ function track_boards(
 
     tracks = Dict{String, _BoardTrack}()
     history = Dict{String, Vector{BoardObservation}}()
-    oh = config.geometry.outlier_halfwidth
 
     collect_diag = on_frame !== nothing
 
@@ -232,7 +235,7 @@ function track_boards(
                 board_feature_dict[uid],
                 image_features, det_rtree, cam_est, camera, k,
                 size(adapt_img);
-                iou_threshold, support_fraction, oh, config,
+                iou_threshold, support_fraction, config,
                 claimed, collect_diag
             )
             diag === nothing || (diags[uid] = diag)
@@ -267,10 +270,11 @@ function track_boards(
                 config, device, gpu_index, exclude_polys = won_polys
             )
             src = discovery ? :detect : :init
-            for (uid, model, quality, scored) in results
+            for (uid, board) in results
                 haskey(won, uid) && continue
                 won[uid] = BoardObservation(
-                    uid, k, model, Float64(quality), count(is_map_inlier, scored.weights), src
+                    uid, k, board.fit.u, Float64(board.fit.metadata.quality),
+                    count(is_map_inlier, board.correspondences.weights), src
                 )
             end
         end
@@ -285,7 +289,7 @@ function track_boards(
                 tr.last = det
                 tr.misses = 0
             else
-                tracks[uid] = _BoardTrack(uid, det, xs, Point2{Float64}[], 0)
+                tracks[uid] = _BoardTrack(uid, det, xs, Point2{Float64}[], 0, nothing)
             end
             push!(get!(history, uid, BoardObservation[]), det)
         end
@@ -327,7 +331,7 @@ end
 # Every blob centre through the board-plane → image point map of the transfer
 # `_world_to_image` hands back: the homography arm's map dehomogenised, and a
 # posed camera's Core `plane_map` (its pinhole twin's plane homography, then the
-# lens's `distortion_map` for a full camera under `undistortion = :none`).
+# lens's `distortion_map` for a full camera under `undistortion = nothing`).
 _plane_point_map(H::HomographyMap) = PerspectiveMap() ∘ H
 _plane_point_map(camera::PosedCamera) = plane_map(camera)
 function _project_blob_centers(transfer, wdiscs)
@@ -343,7 +347,7 @@ function _warm_track_frame(
         tr::_BoardTrack, wdiscs, bundle, board_features,
         image_features, det_rtree, cam_est, camera,
         frame_idx, imsize;
-        iou_threshold, support_fraction, oh, config,
+        iou_threshold, support_fraction, config,
         claimed::BitVector, min_sigma_px = 1.5,
         collect_diag::Bool = false
     )
@@ -441,7 +445,7 @@ function _warm_track_frame(
     # information lives ONLY in data association (predicted motion → IoU
     # gate); the MODEL never conditions on the previous fit. A seeded warm
     # refit was measured to collapse whenever inter-frame motion exceeded
-    # the outlier halfwidth (8 px pan vs oh = 5: 139/140 associated, 0
+    # the outlier half-width (8 px pan vs 5 px: 139/140 associated, 0
     # inliers — IRLS born outside its own basin), and any seed fit on the
     # gated set inherits the gate's selection bias. RANSAC hypotheses don't:
     # on a ~95%-pure set it terminates in a handful of trials, sampling
@@ -454,14 +458,13 @@ function _warm_track_frame(
     # Rank scores REPLACE the :score column here — the warm-track prior is
     # the lexicographic association order, not the descriptor similarity (the
     # prior is always the column: the correspondence standard).
-    res = _find_model(
-        camera, withattrs(pt; score = scores); outlier_halfwidth = oh,
-        local_optimization_strategy = config.geometry.local_optimization_strategy,
-        config = config.ransac_config,
-        extent = Rect(bundle, :world),
-        rng = board_rng(config.ransac_seed, tr.uid)
+    # The find is the track's cache: `init` once, then the frame's problem and a fresh copy of the
+    # board's stream (`board_rng`, the same draws as a fresh solve's) through `reinit!`.
+    res = _warm_find!(
+        tr, EstimationProblem(_board_problem(camera, withattrs(pt; score = scores)), _fit_context(Rect(bundle, :world))),
+        config.geometry.ransac, board_rng(config.ransac_seed, tr.uid)
     )
-    (res !== nothing && VgtkCore.found_model(res)) || return (nothing, _finish_diag(diag))
+    VgtkCore.found_model(res) || return (nothing, _finish_diag(diag))
 
     # ---- verify with find_boards' gates
     w = VgtkCore.weights(res)
@@ -505,6 +508,18 @@ function _warm_track_frame(
     )
 end
 
+
+# One warm frame's find through the track's cache: `init(problem, ransac; rng)` on the track's first warm frame,
+# `solve!(reinit!(cache; f, p, rng))` after. The result aliases the cache's buffers until the next frame's solve
+# (its weights are read within this frame only).
+function _warm_find!(tr::_BoardTrack, prob, ransac, rng)
+    if tr.ransac === nothing
+        tr.ransac = init(prob, ransac; rng)
+    else
+        VgtkCore.reinit!(tr.ransac; f = prob.f, p = prob.p, rng)
+    end
+    return solve!(tr.ransac)
+end
 
 # Warm-bet diagnostics carrier. One value (not parallel Union locals) so the
 # collecting/non-collecting split is a single JET-narrowable union.

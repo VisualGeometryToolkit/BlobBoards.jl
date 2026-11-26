@@ -18,9 +18,47 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
 - The models a board fit returns are spelled as their types (check_naming R20): a pose is a `CameraExtrinsics` (was
   `Extrinsics3`), a pinhole lens `Lens(Perspective())` (was `Pinhole()`), a descriptor match
   `Attributed{Correspondence{Int, Int}, NNMatchMeta}` (was `NNMatch`).
-- `find_board` takes no `refine_workspace` keyword, and its `fit_kw` no `workspace`: each solve owns its RANSAC
-  workspace (Estimation 0.13 has no workspace keyword; its reuse is a cache, `init`/`solve!`/`reinit!`, which takes
-  no new `rng`, and each board fit draws from its own).
+- **A board is found as a `FoundBoard`, not a tuple.** `find_board` returns `nothing` or a `FoundBoard(fit,
+  correspondences)`: `fit` the board's `FitResult` (the RANSAC find's, or the guided local optimization's that
+  polished it), read by field (`fit.u`, `fit.metadata.quality`, `fit.retcode`), `correspondences` the scored set with
+  its `weights` column. `find_boards` returns `Vector{Pair{String, FoundBoard}}` (`uid => board`; was the
+  `(uid, model, quality, scored)` tuples), and so do its frames and pre-extracted forms and the serial oracle.
+- **An arm's settings are its algorithms.** Each geometry arm holds `ransac::Ransac` — its scorer (the Student-t +
+  uniform marginal at the arm's half-width), its local-optimization strategy and its `RansacConfig` — and
+  `min_inliers`: `HomographyGeometry(; ransac, min_inliers)`, `PoseGeometry(camera; ransac, min_inliers,
+  pose_disambiguation, undistortion)`, `RadialHomographyGeometry(image_size; ransac, min_inliers)`. The fields and
+  keywords `outlier_halfwidth` and `local_optimization_strategy` and `FindBoardsConfig.ransac_config` are gone (one
+  value per setting); a `ClassDefault()` scorer or strategy is refused (the guided final fit runs the same two from the
+  RANSAC's seed, `LocalOptimization(ransac.local_optimization_strategy; scoring = ransac.scoring)`).
+  `board_ransac_from_toml(P, class, table; defaults)` builds an arm's `Ransac` from its TOML table (it replaces
+  `geometry_local_optimization_strategy`); `radial_geometry_from_toml` takes the arm's problem type `P`.
+- `find_board(geometry, board_features, image_features; extent, rng, …)`: the arm leads (was a camera token) and the
+  per-board inputs are the solve's context and stream, `extent = Rect(bundle, :world)` and `rng =
+  board_rng(config.ransac_seed, uid)`; `board_solve_keywords` and the `fit_kw` and `resolve_pose_ambiguity` keywords
+  are gone. `find_board` takes no `refine_workspace` keyword: each solve owns its RANSAC workspace.
+- **The planar pose ambiguity is an algorithm.** `PlanarPoseDisambiguation(refine::LocalOptimization; min_separation
+  = deg2rad(4), same_basin = deg2rad(1))`, a refine on the pose arm's `AbsolutePoseProblem` (`RefineProblem(f, θ₀,
+  (; extent, mirror_center))`): it reflects the find's pose, refines both branches by the same seeded local
+  optimization and keeps the one of higher score; `metadata = (; candidates, selected, separation)`. The pose arm's
+  `pose_disambiguation` holds it (`nothing` by default; was `resolve_pose_ambiguity::Bool`). Same gates, same solves
+  in the same order; the branch log is unchanged.
+- **The undistortion policy is a value.** `PoseGeometry`'s `undistortion` is `nothing` (raw pixels, the default) or
+  `GlobalUndistortion()` (was `:none` / `:global`); the TOML tags `"none"` and `"global"` are unchanged
+  (`UNDISTORTION_TAGS`).
+- **Run configuration version 2** (`config_version = 2`, `BB_CONFIG_VERSIONS`, VisualGeometryToolkitCore's
+  `ConfigVersions`): the arm's find is the table `[find_boards.geometry.ransac]` (`scoring = { type =
+  "student_t_uniform", outlier_halfwidth }`, `local_optimization_strategy`, `min_trials`, `max_trials`,
+  `success_prob`), and the pose arm's disambiguation `pose_disambiguation = { type = "planar_pose_disambiguation" }`
+  or `"none"`. `read_run_config` migrates a version-1 file (no `config_version`: every configuration before 0.8, the
+  paper's included) value for value: `[find_boards.ransac]` moves whole, the geometry's `local_optimization_strategy`
+  joins it, `outlier_halfwidth = h` becomes its scorer, `resolve_pose_ambiguity = b` the disambiguation or `"none"`.
+  `write_config` writes version 2. A version-1 name in a version-2 file is refused, naming the current one.
+  The run-config hash (`canonical_config_json(config_dict(FindBoardsConfig()))`) is re-pinned: a layout-only
+  identity move (759414ed… → ba8e5b8a…), the values unchanged. The annotation `config_hash` does not move (it hashes
+  the arm's RANSAC budget under the key it always did; pinned in the suite).
+- `track_boards` keeps one find cache per track: `init(EstimationProblem(f, (; extent)), ransac; rng)` on its first
+  warm frame, then `solve!(reinit!(cache; f, p, rng = board_rng(seed, uid)))` per frame (was a fresh solve per frame):
+  the same draws, the same bits, the workspace kept.
 
 ### Changed
 

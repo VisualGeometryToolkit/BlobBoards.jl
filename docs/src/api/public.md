@@ -43,9 +43,10 @@ BlobBoards.blobs
 
 `find_boards` is the entry point: it detects blobs, fits elliptical frames,
 canonicalizes patches, describes them, matches against a board gallery, and
-estimates pose. The camera lives inside `config.geometry` — `PoseGeometry`
+estimates pose, one `uid => FoundBoard` per board. The camera lives inside `config.geometry` — `PoseGeometry`
 for the calibrated P3P path, `HomographyGeometry` for the uncalibrated one —
-so a camera/geometry mismatch is unrepresentable rather than a runtime error.
+so a camera/geometry mismatch is unrepresentable rather than a runtime error, and so do the arm's
+algorithms: its `ransac` (the board find) and, on the pose arm, its `pose_disambiguation`.
 
 Adaptation is **backend-generic** (KernelAbstractions): one set of kernels
 runs on `device = KA.CPU()` (one work item per blob) and on `CUDABackend()`
@@ -56,6 +57,7 @@ Detection and Pose guide.
 
 ```@docs
 find_boards
+FoundBoard
 track_boards
 FindBoardsConfig
 PoseGeometry

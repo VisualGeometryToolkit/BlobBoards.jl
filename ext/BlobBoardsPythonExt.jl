@@ -10,6 +10,7 @@ using JSON: JSON
 import VisualGeometryToolkitIO
 import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: BoundedCamera   # dispatch token for VisualGeometryToolkitIO.load
+using VisualGeometryToolkitEstimation: HomographyProblem, AbsolutePoseProblem   # the arms' family problems (their scorers' problem types)
 using VisualGeometryToolkitCore: ustrip, m, mm, cm, μm
 using VisualGeometryToolkitCore: px, dpi, pt, inch, Size2, parse_unit, strip_or_bare
 using FlexUnits: Quantity, dimension
@@ -614,12 +615,16 @@ function BlobBoards.find_boards_python(
 
     cam = camera_json === nothing ? nothing :
         VgtkIO.load(BoundedCamera, string(camera_json))
-    geo_kw = _filter_kwargs(
-        min_inliers = min_inliers === nothing ? nothing : Int(min_inliers),
-        outlier_halfwidth = outlier_halfwidth === nothing ? nothing : Float64(outlier_halfwidth)
-    )
-    geometry = cam === nothing ? BlobBoards.HomographyGeometry(; geo_kw...) :
-        BlobBoards.PoseGeometry(cam; geo_kw...)
+    # The arm's find at the caller's half-width: its `[find_boards.geometry.ransac]` table with that scorer, the
+    # rest the defaults'.
+    ransac_table = outlier_halfwidth === nothing ? Dict{String, Any}() : Dict{String, Any}(
+        "scoring" => Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => Float64(outlier_halfwidth)))
+    geo_kw = _filter_kwargs(min_inliers = min_inliers === nothing ? nothing : Int(min_inliers))
+    geometry = cam === nothing ?
+        BlobBoards.HomographyGeometry(;
+            ransac = BlobBoards.board_ransac_from_toml(HomographyProblem{Float64}, :homography, ransac_table), geo_kw...) :
+        BlobBoards.PoseGeometry(cam;
+            ransac = BlobBoards.board_ransac_from_toml(AbsolutePoseProblem, :absolute_pose, ransac_table), geo_kw...)
     cfg_kw = _filter_kwargs(
         verify_similarity = verify_similarity === nothing ? nothing : Float64(verify_similarity),
         min_appearance_support = min_appearance_support === nothing ? nothing : Float64(min_appearance_support)
@@ -633,7 +638,8 @@ function BlobBoards.find_boards_python(
 
     np = pyimport("numpy")
     out = Vector{Any}(undef, length(accepted))
-    for (i, (uid, m, q, sc)) in enumerate(accepted)
+    for (i, (uid, board)) in enumerate(accepted)
+        m, q, sc = board.fit.u, board.fit.metadata.quality, board.correspondences
         w = sc.weights
         model_py = if cam === nothing
             np.array(collect(_homography_in(origin, SMatrix{3, 3, Float64}(m))))

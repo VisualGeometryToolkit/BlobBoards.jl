@@ -86,11 +86,12 @@ using VisualGeometryToolkitCore: is_map_inlier
     # ulp — differs (measured |Δq|/q ≈ 1e-13 on this scene). rtol 1e-9 is
     # ~4 orders looser than that floor and ~10 orders tighter than any real
     # divergence the corpus A/B surfaced.
-    eng = Dict(r[1] => r for r in engine)
-    ser = Dict(r[1] => r for r in oracle)
+    eng = Dict(engine)
+    ser = Dict(oracle)
+    @test all(r -> last(r) isa FoundBoard, engine) && all(r -> last(r) isa FoundBoard, oracle)
     for uid in ("aaa", "bbb")
-        (_, m1, q1, s1) = eng[uid]
-        (_, m2, q2, s2) = ser[uid]
+        m1, q1, s1 = eng[uid].fit.u, eng[uid].fit.metadata.quality, eng[uid].correspondences
+        m2, q2, s2 = ser[uid].fit.u, ser[uid].fit.metadata.quality, ser[uid].correspondences
         @test count(is_map_inlier, s1.weights) == count(is_map_inlier, s2.weights)
         @test isapprox(q1, q2; rtol = 1.0e-9)
         @test isapprox(m1, m2; rtol = 1.0e-9)
@@ -104,9 +105,10 @@ using VisualGeometryToolkitCore: is_map_inlier
     @test !applicable(find_boards, feats, board_features)
     @test !applicable(BlobBoards._find_boards_serial, feats, board_features)
     @test !applicable(BlobBoards.find_board, feats, board_features["aaa"], nothing)
-    @test !applicable(BlobBoards.board_quad, nothing, bundles["aaa"], eng["aaa"][2])
-    @test applicable(BlobBoards.find_board, nothing, board_features["aaa"], feats)
-    @test applicable(BlobBoards.board_quad, nothing, eng["aaa"][2], bundles["aaa"])
+    @test !applicable(BlobBoards.board_quad, nothing, bundles["aaa"], eng["aaa"].fit.u)
+    @test applicable(BlobBoards.find_board, config.geometry, board_features["aaa"], feats)
+    @test !applicable(BlobBoards.find_board, nothing, board_features["aaa"], feats)   # the arm leads, not a camera token
+    @test applicable(BlobBoards.board_quad, nothing, eng["aaa"].fit.u, bundles["aaa"])
 
     # Seeded fits: identical calls give identical results, independent of
     # ambient RNG state — RVG (≥ 0.15.7) routes every sampler draw through
@@ -117,7 +119,7 @@ using VisualGeometryToolkitCore: is_map_inlier
     Random.seed!(0x0BAD5EED)
     engine_repeat = find_boards(board_features, feats; board_bundles = bundles, config)
     fingerprint(rs) = sort!(
-        [(r[1], count(is_map_inlier, r[4].weights), r[3]) for r in rs]; by = first
+        [(first(r), count(is_map_inlier, last(r).correspondences.weights), last(r).fit.metadata.quality) for r in rs]; by = first
     )
     # This one IS `==` on a Float64 quality, unlike the engine-vs-oracle
     # comparison above, because it is the engine against ITSELF: one

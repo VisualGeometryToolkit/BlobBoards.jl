@@ -28,7 +28,7 @@
 # notice — the exact invisible-drift class this file exists to remove.
 # =============================================================================
 
-using VisualGeometryToolkitCore: toml_default, parse_defaults
+using VisualGeometryToolkitCore: toml_default, parse_defaults, ConfigVersions, ConfigMigration, migrate_config
 
 # Every default is `toml_default(_TOML_DEFAULTS, table, key)` (`table = ""` for a key of `[find_boards]` itself)
 # or `toml_default(_AUTHORING_DEFAULTS, table, key)`: Core's one parser (`parse_defaults`: the file, and its
@@ -47,11 +47,38 @@ Path to BlobBoards' `configs/default.toml`: the run configuration of record (its
 """
 run_config_path() = normpath(joinpath(@__DIR__, "..", "configs", "default.toml"))
 
+"""
+    BB_CONFIG_VERSIONS
+
+BlobBoards' run-configuration converter (VisualGeometryToolkitCore's `ConfigVersions`): a run config's
+`[descriptor]` and `[find_boards]` tables are version 2 (configs/default.toml states `config_version = 2`), and
+[`read_run_config`](@ref) reads a stored file of an earlier version through `migrate_config`, so the code sees the
+current tables only. Version 1 → 2 (BlobBoards 0.8): the arm's find is one `Ransac`, its table
+`[find_boards.geometry.ransac]` — `[find_boards.ransac]` moves there whole, the geometry's
+`local_optimization_strategy` joins it, and `outlier_halfwidth = h` becomes its
+`scoring = { type = "student_t_uniform", outlier_halfwidth = h }`; the pose arm's `resolve_pose_ambiguity = true`
+becomes `pose_disambiguation = { type = "planar_pose_disambiguation" }` (`false`: `"none"`).
+"""
+const BB_CONFIG_VERSIONS = ConfigVersions("BlobBoards",
+    # version 1 → 2 (BlobBoards 0.8): an arm's algorithms are values, its find one `Ransac`
+    ConfigMigration(; tables = ["descriptor", "find_boards"],
+        renames = [
+            "find_boards.ransac" => "find_boards.geometry.ransac",
+            "find_boards.geometry.local_optimization_strategy" => "find_boards.geometry.ransac.local_optimization_strategy",
+        ],
+        values = [
+            "find_boards.geometry.outlier_halfwidth" => h -> ("find_boards.geometry.ransac.scoring" =>
+                Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => h)),
+            "find_boards.geometry.resolve_pose_ambiguity" => b -> ("find_boards.geometry.pose_disambiguation" =>
+                b ? Dict{String, Any}("type" => "planar_pose_disambiguation") : "none"),
+        ]);
+    tables = ["descriptor", "find_boards"])
+
 # configs/default.toml's `[find_boards]` tree (`_TOML_DEFAULTS`, the name `parse_defaults` prescribes) and
 # configs/authoring.toml: `[blob_board]` (layout, printing) and `[blob_pattern]` (the placement ladder, shared by
 # boards and patterns) hold `BoardConfig`'s and `PatternConfig`'s keyword defaults, `[board_raster]` the image a
 # board is converted to when no density is named.
-const _TOML_DEFAULTS = parse_defaults(run_config_path())["find_boards"]
+const _TOML_DEFAULTS = parse_defaults(run_config_path(); versions = BB_CONFIG_VERSIONS)["find_boards"]
 const _AUTHORING_DEFAULTS = parse_defaults(normpath(joinpath(@__DIR__, "..", "configs", "authoring.toml")))
 
 """
@@ -87,30 +114,41 @@ _tilts_from_toml(v) = Tuple{Float64, Float64}[(Float64(t[1]), Float64(t[2])) for
 _dflt_tilts() = _tilts_from_toml(toml_default(_TOML_DEFAULTS, "detect", "tilts"))
 
 
-# The RANSAC local-optimization strategy, selected by TOML tag through
-# VisualGeometryToolkitEstimation's loader over its strategies and LocalOptimizationDoneRight's
-# (`student_t_uniform`, `hq`, … are LocalOptimizationDoneRight's):
-# `{ type = "student_t_uniform" }`, or e.g.
-# `{ type = "hq", loss = "welsch", efficiency_constant = "cross_validated" }`, where
-# `efficiency_constant` resolves per `class` and loss through LocalOptimizationDoneRight's
-# `tuning_constant` registry. ONE converter
-# for the geometry structs' defaults AND config_toml.jl's loader. `class` is
-# the RVG pipeline class of the arm (:homography, :absolute_pose,
-# :radial_homography); `section` only names the table in error messages.
-using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, optimization_strategy_from_toml
+# A geometry arm's RANSAC (`[find_boards.geometry.ransac]`): its scorer, selected by TOML tag through
+# VisualGeometryToolkitEstimation's scorer reader (`scoring = { type = "student_t_uniform", outlier_halfwidth = h }`,
+# the priors the stack's `[scoring.student_t_uniform]`), its local-optimization strategy through Estimation's loader
+# over its strategies and LocalOptimizationDoneRight's (`student_t_uniform`, `hq`, … are LocalOptimizationDoneRight's:
+# `{ type = "student_t_uniform" }`, or e.g. `{ type = "hq", loss = "welsch", efficiency_constant = "cross_validated" }`,
+# where `efficiency_constant` resolves per `class` and loss through LocalOptimizationDoneRight's `tuning_constant`
+# registry) and the `RansacConfig` fields beside them. ONE reader for the geometry structs' defaults AND
+# config_toml.jl's loader, downstream arms' included.
+using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, optimization_strategy_from_toml, scoring_from_toml,
+    Ransac, RansacConfig
+using VisualGeometryToolkitCore: check_keys
 import LocalOptimizationDoneRight
 const _OPTIMIZATION_STRATEGY_TAGS = merge(VgtkEstimation.OPTIMIZATION_STRATEGY_TAGS, LocalOptimizationDoneRight.LODR_STRATEGY_TAGS)
+const _BOARD_RANSAC_KEYS = vcat(["scoring", "local_optimization_strategy"], String.(collect(fieldnames(RansacConfig))))
 """
-    geometry_local_optimization_strategy(d, class::Symbol) -> AbstractOptimizationStrategy
+    board_ransac_from_toml(P, class::Symbol, d; defaults = Dict(), section = "find_boards.geometry.ransac") -> Ransac
 
-The RANSAC local-optimization strategy a `[find_boards.geometry]`
-`local_optimization_strategy` table `d` names. It is read by VisualGeometryToolkitEstimation's
-loader over its strategies and LocalOptimizationDoneRight's (`class` is the
-arm's pipeline class: `:homography`, `:absolute_pose`, `:radial_homography`, …).
-The one reader for every geometry arm's TOML, downstream arms' included.
+A geometry arm's `Ransac` from its `[find_boards.geometry.ransac]` table `d`: `scoring` (a scorer table, read by
+VisualGeometryToolkitEstimation's `scoring_from_toml` for the arm's problem type `P`), `local_optimization_strategy`
+(a strategy table, read by Estimation's loader over its strategies and LocalOptimizationDoneRight's for the arm's
+pipeline class `class`: `:homography`, `:absolute_pose`, `:radial_homography`, …) and the `RansacConfig` fields
+(`min_trials`, `max_trials`, `success_prob`). A key `d` leaves out is `defaults`' (a downstream arm's own
+defaults of record, its file's table), and one both leave out is configs/default.toml's `[find_boards.geometry.ransac]`;
+an unknown key is an `ArgumentError`. The one reader for every geometry arm's TOML, downstream arms' included.
 """
-geometry_local_optimization_strategy(d, class::Symbol) = optimization_strategy_from_toml(
-    d; class, section = "find_boards.geometry.local_optimization_strategy", tags = _OPTIMIZATION_STRATEGY_TAGS
-)
-_dflt_local_optimization_strategy(class::Symbol) =
-    geometry_local_optimization_strategy(toml_default(_TOML_DEFAULTS, "geometry", "local_optimization_strategy"), class)
+function board_ransac_from_toml(::Type{P}, class::Symbol, d::AbstractDict;
+        defaults::AbstractDict = Dict{String, Any}(),
+        section::AbstractString = "find_boards.geometry.ransac") where {P}
+    check_keys(defaults, _BOARD_RANSAC_KEYS, section)
+    check_keys(d, _BOARD_RANSAC_KEYS, section)
+    t = merge(toml_default(_TOML_DEFAULTS, "geometry", "ransac"), defaults, d)
+    return Ransac(;
+        scoring = scoring_from_toml(t["scoring"]; problem = P, section = "$section.scoring"),
+        local_optimization_strategy = optimization_strategy_from_toml(t["local_optimization_strategy"];
+            class, section = "$section.local_optimization_strategy", tags = _OPTIMIZATION_STRATEGY_TAGS),
+        config = RansacConfig(; (f => convert(fieldtype(RansacConfig, f), t[String(f)]) for f in fieldnames(RansacConfig))...),
+    )
+end

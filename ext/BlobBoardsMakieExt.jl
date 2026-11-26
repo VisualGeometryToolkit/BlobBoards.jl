@@ -51,11 +51,14 @@ include("makie/view_angle_profile.jl")
 # Docstrings live on the stubs in src/api.jl, not here: a docstring on a method
 # of an imported function breaks extension precompilation.
 
-# A result is (uid, model, quality, scored); a pose is (uid, model). Both
+# A result is `uid => board` (a `FoundBoard`); a pose is (uid, model). Both
 # answer the only two questions a board overlay asks.
-_uid_of(t) = String(t[1])
+const _FoundResult = Pair{<:AbstractString, <:BlobBoards.FoundBoard}
+_uid_of(t) = String(first(t))
+_model_of(r::_FoundResult) = last(r).fit.u
 _model_of(t) = t[2]
-_scored_of(t) = length(t) >= 4 ? t[4] : nothing
+_scored_of(r::_FoundResult) = last(r).correspondences
+_scored_of(_) = nothing
 _n_inliers(t) = (sc = _scored_of(t)) === nothing ? 0 : count(VgtkCore.is_map_inlier, sc.weights)
 
 
@@ -113,7 +116,7 @@ end
 # method below touch NO BlobBoards type — they are weights + targets + frame +
 # ellipses!, all of which VGC owns. They belong beside VGC's `matches!`, which
 # is already the correspondence painter. Only the result-set method is ours,
-# because only the (uid, model, quality, scored) tuple is. An inlier is the MAP
+# because only the `uid => FoundBoard` result is. An inlier is the MAP
 # rule's, `is_map_inlier` of its posterior weight.
 _inlier_frames(sc) =
     [VgtkCore.feature_frame(sc.targets[i]) for (i, w) in enumerate(sc.weights) if VgtkCore.is_map_inlier(w)]
@@ -147,7 +150,7 @@ end
 
 board_panel!(figpos, camera, img::AbstractMatrix, result, bundle; show_frame = true, lens::Bool = true) =
     _board_panel!(
-        figpos, camera, img, _uid_of(result), _model_of(result), result[3],
+        figpos, camera, img, _uid_of(result), _model_of(result), last(result).fit.metadata.quality,
         _scored_of(result).weights, bundle; show_frame, lens
     )
 
@@ -503,7 +506,8 @@ _project_pts(proj, pts) = [proj(Point2(p[1], p[2])) for p in pts]
 function _registered_panels!(fig, trace, row0; ncols = 4)
     reg = trace.registration
     out = Makie.Axis[]
-    for (i, (uid, model, quality, scored)) in enumerate(reg.accepted)
+    for (i, (uid, board)) in enumerate(reg.accepted)
+        model, quality, scored = board.fit.u, board.fit.metadata.quality, board.correspondences
         r, c = fldmod1(i, ncols)
         # show_frame = false: the pose-axes overlay issues a nested `arrows2d!`
         # from inside the recipe's `plot!`; it adds nothing at frame scale.

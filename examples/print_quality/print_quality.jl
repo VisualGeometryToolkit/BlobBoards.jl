@@ -70,10 +70,10 @@ function locate_board(img, scan_dpi, json_path)
     small = BlobBoards.Gray{Float32}.(blockmean(img, k))
     found = find_boards(features, net, small; board_bundles = Dict(board.uid => board.bundle))
     isempty(found) && error("find_boards found no board in the scan")
-    uid, model, _, scored = first(found)
+    uid, found_board = first(found)
     uid == board.uid || error("found board $uid, expected $(board.uid)")
-    H = SMatrix{3, 3, Float64}(k, 0, 0, 0, k, 0, 0, 0, 1) * SMatrix{3, 3, Float64}(model)
-    return board.bundle, H, count(is_map_inlier, scored.weights)
+    H = SMatrix{3, 3, Float64}(k, 0, 0, 0, k, 0, 0, 0, 1) * SMatrix{3, 3, Float64}(found_board.fit.u)
+    return board.bundle, H, count(is_map_inlier, found_board.correspondences.weights)
 end
 
 # a point through a homography (static: no allocation in the per-pixel loop)

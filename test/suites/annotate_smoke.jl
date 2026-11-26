@@ -260,7 +260,7 @@ end
             device = backend
         )
         @test !isempty(results)
-        poses = [(r[1], r[2]) for r in results]
+        poses = [(first(r), last(r).fit.u) for r in results]
         @test plot_boards(cam, results, g.bundles, img) isa CairoMakie.Makie.Figure
         @test plot_board_poses(cam, poses, g.bundles, img) isa CairoMakie.Makie.Figure
         # the retired orders bind no method: image first, and the image second.
@@ -367,12 +367,12 @@ end
     end
 end
 
-# The pose arm under `undistortion = :none` keeps the FULL camera as its
+# The pose arm under `undistortion = nothing` keeps the FULL camera as its
 # estimation camera, which has no plane homography: `track_boards` projects the
 # blob centres through the `PosedCamera` itself. Until the `PosedCamera` method of
 # `_project_blob_centers` existed this died in a MethodError on the first
 # accepted board.
-@testset "track_boards — pose arm, full camera (undistortion = :none)" begin
+@testset "track_boards — pose arm, full camera (undistortion = nothing)" begin
     if !_all_present(_BOARDS_DIR, _MODEL_PATH, _VIDEO_PATH, _VIDEO_CAMERA_JSON)
         @warn "Skipping track_boards pose-arm smoke — example artifacts unavailable"
         return

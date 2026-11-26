@@ -28,7 +28,7 @@
 # CROSS-VALIDATED — fitted nuisance parameters. No derivation exists; they are
 # set by held-out validation against EXTERNAL truth and re-fitted per capture.
 #
-#   [find_boards.geometry] outlier_halfwidth
+#   [find_boards.geometry.ransac] scoring.outlier_halfwidth
 #
 # It is the uniform OUTLIER component's per-axis half-width in the
 # Student-t/uniform mixture — NOT a gate. It implies no threshold directly:
@@ -59,6 +59,11 @@
 #
 # `model` is relative to `data_dir()`, which stays in LocalPreferences.toml:
 # WHERE the data lives is per-machine, WHICH network to use is not.
+
+# The version of this file's layout (`BB_CONFIG_VERSIONS`): version 1 (0.7 and earlier, no key) kept the arm's
+# RANSAC configuration in `[find_boards.ransac]` and its half-width and strategy in `[find_boards.geometry]`; a stored
+# file of it is read through VisualGeometryToolkitCore's `migrate_config`.
+config_version = 2
 
 [descriptor]
 # RealFourthIteration log-polar s96 network (exported 2026-08-10 from
@@ -107,8 +112,9 @@ max_detections = "unbounded"    # cap: about this many of the strongest, spread 
 # regardless of thread scheduling, call order, or ambient RNG state. Sweep it
 # to MEASURE fit-stage RNG sensitivity, never to tune (decisions were
 # seed-stable on the 260527 A/B, 2026-08-17). Top-level, not under
-# [find_boards.ransac]: that table maps 1:1 to RVG's RansacConfig, and the
-# seed is BlobBoards' stream-derivation base, not an RVG knob.
+# [find_boards.geometry.ransac]: that table is the arm's `Ransac`, and the
+# seed is BlobBoards' stream-derivation base, not a `Ransac` field (the rng is
+# the find's solve keyword).
 ransac_seed = 0x0b10b5eed
 
 [find_boards.detect]
@@ -177,7 +183,19 @@ type = "homography"
 # unchanged. (PoseGeometry deliberately sits ONE BELOW, 6, and keeps a Julia
 # literal — this table is homography-scoped; see the note at its constructor.)
 min_inliers = 7
-# The half-width of the UNIFORM OUTLIER COMPONENT, pixels — NOT a threshold and
+# NB no `pose_disambiguation` here: it is pose-only, and the loader
+# refuses it under `type = "homography"`. The plane-induced H is a unique
+# 8-DOF map; the two-fold ambiguity belongs to its DECOMPOSITION into
+# (R, t, n) given K, so an uncalibrated run has no second branch to select.
+# The paper config, which is `pose`, sets it.
+
+[find_boards.geometry.ransac]
+# The arm's find, VisualGeometryToolkitEstimation's `Ransac` on the arm's family problem: its scorer, its
+# local-optimization strategy (also the guided final fit's, from the RANSAC seed) and the RansacConfig fields.
+#
+# The scorer is the Student-t + uniform marginal (VisualGeometryToolkitCore's `StudentTUniformScoring`, its priors
+# Estimation's `[scoring.student_t_uniform]`), not VisualGeometryToolkitEstimation's MSAC default. Its
+# `outlier_halfwidth` is the half-width of the UNIFORM OUTLIER COMPONENT, pixels — NOT a threshold and
 # NOT the residual scale. The estimators here are Student-t/uniform mixtures:
 # this number is the support the outlier hypothesis spreads its unit mass over,
 # so its density is 1/(2r). The inlier component wins near zero residual only
@@ -196,23 +214,13 @@ min_inliers = 7
 # Absolute by intent, unlike max_scale: it tracks detector localization noise,
 # which is sub-pixel regardless of image size. The package default; the BMVC
 # paper's value is cross-validated (bmvc2026/scripts/outlier_halfwidth_cv.jl).
-outlier_halfwidth = 5.0
+scoring = { type = "student_t_uniform", outlier_halfwidth = 5.0 }
 # The RANSAC local-optimization strategy, selected by tag through
 # VisualGeometryToolkitEstimation's loader over its `OPTIMIZATION_STRATEGY_TAGS` and LocalOptimizationDoneRight's `LODR_STRATEGY_TAGS`. BB
 # pins the posterior-weight Student-t/uniform IRLS on every arm (switched back
 # from the Welsch-HQ arm, 2026-07-28); the Welsch-HQ arm would be
 # `{ type = "hq", loss = "welsch", efficiency_constant = "cross_validated" }` here.
-# The fits score with the Student-t + uniform marginal at `outlier_halfwidth`
-# (VisualGeometryToolkitCore's `StudentTUniformScoring`), stated in the code, not
-# VisualGeometryToolkitEstimation's MSAC default.
 local_optimization_strategy = { type = "student_t_uniform" }
-# NB no `resolve_pose_ambiguity` here: it is pose-only, and the loader
-# refuses it under `type = "homography"`. The plane-induced H is a unique
-# 8-DOF map; the two-fold ambiguity belongs to its DECOMPOSITION into
-# (R, t, n) given K, so an uncalibrated run has no second branch to select.
-# The paper config, which is `pose`, sets it.
-
-[find_boards.ransac]
 min_trials = 100
 # 10_000 rather than the library default of 2_000: on this dataset the agenda
 # carries ~30 candidate boards per image, most of which do not match, and the

@@ -60,8 +60,8 @@ img = Gray.(load(joinpath(still, "DSC02847.JPG")))
 
 # uncalibrated: one homography per board
 found = find_boards(board_features, network, img; board_bundles)
-for (uid, H, quality, scored) in found
-    println(uid, ": ", count(is_map_inlier, scored.weights), " inliers")
+for (uid, board) in found
+    println(uid, ": ", count(is_map_inlier, board.correspondences.weights), " inliers")
 end
 ```
 
@@ -116,26 +116,31 @@ camera = VgtkIO.load(BoundedCamera, joinpath(still, "cameras.json"))
 config = FindBoardsConfig(geometry = PoseGeometry(camera))
 posed = find_boards(board_features, network, img; board_bundles, config)
 
-uid, pose, _, scored = first(posed)
+uid, board = first(posed)
+pose = board.fit.u
 pose.R, pose.t          # rotation and translation (mm), board world frame → camera frame
 ```
 
 The pose path undistorts nothing by default. It detects on the raw image and
 verifies through the full camera model (`PoseGeometry(camera; undistortion =
-:none)`), so the inlier gate is in raw pixels everywhere on a strongly
-distorted lens.
+nothing)`, TOML `undistortion = "none"`), so the inlier gate is in raw pixels everywhere on a strongly
+distorted lens; `undistortion = GlobalUndistortion()` (TOML `"global"`) undistorts the image first and fits
+through the camera's pinhole twin. The planar pose ambiguity (two poses of a coplanar target that
+explain its image almost equally) is resolved by `pose_disambiguation`, a
+[`BlobBoards.PlanarPoseDisambiguation`](@ref) of the arm's own local optimization (TOML
+`pose_disambiguation = { type = "planar_pose_disambiguation" }`); none by default.
 
 ## Reading the results
 
-Each result is `(uid, model, quality, scored)`:
+Each result is a pair `uid => board`, `board` a [`FoundBoard`](@ref):
 
 - `uid`: the board's 3-character uid. It is printed in the board's corners and
   is a key of `board_bundles`. `blobs(board_bundles[uid], :world)` gives the
   board's points.
-- `model`: the homography or pose (see the table above).
-- `quality`: the fit's RANSAC score.
-- `scored`: the board-blob → image-detection correspondences, with posterior
-  weights in `scored.weights`. `count(is_map_inlier, scored.weights)` is the
+- `board.fit`: the board's `FitResult`, read by field: `board.fit.u` is the homography or pose (see the table
+  above), `board.fit.metadata.quality` the fit's RANSAC score, `board.fit.retcode` its termination.
+- `board.correspondences`: the board-blob → image-detection correspondences, with posterior
+  weights in `board.correspondences.weights`. `count(is_map_inlier, board.correspondences.weights)` is the
   inlier count.
 
 ## Checking the result visually
@@ -153,9 +158,9 @@ using GeometryBasics: Rect
 
 fig = Figure(size = (1400, 950))
 ax, _ = imshow(fig[1, 1], img)
-for (uid, H, quality, scored) in found
+for (uid, board) in found
     bundle = board_bundles[uid]
-    proj = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H))   # board world (mm) → pixels
+    proj = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(board.fit.u))   # board world (mm) → pixels
     projectedboard!(ax, proj, Rect(bundle, :world), blobs(bundle, :world); cutoff = cutoff(bundle))
 end
 CairoMakie.save("found_boards.png", fig)   # with GLMakie: display(fig)
@@ -181,22 +186,31 @@ config = FindBoardsConfig("my_run.toml"; camera)                       # [find_b
 To change one setting, rebuild the immutable config with `Accessors.@set`, as
 shown in the [`FindBoardsConfig`](@ref) docstring.
 
-Each geometry fits its boards with RANSAC, scored by the Student-t + uniform
-mixture at the geometry's `outlier_halfwidth`, then refines the RANSAC model
-with a local optimization. That strategy is the geometry's
-`local_optimization_strategy`, written in TOML as a tagged table:
+Each geometry fits its boards with its `ransac`, a VisualGeometryToolkitEstimation `Ransac`: RANSAC scored by the
+Student-t + uniform mixture at the arm's outlier half-width, then a local optimization of the RANSAC model by the
+`Ransac`'s strategy (the same strategy and scorer polish the guided final fit). The table is the arm's
+`[find_boards.geometry.ransac]`, its scorer and strategy tagged tables:
 
 ```toml
+config_version = 2
+
 [find_boards.geometry]
 type = "homography"
-outlier_halfwidth = 5.0
+
+[find_boards.geometry.ransac]
+scoring = { type = "student_t_uniform", outlier_halfwidth = 5.0 }
 local_optimization_strategy = { type = "student_t_uniform" }   # the default on every arm
+max_trials = 10000
 ```
 
 `outlier_halfwidth` is the half-width of the uniform outlier component in
 pixels, not an inlier threshold: the scale is estimated from the data, and the
-inlier decision follows from it. The same keyword sets the strategy in Julia,
-for example `HomographyGeometry(; local_optimization_strategy = …)`.
+inlier decision follows from it. In Julia the arm takes the algorithm itself,
+`HomographyGeometry(; ransac = Ransac(; scoring, local_optimization_strategy, config))`, and
+[`BlobBoards.board_ransac_from_toml`](@ref) builds one from such a table. A configuration written before
+`config_version = 2` (the arm's half-width and strategy in `[find_boards.geometry]`, the RANSAC
+bounds in `[find_boards.ransac]`) still loads: `read_run_config` migrates it
+([`BlobBoards.BB_CONFIG_VERSIONS`](@ref)).
 
 ## Blob outcomes
 

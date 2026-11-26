@@ -81,7 +81,8 @@ function plot_results(img, results, board_bundles, cam, label; n = min(10, lengt
     top = results[1:n]
     ncols = min(5, n); nrows = cld(n, ncols)
     fig = Makie.Figure(size = (ncols * 500, nrows * 500))
-    for (i, (uid, model, quality, scored)) in enumerate(top)
+    for (i, (uid, board)) in enumerate(top)
+        model, quality, scored = board.fit.u, board.fit.metadata.quality, board.correspondences
         r, c = fldmod1(i, ncols)
         n_inl = count(is_map_inlier, scored.weights)
         ax, _ = imshow(fig[r, c], img; title = "$uid  q=$(round(quality; digits = 1))  n=$n_inl")
@@ -144,8 +145,9 @@ for (label, geometry) in (
     calibrated = geometry isa PoseGeometry
 
     println("\n== $label ==  $(length(accepted)) verified board(s):")
-    for (uid, model, quality, scored) in accepted
-        n_inl = count(is_map_inlier, scored.weights)
+    for (uid, board) in accepted
+        model = board.fit.u
+        n_inl = count(is_map_inlier, board.correspondences.weights)
         extra = calibrated ? "  t=$(round.(model.t; digits = 1))" : ""
         println("  $uid  inliers=$n_inl$extra")
     end

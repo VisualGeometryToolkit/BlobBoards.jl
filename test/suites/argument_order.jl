@@ -118,8 +118,8 @@ using VisualGeometryToolkitCore: CameraModel, LogicalIntrinsics, CameraCalibrati
         video = Matrix{Float32}[]
         @test !hasmethod(track_boards, Tuple{Dict{String, Any}, String, typeof(video)}, (:trace,))
         @test hasmethod(track_boards, Tuple{Dict{String, Any}, String, typeof(video)}, (:on_frame,))
-        @test !hasmethod(BlobBoards.find_board, Tuple{Nothing, Vector{Any}, Vector{Any}}, (:deps_out,))
-        @test hasmethod(BlobBoards.find_board, Tuple{Nothing, Vector{Any}, Vector{Any}}, (:on_guided_read,))
+        @test !hasmethod(BlobBoards.find_board, Tuple{BlobBoards.HomographyGeometry, Vector{Any}, Vector{Any}}, (:deps_out,))
+        @test hasmethod(BlobBoards.find_board, Tuple{BlobBoards.HomographyGeometry, Vector{Any}, Vector{Any}}, (:on_guided_read,))
         tracks_sig = Tuple{Dict, BlobBoards.DescriptorNetwork, String}
         @test !hasmethod(BlobBoards.build_absolute_tracks, tracks_sig, (:view_stats,))
         @test hasmethod(BlobBoards.build_absolute_tracks, tracks_sig, (:on_view_stats,))
