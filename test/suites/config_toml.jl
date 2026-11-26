@@ -304,7 +304,7 @@ _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
         # no second set of literals to drift. Assert the mechanism directly, so
         # a regression to restated literals fails here rather than silently
         # reintroducing the two-sources problem.
-        toml = TOML.parsefile(BlobBoards.default_config_path())["find_boards"]
+        toml = TOML.parsefile(BlobBoards.run_config_path())["find_boards"]
         cfg = FindBoardsConfig()
         @test cfg.min_similarity == toml["min_similarity"]
         @test cfg.verify_similarity == toml["verify_similarity"]
@@ -643,7 +643,7 @@ end
     # serialized, and read by nothing). It must reload with a warning — the
     # record is immutable — while a typo'd key still fails loudly.
     mktempdir() do dir
-        base = read(BlobBoards.default_config_path(), String)
+        base = read(BlobBoards.run_config_path(), String)
         p1 = joinpath(dir, "retired.toml")
         write(p1, replace(base, "[find_boards.adapt]" => "[find_boards.adapt]\ninit = \"disc\""))
         cfg = @test_logs (:warn, r"retired") match_mode = :any FindBoardsConfig(p1)
@@ -656,7 +656,7 @@ end
 
 @testset "one default authority through every door (2026-09 audit)" begin
     mktempdir() do dir
-        base = read(BlobBoards.default_config_path(), String)
+        base = read(BlobBoards.run_config_path(), String)
         # `nms = { type = "ellipse" }` with no cutoff must inherit the FILE's
         # cutoff (2.0), not EllipseNms()'s struct literal (3.0) — the
         # loader-vs-struct divergence the audit found, one nesting level down.
@@ -668,7 +668,7 @@ end
             )
         )
         cfg = FindBoardsConfig(p1)
-        @test cfg.detect.nms.cutoff == Float32(BlobBoards._dflt("detect", "nms")["cutoff"])
+        @test cfg.detect.nms.cutoff == Float32(VgtkCore.toml_default(BlobBoards._TOML_DEFAULTS, "detect", "nms")["cutoff"])
         # Retirement is (section, key)-scoped: patch_size is retired from
         # [descriptor] only — in [find_boards.detect] it is a typo and throws.
         p2 = joinpath(dir, "scoped_retire.toml")

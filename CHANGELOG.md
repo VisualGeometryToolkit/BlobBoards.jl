@@ -11,6 +11,10 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
 
 - **Renamed** (`fit_` and `find_` name kinds, check_naming R15): `fit_rng` → `board_rng`, `board_fit_keywords` →
   `board_solve_keywords`, `find_boards_table` → `read_find_boards_table` (beside `read_run_config`); same values.
+- **Renamed** (one owner per name, check_duplication; DUPLICATION.toml deleted): `default_config_path` →
+  `run_config_path` (VisualGeometryToolkitEstimation owns `default_config_path`, the path of its own file), and the
+  board-overlay Makie recipe `board`/`board!` → `projectedboard`/`projectedboard!` (type `ProjectedBoard`;
+  VisualGeometryToolkitCore owns `board`, a target's physical board); same arguments and drawing.
 - The models a board fit returns are spelled as their types (check_naming R20): a pose is a `CameraExtrinsics` (was
   `Extrinsics3`), a pinhole lens `Lens(Perspective())` (was `Pinhole()`), a descriptor match
   `Attributed{Correspondence{Int, Int}, NNMatchMeta}` (was `NNMatch`).
@@ -26,6 +30,12 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   `find_radial_homography`), and the guided refit and the pose-ambiguity branches `solve(RefineProblem(f, θ₀, (;
   extent)), LocalOptimization(strategy; scoring))` (was `locally_optimize`). Results are read by field (`r.u`,
   `r.metadata.quality`) and `weights(r)`.
+- No exception to the duplication gate: DUPLICATION.toml is deleted. The defaults are read by Core's `toml_default`
+  directly (`toml_default(_TOML_DEFAULTS, table, key)`; the package's `_dflt` and its `_board_dflt`,
+  `_pattern_dflt` and `_raster_dflt` siblings are gone); `adapt`'s launch policy is Core's `OnBackend(backend;
+  workgroupsize = 256, host_workgroupsize = 1)` (was `_adapt_groupsize`); the training gallery's ONNX provider is
+  `KernelAbstractions.isgpu(device) ? :cuda : :cpu` (was `_execution_provider`). `adapt`'s per-blob record is
+  Estimation's `irls_retcode` and `irls_stop_rule` (was `irls_termination`). Same values, bit for bit on the CPU.
 - `bmvc2026/`, the paper project, stays on its released environment: it reproduces with BlobBoards 0.7.4 on the Core
   0.13 stack, and is no longer a member of the workspace nor in the naming and duplication gates.
 

@@ -58,7 +58,7 @@ end
 
 Each function whose methods live in a package extension, with that extension's
 name. Every one has the fallback `f(args...; kwargs...)` that raises the error
-naming `EXTENSION_INSTALL`'s install line. `board` and `board!` are not
+naming `EXTENSION_INSTALL`'s install line. `projectedboard` and `projectedboard!` are not
 here: they forward to the extension's Makie recipe (src/authoring_stubs.jl).
 """
 const EXTENSION_FUNCTIONS = (

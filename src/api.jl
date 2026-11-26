@@ -74,16 +74,16 @@ export save_trace, load_trace              # trace bundles (TrackTrace dirs; Pip
 public PipelineTrace, PipelineCapture, trace_pipeline, inspect_pipeline   # pipeline-stage capture (+ its Attributed provenance) + viewer (src/inspect.jl)
 export data_dir                            # LocalPreferences-backed data root
 export write_config, read_run_config, config_dict, descriptor_network_path
-export default_config_path
+export run_config_path
 export default_device
 
 # -----------------------------------------------------------------------------
 # 3. VISUALIZATION — Makie recipes (methods land via the Makie/GLMakie exts)
 # -----------------------------------------------------------------------------
-# `board` / `board!` are 2D recipes (any Makie backend). The LScene-based
+# `projectedboard` / `projectedboard!` are 2D recipes (any Makie backend). The LScene-based
 # `board3d`/`board3d!`/`BoardMesh` cluster (BlobBoardsGLMakieExt) was deleted in
 # the 2026-09-07 audit: zero users in-repo or downstream since the 0.23 round.
-export board, board!
+export projectedboard, projectedboard!
 
 # Each function's methods live in BlobBoardsMakieExt; its fallback, which names
 # the install line when no Makie backend is loaded, is defined from

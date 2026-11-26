@@ -54,7 +54,7 @@ end
     include("suites/readme_rows.jl")
     run_row("find boards on the CPU"; after = """
         fallbacks = [collect(BlobBoards.EXTENSION_FUNCTIONS);
-                     (BlobBoards.board, :BlobBoardsMakieExt); (BlobBoards.board!, :BlobBoardsMakieExt)]
+                     (BlobBoards.projectedboard, :BlobBoardsMakieExt); (BlobBoards.projectedboard!, :BlobBoardsMakieExt)]
         for (f, ext) in fallbacks
             err = try f("a", 1); nothing catch e; e end
             @test err isa ErrorException

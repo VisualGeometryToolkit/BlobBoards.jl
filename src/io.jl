@@ -462,7 +462,7 @@ would otherwise undercut).
 _default_density(bundle::BoardBundle) = _default_density(bundle.preamble.board_config.layout_grid, bundle)
 _default_density(g::PixelGrid, _) = g.density
 function _default_density(::PointGrid, bundle::BoardBundle)
-    across = _raster_dflt("min_blob_px") / _diameter_factor(bundle.preamble.pattern_config.cutoff)   # as σ, in pixels
+    across = toml_default(_AUTHORING_DEFAULTS, "board_raster", "min_blob_px") / _diameter_factor(bundle.preamble.pattern_config.cutoff)   # as σ, in pixels
     return _density_for_sigma(bundle.preamble, max(across, MIN_SIGMA_PX))
 end
 

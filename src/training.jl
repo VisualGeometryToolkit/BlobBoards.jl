@@ -52,14 +52,6 @@ using CoordinateTransformations: PerspectiveMap, transform_deriv   # a homograph
 # cuDNN was only ever an extension trigger here (nothing in this file calls it);
 # scripts that need the ONNX `:cuda` EP load it themselves.
 
-
-# ONNX execution provider matching a compute backend. Without this a CPU run
-# still asks for the `:cuda` EP, and `DescriptorNetwork` answers with a
-# "CUDA execution provider unavailable" warning before falling back to `:cpu`
-# on its own — noise that reads like a misconfiguration. Non-KA tokens (VGF's
-# `CudaBackend()`) keep the CUDA default.
-_execution_provider(backend) = backend isa KA.CPU ? :cpu : :cuda
-
 # `best_iou_match` is VisualGeometryToolkitCore's since 0.21.1 (beside `iou`).
 using VisualGeometryToolkitCore: best_iou_match
 
@@ -479,7 +471,9 @@ function load_board_gallery(
     check_blob_id_collisions(Dict(b.uid => b.config_hash for b in boards))
     model = DescriptorNetwork(
         descriptor_model_path;
-        execution_provider = _execution_provider(device)
+        # the ONNX provider of the compute backend: a host run does not ask for the `:cuda` provider (which would warn
+        # "CUDA execution provider unavailable" before falling back to `:cpu`)
+        execution_provider = KA.isgpu(device) ? :cuda : :cpu
     )
     board_feature_dict = Dict(b.uid => extract_board_features(model, b; device, b.image) for b in boards)
     board_bundles = Dict(b.uid => b.bundle for b in boards)

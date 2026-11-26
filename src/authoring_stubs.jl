@@ -6,7 +6,7 @@
 # submodule BlobBoards.Authoring (src/authoring/), which adds the methods. The
 # package never loads Makie for it.
 #
-# INSPECTION recipes (`board!` overlay, `inspect_pipeline`) live in
+# INSPECTION recipes (`projectedboard!` overlay, `inspect_pipeline`) live in
 # BlobBoardsMakieExt, triggered by any `using <Makie backend>`.
 
 """
@@ -253,18 +253,18 @@ follows [`render_board`](@ref)'s rules. Implemented in `BlobBoards.Authoring`.
 function save_canvas_texture end
 
 """
-    board!(ax, proj, rect, blobs; cutoff)
+    projectedboard!(ax, proj, rect, blobs; cutoff)
 
 Project a board's world rect + blobs into an image axis. Requires a Makie
 backend (BlobBoardsMakieExt).
 """
-board!(args...; kwargs...) = _makie_recipe(board!, args, kwargs)
+projectedboard!(args...; kwargs...) = _makie_recipe(projectedboard!, args, kwargs)
 
-"Non-mutating form of [`board!`](@ref). Requires a Makie backend."
-board(args...; kwargs...) = _makie_recipe(board, args, kwargs)
+"Non-mutating form of [`projectedboard!`](@ref). Requires a Makie backend."
+projectedboard(args...; kwargs...) = _makie_recipe(projectedboard, args, kwargs)
 
-# `board`/`board!` are the functions of the extension's Makie recipe (`Board`).
-# `Makie.@recipe` defines `board(args...; kw...)` itself, the same signature as
+# `projectedboard`/`projectedboard!` are the functions of the extension's Makie recipe (`ProjectedBoard`).
+# `Makie.@recipe` defines `projectedboard(args...; kw...)` itself, the same signature as
 # a fallback here, and a method overwritten from an extension is an error under
 # precompilation. So the recipe's functions are the extension's own, and these
 # forward to them — or name the install line when no Makie backend is loaded.

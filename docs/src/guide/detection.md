@@ -141,7 +141,7 @@ Each result is `(uid, model, quality, scored)`:
 ## Checking the result visually
 
 Each board's model maps its `:world` plane into the image, so drawing the board
-through it shows at a glance whether the fit is right. `board!` draws a board's
+through it shows at a glance whether the fit is right. `projectedboard!` draws a board's
 outline and blobs through any map, on any Makie backend:
 
 ```julia
@@ -156,7 +156,7 @@ ax, _ = imshow(fig[1, 1], img)
 for (uid, H, quality, scored) in found
     bundle = board_bundles[uid]
     proj = PerspectiveMap() ∘ HomographyMap(SMatrix{3, 3, Float64}(H))   # board world (mm) → pixels
-    board!(ax, proj, Rect(bundle, :world), blobs(bundle, :world); cutoff = cutoff(bundle))
+    projectedboard!(ax, proj, Rect(bundle, :world), blobs(bundle, :world); cutoff = cutoff(bundle))
 end
 CairoMakie.save("found_boards.png", fig)   # with GLMakie: display(fig)
 ```

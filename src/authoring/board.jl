@@ -99,7 +99,7 @@ function _generate_board(preamble::BoardPreamble; dir, output, id_label)
     _check_output(out, preamble, board_sizes)                     # before placement
     blobs_stored = BlobBoards._place_board_blobs(preamble)        # the board's stored unit (pt; px for v3)
     config_hash = BlobBoards._board_identity(preamble, blobs_stored)
-    return _assemble_board(preamble, board_sizes, blobs_stored, config_hash; dir, out, id_label = something(id_label, BlobBoards._board_dflt("id_label")::Bool), verified = true)
+    return _assemble_board(preamble, board_sizes, blobs_stored, config_hash; dir, out, id_label = something(id_label, VgtkCore.toml_default(BlobBoards._AUTHORING_DEFAULTS, "blob_board", "id_label")::Bool), verified = true)
 end
 
 # The board's identity in one printed line, so every printed sheet can be

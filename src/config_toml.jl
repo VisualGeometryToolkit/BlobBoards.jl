@@ -61,7 +61,7 @@ import VisualGeometryToolkitEstimation: config_dict
 # it carries no values for this one, and the struct's @kwdef literals are the
 # only authority (documented at the structs).
 function _nms_kwargs(d, type::AbstractString, spec::Pair{String}...)
-    fd = _dflt("detect", "nms")
+    fd = toml_default(_TOML_DEFAULTS, "detect", "nms")
     return present_kwargs(d, spec...; fallback = fd["type"] == type ? fd : nothing)
 end
 
@@ -436,7 +436,7 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
                 fb, "geometry",
                 # Absent table inherits the file's default arm — not a
                 # restated literal that could drift from it.
-                Dict{String, Any}("type" => _dflt("geometry", "type"))
+                Dict{String, Any}("type" => toml_default(_TOML_DEFAULTS, "geometry", "type"))
             ), camera, image_size
         ),
         # Absent keys inherit configs/default.toml (the ONE default authority, as
@@ -446,7 +446,7 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
         # is written, accepted and READ, not silently dropped on reload.
         ransac_config = RansacConfig(;
             (
-                f => convert(fieldtype(RansacConfig, f), get(() -> _dflt("ransac", String(f)), ransac, String(f)))
+                f => convert(fieldtype(RansacConfig, f), get(() -> toml_default(_TOML_DEFAULTS, "ransac", String(f)), ransac, String(f)))
                     for f in fieldnames(RansacConfig)
             )...
         ),
@@ -680,7 +680,7 @@ const _EXAMPLE_ARTIFACTS = Dict(
 )
 
 descriptor_network_path(path::AbstractString) = descriptor_network_path(read_run_config(path))
-descriptor_network_path() = descriptor_network_path(default_config_path())
+descriptor_network_path() = descriptor_network_path(run_config_path())
 
 """
     read_run_config(path; tables = ()) -> (; config_toml, find_boards, experiment, gallery, descriptor)

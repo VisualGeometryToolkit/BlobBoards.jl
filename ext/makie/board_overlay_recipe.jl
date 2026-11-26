@@ -13,8 +13,8 @@ using StaticArrays: SMatrix
 using GeometryBasics: Point2f, Point3f
 
 """
-    board(mapping, rect, blobs; kwargs...)
-    board!(ax, mapping, rect, blobs; kwargs...)
+    projectedboard(mapping, rect, blobs; kwargs...)
+    projectedboard!(ax, mapping, rect, blobs; kwargs...)
 
 Overlay projected board geometry on a 2D image axis.
 
@@ -26,11 +26,11 @@ Overlay projected board geometry on a 2D image axis.
 
 # Example
 ```julia
-board!(ax, PosedCamera(cam_model, pose), rect, discs; cutoff=2.0)
-board!(ax, PerspectiveMap() ∘ HomographyMap(H), rect, discs; cutoff=2.0)
+projectedboard!(ax, PosedCamera(cam_model, pose), rect, discs; cutoff=2.0)
+projectedboard!(ax, PerspectiveMap() ∘ HomographyMap(H), rect, discs; cutoff=2.0)
 ```
 """
-Makie.@recipe(Board, mapping, rect, blobs) do scene
+Makie.@recipe(ProjectedBoard, mapping, rect, blobs) do scene
     Makie.Attributes(
         cutoff = BlobBoards.DEFAULT_CUTOFF,
         show_outline = true,
@@ -55,7 +55,7 @@ end
 _project_shape(m, x) = m(x)
 _project_shape(cam::PosedCamera, x) = project(cam, x)
 
-function Makie.plot!(p::Board)
+function Makie.plot!(p::ProjectedBoard)
     m = p.mapping[]
 
     # Outline: single shape, one poly! call. `nothing` when no part of the
@@ -94,8 +94,8 @@ function Makie.plot!(p::Board)
     return p
 end
 
-_board_frame!(::Board, ::Any) = nothing
-function _board_frame!(p::Board, cam::PosedCamera)
+_board_frame!(::ProjectedBoard, ::Any) = nothing
+function _board_frame!(p::ProjectedBoard, cam::PosedCamera)
     p.show_frame[] || return
     origin_2d = Point2f(project(cam, Point3f(0, 0, 0)))
     scale = p.frame_scale[]

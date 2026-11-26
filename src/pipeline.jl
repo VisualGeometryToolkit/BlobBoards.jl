@@ -434,7 +434,7 @@ _default_lo(::BoundedCamera) = _dflt_local_optimization_strategy(:absolute_pose)
 # outlier_halfwidth` (configs/default.toml), never a literal here. Every engine
 # path supplies the geometry's own value; the radial arm, which holds its
 # geometry, falls back to that geometry's value.
-_dflt_outlier_halfwidth() = Float64(_dflt("geometry", "outlier_halfwidth"))
+_dflt_outlier_halfwidth() = Float64(toml_default(_TOML_DEFAULTS, "geometry", "outlier_halfwidth"))
 
 # A board fit's solve context: the board's world extent, whose consensus hook
 # rejects a model that folds the board's outer corners, or none.
@@ -1262,7 +1262,7 @@ function find_board(
         # radial geometry, never a vector. (The camera slot stays untyped —
         # the geometry types are defined further down this file.)
         camera, board_features::AbstractVector, image_features::AbstractVector;
-        min_similarity = _dflt("min_similarity"),
+        min_similarity = toml_default(_TOML_DEFAULTS, "", "min_similarity"),
         # The ENGINE's guided-association overlap gate. 0.5, its tuned value —
         # This gate is what rejects confuser boards (see `guided_search`).
         # Moving it is a tuned-parameter change and wants its own experiment.
@@ -1578,8 +1578,8 @@ so the proxy was removed (2026-08-13) rather than kept as a second, weaker
 knob on the same failure mode.
 """
 Base.@kwdef struct HomographyGeometry{L} <: GeometryConfig
-    outlier_halfwidth::Float64 = _dflt("geometry", "outlier_halfwidth")
-    min_inliers::Int = _dflt("geometry", "min_inliers")
+    outlier_halfwidth::Float64 = toml_default(_TOML_DEFAULTS, "geometry", "outlier_halfwidth")
+    min_inliers::Int = toml_default(_TOML_DEFAULTS, "geometry", "min_inliers")
     # The RANSAC local-optimization strategy (an RVG `AbstractOptimizationStrategy`),
     # selected by tag in the file: `local_optimization_strategy = { type = "student_t_uniform" }`.
     # A type parameter, not an abstract field: the per-board fit loop reads it.
@@ -1635,7 +1635,7 @@ struct PoseGeometry{C, L} <: GeometryConfig
     undistortion::Symbol
 end
 const _UNDISTORTION_POLICIES = (:none, :global)
-# DELIBERATE literals, not _dflt: the pose arm is tuned ONE BELOW the
+# DELIBERATE literals, not configs/default.toml defaults: the pose arm is tuned ONE BELOW the
 # homography arm's `min_inliers` (a calibrated P3P fit is far more constrained
 # than an 8-dof H, so fewer inliers carry the same evidence). It has moved in
 # lockstep with every gate change — 5→6 alongside homography's 6→7 when the
@@ -1692,8 +1692,8 @@ struct RadialHomographyGeometry{L} <: GeometryConfig
 end
 RadialHomographyGeometry(
     image_size;
-    outlier_halfwidth::Float64 = _dflt("geometry", "outlier_halfwidth"),
-    min_inliers::Int = _dflt("geometry", "min_inliers"),
+    outlier_halfwidth::Float64 = toml_default(_TOML_DEFAULTS, "geometry", "outlier_halfwidth"),
+    min_inliers::Int = toml_default(_TOML_DEFAULTS, "geometry", "min_inliers"),
     local_optimization_strategy = _dflt_local_optimization_strategy(:radial_homography)
 ) =
     RadialHomographyGeometry(
@@ -1984,9 +1984,9 @@ Base.@kwdef struct FindBoardsConfig{G <: GeometryConfig, N}
     # paid only by plausible candidates where adaptive stopping usually
     # fires in ~100 trials anyway.
     ransac_config::RansacConfig = RansacConfig(
-        min_trials = _dflt("ransac", "min_trials"),
-        max_trials = _dflt("ransac", "max_trials"),
-        success_prob = _dflt("ransac", "success_prob")
+        min_trials = toml_default(_TOML_DEFAULTS, "ransac", "min_trials"),
+        max_trials = toml_default(_TOML_DEFAULTS, "ransac", "max_trials"),
+        success_prob = toml_default(_TOML_DEFAULTS, "ransac", "success_prob")
     )
     # Base seed for the per-fit RANSAC streams: every board's fit draws from
     # `Xoshiro(ransac_seed ⊻ uid)` (see `board_rng`), so identical inputs give
@@ -1997,14 +1997,14 @@ Base.@kwdef struct FindBoardsConfig{G <: GeometryConfig, N}
     # the 260527 A/B, 2026-08-17). Top-level rather than inside
     # `[find_boards.ransac]`: that table maps 1:1 to RVG's RansacConfig, and
     # the seed is BB's stream-derivation base, not an RVG knob.
-    ransac_seed::Int = Int(_dflt("ransac_seed"))
+    ransac_seed::Int = Int(toml_default(_TOML_DEFAULTS, "", "ransac_seed"))
     # Matching
-    min_similarity::Float64 = _dflt("min_similarity")
+    min_similarity::Float64 = toml_default(_TOML_DEFAULTS, "", "min_similarity")
     # Appearance verification (verify.jl): per-inlier descriptor gate and the
     # minimum corroborated fraction. Mandatory in the accept path — replaced
     # the geometry structs' min_inlier_fraction (2026-08-13).
-    verify_similarity::Float64 = _dflt("verify_similarity")
-    min_appearance_support::Float64 = _dflt("min_appearance_support")
+    verify_similarity::Float64 = toml_default(_TOML_DEFAULTS, "", "verify_similarity")
+    min_appearance_support::Float64 = toml_default(_TOML_DEFAULTS, "", "min_appearance_support")
     # Tracker knobs — [find_boards.track]; every track_boards keyword defaults
     # from here and overrides per call.
     track::TrackConfig = TrackConfig()

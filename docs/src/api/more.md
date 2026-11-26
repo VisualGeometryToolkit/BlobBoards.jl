@@ -20,8 +20,8 @@ Loaded by any Makie backend: `pkg> add BlobBoards CairoMakie`, then
 line.
 
 ```@docs
-board
-board!
+projectedboard
+projectedboard!
 BlobBoards.plot_boards
 BlobBoards.plot_board_poses
 BlobBoards.board_overlay!
@@ -77,7 +77,7 @@ BlobBoards.TrackConfig
 config_dict
 write_config
 read_run_config
-default_config_path
+run_config_path
 data_dir
 BlobDetection
 BlobBoards.BoardObservation

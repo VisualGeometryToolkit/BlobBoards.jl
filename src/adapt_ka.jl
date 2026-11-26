@@ -8,8 +8,8 @@
 # Design (each point audited against the legacy kernels, 2026-08-10):
 #
 # - ONE implementation on every backend: the per-blob kernels below run on
-#   the CPU too (`KA.CPU()`), a blob one workgroup of `_adapt_groupsize`
-#   work items — 256 on a GPU, one on the CPU, where the work item walks its
+#   the CPU too (`KA.CPU()`), a blob one workgroup (`_adapt_exec`, Core's
+#   `OnBackend`) of work items — 256 on a GPU, one on the CPU, where the work item walks its
 #   blob's pixels in scan order (see "The per-blob kernels"). The threaded
 #   host twin of the same math (`_adapt_cpu`) that the CPU used to run is
 #   deleted (2026-11, the 0.9 duplication audit).
@@ -144,7 +144,7 @@ end
 # =============================================================================
 #
 # ONE implementation: the same kernels run on the CPU (`KA.CPU()`) and on any
-# GPU backend. A blob is one workgroup of `_adapt_groupsize(backend)` work
+# GPU backend. A blob is one workgroup (`_adapt_exec(backend)`) of work
 # items: 256 on a GPU (the pixel loops strided over the group, group-shared
 # reductions and a bitonic sort), ONE on the CPU, where the workgroup is a
 # single work item that walks its blob's pixels in scan order and the
@@ -168,14 +168,10 @@ end
 # The reductions guard `tid + s ≤ nt`, so a group smaller than the 256-slot
 # shared buffers reads no slot nobody wrote.
 
-"""
-    _adapt_groupsize(backend) -> Int
-
-Work items per blob of the adaptation kernels: 256 on a GPU backend, one on
-the CPU (see "The per-blob kernels" in src/adapt_ka.jl).
-"""
-_adapt_groupsize(::KA.Backend) = 256
-_adapt_groupsize(::KA.CPU) = 1
+# The launch policy of the adaptation kernels on `backend`, Core's `OnBackend`: a workgroup of 256 work items per
+# blob on a GPU, one on the host (`host_workgroupsize`). Each launch's ndrange is that group size times the blob
+# count, read back from the policy (`exec.workgroupsize`), so the size is stated once.
+_adapt_exec(backend::KA.Backend) = VgtkCore.OnBackend(backend; workgroupsize = 256, host_workgroupsize = 1)
 
 # A blob's pixel count and flat-buffer base; no pixels for a blob that is
 # not live (invalid, or — where `converged` is given — converged).
@@ -608,7 +604,7 @@ const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_
 # The outcome record of one blob, in VisualGeometryToolkitCore's termination
 # vocabulary (§14). Converged (rtol on the relative parameter step) and capped
 # are the reweighted fits' one record, VisualGeometryToolkitEstimation's
-# `irls_termination`: Success / IncrementSize and MaxIters / IterationCap. A
+# `irls_retcode` and `irls_stop_rule`: Success / IncrementSize and MaxIters / IterationCap. A
 # singular solve only invalidates its blob (no frame), so its record is not used.
 # Refused by the shape gate is BlobBoards' own (no stack form): Failure /
 # ShapeGate, or InitialFailure when the very first step from the seed was
@@ -616,8 +612,9 @@ const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_
 function _blob_outcome(state::Int32, initial::Bool)
     RC = VgtkCore.ReturnCode
     if state == _ADAPT_CONVERGED || state == Int32(0)    # converged, or capped at max_irls_iter
-        retcode, stop_rule = VgtkEstimation.irls_termination(state == _ADAPT_CONVERGED, false)
-        return (; retcode, stop_rule, rejection = :none)
+        converged = state == _ADAPT_CONVERGED
+        return (; retcode = VgtkEstimation.irls_retcode(converged, false), stop_rule = VgtkEstimation.irls_stop_rule(converged, false),
+                  rejection = :none)
     end
     return (; retcode = initial ? RC.InitialFailure : RC.Failure, stop_rule = VgtkCore.ShapeGate, rejection = _REJECTION[state])
 end
@@ -787,7 +784,8 @@ function _adapt_ka(
     # CUDA/CPU (identical to the legacy kernels), Float32 on Metal.
     Ta = KA.supports_float64(device) ? Float64 : Float32
     lgamma_f = lgamma_lanczos
-    gs = _adapt_groupsize(device)
+    exec = _adapt_exec(device)
+    gs = exec.workgroupsize
 
     cutoff = cfg.cutoff
     max_irls_iter = cfg.max_irls_iter
@@ -855,7 +853,7 @@ function _adapt_ka(
     d_bg = KA.zeros(device, Ta, N)
     KA.synchronize(device)
 
-    _scan_ka!(device, gs)(
+    exec(_scan_ka!)(
         d_A, d_f_obs, d_v, d_cnt, d_bg,
         d_img, d_cx, d_cy, d_hw, d_spacing, d_valid, d_offsets,
         Int32(H), Int32(W), Ta(sat[1]), Ta(sat[2]), Ta(cfg.min_intensity);
@@ -877,7 +875,7 @@ function _adapt_ka(
 
     # --- θ₀ seed (host, cheap); per-blob max(f_obs) reduced on device ---
     d_maxf = KA.zeros(device, Ta, N)
-    _segmented_maxf_ka!(device, gs)(
+    exec(_segmented_maxf_ka!)(
         d_maxf, d_f_obs, d_cnt, d_valid_live, d_offsets; ndrange = gs * N
     )
     KA.synchronize(device)
@@ -912,15 +910,15 @@ function _adapt_ka(
     KA.synchronize(device)
 
     # --- Initial residuals + fused sort/median/sweep + initial weights ---
-    _residuals_ka!(device, gs)(
+    exec(_residuals_ka!)(
         d_r2, d_A, d_v, d_theta, d_bg, d_cnt, d_valid_live, d_offsets;
         ndrange = gs * N
     )
-    _sort_sweep_ka!(device, gs)(
+    exec(_sort_sweep_ka!)(
         d_nu, d_s_hat_sq, d_ohw, d_r2, d_np, d_cnt, d_valid_live, d_offsets,
         on_device(device, Ta.(log_gamma_table(Int(_SORT_PADDED), 1; alpha0 = 0.0))); ndrange = gs * N
     )
-    _soft_weights_ka!(device, gs)(
+    exec(_soft_weights_ka!)(
         d_w, d_pin, d_r2, d_A, d_theta, d_nu, d_s_hat_sq, d_ohw,
         d_cnt, d_valid_live, d_offsets, spatial_weighting, lgamma_f;
         ndrange = gs * N
@@ -934,7 +932,7 @@ function _adapt_ka(
 
         d_AtWA .= zero(Ta)
         d_AtWz .= zero(Ta)
-        _accumulate_ka!(device, gs)(
+        exec(_accumulate_ka!)(
             d_AtWA, d_AtWz, d_A, d_v, d_w, d_bg,
             d_cnt, d_valid_live, d_offsets, d_np, d_converged;
             ndrange = gs * N
@@ -951,7 +949,7 @@ function _adapt_ka(
             ndrange = 256 * cld(N, 256)
         )
 
-        _fused_ka!(device, gs)(
+        exec(_fused_ka!)(
             d_r2, d_w, d_pin, d_s_hat_sq, d_nu,
             d_A, d_v, d_theta, d_bg, d_ohw,
             d_cnt, d_valid_live, d_offsets, spatial_weighting,

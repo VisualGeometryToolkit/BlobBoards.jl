@@ -95,8 +95,8 @@ Parameterized on the NMS config type `N` (`Nothing`, `MxmNms`, or
 `EllipseNms`) so the field stays concrete rather than an abstract union.
 """
 Base.@kwdef struct DetectConfig{N}
-    peak_threshold::Float64 = _dflt("detect", "peak_threshold")
-    edge_threshold::Float64 = _dflt("detect", "edge_threshold")
+    peak_threshold::Float64 = toml_default(_TOML_DEFAULTS, "detect", "peak_threshold")
+    edge_threshold::Float64 = toml_default(_TOML_DEFAULTS, "detect", "edge_threshold")
     polarity::Symbol = :dark
     # NB: there is no `nms_mode`. It selected 2D-vs-3D scale-space extremum
     # suppression in VGF's retired WORKSPACE pipeline; detection now routes
@@ -115,7 +115,7 @@ Base.@kwdef struct DetectConfig{N}
     # more detections than a wider footprint. It equals DEFAULT_CUTOFF by
     # coincidence — deriving it from the constant would let a future change to
     # the boundary convention silently re-tune the detector.
-    nms::N = let n = _dflt("detect", "nms")
+    nms::N = let n = toml_default(_TOML_DEFAULTS, "detect", "nms")
         # Three-way, mirroring the loader's NMS_TAGS — the file format admits
         # "none", and the old two-way branch indexed n["window_half"] for it,
         # a KeyError at precompile time.
@@ -146,9 +146,9 @@ Base.@kwdef struct DetectConfig{N}
     # ladder: interior slices s = 1 … S of octave o have
     # σ = seed_sigma·2^((s + 0.5)/S)·2^o (Features' extraction searches no
     # boundary slice), so these two set the finest and coarsest scales found.
-    upsample::Int = _dflt("detect", "upsample")
-    nb_scales::Int = _dflt("detect", "nb_scales")
-    nb_octaves::Int = _dflt("detect", "nb_octaves")   # 0: Features' default
+    upsample::Int = toml_default(_TOML_DEFAULTS, "detect", "upsample")
+    nb_scales::Int = toml_default(_TOML_DEFAULTS, "detect", "nb_scales")
+    nb_octaves::Int = toml_default(_TOML_DEFAULTS, "detect", "nb_octaves")   # 0: Features' default
 end
 
 """
@@ -169,9 +169,9 @@ tracking run's sidecar could not name them.
   disables periodic discovery after frame 1.
 """
 Base.@kwdef struct TrackConfig
-    iou_threshold::Float64 = _dflt("track", "iou_threshold")
-    support_fraction::Float64 = _dflt("track", "support_fraction")
-    patience::Int = Int(_dflt("track", "patience"))
-    keyframe_every::Int = Int(_dflt("track", "keyframe_every"))
+    iou_threshold::Float64 = toml_default(_TOML_DEFAULTS, "track", "iou_threshold")
+    support_fraction::Float64 = toml_default(_TOML_DEFAULTS, "track", "support_fraction")
+    patience::Int = Int(toml_default(_TOML_DEFAULTS, "track", "patience"))
+    keyframe_every::Int = Int(toml_default(_TOML_DEFAULTS, "track", "keyframe_every"))
 end
 

@@ -441,8 +441,8 @@ function suggest_blob_sizes(density, extent)
         ArgumentError("suggest_blob_sizes takes a printer's density first, e.g. suggest_blob_sizes(600dpi, \"A4\"); got $(repr(density))")
     )
     w, h = _board_extent(extent)
-    smallest = _board_dflt("min_blob_diameter_mm") * (_board_dflt("min_blob_reference_dpi") / ustrip(dpi, density))
-    largest = min(_pattern_dflt("max_blob_fraction") * min(w, h), _board_dflt("max_blob_diameter_mm"))
+    smallest = toml_default(_AUTHORING_DEFAULTS, "blob_board", "min_blob_diameter_mm") * (toml_default(_AUTHORING_DEFAULTS, "blob_board", "min_blob_reference_dpi") / ustrip(dpi, density))
+    largest = min(toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "max_blob_fraction") * min(w, h), toml_default(_AUTHORING_DEFAULTS, "blob_board", "max_blob_diameter_mm"))
     return (smallest * mm, largest * mm)
 end
 
@@ -463,7 +463,7 @@ _diameter_factor(cutoff::Float64) = 2 * cutoff
 
 # The default largest blob when `blob_sizes` gives no max: a disc whose DIAMETER is
 # 20% of the short side (v1's `max_diameter_fraction = 0.2`).
-const DEFAULT_MAX_BLOB = _pattern_dflt("max_blob_fraction") * short_side
+const DEFAULT_MAX_BLOB = toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "max_blob_fraction") * short_side
 
 # The smallest σ the placement accepts (`calc_blob_scales`), in px.
 const MIN_SIGMA_PX = 2.0
@@ -503,7 +503,7 @@ function _resolve_blob_sizes(
             "$fname: `blob_sizes = (min, max)` is required — the smallest and largest printed disc " *
                 "diameters, e.g. blob_sizes = suggest_blob_sizes(600dpi, \"A4\") for a 600 dpi printer " *
                 "and the default A4 board (6 mm … $(_short_number(100 * DEFAULT_MAX_BLOB.fraction))% of the board's " *
-                "shorter side, at most $(_short_number(_board_dflt("max_blob_diameter_mm"))) mm)"
+                "shorter side, at most $(_short_number(toml_default(_AUTHORING_DEFAULTS, "blob_board", "max_blob_diameter_mm"))) mm)"
         )
     )
     sizes = get(() -> (factor * default_min_sigma, nothing), kw, :blob_sizes)
@@ -537,7 +537,7 @@ function _resolve_blob_sizes(
             ArgumentError(
                 "$fname: the largest blob cannot be `nothing` — give blob_sizes[2] as a length " *
                     "(`suggest_blob_sizes(density, extent)[2]`: $(_short_number(100 * DEFAULT_MAX_BLOB.fraction))% of the " *
-                    "board's shorter side, at most $(_short_number(_board_dflt("max_blob_diameter_mm"))) mm) or as `0.2short_side`"
+                    "board's shorter side, at most $(_short_number(toml_default(_AUTHORING_DEFAULTS, "blob_board", "max_blob_diameter_mm"))) mm) or as `0.2short_side`"
             )
         )
         DEFAULT_MAX_BLOB.fraction * short / factor
@@ -580,7 +580,7 @@ scales are exactly `min_scale · 2^(i / scales_per_octave)`. Unitless px.
 `min_sigma` is the smallest `min_scale` accepted (2 px, the rendering floor).
 """
 function calc_blob_scales(
-        min_scale::Real, max_scale::Real; scales_per_octave::Int = _pattern_dflt("scales_per_octave"), min_sigma::Real = MIN_SIGMA_PX
+        min_scale::Real, max_scale::Real; scales_per_octave::Int = toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "scales_per_octave"), min_sigma::Real = MIN_SIGMA_PX
     )
     scales_per_octave > 0 || throw(ArgumentError("scales_per_octave ($scales_per_octave) must be positive"))
     min_scale >= min_sigma || throw(
@@ -601,7 +601,7 @@ function calc_blob_scales(
 end
 
 function calc_scale_counts(
-        pattern_size::Size2, scales; α = Float64(_pattern_dflt("alpha")), cutoff::Float64,
+        pattern_size::Size2, scales; α = Float64(toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "alpha")), cutoff::Float64,
         free_area = VgtkCore.area(pattern_size)
     )
     isempty(scales) && throw(ArgumentError("Empty candidate scale list; check blob scale parameters (see calc_blob_scales diagnostics)."))

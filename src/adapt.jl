@@ -49,21 +49,21 @@ it (Float32 on Metal); per-pixel staging is pinned Float32.
 (`store` was deleted 2026-09: inert since the KA port — no kernel read it.)
 """
 Base.@kwdef struct AdaptConfig
-    spatial_weighting::Bool = _dflt("adapt", "spatial_weighting")
+    spatial_weighting::Bool = toml_default(_TOML_DEFAULTS, "adapt", "spatial_weighting")
     # DATA, not configuration: the printed blob's boundary in units of sigma.
     # `find_boards` overrides it from the gallery (`_shared_image_cutoff`), so
     # the scan window, the clip test and the canonicalization extent cannot
     # disagree. This default serves only the gallery-less callers (`adapt` used
     # directly, `annotate_blobs`). NOT a TOML key — tune `scan_padding` instead.
     cutoff::Float64 = DEFAULT_CUTOFF
-    max_irls_iter::Int = _dflt("adapt", "max_irls_iter")
-    rtol::Float64 = _dflt("adapt", "rtol")
-    min_intensity::Float64 = _dflt("adapt", "min_intensity")
-    max_scale_fraction::Float64 = _dflt("adapt", "max_scale_fraction")
-    max_scale_ratio::Float64 = _dflt("adapt", "max_scale_ratio")
-    scan_padding::Float64 = _dflt("adapt", "scan_padding")
-    max_clip_ratio::Float64 = _dflt("adapt", "max_clip_ratio")
-    max_aspect_ratio::Float64 = _dflt("adapt", "max_aspect_ratio")
+    max_irls_iter::Int = toml_default(_TOML_DEFAULTS, "adapt", "max_irls_iter")
+    rtol::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "rtol")
+    min_intensity::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "min_intensity")
+    max_scale_fraction::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_scale_fraction")
+    max_scale_ratio::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_scale_ratio")
+    scan_padding::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "scan_padding")
+    max_clip_ratio::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_clip_ratio")
+    max_aspect_ratio::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_aspect_ratio")
 end
 
 # =============================================================================
@@ -177,10 +177,10 @@ function filter_blobs(
         frames, detections;
         cutoff = DEFAULT_CUTOFF,
         image = nothing,
-        max_aspect_ratio = _dflt("adapt", "max_aspect_ratio"),
-        max_scale_ratio = _dflt("adapt", "max_scale_ratio"),
+        max_aspect_ratio = toml_default(_TOML_DEFAULTS, "adapt", "max_aspect_ratio"),
+        max_scale_ratio = toml_default(_TOML_DEFAULTS, "adapt", "max_scale_ratio"),
         max_center_drift = 10.0,
-        max_clip_ratio = _dflt("adapt", "max_clip_ratio")
+        max_clip_ratio = toml_default(_TOML_DEFAULTS, "adapt", "max_clip_ratio")
     )
     image_rect = image !== nothing ? Rect(Size2(image)) : nothing
 

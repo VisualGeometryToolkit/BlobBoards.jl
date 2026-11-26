@@ -12,9 +12,9 @@ module BlobBoardsMakieExt
 using Makie: Makie
 using BlobBoards
 using BlobBoards: PipelineTrace
-# `board` and `board!` are NOT imported: the `@recipe` in
-# makie/board_overlay_recipe.jl defines this module's own `board(args...; kw...)`
-# and `board!(args...; kw...)`, and the core's functions of those names forward
+# `projectedboard` and `projectedboard!` are NOT imported: the `@recipe` in
+# makie/board_overlay_recipe.jl defines this module's own `projectedboard(args...; kw...)`
+# and `projectedboard!(args...; kw...)`, and the core's functions of those names forward
 # to them (src/authoring_stubs.jl). A recipe method on the core's function would
 # overwrite the core's fallback of the same signature, which precompilation refuses.
 import BlobBoards: inspect_pipeline, plot_annotations, plot_boards, plot_board_poses, plot_tracks, replay
@@ -175,7 +175,7 @@ end
     plot_boards(camera, results, board_bundles, img; n = min(10, length(results)))
 
 Figure with one panel per accepted `find_boards` result: the image with the
-board's world rect + blobs projected through the estimated model (`board!`
+board's world rect + blobs projected through the estimated model (`projectedboard!`
 recipe). `camera === nothing` for the homography path; for the pose path supply
 the PINHOLE camera and the UNDISTORTED image (poses live in undistorted-image
 coordinates). Backend-agnostic — display via GLMakie or export via CairoMakie.
@@ -369,11 +369,11 @@ function inspect_pipeline(trace::PipelineTrace; region = nothing)
 end
 
 # Verified boards: each accepted model reprojects its world Rect + blobs into
-# the image via `board!`, with inlier correspondences drawn by `matches!` —
+# the image via `projectedboard!`, with inlier correspondences drawn by `matches!` —
 # the same primitives examples/pipeline/find_boards.jl uses, so this panel and
 # the example agree by construction.
 #
-# Both paths hand `board!` a 2D->2D homography composition, the mapping its
+# Both paths hand `projectedboard!` a 2D->2D homography composition, the mapping its
 # recipe is actually exercised with. `_project_shape` nominally also accepts a
 # `PosedCamera`, but supplying one blows the stack inside Makie's argument pipeline —
 # that path appears never to have been used.
@@ -466,7 +466,7 @@ _board_proj(::Nothing, m::VgtkCore.RadialCamera; lens::Bool = true) = throw(
     )
 )
 
-# The `board!` recipe takes its mapping as a PLOT ARGUMENT, and Makie's argument
+# The `projectedboard!` recipe takes its mapping as a PLOT ARGUMENT, and Makie's argument
 # pipeline recurses into it — anything holding a `PosedCamera` blows the stack there
 # (the note at `_board_proj` above records the same for a bare `PosedCamera`, and
 # `CameraBoardProj` hits it identically). So the camera path draws the two
@@ -494,7 +494,7 @@ function _draw_board!(
     return ax
 end
 # every other mapping is a plain 2D→2D composition the recipe handles
-_draw_board!(ax, proj, rect, blobs; kwargs...) = board!(ax, proj, rect, blobs; kwargs...)
+_draw_board!(ax, proj, rect, blobs; kwargs...) = projectedboard!(ax, proj, rect, blobs; kwargs...)
 
 # Board geometry is planar: lift each world POSITION onto z = 0 as a `Point3`
 # (positions are Points, displacements are Vecs) before projecting.

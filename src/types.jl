@@ -26,7 +26,7 @@ Type alias for a `Detection` with an `EllipticFrame` and metadata containing:
     convergence is `successful_retcode(det.retcode)`, §14, not a field of its own), `MaxIters` (capped at
     `max_irls_iter`: unconverged), `Failure` (the shape gate refused a step:
     rejected), `InitialFailure` (it refused the first step from the seed);
-  - `stop_rule::StopRule` — `IncrementSize` (the IRLS step below `rtol`, Estimation's `irls_termination`), `IterationCap` or `ShapeGate`;
+  - `stop_rule::StopRule` — `IncrementSize` (the IRLS step below `rtol`, Estimation's `irls_stop_rule`), `IterationCap` or `ShapeGate`;
   - `rejection::Symbol` — why the shape gate refused: `:not_peak` (the fitted
     paraboloid is not concave) or `:aspect_ratio` (beyond `max_aspect_ratio`);
     `:none` otherwise.
@@ -186,12 +186,12 @@ struct PatternConfig{U <: Quantity, U2, PT}
             seed::Integer = rand(RandomDevice(), UInt64),
             pixel_type::Type{PT} = Gray{N0f8},
             max_scale = nothing,
-            scales_per_octave::Int = _pattern_dflt("scales_per_octave"),
-            max_trials::Int = _pattern_dflt("max_trials"),
-            α::Float64 = Float64(_pattern_dflt("alpha")),
+            scales_per_octave::Int = toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "scales_per_octave"),
+            max_trials::Int = toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "max_trials"),
+            α::Float64 = Float64(toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "alpha")),
             cutoff::Float64 = DEFAULT_CUTOFF,
             raster_aligned::Bool = true,
-            polarity::Symbol = Symbol(_pattern_dflt("polarity"))
+            polarity::Symbol = Symbol(toml_default(_AUTHORING_DEFAULTS, "blob_pattern", "polarity"))
         ) where {PT}
 
 
@@ -570,7 +570,7 @@ end
 # The white margin the default board leaves on every side of the page (see
 # `BoardConfig`): clears printers' unprintable borders (≤ 6.35 mm) and leaves
 # room for the id label under the board.
-const DEFAULT_BOARD_MARGIN = _board_dflt("margin_mm") * mm
+const DEFAULT_BOARD_MARGIN = toml_default(_AUTHORING_DEFAULTS, "blob_board", "margin_mm") * mm
 
 # A board is centred on its canvas: its margin is a `Size2` — `width` the
 # margin left and right of it, `height` above and below — and the board is the
@@ -596,13 +596,13 @@ _default_board_size(canvas_size::Size2) =
 # they hold the ruler ticks, the uid glyphs and the identity QR code, none of
 # which grows with the board (the band was 7.5 % of the page's longer side until
 # 2026-10: 22 mm on A4, 89 mm on A0).
-const DEFAULT_RULER_WIDTH = _board_dflt("ruler_width_mm") * mm
+const DEFAULT_RULER_WIDTH = toml_default(_AUTHORING_DEFAULTS, "blob_board", "ruler_width_mm") * mm
 # The corner cells' side: the QR code top-left, a uid character in each other corner.
-const DEFAULT_CORNER_SIZE = _board_dflt("corner_size_mm") * mm
+const DEFAULT_CORNER_SIZE = toml_default(_AUTHORING_DEFAULTS, "blob_board", "corner_size_mm") * mm
 # The smallest disc any board may have (`_board_preamble`).
-const MIN_PRINTABLE_DISC = _board_dflt("min_printable_disc_mm") * mm
+const MIN_PRINTABLE_DISC = toml_default(_AUTHORING_DEFAULTS, "blob_board", "min_printable_disc_mm") * mm
 # The most placement trials per blob size a board may ask for (`_board_preamble`).
-const MAX_TRIALS_LIMIT = Int(_board_dflt("max_trials_limit"))
+const MAX_TRIALS_LIMIT = Int(toml_default(_AUTHORING_DEFAULTS, "blob_board", "max_trials_limit"))
 
 # The frame's fields, its keyword values given or `nothing`. On a point-grid
 # (v4) board each mark is switched by its size: `corner_size` (the corner
@@ -624,10 +624,10 @@ function _frame_fields(
     # (zero while the ruler is off: a TOML default the sheet does not draw would
     # still enter the identity, and a later edit of it break every such board)
     ticked = ruled || grid isa PixelGrid
-    major_s = something(major_tick_spacing, ticked ? _board_dflt("major_tick_spacing_mm") * mm : zero(rw))
-    minor_s = something(minor_tick_spacing, ticked ? _board_dflt("minor_tick_spacing_mm") * mm : zero(rw))
+    major_s = something(major_tick_spacing, ticked ? toml_default(_AUTHORING_DEFAULTS, "blob_board", "major_tick_spacing_mm") * mm : zero(rw))
+    minor_s = something(minor_tick_spacing, ticked ? toml_default(_AUTHORING_DEFAULTS, "blob_board", "minor_tick_spacing_mm") * mm : zero(rw))
     major_w = something(major_tick_width, ruled ? rw - 2 * padding : zero(rw))
-    minor_w = something(minor_tick_width, ruled ? _board_dflt("minor_tick_fraction") * major_w : zero(rw))
+    minor_w = something(minor_tick_width, ruled ? toml_default(_AUTHORING_DEFAULTS, "blob_board", "minor_tick_fraction") * major_w : zero(rw))
     return rw, cs, major_s, minor_s, major_w, minor_w
 end
 
@@ -681,7 +681,7 @@ struct BoardConfig{L <: Quantity, G <: LayoutGrid, F <: Quantity, P <: Quantity,
             # `nothing`: not given (`_frame_fields`)
             ruler_width = nothing,
             corner_size = nothing,
-            frame_padding = _board_dflt("frame_padding_mm") * mm,
+            frame_padding = toml_default(_AUTHORING_DEFAULTS, "blob_board", "frame_padding_mm") * mm,
             major_tick_spacing = nothing,
             minor_tick_spacing = nothing,
             major_tick_width = nothing,

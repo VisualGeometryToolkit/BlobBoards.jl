@@ -87,7 +87,7 @@ function plot_results(img, results, board_bundles, cam, label; n = min(10, lengt
         ax, _ = imshow(fig[r, c], img; title = "$uid  q=$(round(quality; digits = 1))  n=$n_inl")
         proj = PerspectiveMap() ∘ HomographyMap(_to_homography(model, cam))
         bundle = board_bundles[uid]
-        board!(ax, proj, Rect(bundle, :world), blobs(bundle, :world); cutoff = cutoff(bundle))
+        projectedboard!(ax, proj, Rect(bundle, :world), blobs(bundle, :world); cutoff = cutoff(bundle))
         proj_pts = Point2f.(proj.(Point2.(centroid.(sources(scored)))))
         det_pts = Point2f.(centroid.(targets(scored)))
         matches!(ax, proj_pts, det_pts; weights = scored.weights)

@@ -3,8 +3,8 @@
 # file or retired pattern restated. Run over the package and its repository (the
 # stack repositories named in VGTK_STACK_PATHS too, when set).
 #
-# Names an upstream package owns for ANOTHER concept are DUPLICATION.toml entries,
-# each with its proof (the owner's ruling). OPEN: the findings below wait for a hoist into the stack or an owner's API
+# The repository has no DUPLICATION.toml: no exception of any kind (owner, 2026-11-26: zero exemptions stack-wide;
+# every duplicate is hoisted into its one owner). OPEN: the findings below wait for a hoist into the stack or an owner's API
 # decision, each an open item of .release/duplication-checklist.md. The list only
 # shrinks: a finding not on it fails, and so does an entry that no longer finds
 # anything (delete it when its item closes). The release leg refuses while the
@@ -29,6 +29,5 @@ foreach(v -> _key(v) in OPEN || println(stderr, v), found)
 @test isempty(found)
 
 # No call splats a collection whose length is data (VisualGeometryToolkitCore's `check_splat`, every method of the
-# package and its loaded extensions inferred at its own signature); the reasoned exceptions are DUPLICATION.toml's
-# `[[splat]]` entries.
+# package and its loaded extensions inferred at its own signature); no exception (no DUPLICATION.toml).
 VgtkCore.test_splat(BlobBoards)
