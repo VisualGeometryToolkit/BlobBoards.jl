@@ -37,7 +37,7 @@
 # derives the radius from the half-width and the solve's own residual scale.
 #
 # They need fitting because the detection-stage E-step holds the inlier prior
-# at ½ (the soft posterior's default `inlier_prior`, `mixture_ecm!`'s; it is not estimated
+# at ½ (the soft posterior's default `inlier_prior`; `update_inlier_prior!` is not run, so it is not estimated
 # here), so the half-width is the ONLY knob setting the inlier/outlier balance. The scale and nu ARE fitted (VisualGeometryToolkitCore's
 # `update_scale!` writes the scale, `update_nu!` the nu, each its own M-step),
 # which is why those are absent here.

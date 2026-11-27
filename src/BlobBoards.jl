@@ -207,7 +207,7 @@ include("board_output.jl") # Pdf / Tiff / Png — what a board is written as
 include("io.jl")           # File I/O: JSON sidecars + loading (figure export in authoring/)
 include("migrate_boards.jl")   # the retired {value, unit} schemas: vgio_migrate's migrate_schema methods for boards and patterns
 include("board_code.jl")   # board_code / parse_board_code — the definition a board's QR carries
-include("authoring_stubs.jl")  # blob_board/rebuild_board/render_board docs (authoring/); board! etc. (MakieExt)
+include("authoring_stubs.jl")  # blob_board/rebuild_board/render_board docs (authoring/); projectedboard! etc. (MakieExt)
 include("media.jl")        # media enumeration: walk/probe/group by resolution
 include("device.jl")        # default_device() — GPU when one is functional
 include("detect_config.jl")   # DetectConfig + Mxm/EllipseNms types

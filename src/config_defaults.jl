@@ -28,7 +28,7 @@
 # notice — the exact invisible-drift class this file exists to remove.
 # =============================================================================
 
-using VisualGeometryToolkitCore: toml_default, parse_defaults, ConfigVersions, ConfigMigration, migrate_config
+using VisualGeometryToolkitCore: toml_default, parse_defaults, ConfigVersions, ConfigMigration, migrate_config, unbounded_from_toml
 
 # Every default is `toml_default(_TOML_DEFAULTS, table, key)` (`table = ""` for a key of `[find_boards]` itself)
 # or `toml_default(_AUTHORING_DEFAULTS, table, key)`: Core's one parser (`parse_defaults`: the file, and its
@@ -95,14 +95,9 @@ const DEFAULT_CUTOFF = Float64(toml_default(_AUTHORING_DEFAULTS, "blob_pattern",
 # These mirror the loader's converters in config_toml.jl. They live here
 # because the structs are defined before that file is included.
 
-# "unbounded" ⇒ no cap (TOML integers are 64-bit signed; the literal
-# round-trips confusingly, so the file spells it). ONE converter for the
-# @kwdef defaults AND the loader — the pair had drifted (any string was
-# uncapped here, strict there; a typo'd default.toml now fails loudly).
-_max_detections(v::AbstractString) = v == "unbounded" ? typemax(Int) :
-    throw(ArgumentError("max_detections must be an integer or \"unbounded\", got $(repr(v))"))
-_max_detections(v::Integer) = Int(v)
-_dflt_max_detections() = _max_detections(toml_default(_TOML_DEFAULTS, "", "max_detections"))
+# "unbounded" ⇒ no cap: VisualGeometryToolkitCore's one TOML encoding of an uncapped count (`toml_unbounded`,
+# `unbounded_from_toml`), for the @kwdef default AND the loader (a typo'd default.toml fails loudly, naming the key).
+_dflt_max_detections() = unbounded_from_toml(toml_default(_TOML_DEFAULTS, "", "max_detections"), "max_detections")
 
 # Empty list ⇒ the IMAS-25 schedule, and the EMPTY VECTOR carries that meaning
 # all the way through: the TOML already spells it `tilts = []`, so translating

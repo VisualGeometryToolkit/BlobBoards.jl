@@ -48,7 +48,8 @@ using TOML: TOML
 # lookup and the sorted writer. What stays here is BlobBoards': the retired-key
 # set, the tag registries and the hook methods for its own types.
 using VisualGeometryToolkitCore: present_kwargs, check_keys, toml_table, read_table,
-    allowed_keys, write_toml, TagRegistry, tag_of, CONFIG_VERSION_KEY, CONFIG_VERSIONS_KEY, current_config_version, ConfigVersions
+    allowed_keys, write_toml, TagRegistry, tag_of, CONFIG_VERSION_KEY, CONFIG_VERSIONS_KEY, current_config_version, ConfigVersions,
+    toml_unbounded
 import VisualGeometryToolkitCore: toml_skip_fields, toml_field
 # A run configuration's TOML table is VisualGeometryToolkitEstimation's `config_dict`
 # (one of its CONTRACT_GENERICS): BlobBoards adds the methods of its configs.
@@ -470,7 +471,7 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
             ), camera, image_size
         ),
         max_detections = haskey(fb, "max_detections") ?
-            _max_detections(fb["max_detections"]) : _dflt_max_detections(),
+            unbounded_from_toml(fb["max_detections"], "max_detections") : _dflt_max_detections(),
         # Scalar knobs via present_kwargs: an absent key falls through to the
         # struct's @kwdef default (the ONE default authority — see above).
         present_kwargs(
@@ -509,8 +510,7 @@ toml_skip_fields(::Type{<:DetectConfig}) = (:polarity,)  # derived from the bund
 toml_skip_fields(::Type{<:AdaptConfig}) = (:cutoff,)     # data, from the gallery
 
 # Per-field overrides for the four non-mechanical cases.
-toml_field(c::FindBoardsConfig, ::Val{:max_detections}) =
-    c.max_detections == typemax(Int) ? "unbounded" : c.max_detections
+toml_field(c::FindBoardsConfig, ::Val{:max_detections}) = toml_unbounded(c.max_detections)
 toml_field(c::FindBoardsConfig, ::Val{:detect}) = toml_table(c.detect)
 toml_field(c::FindBoardsConfig, ::Val{:adapt}) = toml_table(c.adapt)
 toml_field(c::FindBoardsConfig, ::Val{:geometry}) = _geometry_toml(c.geometry)
@@ -589,7 +589,7 @@ and each delegated owner's under `[config_versions]`, as [`read_run_config`](@re
 round-trips through [`FindBoardsConfig(path)`](@ref) — which the test suite asserts — so a
 config recorded beside an artifact reproduces the run that made it.
 
-`max_detections = typemax(Int)` is emitted as the string `"unbounded"`, since
+`max_detections = typemax(Int)` is emitted as the string `"unbounded"` (VisualGeometryToolkitCore's `toml_unbounded`), since
 TOML integers are 64-bit signed and the literal round-trips confusingly.
 """
 function write_config(path::AbstractString, config; extra::AbstractDict = Dict{String, Any}(),
