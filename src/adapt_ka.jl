@@ -589,7 +589,7 @@ end
 end
 
 # A blob's IRLS state in `d_converged` (Int32): 0 live, `_ADAPT_CONVERGED`
-# when the relative step fell below `rtol`, `_ADAPT_NOT_PEAK` /
+# when Core's `StopWhenIncrementLess(rtol)` stopped it (the relative step below `rtol`), `_ADAPT_NOT_PEAK` /
 # `_ADAPT_ASPECT_RATIO` when the shape gate refused the step (the blob keeps
 # its previous iterate). Every kernel reads "live" as `== 0`, so each stop ends
 # the blob's iterations. A blob still live after `max_irls_iter` was capped.
@@ -621,14 +621,14 @@ end
 
 # Apply solution + convergence/validity check — one thread per blob.
 # Mirrors legacy: LU failure invalidates; !is_peak or aspect violation
-# reverts to θ_old and stops; otherwise apply + rtol convergence check.
+# reverts to θ_old and stops; otherwise apply + the convergence check, Core's
+# `StopWhenIncrementLess(rtol)` (`increment`, isbits, `rtol` at the accumulation precision).
 @kernel inbounds = true unsafe_indices = true function _apply_check_ka!(
         theta, @Const(theta_old), @Const(AtWz), @Const(info), valid, converged,
-        @Const(np), rtol, max_aspect_ratio
+        @Const(np), increment, max_aspect_ratio
     )
     blob = @index(Global, Linear)
     if blob <= size(theta, 2) && valid[blob] && converged[blob] == Int32(0)
-        Ta = eltype(theta)
         if info[blob] != Int32(0)
             valid[blob] = false
         else
@@ -645,16 +645,10 @@ end
                 for j in 1:6
                     theta[j, blob] = θ[j]
                 end
-                diff_sq = zero(Ta)
-                norm_sq = zero(Ta)
-                for j in 1:Int(m)
-                    d = theta[j, blob] - theta_old[j, blob]
-                    diff_sq += d * d
-                    norm_sq += theta[j, blob] * theta[j, blob]
-                end
-                if sqrt(diff_sq) / (sqrt(norm_sq) + Ta(1.0e-300)) < rtol
-                    converged[blob] = _ADAPT_CONVERGED
-                end
+                # Core's increment test on the blob's m model parameters (no state, method or problem read)
+                VgtkCore.stop_reason(increment, nothing, nothing, nothing, view(theta, 1:Int(m), blob),
+                                     view(theta_old, 1:Int(m), blob), 0) === VgtkCore.CONTINUE ||
+                    (converged[blob] = _ADAPT_CONVERGED)
             end
         end
     end
@@ -945,7 +939,7 @@ function _adapt_ka(
 
         _apply_check_ka!(device, 256)(
             d_theta, d_theta_old, d_AtWz, d_info, d_valid_live, d_converged,
-            d_np, Ta(cfg.rtol), Ta(cfg.max_aspect_ratio);
+            d_np, VgtkCore.StopWhenIncrementLess(Ta(cfg.rtol)), Ta(cfg.max_aspect_ratio);
             ndrange = 256 * cld(N, 256)
         )
 

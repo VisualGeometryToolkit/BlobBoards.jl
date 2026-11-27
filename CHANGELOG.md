@@ -86,6 +86,9 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   workgroupsize = 256, host_workgroupsize = 1)` (was `_adapt_groupsize`); the training gallery's ONNX provider is
   `KernelAbstractions.isgpu(device) ? :cuda : :cpu` (was `_execution_provider`). `adapt`'s per-blob record is
   Estimation's `irls_retcode` and `irls_stop_rule` (was `irls_termination`). Same values, bit for bit on the CPU.
+- `adapt`'s per-blob convergence test is VisualGeometryToolkitCore's `StopWhenIncrementLess(rtol)` (Core 0.14, set 3),
+  evaluated in the apply kernel on the blob's model parameters (`rtol` at the accumulation precision); the kernel's own
+  copy of the increment rule is gone. Same values, bit for bit on the CPU and the GPU.
 - `max_detections`' uncapped count is read and written by VisualGeometryToolkitCore's one TOML encoding,
   `toml_unbounded` and `unbounded_from_toml` (Core 0.14, C2): `typemax(Int)` is still the string `"unbounded"`, so no
   stored file changes; the package's own converter (`_max_detections`) is gone. A value that is neither an integer nor
