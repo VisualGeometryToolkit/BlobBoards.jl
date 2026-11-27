@@ -1393,7 +1393,7 @@ end
         write(json, JSON.json(obj))
         own = load_board(json)
         @test ustrip(dpi, own.density) == 34
-        small = BlobBoards._board_raster(own.image_path, own.bundle, own.config_hash; density = own.density)
+        small = BlobBoards.board_raster(own)
         @test size(small) == (282, 199)
         x, y = own.canvas_frames[j].center
         @test Float64(small[ceil(Int, y), ceil(Int, x)]) < 0.1

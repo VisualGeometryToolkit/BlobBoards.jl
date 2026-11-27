@@ -287,7 +287,7 @@ definitions can live in a content-addressed artifact tree, which must stay
 immutable.
 
 A PDF, not a raster: it has no density, so one cached file serves every
-density a caller rasterizes at (`_board_raster`'s own content-addressed cache,
+density a caller rasterizes at (`board_raster`'s own content-addressed cache,
 which runs in parallel), and writing it is milliseconds.
 
 The cache is content-stable:
@@ -530,9 +530,10 @@ end
 _load_raster(image_path, _) = PNGFiles.load(String(image_path); gamma = 1.0)
 
 """
-    _board_raster(image_path, bundle, config_hash; density = nothing) -> Matrix{Gray{N0f8}}
+    board_raster(board) -> Matrix{Gray{N0f8}}
 
-A board's raster for feature extraction, through a lossless scratch cache. A
+The raster of a loaded board ([`load_board`](@ref)'s result: its `image_path`, `bundle`, `config_hash` and
+`density`), the image its features are extracted from, at the board's `density`, through a lossless scratch cache. A
 PDF is rasterized once (`rasterize_pdf`, ~1.3 s for a 150 mm board at 1200
 dpi) and the result kept as PNG (0.5 s to decode, 1/6 of a raw PGM's disk), so
 a warm build never rasterizes. Any other image is decoded as before.
@@ -547,7 +548,8 @@ an entry can never go stale. The source directory is never written to; the
 PNG is written to a temporary name and renamed, so a concurrent build sees
 either no entry or a whole one.
 """
-function _board_raster(image_path::AbstractString, bundle, config_hash::AbstractString; density = nothing)
+function board_raster(board)
+    (; image_path, bundle, config_hash, density) = board
     lowercase(splitext(image_path)[2]) == ".pdf" || return _load_image(image_path, bundle; density)
     render_dpi = _raster_dpi(image_path, bundle, density)
     key = string(

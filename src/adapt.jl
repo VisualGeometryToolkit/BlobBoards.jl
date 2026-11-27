@@ -19,6 +19,26 @@ using VisualGeometryToolkitCore: EnsembleProblem, EnsembleKernel, EnsembleResult
 # =============================================================================
 
 """
+    SpatialWeighting()
+
+[`BlobAdaptation`](@ref)'s spatial weighting: a pixel's IRLS weight is its posterior weight times the fitted blob's
+own window at the current iterate, `exp(θ₄a₄ + θ₅a₅ + θ₆a₆)` (the paraboloid's quadratic part), so the fit follows
+the blob's shape rather than the scan box. The default `weighting`; `nothing` weighs by the posterior alone. Its TOML
+tag is `"spatial"` (`[find_boards.blob_adaptation] weighting`, `BLOB_WEIGHTING_TAGS`).
+"""
+struct SpatialWeighting end
+
+# `[find_boards.blob_adaptation] weighting`: a tag of `BLOB_WEIGHTING_TAGS` (`"spatial"`, `"none"`).
+const BLOB_WEIGHTING_TAGS = VgtkCore.TagRegistry(
+    :weighting, "Weighting", "none" => nothing, "spatial" => SpatialWeighting;
+    paths = [r"find_boards\.blob_adaptation\.weighting"],
+)
+_weighting_from_toml(t::AbstractString) = (T = BLOB_WEIGHTING_TAGS[t]; T === nothing ? nothing : T())
+# The kernel's switch: whether the window multiplies the posterior weight.
+_spatial(::SpatialWeighting) = true
+_spatial(::Nothing) = false
+
+"""
     BlobAdaptation(; kwargs...)
 
 The blob adaptation (paraboloid fitting) of an ensemble of blobs, a VisualGeometryToolkitCore `FitKind`:
@@ -50,7 +70,9 @@ frame gates: not a peak, an invalid shape, a scale ratio beyond `max_scale_ratio
 [`count_rejected`](@ref) count them.
 
 # IRLS
-- `spatial_weighting::Bool = true` — adaptive spatial weights from current shape
+- `weighting::Union{Nothing, SpatialWeighting} = SpatialWeighting()` — the IRLS weight of a pixel: its posterior weight
+  times the fitted blob's own spatial window ([`SpatialWeighting`](@ref), the default; TOML `"spatial"`), or the
+  posterior weight alone (`nothing`; TOML `"none"`)
 - `cutoff::Float64 = 2.0` — pixel window in units of σ
 
 # Filtering
@@ -73,7 +95,7 @@ Float64 wherever the backend supports it (Float32 on Metal, where `stops`' toler
 per-pixel staging is pinned Float32.
 """
 Base.@kwdef struct BlobAdaptation <: VgtkCore.AbstractEstimationAlgorithm
-    spatial_weighting::Bool = toml_default(_TOML_DEFAULTS, "blob_adaptation", "spatial_weighting")
+    weighting::Union{Nothing, SpatialWeighting} = _weighting_from_toml(toml_default(_TOML_DEFAULTS, "blob_adaptation", "weighting"))
     # DATA, not configuration: the printed blob's boundary in units of sigma.
     # `find_boards` overrides it from the gallery (`_shared_image_cutoff`), so
     # the scan window, the clip test and the canonicalization extent cannot

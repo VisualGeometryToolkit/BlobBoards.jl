@@ -21,17 +21,9 @@ mutable struct TrainingResult{P, S}
     best_fpr::Float64
 end
 
-function _make_optimizer(cfg::TrainingConfig)
-    lr = Float32(cfg.lr)
-    wd = Float32(cfg.weight_decay)
-    return if cfg.optimizer === :adamw
-        AdamW(; eta = lr, lambda = wd)
-    elseif cfg.optimizer === :sgd
-        OptimiserChain(Momentum(lr, 0.9f0), WeightDecay(wd))
-    else
-        error("Unknown optimizer: $(cfg.optimizer). Use :adamw or :sgd.")
-    end
-end
+_make_optimizer(cfg::TrainingConfig) = _optimizer(cfg.optimizer, Float32(cfg.lr), Float32(cfg.weight_decay))
+_optimizer(::Type{AdamW}, lr::Float32, wd::Float32) = AdamW(; eta = lr, lambda = wd)
+_optimizer(::Type{Momentum}, lr::Float32, wd::Float32) = OptimiserChain(Momentum(lr, 0.9f0), WeightDecay(wd))
 
 # The method of the core's `train_descriptor` (src/training.jl), whose
 # docstring documents it: a docstring on a method of an imported function

@@ -461,7 +461,7 @@ function load_board_gallery(
     tasks = map(board_paths) do p
         Threads.@spawn begin
             b = load_board(p)
-            (; b..., image = _board_raster(b.image_path, b.bundle, b.config_hash; density = b.density))
+            (; b..., image = board_raster(b))
         end
     end
     boards = map(fetch, tasks)

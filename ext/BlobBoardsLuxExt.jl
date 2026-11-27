@@ -21,7 +21,7 @@ using JLD2: JLD2
 
 using BlobBoards
 import KernelAbstractions as KA
-using BlobBoards: AbstractDescriptorNetwork, _board_raster, _board_mask_image, DEFAULT_OUTER_EXTENT,
+using BlobBoards: AbstractDescriptorNetwork, board_raster, _board_mask_image, DEFAULT_OUTER_EXTENT,
     _stack_2ch, canonicalize, cutoff, described_features
 import BlobBoards: describe, network_hash, LuxDescriptorNetwork,
     extract_board_features
@@ -163,7 +163,7 @@ function extract_board_features(
         inner_extent = cutoff(board.bundle),
         outer_extent = DEFAULT_OUTER_EXTENT,
         device = nothing,
-        image::AbstractMatrix = _board_raster(board.image_path, board.bundle, board.config_hash; density = board.density)
+        image::AbstractMatrix = board_raster(board)
     )
     # `device` is accepted and deliberately IGNORED: this backend canonicalizes
     # on the CPU by design (see above), and `Base.insert!(::BoardGallery, …)`

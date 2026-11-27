@@ -79,12 +79,27 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   same values. The run-config hash is re-pinned for the layout (ba8e5b8a… → 63d0cd75…): version 2's default tree
   migrated is version 3's. The annotation `config_hash` does not move (it hashes the adaptation as version 2's
   `[find_boards.adapt]`).
+- **Run configuration version 4** (`config_version = 4`): the blob adaptation's weight model is a type field,
+  `BlobAdaptation(; weighting = SpatialWeighting())` (`weighting = nothing`: the posterior weight alone), stored as
+  `[find_boards.blob_adaptation] weighting = "spatial"` or `"none"` (a tag); the Bool field and key `spatial_weighting`
+  are gone. `read_run_config` migrates a version-3 file (`spatial_weighting = true` → `"spatial"`, `false` →
+  `"none"`) and every earlier one through the steps; `spatial_weighting` in a version-4 file is refused. Same weights,
+  same bits. The run-config hash is re-pinned for the layout (63d0cd75… → 406f5b2b…); the annotation `config_hash`
+  does not move (it hashes the weighting as version 2's `spatial_weighting`).
+- **The training optimizer is a type** (the training extension): `TrainingConfig(; optimizer = AdamW)` takes an
+  Optimisers.jl rule type, `AdamW` (the default) or `Momentum` (was the Symbol `:adamw` or `:sgd`, an unknown one an
+  `error`); a stored spelling is a tag of the extension's `OPTIMIZER_TAGS` (`"adam_w"`, `"momentum"`; the retired
+  `"adamw"` and `"sgd"` are refused, naming their successors). Same rules, same updates.
 - `track_boards` keeps one find cache per track: `init(EstimationProblem(f, (; extent)), ransac; rng)` on its first
   warm frame, then `solve!(reinit!(cache; f, p, rng = board_rng(seed, uid)))` per frame (was a fresh solve per frame):
   the same draws, the same bits, the workspace kept.
 
 ### Added
 
+- `board_raster(board)` (public): a loaded board's raster (`load_board`'s result), the image its features are extracted
+  from, through the content-addressed scratch cache (was the private `_board_raster(image_path, bundle, config_hash;
+  density)`, which a dependent's experiments reached). Same pixels.
+- `SpatialWeighting` (public): `BlobAdaptation`'s spatial weighting, its `weighting` field's default.
 - `board_ransac_toml(r::Ransac)` (public): a board fit's `Ransac` as its TOML table, the inverse of
   `board_ransac_from_toml` (was the private `_ransac_toml`). A downstream package writes its own board fits with it
   (CaliBlobs' `[board_refinement.ransac]`).

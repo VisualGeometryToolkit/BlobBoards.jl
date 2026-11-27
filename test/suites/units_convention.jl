@@ -75,14 +75,14 @@ end
 # difference through it lands an ulp away). Each case shows the native form
 # disagreeing with the stored arithmetic on a value the boards in circulation
 # carry; the units audit (2026-10-15) keeps these and nothing else by hand.
+import VisualGeometryToolkitCore as VgtkCore
 @testset "units: hand arithmetic that stays bit-identical to stored boards" begin
-    BB = BlobBoards
     # A4 with a 10 mm margin: the derived board is 190 × 277 mm exactly;
     # FlexUnits' difference is 276.99999999999994 mm
-    cs, mg = BB.Size2(width = 210.0mm, height = 297.0mm), BB.Size2(width = 10.0mm, height = 10.0mm)
-    @test BB.ustrip(mm, BB._board_from_margin(cs, mg).height) === 277.0
-    @test BB.ustrip(mm, cs.height - 2 * mg.height) !== 277.0
-    @test BB._margin_of(cs, BB._board_from_margin(cs, mg)) == mg
+    cs, mg = VgtkCore.Size2(width = 210.0mm, height = 297.0mm), VgtkCore.Size2(width = 10.0mm, height = 10.0mm)
+    @test VgtkCore.ustrip(mm, BlobBoards._board_from_margin(cs, mg).height) === 277.0
+    @test VgtkCore.ustrip(mm, cs.height - 2 * mg.height) !== 277.0
+    @test BlobBoards._margin_of(cs, BlobBoards._board_from_margin(cs, mg)) == mg
     # a physical length in px: mm × px/mm, the arithmetic the sheets were laid out
     # with (tick spacings, padding, grid counts). Through FlexUnits 0.6.15 the
     # native product differed on both values below (at 135.89 mm and 300 dpi
@@ -90,18 +90,18 @@ end
     # scale with one rounding and agrees on them, and the hand form stays the
     # arithmetic the stored sheets were made with
     q, d = 0.5mm, 300dpi
-    @test BB._length_to_px(q, d) === BB.ustrip(mm, q) * BB.ustrip(px / mm, d)
-    @test floor(BB._length_to_px(135.89mm, 300dpi)) == 1604
+    @test BlobBoards._length_to_px(q, d) === VgtkCore.ustrip(mm, q) * VgtkCore.ustrip(px / mm, d)
+    @test floor(BlobBoards._length_to_px(135.89mm, 300dpi)) == 1604
     # points per pixel of a density: a ratio of dpi magnitudes (vector blobs, the
     # PDF's point scale); the native quotient differs at 96 dpi
-    @test BB._pt_per(96dpi) === BB.ustrip(dpi, BB.POINT_DENSITY) / 96.0
-    @test BB._pt_per(96dpi) !== BB.ustrip(BB.POINT_DENSITY / 96dpi)
+    @test BlobBoards._pt_per(96dpi) === VgtkCore.ustrip(dpi, BlobBoards.POINT_DENSITY) / 96.0
+    @test BlobBoards._pt_per(96dpi) !== VgtkCore.ustrip(BlobBoards.POINT_DENSITY / 96dpi)
     # world blobs: stored px ÷ the stored density's px per mm
-    bundle, _, _ = BB.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
-    bc = BB.board_config(bundle)
-    world = BB.blobs(bundle, :world)
-    ppm = BB.ustrip(px / mm, BB.stored_density(bc))
-    canvas = bundle.blobs .+ Ref(BB._frame_offset(bundle, :canvas))
-    @test all(w.σ === BB.ustrip(px, b.σ) / ppm for (w, b) in zip(world, canvas))
-    @test any(w.σ !== BB.ustrip(mm, b.σ / BB.stored_density(bc)) for (w, b) in zip(world, canvas))
+    bundle, _, _ = BlobBoards.load_bundle(joinpath(@__DIR__, "..", "fixtures", "v3_render", "odd300.json"))
+    bc = BlobBoards.board_config(bundle)
+    world = BlobBoards.blobs(bundle, :world)
+    ppm = VgtkCore.ustrip(px / mm, BlobBoards.stored_density(bc))
+    canvas = bundle.blobs .+ Ref(BlobBoards._frame_offset(bundle, :canvas))
+    @test all(w.σ === VgtkCore.ustrip(px, b.σ) / ppm for (w, b) in zip(world, canvas))
+    @test any(w.σ !== VgtkCore.ustrip(mm, b.σ / BlobBoards.stored_density(bc)) for (w, b) in zip(world, canvas))
 end

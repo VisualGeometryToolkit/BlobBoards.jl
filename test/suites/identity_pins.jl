@@ -461,11 +461,15 @@ const PINNED_PATTERN_V3_JSON = """
     # `rtol` under `[find_boards.blob_adaptation.stops]` (ba8e5b8a… → 63d0cd75…). The values are unchanged: version 2's
     # default tree migrated by BB_CONFIG_VERSIONS is this tree. The annotation hash does NOT move: it hashes the
     # adaptation as version 2's `[find_boards.adapt]` (`config_hash`).
+    # Re-pinned 2026-11-27 (0.8.0) for a LAYOUT change, the run configuration's version 4: the adaptation's weight model
+    # is the tag `weighting = "spatial"` (`SpatialWeighting`), not the Bool `spatial_weighting = true`
+    # (63d0cd75… → 406f5b2b…). The values are unchanged. The annotation hash does NOT move: it hashes the weighting as
+    # version 2's Bool (`config_hash`).
     @testset "annotation and run-config hashes" begin
         @test BlobBoards.config_hash(;
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
         ) == "fbd5d8ccf864b904584b0578e69f59fd9e169ca6637c2a459df4a40e58d9158b"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "63d0cd7596aefb3698837fa1c64d434bfb720c3a48408538dc08dd7e02b63f6d"
+            "406f5b2b61480f7d1291992e3ca42c21eba452da57fa2bd1993e08bcc22db458"
     end
 end

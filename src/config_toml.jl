@@ -175,7 +175,7 @@ function _blob_adaptation_from_toml(d)
             d,
             "min_intensity" => Float64,
             "scan_padding" => Float64,
-            "spatial_weighting" => Bool,
+            "weighting" => _weighting_from_toml,
             "max_scale_fraction" => Float64,
             "max_scale_ratio" => Float64,
             "max_clip_ratio" => Float64,
@@ -395,7 +395,7 @@ Unknown keys in any section are an error. A typo'd knob that silently runs at
 its default is the failure mode this loader exists to prevent.
 
 ```toml
-config_version = 3
+config_version = 4
 
 [find_boards]
 min_similarity = 0.6
@@ -528,6 +528,7 @@ toml_field(c::FindBoardsConfig, ::Val{:detect}) = toml_table(c.detect)
 toml_field(c::FindBoardsConfig, ::Val{:blob_adaptation}) =
     merge(toml_table(c.blob_adaptation), Dict{String, Any}("stops" => _blob_adaptation_stops_toml(c.blob_adaptation_stops)))
 toml_field(c::FindBoardsConfig, ::Val{:geometry}) = _geometry_toml(c.geometry)
+toml_field(a::BlobAdaptation, ::Val{:weighting}) = tag_of(BLOB_WEIGHTING_TAGS, a.weighting)
 toml_field(c::FindBoardsConfig, ::Val{:track}) = toml_table(c.track)
 toml_field(c::DetectConfig, ::Val{:nms}) = _nms_toml(c.nms)
 toml_field(c::DetectConfig, ::Val{:tilts}) = [[t[1], t[2]] for t in c.tilts]

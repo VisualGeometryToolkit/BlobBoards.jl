@@ -891,8 +891,8 @@ end
 # The versioned converter (decision 11): the configs of record of the paper (bmvc2026, version 1, no
 # `config_version`) read through BB_CONFIG_VERSIONS to the same settings, now as the arm's algorithms.
 @testset "BB_CONFIG_VERSIONS: the configs of record keep loading (2026-11)" begin
-    @test VgtkCore.current_config_version(BlobBoards.BB_CONFIG_VERSIONS) == 3
-    @test TOML.parsefile(BlobBoards.run_config_path())["config_version"] == 3
+    @test VgtkCore.current_config_version(BlobBoards.BB_CONFIG_VERSIONS) == 4
+    @test TOML.parsefile(BlobBoards.run_config_path())["config_version"] == 4
     root = joinpath(pkgdir(BlobBoards), "bmvc2026", "configs")
     for (name, disambiguated) in (("bmvc2026_260527.toml", true), ("bmvc2026_260527_noflip.toml", false))
         f = joinpath(root, name)
@@ -912,11 +912,12 @@ end
         # the adaptation (v1 → v3): its table and its stops
         a = FindBoardsConfig(f; camera = _CAM)
         @test a.blob_adaptation_stops === BlobBoards.blob_adaptation_stops(; max_iter = v1["adapt"]["max_irls_iter"], rtol = v1["adapt"]["rtol"])
-        @test all(k -> getfield(a.blob_adaptation, Symbol(k)) == v1["adapt"][k], setdiff(keys(v1["adapt"]), ["max_irls_iter", "rtol"]))
-        # the migrated config is written at version 3 and reads back the same
+        @test all(k -> getfield(a.blob_adaptation, Symbol(k)) == v1["adapt"][k], setdiff(keys(v1["adapt"]), ["max_irls_iter", "rtol", "spatial_weighting"]))
+        @test BlobBoards._spatial(a.blob_adaptation.weighting) == get(v1["adapt"], "spatial_weighting", true)   # v3 → v4: the Bool is the type
+        # the migrated config is written at version 4 and reads back the same
         mktempdir() do dir
-            p = write_config(joinpath(dir, "v3.toml"), FindBoardsConfig(f; camera = _CAM))
-            @test TOML.parsefile(p)["config_version"] == 3
+            p = write_config(joinpath(dir, "v4.toml"), FindBoardsConfig(f; camera = _CAM))
+            @test TOML.parsefile(p)["config_version"] == 4
             @test config_dict(FindBoardsConfig(p; camera = _CAM)) == config_dict(FindBoardsConfig(f; camera = _CAM))
         end
     end
@@ -928,12 +929,22 @@ end
     @test v2.blob_adaptation.scan_padding === 1.5
     @test config_dict(v2) == config_dict(FindBoardsConfig(_write(dir, "a3.toml",
         "config_version = 3\n[find_boards.blob_adaptation]\nscan_padding = 1.5\n[find_boards.blob_adaptation.stops]\nmax_iter = 40\nrtol = 1.0e-5\n")))
-    @test_throws r"find_boards.adapt.*blob_adaptation" FindBoardsConfig(_write(dir, "a4.toml", "config_version = 3\n[find_boards.adapt]\nrtol = 1.0e-5\n"))
+    @test_throws r"find_boards.adapt.*blob_adaptation" FindBoardsConfig(_write(dir, "a4.toml", "config_version = 4\n[find_boards.adapt]\nrtol = 1.0e-5\n"))
     @test_throws ArgumentError FindBoardsConfig(_write(dir, "a5.toml", "config_version = 3\n[find_boards.blob_adaptation]\nrtol = 1.0e-5\n"))
     @test_throws ArgumentError FindBoardsConfig(_write(dir, "r.toml", "config_version = 2\n[find_boards.ransac]\nmax_trials = 9\n"))
     @test_throws ArgumentError FindBoardsConfig(_write(dir, "p.toml",
         "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\nresolve_pose_ambiguity = true\n"); camera = _CAM)
-    @test_throws ArgumentError FindBoardsConfig(_write(dir, "f.toml", "config_version = 4\n"))   # newer than the package
+    # version 3 → 4: the Bool `spatial_weighting` is the type field `weighting` ("spatial" | "none")
+    for (b, w) in ((true, BlobBoards.SpatialWeighting()), (false, nothing))
+        v3 = FindBoardsConfig(_write(dir, "w$b.toml", "config_version = 3\n[find_boards.blob_adaptation]\nspatial_weighting = $b\n"))
+        @test v3.blob_adaptation.weighting === w
+        @test config_dict(v3) == config_dict(FindBoardsConfig(_write(dir, "w4$b.toml",
+            "config_version = 4\n[find_boards.blob_adaptation]\nweighting = \"$(b ? "spatial" : "none")\"\n")))
+    end
+    @test BlobBoards.BlobAdaptation().weighting === BlobBoards.SpatialWeighting()      # the default of record
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "w4.toml", "config_version = 4\n[find_boards.blob_adaptation]\nspatial_weighting = true\n"))
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "w5.toml", "config_version = 4\n[find_boards.blob_adaptation]\nweighting = \"gaussian\"\n"))
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "f.toml", "config_version = 5\n"))   # newer than the package
     # a pose disambiguation's gates are radians, and round-trip
     t = "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\npose_disambiguation = { type = \"planar_pose_disambiguation\", min_separation = 0.1, same_basin = 0.01 }\n"
     g = FindBoardsConfig(_write(dir, "d.toml", t); camera = _CAM).geometry

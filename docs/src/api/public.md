@@ -65,6 +65,7 @@ HomographyGeometry
 RadialHomographyGeometry
 BlobBoards.prepare_image_features
 load_board
+BlobBoards.board_raster
 BlobBoards.load_bundle
 ```
 
@@ -83,6 +84,7 @@ the chain.
 BlobBoards.detect_blobs
 DetectConfig
 BlobBoards.BlobAdaptation
+BlobBoards.SpatialWeighting
 BlobBoards.BlobBatch
 BlobBoards.blob_adaptation_stops
 BlobBoards.adapted_blobs

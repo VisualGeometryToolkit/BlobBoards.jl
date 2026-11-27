@@ -57,6 +57,7 @@ export DetectConfig, MxmNms, EllipseNms
 export AbstractDescriptorNetwork, DescriptorNetwork, LuxDescriptorNetwork
 export BoardGallery                        # Cached per-board feature extraction
 export load_board                          # Board JSON loading (cameras: VisualGeometryToolkitIO.load)
+public board_raster                        # a loaded board's raster, the image its features are extracted from (cached)
 export board_points, board_library, board_resolver, board_target   # the design resolver: a board uid → its nominal plane points; the target with its board and canvas
 export extract_board_features, extract_image_features  # Pre-extraction for multi-frame reuse
 export Disc, EllipticFrame, BlobDetection  # Result/geometry types
@@ -126,7 +127,7 @@ function replay end
 # 4. ADVANCED / SUPPORTED-UNEXPORTED — use as `BlobBoards.name`
 # -----------------------------------------------------------------------------
 # Pipeline stages (find_boards composes these; useful standalone for research)
-public detect_blobs, BlobAdaptation, BlobBatch, blob_adaptation_stops, adapted_blobs, count_unconverged, count_rejected,
+public detect_blobs, BlobAdaptation, SpatialWeighting, BlobBatch, blob_adaptation_stops, adapted_blobs, count_unconverged, count_rejected,
     filter_blobs, canonicalize, describe
 public TrackConfig
 public Telemetry, with_tag           # experiment instrumentation sinks for find_boards (pipeline.jl)

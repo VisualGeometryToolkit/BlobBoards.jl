@@ -139,7 +139,7 @@ function _insert_board!(
     try
         key = _gallery_key(gallery, board)
         features = get!(cache, key) do
-            img = image === nothing ? _board_raster(board.image_path, board.bundle, board.config_hash; density = board.density) : image
+            img = image === nothing ? board_raster(board) : image
             extract_board_features(
                 model, board;
                 patch_size = gallery.patch_size,
@@ -189,7 +189,7 @@ function Base.insert!(
     n = length(board_paths)
     t0 = time()
     # Load every board and, for those the gallery does not hold yet, rasterize
-    # them — on all threads (pdftocairo subprocesses, PNG decodes; `_board_raster`
+    # them — on all threads (pdftocairo subprocesses, PNG decodes; `board_raster`
     # caches). Describing stays serial on the one device. `fetch` in path
     # order keeps the output order; each result depends on its own board only.
     boards = map(fetch, [Threads.@spawn(load_board(bp)) for bp in board_paths])
@@ -198,7 +198,7 @@ function Base.insert!(
         fetch(t) for t in [
             Threads.@spawn(
                 _gallery_key(gallery, b) in missing_keys ?
-                    _board_raster(b.image_path, b.bundle, b.config_hash; density = b.density) : nothing
+                    board_raster(b) : nothing
             ) for b in boards
         ]
     ]

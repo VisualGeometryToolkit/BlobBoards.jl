@@ -3,6 +3,14 @@
 # =============================================================================
 
 using Random: randperm
+using Optimisers: AdamW, Momentum
+using VisualGeometryToolkitCore: TagRegistry
+
+# The optimizer of a descriptor training, an Optimisers.jl rule type chosen by its tag (the stack's tag rule:
+# `"adam_w"`, `"momentum"`): the one reading of a stored `optimizer` spelling (a driver's training table). The
+# former Symbol spellings `:adamw` and `:sgd` are retired tags, refused naming their successors.
+const OPTIMIZER_TAGS = TagRegistry(:optimizer, "", "adam_w" => AdamW, "momentum" => Momentum;
+                                   retired = ("adamw" => "adam_w", "sgd" => "momentum"))
 
 # =============================================================================
 # Training Config
@@ -26,7 +34,9 @@ Hyperparameters for descriptor training.
 - `temperature::Float32 = 0.07f0` — SupCon softmax temperature τ
 
 # Optimization
-- `optimizer::Symbol = :adamw` — `:adamw` or `:sgd`
+- `optimizer = AdamW` — the rule, an Optimisers.jl type: `AdamW` (its `eta` the learning rate, `lambda` the weight
+  decay) or `Momentum` (momentum 0.9, chained with `WeightDecay`); a stored spelling is its tag of `OPTIMIZER_TAGS`
+  (`"adam_w"`, `"momentum"`)
 - `lr::Float64 = 1e-3` — initial learning rate (decays linearly to 0)
 - `weight_decay::Float64 = 1e-4` — L2 regularization
 - `epochs::Int = 50` — number of training epochs
@@ -48,7 +58,7 @@ Base.@kwdef struct TrainingConfig
     # Loss
     temperature::Float32 = 0.07f0
     # Optimization
-    optimizer::Symbol = :adamw
+    optimizer::Union{Type{AdamW}, Type{Momentum}} = AdamW
     lr::Float64 = 1.0e-3
     weight_decay::Float64 = 1.0e-4
     epochs::Int = 50

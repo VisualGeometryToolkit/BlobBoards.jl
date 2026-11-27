@@ -787,7 +787,7 @@ function _adapt_ka(
     gs = exec.workgroupsize
 
     cutoff = cfg.cutoff
-    spatial_weighting = cfg.spatial_weighting
+    spatial_weighting = _spatial(cfg.weighting)
 
     # The kernels promote per-pixel loads to Ta. The image is on `device`
     # through Core's one upload, on every backend: an array already there in

@@ -192,7 +192,7 @@ Student-t + uniform mixture at the arm's outlier half-width, then a local optimi
 `[find_boards.geometry.ransac]`, its scorer and strategy tagged tables:
 
 ```toml
-config_version = 3
+config_version = 4
 
 [find_boards.geometry]
 type = "homography"

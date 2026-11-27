@@ -232,7 +232,7 @@ metadata); `outer_extent` is the outer sampling radius for the log-polar
 patch (in σ units relative to each blob's scale). `image` is the board's
 raster when the caller already has it (`load_board_gallery`, the gallery's
 batch `insert!`); by default it is read through the raster cache
-(`_board_raster`), so the PDF is rasterized at most once per board.
+(`board_raster`), so the PDF is rasterized at most once per board.
 
 Returns `StructArray{DescribedFeature}` pairing world-coordinate Disc
 detections with their descriptor vectors.
@@ -243,7 +243,7 @@ function extract_board_features(
         inner_extent = cutoff(board.bundle),
         outer_extent = DEFAULT_OUTER_EXTENT,
         device::KA.Backend = default_device(),
-        image::AbstractMatrix = _board_raster(board.image_path, board.bundle, board.config_hash; density = board.density)
+        image::AbstractMatrix = board_raster(board)
     )
     # Same canonicalize+describe stage as the query path (`_canon_describe`):
     # on CUDA the patch cube stays on-device and feeds ORT device tensors —
@@ -595,7 +595,7 @@ Dispatches on the MODEL, the honest discriminator:
   behind a cheirality test at the centre, which the bare composite cannot make
   (a homography images a plane conic behind the camera as a perfectly good one).
   `cam` is the ESTIMATION camera (`_estimation_camera`): the pinhole twin under
-  `:global`, the full camera under `:none`; `plane_map` dispatches between the
+  `GlobalUndistortion()`, the full camera with no undistortion (`nothing`); `plane_map` dispatches between the
   two forms, so no per-lens method is needed here;
 - a `HomographyMat` already IS the plane map: its `HomographyMap` (`cam` ignored);
 - the radial arm forwards its MODEL: the guided transfer needs (H, k, centre)
@@ -681,7 +681,7 @@ _world_to_image(m::VgtkCore.RadialHomography, _) = m
 # affinity at its centre, so the detection index stays in distorted pixels.
 # A homography, or a posed camera (the pose arms: Core's
 # `transfer_ellipse(::PosedCamera, _)` — its `plane_map`, the plane homography
-# exactly and, for the full camera under `:none`, the lens's affinity at the
+# exactly and, for the full camera with no undistortion (`nothing`), the lens's affinity at the
 # centre, behind a cheirality test): the transferred conic lives where the
 # detections are, so it is compared and searched there.
 @inline function _guided_transfer(T::Union{HomographyMap, PosedCamera}, wreg)
@@ -2137,8 +2137,8 @@ _detect_config_for_boards(config, polarity::Symbol) =
 )
 
 # Undistort for the detector: the geometry decides (KA kernel on `device`
-# for the pose arm under :global; identity for the perspective lens/no camera, for the
-# raw-detecting arms, and for the pose arm under :none). The detector
+# for the pose arm under GlobalUndistortion(); identity for the perspective lens/no camera, for the
+# raw-detecting arms, and for the pose arm with no undistortion, `nothing`). The detector
 # consumes host UInt8; the adaptation and the descriptor read the same pixels as
 # a Float32 image on `device`, uploaded once (`_device_image`: a storage
 # convert, not a second kernel).
