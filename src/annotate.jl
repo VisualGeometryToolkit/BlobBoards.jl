@@ -47,10 +47,11 @@ using VisualGeometryToolkitCore: bbox
 # only so a caller can be explicit, and a mismatch fails in `describe`.
 _declared_patch_size(network) = patch_size(network)
 
-# The world → image transfer annotation projects GT blobs through: a homography's or a pose's (`_world_to_image`); the
-# radial arm's model is refused, by dispatch, so nothing past it sees a radial transfer.
-_annotation_transfer(model::Union{HomographyMat, CameraExtrinsics}, cam) = _world_to_image(model, cam)
-_annotation_transfer(model, _) =
+# The world → image transfer annotation projects GT blobs through: any arm's model with a `_world_to_image` method (a
+# homography's, a pose's, a downstream arm's); the radial arm's model is refused, by dispatch, so nothing past it sees
+# a radial transfer.
+_annotation_transfer(model, cam) = _world_to_image(model, cam)
+_annotation_transfer(model::VgtkCore.RadialHomography, _) =
     throw(ArgumentError("annotate_blobs: the radial arm is not wired into annotation ($(nameof(typeof(model))))"))
 
 """

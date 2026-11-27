@@ -99,7 +99,8 @@ Run detect → adapt → filter, capturing every intermediate. All `adapt_arms` 
 Registration (when a gallery + bundles + network are given) runs under ONE
 `FindBoardsConfig` — geometry from `cam`, `detect = detect_config`, `blob_adaptation` =
 the FIRST arm of `adapt_arms` and its stops `adaptation_stops` — and that same config is what
-the trace records.
+the trace records. Without `find_config` the stops must be of the recorded form,
+`blob_adaptation_stops(; max_iter, rtol)` (an `ArgumentError` otherwise, before any work).
 """
 function trace_pipeline(
         # Typed so a call in the retired `(img, cam)` order is a MethodError.
@@ -116,6 +117,11 @@ function trace_pipeline(
         descriptor_network = nothing,
         find_config = nothing
     )
+    # The recorded config holds the stops in their TOML form; refuse any other before the work, not after it.
+    find_config === nothing && !(adaptation_stops isa fieldtype(FindBoardsConfig, :blob_adaptation_stops)) &&
+        throw(ArgumentError("trace_pipeline records `adaptation_stops` in its FindBoardsConfig, which holds stops of the " *
+                            "form `blob_adaptation_stops(; max_iter, rtol)`; got $adaptation_stops (pass `find_config` " *
+                            "to record another config)"))
     u8, adapt_img = _undistorted_pair(img, cam, device)   # the pipeline's one undistort-for-detect/adapt helper
     detections = detect_blobs(u8; config = detect_config, device)
     # Left UNTYPED and narrowed at the end: a `Pair{Symbol, NamedTuple}[]`

@@ -52,6 +52,8 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   or `"none"`. `read_run_config` migrates a version-1 file (no `config_version`: every configuration before 0.8, the
   paper's included) value for value: `[find_boards.ransac]` moves whole, the geometry's `local_optimization_strategy`
   joins it, `outlier_halfwidth = h` becomes its scorer, `resolve_pose_ambiguity = b` the disambiguation or `"none"`.
+  A version-1 file that tuned only `[find_boards.ransac]` (no `[find_boards.geometry]`) keeps the default arm: a
+  geometry table without a `type` inherits configs/default.toml's, as an absent table does.
   `write_config` writes version 2. A version-1 name in a version-2 file is refused, naming the current one.
   The run-config hash (`canonical_config_json(config_dict(FindBoardsConfig()))`) is re-pinned: a layout-only
   identity move (759414ed… → ba8e5b8a…), the values unchanged. The annotation `config_hash` does not move (it hashes
@@ -70,7 +72,9 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   `blob_adaptation::BlobAdaptation` and `blob_adaptation_stops`; the keyword `adapt_config` of
   `extract_image_features`, `describe_detections` and `adapt_detections` is `blob_adaptation` and `adaptation_stops`;
   `trace_pipeline`'s `adapt_arms` are `BlobAdaptation`s, solved with its `adaptation_stops`. Same frames, bit for bit
-  on the CPU and the GPU.
+  on the CPU and the GPU. Without a `find_config`, `trace_pipeline` records its stops in the trace's
+  `FindBoardsConfig`, so stops not of the form `blob_adaptation_stops(; max_iter, rtol)` are an `ArgumentError` before
+  any work (they failed to convert after the adaptation ran).
 - **Run configuration version 3** (`config_version = 3`, decision 11): `[find_boards.adapt]` is
   `[find_boards.blob_adaptation]`, its `max_irls_iter` and `rtol` `[find_boards.blob_adaptation.stops]` `max_iter` and
   `rtol`. `read_run_config` migrates a version-2 file (and a version-1 one through both steps) value for value; a
@@ -124,7 +128,10 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   workgroupsize = 256, host_workgroupsize = 1)` (was `_adapt_groupsize`); the training gallery's ONNX provider is
   `KernelAbstractions.isgpu(device) ? :cuda : :cpu` (was `_execution_provider`). The adaptation's per-blob record is
   the record its stops return, Core's `(Success, IncrementSize)` and `(MaxIters, IterationCap)` (was
-  `irls_termination`). Same values, bit for bit on the CPU.
+  `irls_termination`). Same values, bit for bit on the CPU. The arm's `[find_boards.geometry.ransac]` reader takes its
+  key list and its `RansacConfig` fields from Core's `allowed_keys` and `read_table` (the package's `_allowed_keys`
+  synonym and its hand-written field walk are gone), and the arm's seeded local optimization has one spelling (the
+  pose disambiguation's TOML loader builds it through the guided final fit's step).
 - The adaptation's per-blob convergence test is VisualGeometryToolkitCore's `StopWhenIncrementLess(rtol)` (Core 0.14, set 3),
   evaluated in the apply kernel on the blob's model parameters (`rtol` at the accumulation precision); the kernel's own
   copy of the increment rule is gone. Same values, bit for bit on the CPU and the GPU.

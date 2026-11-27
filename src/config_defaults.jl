@@ -136,10 +136,10 @@ _dflt_tilts() = _tilts_from_toml(toml_default(_TOML_DEFAULTS, "detect", "tilts")
 # config_toml.jl's loader, downstream arms' included.
 using VisualGeometryToolkitEstimation: VisualGeometryToolkitEstimation, optimization_strategy_from_toml, scoring_from_toml,
     Ransac, RansacConfig
-using VisualGeometryToolkitCore: check_keys
+using VisualGeometryToolkitCore: check_keys, allowed_keys, read_table
 import LocalOptimizationDoneRight
 const _OPTIMIZATION_STRATEGY_TAGS = merge(VgtkEstimation.OPTIMIZATION_STRATEGY_TAGS, LocalOptimizationDoneRight.LODR_STRATEGY_TAGS)
-const _BOARD_RANSAC_KEYS = vcat(["scoring", "local_optimization_strategy"], String.(collect(fieldnames(RansacConfig))))
+const _BOARD_RANSAC_KEYS = allowed_keys(RansacConfig, "scoring", "local_optimization_strategy")   # Core's derived key list
 """
     board_ransac_from_toml(P, class::Symbol, d; defaults = Dict(), section = "find_boards.geometry.ransac") -> Ransac
 
@@ -161,6 +161,6 @@ function board_ransac_from_toml(::Type{P}, class::Symbol, d::AbstractDict;
         scoring = scoring_from_toml(t["scoring"]; problem = P, section = "$section.scoring"),
         local_optimization_strategy = optimization_strategy_from_toml(t["local_optimization_strategy"];
             class, section = "$section.local_optimization_strategy", tags = _OPTIMIZATION_STRATEGY_TAGS),
-        config = RansacConfig(; (f => convert(fieldtype(RansacConfig, f), t[String(f)]) for f in fieldnames(RansacConfig))...),
+        config = RansacConfig(; read_table(RansacConfig, t)...),   # Core's reader half of `toml_table`
     )
 end

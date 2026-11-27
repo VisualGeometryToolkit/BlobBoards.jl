@@ -454,12 +454,12 @@ _board_find(camera, ransac, pt_correspondences; extent = nothing, rng = Random.d
 # and the pose-ambiguity LRT compare scorer qualities. It is not a
 # `LevenbergMarquardt` refine: a refine runs no scorer (it estimates no scale and
 # forms no consensus set; the robust-estimation contract, B1).
-_board_refine(cam::Nothing, local_optimization, pt_correspondences, θ₀; extent = nothing) =
-    length(pt_correspondences) < 4 ? nothing : solve(
-    RefineProblem(_board_problem(cam, pt_correspondences), θ₀, _fit_context(extent)), local_optimization
-)
-_board_refine(cam::BoundedCamera, local_optimization, pt_correspondences, θ₀; extent = nothing) =
+_board_refine(cam::Union{Nothing, BoundedCamera}, local_optimization, pt_correspondences, θ₀; extent = nothing) =
+    length(pt_correspondences) < _refine_min_sample(cam) ? nothing :
     solve(RefineProblem(_board_problem(cam, pt_correspondences), θ₀, _fit_context(extent)), local_optimization)
+# The guided refit's floor: a homography's minimal sample; the pose arm refines any set.
+_refine_min_sample(::Nothing) = 4
+_refine_min_sample(::BoundedCamera) = 0
 
 # Endpoint lift per estimator arm (#21): H fits on 2D centroids; pose
 # z=0-lifts them to world points. (The radial arm's method — 2D, like H —
@@ -1382,12 +1382,6 @@ function find_board(
     return FoundBoard(res, withattrs(scored; weights = VgtkCore.weights(res)))
 end
 
-# A descriptor match, `Attributed{Correspondence{Int, Int}, NNMatchMeta}` (built
-# `Attributed(Correspondence{Int, Int}(i, j), NNMatchMeta(score, ratio))`), is the
-# guided-search correspondences' type below and rides the agenda's `resolved`
-# field. The stacked gallery matcher that used to build these dictionaries here
-# now lives in VGF (`nn_match_stacked`).
-
 # The gallery, concatenated ONCE: the board set is ONE gallery, not 51.
 #
 # `nn_match_stacked(strategy, galleries::AbstractDict, features)` is documented
@@ -1603,9 +1597,9 @@ function _board_ransac(r::Ransac)
 end
 
 # The arm's seeded local optimization (the guided final fit's; the pose disambiguation's default refine): the find's
-# own strategy and scorer, from a seed.
-_board_local_optimization(g::GeometryConfig) =
-    LocalOptimization(g.ransac.local_optimization_strategy; scoring = g.ransac.scoring)
+# own strategy and scorer, from a seed. The one spelling of it, for an arm or for its `Ransac`.
+_board_local_optimization(r::Ransac) = LocalOptimization(r.local_optimization_strategy; scoring = r.scoring)
+_board_local_optimization(g::GeometryConfig) = _board_local_optimization(g.ransac)
 
 """
     GlobalUndistortion()
@@ -1631,7 +1625,7 @@ one place and illegal camera/geometry mismatches are unrepresentable.
 (the default: `[find_boards.geometry.ransac]`, read for `AbsolutePoseProblem`). `pose_disambiguation` is `nothing` or
 a [`PlanarPoseDisambiguation`](@ref) of the find's winner (the planar pose ambiguity), its refine usually the arm's
 own seeded local optimization, `LocalOptimization(ransac.local_optimization_strategy; scoring = ransac.scoring)` (the
-TOML loader builds that one).
+TOML loader builds that one, through the same internal step the guided final fit uses).
 
 `undistortion` selects where the pose is measured: `nothing` (the default; TOML `"none"`)
 detects, adapts and describes on the RAW image and the estimator verifies
@@ -1781,6 +1775,17 @@ _estimation_camera(::GlobalUndistortion, camera::BoundedCamera) = VgtkCore.with_
 _estimation_camera(g::RadialHomographyGeometry) = g
 
 # The pose arm's disambiguation of the find's winner; none on the other arms.
+#
+# PoseGeometry opts into resolving the planar pose ambiguity; every other
+# geometry is branch-free BY CONSTRUCTION, not by omission: the plane-induced
+# homography is a unique 8-DOF map fixed by the correspondences, and the
+# two-fold ambiguity is a property of its DECOMPOSITION into (R, t, n) given K
+# (Faugeras & Lustman 1988: 8 solutions → 4 by plane-in-front → 2 by
+# cheirality, and those 2 are this ambiguity). Nothing in BB decomposes an H,
+# so the uncalibrated arm has no branch to select. A future consumer that does
+# decompose one inherits the ambiguity at that point — and none of this
+# machinery, since the disambiguation's likelihood ratio requires both branches refined
+# through the same scoring object.
 _pose_disambiguation(g::PoseGeometry) = g.pose_disambiguation
 _pose_disambiguation(::GeometryConfig) = nothing
 
@@ -3228,14 +3233,3 @@ function _features_outside_polys(image_features, polys)
     end
     return findall(keep)
 end
-
-# PoseGeometry opts into resolving the planar pose ambiguity; every other
-# geometry is branch-free BY CONSTRUCTION, not by omission: the plane-induced
-# homography is a unique 8-DOF map fixed by the correspondences, and the
-# two-fold ambiguity is a property of its DECOMPOSITION into (R, t, n) given K
-# (Faugeras & Lustman 1988: 8 solutions → 4 by plane-in-front → 2 by
-# cheirality, and those 2 are this ambiguity). Nothing in BB decomposes an H,
-# so the uncalibrated arm has no branch to select. A future consumer that does
-# decompose one inherits the ambiguity at that point — and none of this
-# machinery, since the likelihood ratio below requires both branches refined
-# through the same scoring object.

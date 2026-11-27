@@ -170,7 +170,8 @@ end
 
 # The launch policy of the adaptation kernels on `backend`, Core's `OnBackend`: a workgroup of 256 work items per
 # blob on a GPU, one on the host (`host_workgroupsize`). Each launch's ndrange is that group size times the blob
-# count, read back from the policy (`exec.workgroupsize`), so the size is stated once.
+# count, read back from the policy (`exec.workgroupsize`), so the size is stated once. (The per-blob-thread kernels,
+# `_lu6_kernel!` and `_apply_check_ka!`, one work item per blob, still launch at a group of 256 of their own.)
 _adapt_exec(backend::KA.Backend) = VgtkCore.OnBackend(backend; workgroupsize = 256, host_workgroupsize = 1)
 
 # A blob's pixel count and flat-buffer base; no pixels for a blob that is

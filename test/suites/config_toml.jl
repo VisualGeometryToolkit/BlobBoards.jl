@@ -27,7 +27,7 @@ const _CAM = VisualGeometryToolkitCore.BoundedCamera(
 _write(dir, name, s) = (p = joinpath(dir, name); write(p, s); p)
 # The pose arm's find from a `[find_boards.geometry.ransac]` table, and the disambiguation of its own local optimization.
 _pose_ransac(t = Dict{String, Any}()) = board_ransac_from_toml(VgtkEstimation.AbsolutePoseProblem, :absolute_pose, t)
-_disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r.local_optimization_strategy; scoring = r.scoring))
+_disambiguation(r) = PlanarPoseDisambiguation(BlobBoards._board_local_optimization(r))
 
 @testset "FindBoardsConfig from TOML" begin
 
@@ -90,6 +90,14 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
                 @test config_dict(back) == config_dict(cfg)
                 @test typeof(back) == typeof(cfg)     # concreteness survives the trip
             end
+        end
+    end
+
+    @testset "a version-1 file that tuned only [find_boards.ransac] keeps the default arm" begin
+        mktempdir() do dir
+            cfg = FindBoardsConfig(_write(dir, "v1.toml", "[find_boards.ransac]\nmax_trials = 5000\n"))
+            @test cfg.geometry isa HomographyGeometry
+            @test cfg.geometry.ransac.config.max_trials == 5000
         end
     end
 
@@ -435,7 +443,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
                     BlobBoards.config_dict(FindBoardsConfig())
             end
             # And the forbidden derived key stays refused (already enforced via
-            # _skip_fields → _allowed_keys; pinned here because the docstring once
+            # toml_skip_fields → allowed_keys; pinned here because the docstring once
             # taught it).
             mktemp() do path, io
                 write(

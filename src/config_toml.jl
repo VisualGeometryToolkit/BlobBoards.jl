@@ -87,7 +87,7 @@ function _nms_table(d, section)
     # table, so `nms = { type = "ellipse", cutof = 2.0 }` used to construct an
     # EllipseNms at the DEFAULT cutoff and report success — the typo'd-knob
     # failure this loader exists to prevent, one nesting level down.
-    _check_run_keys(d, v === nothing ? ["type"] : _allowed_keys(typeof(v), :type), section)   # `none` too
+    _check_run_keys(d, v === nothing ? ["type"] : allowed_keys(typeof(v), :type), section)   # `none` too
     return v
 end
 
@@ -136,7 +136,7 @@ function _detect_from_toml(d)
     # No `polarity`: it is a property of the boards being sought, recorded in
     # each bundle, and derived per run (see _board_settings). Asserting it here
     # could only agree — or disagree and silently filter away every blob.
-    _check_run_keys(d, _allowed_keys(DetectConfig), "find_boards.detect")
+    _check_run_keys(d, allowed_keys(DetectConfig), "find_boards.detect")
     kw = present_kwargs(
         d,
         "peak_threshold" => Float64,
@@ -169,7 +169,7 @@ function _blob_adaptation_from_toml(d)
     # (`_shared_image_cutoff`). Do not restore the key — oversize or undersize
     # the window with `scan_padding`, which is the lever for exactly that and
     # keeps the extent anchored to the print.
-    _check_run_keys(d, _allowed_keys(BlobAdaptation, :stops), "find_boards.blob_adaptation")
+    _check_run_keys(d, allowed_keys(BlobAdaptation, :stops), "find_boards.blob_adaptation")
     return BlobAdaptation(;
         present_kwargs(
             d,
@@ -235,7 +235,7 @@ arm another package registers (its [`geometry_from_toml`](@ref) method is one ca
 """
 function radial_geometry_from_toml(::Type{G}, ::Type{P}, tag::Symbol, d; camera = nothing, image_size,
         ransac_defaults::AbstractDict = Dict{String, Any}()) where {G, P}
-    _check_run_keys(d, _allowed_keys(G, :type), "find_boards.geometry")
+    _check_run_keys(d, allowed_keys(G, :type), "find_boards.geometry")
     image_size === nothing && throw(
         ArgumentError("[find_boards.geometry] type = \"$(tag)\" needs the image size: `image_size = (width, height)` beside the config")
     )
@@ -261,7 +261,7 @@ function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
                 "uncalibrated arm estimates H directly and has no second branch"
         )
     )
-    _check_run_keys(d, _allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
+    _check_run_keys(d, allowed_keys(HomographyGeometry, :type), "find_boards.geometry")
     camera === nothing || @warn "geometry type = \"homography\" ignores the `camera` keyword"
     return HomographyGeometry(;
         ransac = board_ransac_from_toml(HomographyProblem{Float64}, :homography, _ransac_table(d)),
@@ -270,7 +270,7 @@ function _geometry_arm(::Type{HomographyGeometry}, d, camera, _)
 end
 
 function _geometry_arm(::Type{PoseGeometry}, d, camera, _)
-    _check_run_keys(d, _allowed_keys(PoseGeometry, :type), "find_boards.geometry")
+    _check_run_keys(d, allowed_keys(PoseGeometry, :type), "find_boards.geometry")
     camera === nothing && throw(
         ArgumentError(
             "[find_boards.geometry] type = \"pose\" needs a camera: " *
@@ -316,7 +316,7 @@ function _pose_disambiguation_from_toml(d::AbstractDict, ransac)
     POSE_DISAMBIGUATION_TAGS[t] === nothing && throw(ArgumentError("[find_boards.geometry] pose_disambiguation = \"none\" is a string, not a table"))
     _check_run_keys(d, ["type", "min_separation", "same_basin"], "find_boards.geometry.pose_disambiguation")
     return PlanarPoseDisambiguation(
-        LocalOptimization(ransac.local_optimization_strategy; scoring = ransac.scoring);
+        _board_local_optimization(ransac);
         present_kwargs(d, "min_separation" => Float64, "same_basin" => Float64)...
     )
 end
@@ -460,12 +460,12 @@ _current_find_boards(table::AbstractDict) =
     migrate_config(Dict{String, Any}("find_boards" => table), BB_CONFIG_VERSIONS; source = "a [find_boards] table")["find_boards"]
 
 function _track_from_toml(d::AbstractDict)
-    _check_run_keys(d, _allowed_keys(TrackConfig), "find_boards.track")
+    _check_run_keys(d, allowed_keys(TrackConfig), "find_boards.track")
     return TrackConfig(; read_table(TrackConfig, d)...)   # Core's reader: each present key in its field's type
 end
 
 function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size = nothing)
-    _check_run_keys(fb, _allowed_keys(FindBoardsConfig), "find_boards")
+    _check_run_keys(fb, allowed_keys(FindBoardsConfig), "find_boards")
     return FindBoardsConfig(;
         detect = _detect_from_toml(get(fb, "detect", Dict{String, Any}())),
         blob_adaptation = _blob_adaptation_from_toml(get(fb, "blob_adaptation", Dict{String, Any}())),
@@ -474,13 +474,12 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
         track = _track_from_toml(get(fb, "track", Dict{String, Any}())),
         # The arm and its find (`[find_boards.geometry.ransac]`): absent keys inherit configs/default.toml (the ONE
         # default authority, as the arms' own constructors do).
+        # An absent table, or a table without a `type` (a version-1 file that tuned only `[find_boards.ransac]`,
+        # migrated to `[find_boards.geometry.ransac]`), inherits the file's default arm — not a restated literal
+        # that could drift from it.
         geometry = _geometry_from_toml(
-            get(
-                fb, "geometry",
-                # Absent table inherits the file's default arm — not a
-                # restated literal that could drift from it.
-                Dict{String, Any}("type" => toml_default(_TOML_DEFAULTS, "geometry", "type"))
-            ), camera, image_size
+            merge(Dict{String, Any}("type" => toml_default(_TOML_DEFAULTS, "geometry", "type")),
+                  get(fb, "geometry", Dict{String, Any}())), camera, image_size
         ),
         max_detections = haskey(fb, "max_detections") ?
             unbounded_from_toml(fb["max_detections"], "max_detections") : _dflt_max_detections(),
@@ -582,11 +581,6 @@ Derived from the structs by walking `fieldnames`, so it cannot fall out of
 sync with them: add a field to any config type and it appears here.
 """
 config_dict(c::FindBoardsConfig) = toml_table(c)
-
-# Allowed TOML keys, derived from the same field lists the writer walks — so a
-# new field is readable and writable together. Emitting a key the reader then
-# refuses is exactly the asymmetry this avoids.
-_allowed_keys(::Type{T}, extra::Symbol...) where {T} = allowed_keys(T, extra...)
 
 """
     write_config(path, config; extra = Dict(), versions = BB_CONFIG_VERSIONS,
