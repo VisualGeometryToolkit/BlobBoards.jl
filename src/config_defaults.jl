@@ -51,13 +51,15 @@ run_config_path() = normpath(joinpath(@__DIR__, "..", "configs", "default.toml")
     BB_CONFIG_VERSIONS
 
 BlobBoards' run-configuration converter (VisualGeometryToolkitCore's `ConfigVersions`): a run config's
-`[descriptor]` and `[find_boards]` tables are version 2 (configs/default.toml states `config_version = 2`), and
+`[descriptor]` and `[find_boards]` tables are version 3 (configs/default.toml states `config_version = 3`), and
 [`read_run_config`](@ref) reads a stored file of an earlier version through `migrate_config`, so the code sees the
 current tables only. Version 1 → 2 (BlobBoards 0.8): the arm's find is one `Ransac`, its table
 `[find_boards.geometry.ransac]` — `[find_boards.ransac]` moves there whole, the geometry's
 `local_optimization_strategy` joins it, and `outlier_halfwidth = h` becomes its
 `scoring = { type = "student_t_uniform", outlier_halfwidth = h }`; the pose arm's `resolve_pose_ambiguity = true`
-becomes `pose_disambiguation = { type = "planar_pose_disambiguation" }` (`false`: `"none"`).
+becomes `pose_disambiguation = { type = "planar_pose_disambiguation" }` (`false`: `"none"`). Version 2 → 3
+(BlobBoards 0.8): `[find_boards.adapt]` is `[find_boards.blob_adaptation]` ([`BlobAdaptation`](@ref)'s table), its
+`max_irls_iter` and `rtol` the solve's stops, `[find_boards.blob_adaptation.stops]` `max_iter` and `rtol`.
 """
 const BB_CONFIG_VERSIONS = ConfigVersions("BlobBoards",
     # version 1 → 2 (BlobBoards 0.8): an arm's algorithms are values, its find one `Ransac`
@@ -71,6 +73,14 @@ const BB_CONFIG_VERSIONS = ConfigVersions("BlobBoards",
                 Dict{String, Any}("type" => "student_t_uniform", "outlier_halfwidth" => h)),
             "find_boards.geometry.resolve_pose_ambiguity" => b -> ("find_boards.geometry.pose_disambiguation" =>
                 b ? Dict{String, Any}("type" => "planar_pose_disambiguation") : "none"),
+        ]),
+    # version 2 → 3 (BlobBoards 0.8): the adaptation's table is named after its algorithm (`BlobAdaptation`), its
+    # iteration cap and tolerance the solve's stops (`[find_boards.blob_adaptation.stops]`, decision 11)
+    ConfigMigration(; tables = ["descriptor", "find_boards"],
+        renames = [
+            "find_boards.adapt" => "find_boards.blob_adaptation",
+            "find_boards.blob_adaptation.max_irls_iter" => "find_boards.blob_adaptation.stops.max_iter",
+            "find_boards.blob_adaptation.rtol" => "find_boards.blob_adaptation.stops.rtol",
         ]);
     tables = ["descriptor", "find_boards"])
 

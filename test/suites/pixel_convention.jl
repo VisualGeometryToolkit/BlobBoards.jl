@@ -35,7 +35,7 @@ import KernelAbstractions as KA
     dets = detect_blobs(detect_img; config = cfg.detect, device)
     frames = adapt_detections(
         rescale_detections(dets, DEFAULT_CUTOFF), adapt_img;
-        cutoff = DEFAULT_CUTOFF, adapt_config = cfg.adapt, device,
+        cutoff = DEFAULT_CUTOFF, blob_adaptation = cfg.blob_adaptation, adaptation_stops = cfg.blob_adaptation_stops, device,
     )
     @test length(dets) == length(centres) && length(frames) == length(centres)
     nearest(pts, p) = pts[argmin([hypot((q - p)...) for q in pts])]

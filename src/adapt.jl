@@ -1,33 +1,57 @@
 using VisualGeometryToolkitCore: EllipticFrame, feature_frame, aspect_ratio
+using VisualGeometryToolkitCore: EnsembleProblem, EnsembleKernel, EnsembleResult, StoppingCriterion, StopWhenAny,
+    StopWhenIncrementLess, StopAfterIteration
 
 # =============================================================================
-# Blob Adaptation — Unified Interface
+# Blob Adaptation — an ensemble solve
 # =============================================================================
 #
-# adapt(detections, img; config=AdaptConfig(), device)
+# solve(EnsembleProblem(BlobBatch(detections, img), length(detections)), BlobAdaptation(; …), EnsembleKernel(device);
+#       stops) -> EnsembleResult
 #   Paraboloid IRLS in log-intensity space — Student-t/uniform mixture with
-#   whitened normal equations, backend-generic via KernelAbstractions
-#   (src/adapt_ka.jl): KA.CPU(), CUDABackend(), Metal, ROCm.
+#   whitened normal equations, one item per blob, backend-generic via
+#   KernelAbstractions (src/adapt_ka.jl): KA.CPU(), CUDABackend(), Metal, ROCm.
+#   `adapted_blobs(result)` is the kept blobs.
 #
 # filter_blobs(frames, detections; ...)
 #   Geometric quality filters on fitted frames.
 #
 # =============================================================================
 
-# =============================================================================
-# AdaptConfig — all adaptation hyperparameters in one struct
-# =============================================================================
-
 """
-    AdaptConfig(; kwargs...)
+    BlobAdaptation(; kwargs...)
 
-Configuration for blob adaptation (paraboloid fitting).
+The blob adaptation (paraboloid fitting) of an ensemble of blobs, a VisualGeometryToolkitCore `FitKind`:
+
+    solve(EnsembleProblem(BlobBatch(detections, img), length(detections)), BlobAdaptation(; …), EnsembleKernel(device);
+          stops = blob_adaptation_stops()) -> EnsembleResult
+
+Each detection (a `Detection` of `detect_blobs`, or a `Disc` of ground truth) is one item, fitted by the Student-t /
+uniform mixture IRLS (WLS in log-space with the f² correction and the sort-and-sweep posterior partition; not
+configurable), all of them in one KernelAbstractions launch per iteration on the `EnsembleKernel`'s backend. The model
+follows the blob's sample count: 20 or more fit the anisotropic paraboloid (6 parameters), 10 to 19 the isotropic one
+(4 parameters: a round blob, `C = c·I`), and a blob of fewer than 10 is dropped. A detection whose geometry is an
+`EllipticFrame` (the ASIFT pipeline's back-projected ellipses) seeds the IRLS from its shape.
+
+`stops` is a VisualGeometryToolkitCore `StoppingCriterion` evaluated per blob in the kernel after every accepted step
+(`stop_reason(stops, nothing, nothing, nothing, θ, θ_old, iteration)` on the blob's model parameters), and it must
+hold one `StopAfterIteration(max_iter)`, the budget (an `ArgumentError` otherwise). [`blob_adaptation_stops`](@ref)
+is the configured one: `StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter)`, the increment test first, so a
+blob that converges on the last iteration is converged.
+
+The result is an `EnsembleResult`, one entry per detection in order: `u[i]` the blob's [`BlobDetection`](@ref)
+(`id = i`, its outcome), or `nothing` where a gate dropped it; `retcode[i]` and `stop_rule[i]` its termination record —
+`(Success, IncrementSize)` converged, `(MaxIters, IterationCap)` capped (returned, flagged, unconverged), `(Failure,
+ShapeGate)` / `(InitialFailure, ShapeGate)` refused by the shape gate (`rejection` says why: `:not_peak` or
+`:aspect_ratio`; the blob keeps its previous iterate), and for a dropped blob `(InitialFailure, NoRule)` (oversize,
+clipped or too few samples: never fitted), `(Failure, NonFinite)` (a singular solve) or `(Failure, ShapeGate)` (the
+frame gates: not a peak, an invalid shape, a scale ratio beyond `max_scale_ratio`); `nsteps[i]` its IRLS iterations;
+`rms` NaN (the fit reports none). [`adapted_blobs`](@ref) is the kept blobs; [`count_unconverged`](@ref) and
+[`count_rejected`](@ref) count them.
 
 # IRLS
 - `spatial_weighting::Bool = true` — adaptive spatial weights from current shape
 - `cutoff::Float64 = 2.0` — pixel window in units of σ
-- `max_irls_iter::Int = 100` — maximum IRLS iterations (a blob still moving after it is returned flagged `retcode = ReturnCode.MaxIters`)
-- `rtol::Float64 = 1e-6` — relative parameter convergence threshold
 
 # Filtering
 - `min_intensity::Float64 = 1e-6` — minimum inverted intensity to include pixel
@@ -44,91 +68,106 @@ Configuration for blob adaptation (paraboloid fitting).
 - `max_clip_ratio::Float64 = 0.2` — reject if blob is clipped by image boundary
 - `max_aspect_ratio::Float64 = 10.0` — reject if ellipse axis ratio exceeds this
 
-Accumulation and the 6×6 solve run in Float64 wherever the backend supports
-it (Float32 on Metal); per-pixel staging is pinned Float32.
-(`store` was deleted 2026-09: inert since the KA port — no kernel read it.)
+The defaults are `[find_boards.blob_adaptation]` of configs/default.toml. Accumulation and the 6×6 solve run in
+Float64 wherever the backend supports it (Float32 on Metal, where `stops`' tolerances compare in Float32 too);
+per-pixel staging is pinned Float32.
 """
-Base.@kwdef struct AdaptConfig
-    spatial_weighting::Bool = toml_default(_TOML_DEFAULTS, "adapt", "spatial_weighting")
+Base.@kwdef struct BlobAdaptation <: VgtkCore.AbstractEstimationAlgorithm
+    spatial_weighting::Bool = toml_default(_TOML_DEFAULTS, "blob_adaptation", "spatial_weighting")
     # DATA, not configuration: the printed blob's boundary in units of sigma.
     # `find_boards` overrides it from the gallery (`_shared_image_cutoff`), so
     # the scan window, the clip test and the canonicalization extent cannot
-    # disagree. This default serves only the gallery-less callers (`adapt` used
+    # disagree. This default serves only the gallery-less callers (a solve run
     # directly, `annotate_blobs`). NOT a TOML key — tune `scan_padding` instead.
     cutoff::Float64 = DEFAULT_CUTOFF
-    max_irls_iter::Int = toml_default(_TOML_DEFAULTS, "adapt", "max_irls_iter")
-    rtol::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "rtol")
-    min_intensity::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "min_intensity")
-    max_scale_fraction::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_scale_fraction")
-    max_scale_ratio::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_scale_ratio")
-    scan_padding::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "scan_padding")
-    max_clip_ratio::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_clip_ratio")
-    max_aspect_ratio::Float64 = toml_default(_TOML_DEFAULTS, "adapt", "max_aspect_ratio")
+    min_intensity::Float64 = toml_default(_TOML_DEFAULTS, "blob_adaptation", "min_intensity")
+    max_scale_fraction::Float64 = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_scale_fraction")
+    max_scale_ratio::Float64 = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_scale_ratio")
+    scan_padding::Float64 = toml_default(_TOML_DEFAULTS, "blob_adaptation", "scan_padding")
+    max_clip_ratio::Float64 = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_clip_ratio")
+    max_aspect_ratio::Float64 = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_aspect_ratio")
+end
+VgtkCore.estimator_kind(::BlobAdaptation) = VgtkCore.FitKind()
+
+"""
+    BlobBatch(detections, img)
+
+The data of a [`BlobAdaptation`](@ref) ensemble: the blobs to fit (`detections`, a `Vector{Detection}` of
+`detect_blobs` or a `Vector{Disc}` of ground truth; the shapes lead) and the image they are fitted in. One
+`EnsembleProblem(BlobBatch(detections, img), length(detections))` is every blob, item `i` the `i`-th detection.
+Image detections are pixels by regime: px-united frames are stripped in px, bare ones kept.
+"""
+struct BlobBatch{D <: AbstractVector, I <: AbstractMatrix}
+    detections::D
+    img::I
 end
 
-# =============================================================================
-# adapt — Unified entry point
-# =============================================================================
-
-# Resolve the image-relative σ cap to pixels. Both solver arms already have
-# W and H in scope for their clip test, so this stays a host-side scalar.
-_max_scale_px(cfg::AdaptConfig, W, H) = cfg.max_scale_fraction * sqrt(float(W) * float(H))
-
 """
-    adapt(detections, img; config=AdaptConfig(), device = default_device()) -> Vector{BlobDetection}
+    blob_adaptation_stops(; max_iter, rtol) -> StoppingCriterion
 
-Fit elliptical frames to raw blob detections in `img` — the detections are the
-shapes being refined, so they lead. Both are typed, so a call in the retired
-`(img, detections)` order is a MethodError.
-
-Uses a unified IRLS loop with Student-t posterior weights.
-The solve step is the Student-t/uniform mixture: WLS in log-space with f²
-correction and the sort-and-sweep posterior partition. It is not configurable.
-The model follows the blob's sample count: 20 or more fit the anisotropic
-paraboloid (6 parameters), 10 to 19 the isotropic one (4 parameters: a round
-blob, `C = c·I`), and a blob of fewer than 10 is dropped.
-
-Accepts `Vector{Detection}` (from `detect_blobs`) or `Vector{Disc}` (ground truth).
-
-# Returns
-`Vector{BlobDetection{Float64}}` — fitted elliptical frames with `.id` indexing
-into the original detection vector, and the blob's outcome (see
-[`BlobDetection`](@ref)): converged at `rtol` (`retcode = ReturnCode.Success`),
-capped at `max_irls_iter` (`MaxIters`, unconverged), or rejected by the shape
-gate (`Failure`, or `InitialFailure` at the first step; `rejection` says why:
-`:not_peak` or `:aspect_ratio`; the blob keeps its previous iterate). Capped
-and rejected blobs are returned, flagged, never silently valid;
-[`count_unconverged`](@ref) and [`count_rejected`](@ref) count them.
+The stops of a [`BlobAdaptation`](@ref) solve. They are `StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter)`
+(VisualGeometryToolkitCore's criteria): a blob is converged once its step relative to its new parameters is below
+`rtol`, capped after `max_iter` iterations. The defaults are `[find_boards.blob_adaptation.stops]` of
+configs/default.toml (`max_iter = 100`, `rtol = 1e-6`).
 """
-function adapt(detections::AbstractVector, img::AbstractMatrix; config::AdaptConfig = AdaptConfig(), device = default_device())
-    # When the detection geometry is already an EllipticFrame (e.g. the
-    # GPU ASIFT pipeline back-projects each per-warp feature to
-    # an anisotropic input-frame ellipse), forward the frames and seed
-    # the paraboloid IRLS from S.S' instead of collapsing to a Disc.
-    # Image detections are px by regime: px-united frames strip in px, bare
-    # ones are kept (`strip_or_bare`).
-    sites = if !isempty(detections) && feature_frame(first(detections)) isa EllipticFrame
+blob_adaptation_stops(; max_iter::Integer = toml_default(_TOML_DEFAULTS, "blob_adaptation.stops", "max_iter"),
+                        rtol::Real = toml_default(_TOML_DEFAULTS, "blob_adaptation.stops", "rtol")) =
+    StopWhenIncrementLess(Float64(rtol)) | StopAfterIteration(Int(max_iter))
+
+# The budget of a stops criterion: its one `StopAfterIteration` (the host loop's iteration count).
+_stops_budget(c::StopAfterIteration) = c.n
+_stops_budget(c::StopWhenAny) = (n = [_stops_budget(x) for x in c.criteria if _has_budget(x)]; length(n) == 1 ? only(n) : _no_budget(c))
+_stops_budget(c::StoppingCriterion) = _no_budget(c)
+_has_budget(c::StopAfterIteration) = true
+_has_budget(c::StopWhenAny) = any(_has_budget, c.criteria)
+_has_budget(::StoppingCriterion) = false
+_no_budget(c) = throw(ArgumentError(
+    "BlobAdaptation: `stops` must hold one StopAfterIteration(max_iter), the iteration budget; got $(c)"))
+
+# The criterion at the accumulation precision `Ta` (a Float32 kernel compares in Float32).
+_stops_at(::Type{Ta}, c::StopWhenIncrementLess) where {Ta} = StopWhenIncrementLess(Ta(c.rtol))
+_stops_at(::Type{Ta}, c::StopWhenAny) where {Ta} = StopWhenAny(map(x -> _stops_at(Ta, x), c.criteria))
+_stops_at(::Type, c::StoppingCriterion) = c
+
+function VgtkCore.__solve(ens::EnsembleProblem{<:BlobBatch}, alg::BlobAdaptation, e::EnsembleKernel;
+                          stops::StoppingCriterion = blob_adaptation_stops())
+    (; detections, img) = ens.f
+    ens.n == length(detections) || throw(ArgumentError(
+        "BlobAdaptation: the ensemble's $(ens.n) items are not the batch's $(length(detections)) detections"))
+    return _adapt_ka(img, _adapt_sites(detections), alg, stops, e.backend)
+end
+
+# When the detection geometry is already an EllipticFrame (e.g. the GPU ASIFT pipeline back-projects each per-warp
+# feature to an anisotropic input-frame ellipse), forward the frames and seed the paraboloid IRLS from S.S' instead of
+# collapsing to a Disc. Image detections are px by regime: px-united frames strip in px, bare ones are kept
+# (`strip_or_bare`).
+_adapt_sites(discs::AbstractVector{<:Disc}) = strip_or_bare.(px, discs)
+_adapt_sites(detections::AbstractVector) =
+    if !isempty(detections) && feature_frame(first(detections)) isa EllipticFrame
         [strip_or_bare(px, feature_frame(d)) for d in detections]
     else
         [strip_or_bare(px, Disc(d)) for d in detections]
     end
-    return _adapt_ka(img, sites, config, device)
-end
 
-function adapt(discs::AbstractVector{<:Disc}, img::AbstractMatrix; config::AdaptConfig = AdaptConfig(), device = default_device())
-    # px regime: px-united discs strip in px, bare ones are kept.
-    return _adapt_ka(img, strip_or_bare.(px, discs), config, device)
-end
+"""
+    adapted_blobs(result::EnsembleResult) -> Vector{BlobDetection{Float64}}
 
-# Backend-generic KernelAbstractions adaptation (src/adapt_ka.jl): the same
-# KA kernels on KA.CPU() and on any GPU backend, with no backend hook (one
-# lgamma, one 6×6 solve).
+The blobs a [`BlobAdaptation`](@ref) solve kept, in detection order (each `id` its detection's index): the
+result's `u` without the dropped items.
+"""
+adapted_blobs(r::EnsembleResult{<:AbstractVector{Union{Nothing, BlobDetection{Float64}}}}) =
+    BlobDetection{Float64}[d for d in r.u if d !== nothing]
+
+# Resolve the image-relative σ cap to pixels. Both solver arms already have
+# W and H in scope for their clip test, so this stays a host-side scalar.
+_max_scale_px(alg::BlobAdaptation, W, H) = alg.max_scale_fraction * sqrt(float(W) * float(H))
+
 """
     count_unconverged(frames) -> Int
 
-The number of adapted frames whose IRLS was capped at `max_irls_iter` before
-meeting `rtol` (`retcode = ReturnCode.MaxIters`). Rejected blobs are not counted here
-(see [`count_rejected`](@ref)). See [`adapt`](@ref).
+The number of adapted frames whose IRLS was capped by its iteration budget before it
+converged (`retcode = ReturnCode.MaxIters`). Rejected blobs are not counted here
+(see [`count_rejected`](@ref)). See [`BlobAdaptation`](@ref).
 """
 count_unconverged(frames::AbstractVector) = count(f -> f.retcode == VgtkCore.ReturnCode.MaxIters, frames)
 
@@ -138,7 +177,7 @@ count_unconverged(frames::AbstractVector) = count(f -> f.retcode == VgtkCore.Ret
 
 The number of adapted frames whose IRLS step the shape gate refused. Those are
 `retcode = ReturnCode.Failure` or `InitialFailure`, `stop_rule = ShapeGate`; with `rejection`, only those
-refused for that reason, `:not_peak` or `:aspect_ratio`. See [`adapt`](@ref).
+refused for that reason, `:not_peak` or `:aspect_ratio`. See [`BlobAdaptation`](@ref).
 """
 count_rejected(frames::AbstractVector) = count(f -> f.stop_rule == VgtkCore.ShapeGate, frames)
 function count_rejected(frames::AbstractVector, rejection::Symbol)
@@ -159,7 +198,7 @@ Apply geometric quality filters to fitted blob detections.
 Uses `det.id` to look up the original detection for scale/drift comparisons.
 
 # Arguments
-- `frames`: Fitted detections from `adapt`
+- `frames`: Fitted detections, [`adapted_blobs`](@ref) of a [`BlobAdaptation`](@ref) solve
 - `detections`: Original detections (indexed by `frame.id`)
 
 # Keyword Arguments
@@ -177,10 +216,10 @@ function filter_blobs(
         frames, detections;
         cutoff = DEFAULT_CUTOFF,
         image = nothing,
-        max_aspect_ratio = toml_default(_TOML_DEFAULTS, "adapt", "max_aspect_ratio"),
-        max_scale_ratio = toml_default(_TOML_DEFAULTS, "adapt", "max_scale_ratio"),
+        max_aspect_ratio = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_aspect_ratio"),
+        max_scale_ratio = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_scale_ratio"),
         max_center_drift = 10.0,
-        max_clip_ratio = toml_default(_TOML_DEFAULTS, "adapt", "max_clip_ratio")
+        max_clip_ratio = toml_default(_TOML_DEFAULTS, "blob_adaptation", "max_clip_ratio")
     )
     image_rect = image !== nothing ? Rect(Size2(image)) : nothing
 

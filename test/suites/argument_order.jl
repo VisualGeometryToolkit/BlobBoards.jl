@@ -72,11 +72,12 @@ using VisualGeometryToolkitCore: CameraModel, LogicalIntrinsics, CameraCalibrati
 
     @testset "shapes lead the image they are sampled from" begin
         @test !applicable(BlobBoards.canonicalize, img, frames)
-        @test !applicable(BlobBoards.adapt, img, frames)
-        @test !applicable(BlobBoards.adapt, img, discs)
+        @test !isdefined(BlobBoards, :adapt)                             # the adaptation is BlobAdaptation's ensemble solve
+        @test_throws MethodError BlobBoards.BlobBatch(img, frames)
+        @test_throws MethodError BlobBoards.BlobBatch(img, discs)
         @test applicable(BlobBoards.canonicalize, frames, img)
-        @test applicable(BlobBoards.adapt, frames, img)
-        @test applicable(BlobBoards.adapt, discs, img)
+        @test BlobBoards.BlobBatch(frames, img) isa BlobBoards.BlobBatch
+        @test BlobBoards.BlobBatch(discs, img) isa BlobBoards.BlobBatch
     end
 
     @testset "a given homography leads the frames it relates" begin

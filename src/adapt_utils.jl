@@ -10,13 +10,13 @@ import VisualGeometryToolkitEstimation
 
 # =============================================================================
 # Solve-type tags — select the per-blob solver/objective. Shared by the GPU
-# adaptation extension and `AdaptConfig`.
+# adaptation extension and `BlobAdaptation`.
 # (The CPU paraboloid implementation that consumed these was removed.)
 # =============================================================================
 # NB no `SolveType` hierarchy. There were three — WhitenedLinearSolveType,
-# LinearSolveType, HqSolveType — selectable via `AdaptConfig.solve`. Two of
+# LinearSolveType, HqSolveType — selectable via the adaptation config's `solve`. Two of
 # them were fiction: adaptation was GPU-only at the time, and the CUDA
-# `_adapt` dispatched on `AdaptConfig{T}` alone, so whitened-vs-unwhitened
+# `_adapt` dispatched on the config's type parameter alone, so whitened-vs-unwhitened
 # never reached a kernel and picking `linear` changed nothing. The third (half-quadratic Welsch) was
 # a real alternative arm that measured worse than the Student-t mixture and
 # was not used. Removed 2026-08: the solver is the Student-t/uniform mixture

@@ -88,15 +88,18 @@ end
 """
     trace_pipeline(cam, img; detect_config, cutoff=DEFAULT_CUTOFF,
                    device=KA.CPU(),
-                   adapt_arms=[:default => AdaptConfig(cutoff = cutoff)])
+                   adapt_arms=[:default => BlobAdaptation(; cutoff)],
+                   adaptation_stops=blob_adaptation_stops())
         -> PipelineTrace
 
-Run detect → adapt → filter, capturing every intermediate. All `adapt_arms`
-consume the same detections. Supply `cam = nothing` to skip undistortion.
+Run detect → adapt → filter, capturing every intermediate. All `adapt_arms` (each a
+[`BlobAdaptation`](@ref), solved with `adaptation_stops`) consume the same detections. Supply
+`cam = nothing` to skip undistortion.
 
 Registration (when a gallery + bundles + network are given) runs under ONE
-`FindBoardsConfig` — geometry from `cam`, `detect = detect_config`, `adapt` =
-the FIRST arm of `adapt_arms` — and that same config is what the trace records.
+`FindBoardsConfig` — geometry from `cam`, `detect = detect_config`, `blob_adaptation` =
+the FIRST arm of `adapt_arms` and its stops `adaptation_stops` — and that same config is what
+the trace records.
 """
 function trace_pipeline(
         # Typed so a call in the retired `(img, cam)` order is a MethodError.
@@ -105,8 +108,9 @@ function trace_pipeline(
         detect_config::DetectConfig = DetectConfig(),
         cutoff::Real = DEFAULT_CUTOFF,
         device = default_device(),
-        adapt_arms::AbstractVector{<:Pair{Symbol, <:AdaptConfig}} =
-            [:default => AdaptConfig(cutoff = cutoff)],
+        adapt_arms::AbstractVector{<:Pair{Symbol, BlobAdaptation}} =
+            [:default => BlobAdaptation(; cutoff)],
+        adaptation_stops::VgtkCore.StoppingCriterion = blob_adaptation_stops(),
         board_feature_dict = nothing,
         board_bundles = nothing,
         descriptor_network = nothing,
@@ -120,7 +124,8 @@ function trace_pipeline(
     # out of the record.
     arms = []
     for (name, acfg) in adapt_arms
-        frames = adapt(detections, adapt_img; config = acfg, device)
+        frames = adapted_blobs(VgtkCore.solve(EnsembleProblem(BlobBatch(detections, adapt_img), length(detections)), acfg,
+                                              EnsembleKernel(device); stops = adaptation_stops))
         filtered = filter_blobs(
             frames, detections; cutoff,
             image = adapt_img, max_clip_ratio = 0.0
@@ -141,7 +146,7 @@ function trace_pipeline(
         find_config, FindBoardsConfig(
             geometry = cam === nothing ? HomographyGeometry() : PoseGeometry(cam),
             detect = detect_config,
-            adapt = last(first(adapt_arms))
+            blob_adaptation = last(first(adapt_arms)), blob_adaptation_stops = adaptation_stops
         )
     )
     registration = if board_feature_dict === nothing || board_bundles === nothing ||

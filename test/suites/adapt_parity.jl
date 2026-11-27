@@ -5,7 +5,7 @@
 # the level the architecture note licenses: frame-level with tolerances, never
 # bitwise — CUDA's atomic pixel-slot assignment jitters even GPU-vs-GPU runs.
 #
-# `adapt` returns VALID frames only, id-indexed (`_finalize_frames` drops
+# `adapted_blobs` of a `BlobAdaptation` solve is the VALID frames only, id-indexed (`_finalize_frames` drops
 # failed fits) — so parity is judged by MATCHING IDS: a frame present on one
 # side only is a validity disagreement (none is allowed),
 # and centroids are compared on the common id set.
@@ -15,6 +15,7 @@ using Test
 using BlobBoards
 using BlobBoards.KernelAbstractions: CPU
 using CUDA: CUDA, CUDABackend
+import VisualGeometryToolkitCore
 using VisualGeometryToolkitCore: centroid, feature_frame, successful_retcode
 using Random
 using Colors: Gray
@@ -42,9 +43,11 @@ if CUDA.functional()
         img_g = Gray.(img)
         dets = BlobBoards.detect_blobs(img_g; device = CPU())
         @test length(dets) >= 30
-        cfg = BlobBoards.AdaptConfig()
-        cpu = BlobBoards.adapt(dets, img_g; config = cfg, device = CPU())
-        gpu = BlobBoards.adapt(dets, img_g; config = cfg, device = CUDABackend())
+        alg = BlobBoards.BlobAdaptation(); stops = BlobBoards.blob_adaptation_stops()
+        ens(device) = BlobBoards.adapted_blobs(VisualGeometryToolkitCore.solve(VisualGeometryToolkitCore.EnsembleProblem(
+            BlobBoards.BlobBatch(dets, img_g), length(dets)), alg, VisualGeometryToolkitCore.EnsembleKernel(device); stops))
+        cpu = ens(CPU())
+        gpu = ens(CUDABackend())
         by_id(v) = Dict(f.id => f for f in v)
         c, g = by_id(cpu), by_id(gpu)
         common = intersect(keys(c), keys(g))

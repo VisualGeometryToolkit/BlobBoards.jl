@@ -24,7 +24,7 @@ using VisualGeometryToolkitFeatures: gray_f32
 Detect blobs in an image via the KernelAbstractions ASIFT pipeline, then apply
 the detection cap (`max_detections`, Features' `spread_strongest`).
 
-Returns raw detections. Use `adapt` for shape fitting and `filter_blobs`
+Returns raw detections. Use [`BlobAdaptation`](@ref) for shape fitting and `filter_blobs`
 for quality filtering.
 
 # Keyword Arguments
@@ -42,7 +42,7 @@ detector backend consumes — that's why it lives here rather than on
 There is deliberately no `cutoff`: detection is scale-space extrema and is
 cutoff-INDEPENDENT. The kwarg existed "for API parity" and was a documented
 no-op, which made `cutoff` look like a detection parameter when it is
-actually a property of the BOARD, consumed downstream by `adapt`,
+actually a property of the BOARD, consumed downstream by the adaptation,
 `filter_blobs` and `canonicalize`. That misreading is what let a run config
 state a cutoff that disagreed with the boards.
 
@@ -54,8 +54,9 @@ only knows `Disc` bbox IoU and is bypassed).
 # Example
 ```julia
 detections = detect_blobs(img)
-frames = adapt(detections, img; cutoff=2.0)
-frames = filter_blobs(frames, detections; cutoff=2.0)
+res = solve(EnsembleProblem(BlobBatch(detections, img), length(detections)), BlobAdaptation(; cutoff = 2.0),
+            EnsembleKernel(default_device()); stops = blob_adaptation_stops())
+frames = filter_blobs(adapted_blobs(res), detections; cutoff=2.0)
 ```
 """
 function detect_blobs(
@@ -208,7 +209,7 @@ what the detector reports to `σ₀`. The shape matrix is `S = σ·A⁻¹` (VGF'
 back-projection), so scaling `S` scales σ and leaves the warp's tilt/angle
 untouched.
 
-This is consumed by `adapt`, which sizes its per-blob fitting window from
+This is consumed by the adaptation ([`BlobAdaptation`](@ref)), which sizes its per-blob fitting window from
 `characteristic_scale` — an unbiased scale gives a correctly sized window.
 It does NOT correct the scale adaptation converges to: that fit re-estimates
 scale from the pixel data and is insensitive to its seed (measured: adapted

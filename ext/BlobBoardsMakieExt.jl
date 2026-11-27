@@ -221,7 +221,7 @@ undistorted-image coordinates), or `camera === nothing` with world→image
 homographies. Backend-agnostic.
 
 `detections` optionally overlays measured image features (e.g. adapted
-elliptical frames from `adapt`, or `feature_frame.(detect_blobs(img))`) in a
+elliptical frames from a `BlobAdaptation` solve (`adapted_blobs`), or `feature_frame.(detect_blobs(img))`) in a
 contrasting color, so model-projected blobs and actual detections can be
 compared in the same axis.
 

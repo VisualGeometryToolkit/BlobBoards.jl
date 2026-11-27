@@ -279,7 +279,8 @@ function extract_image_features(
         cutoff = DEFAULT_CUTOFF,
         device::KA.Backend = default_device(),
         detect_img = img,
-        adapt_config = AdaptConfig(),
+        blob_adaptation::BlobAdaptation = BlobAdaptation(),
+        adaptation_stops::VgtkCore.StoppingCriterion = blob_adaptation_stops(),
         detect_config::DetectConfig = DetectConfig(),
         max_detections::Int = typemax(Int),
         patch_size::Int = 64
@@ -291,13 +292,13 @@ function extract_image_features(
     )
     return describe_detections(
         model, detections, img;
-        cutoff, device, adapt_config, patch_size
+        cutoff, device, blob_adaptation, adaptation_stops, patch_size
     )
 end
 
 """
     describe_detections(model, detections, img; cutoff, device,
-                        adapt_config, patch_size) -> StructArray{DescribedFeature}
+                        blob_adaptation, adaptation_stops, patch_size) -> StructArray{DescribedFeature}
 
 Adapt → filter → canonicalize → describe a FIXED detection set at one `cutoff`.
 
@@ -315,10 +316,11 @@ function describe_detections(
         model, detections::AbstractVector, img::AbstractMatrix;
         cutoff = DEFAULT_CUTOFF,
         device::KA.Backend = default_device(),
-        adapt_config = AdaptConfig(),
+        blob_adaptation::BlobAdaptation = BlobAdaptation(),
+        adaptation_stops::VgtkCore.StoppingCriterion = blob_adaptation_stops(),
         patch_size::Int = 64
     )
-    frames = adapt_detections(detections, img; cutoff, adapt_config, device)
+    frames = adapt_detections(detections, img; cutoff, blob_adaptation, adaptation_stops, device)
     return describe_frames(
         model, frames, img; inner_extent = cutoff,
         device, patch_size
@@ -326,9 +328,10 @@ function describe_detections(
 end
 
 """
-    adapt_detections(detections, img; cutoff, adapt_config, device) -> frames
+    adapt_detections(detections, img; cutoff, blob_adaptation, adaptation_stops, device) -> frames
 
-Fit elliptic frames to raw detections and drop the unusable ones. Independent
+Fit elliptic frames to raw detections ([`BlobAdaptation`](@ref)'s ensemble solve with `adaptation_stops`, its
+[`adapted_blobs`](@ref)) and drop the unusable ones. Independent
 of the descriptor's sampling extent, so it is done ONCE per polarity group and
 shared (see `_find_boards_grouped`).
 
@@ -339,19 +342,22 @@ a partially observed blob has a biased centre and a meaningless descriptor.
 """
 adapt_detections(
     detections::AbstractVector, img::AbstractMatrix; cutoff = DEFAULT_CUTOFF,
-    adapt_config = AdaptConfig(),
+    blob_adaptation::BlobAdaptation = BlobAdaptation(),
+    adaptation_stops::VgtkCore.StoppingCriterion = blob_adaptation_stops(),
     device::KA.Backend = default_device()
 ) =
     filter_blobs(
     # ONE extent for all three consumers. `cutoff` is the gallery's
     # (`_shared_image_cutoff`): it sets the adaptation scan window, the clip
     # test below, and — via `describe_detections` — the canonicalization inner
-    # extent. It used to reach only the last two while `adapt` read
-    # `AdaptConfig.cutoff` from the TOML, so a board set whose printed cutoff
+    # extent. It used to reach only the last two while the adaptation read
+    # its `cutoff` from the TOML, so a board set whose printed cutoff
     # differed from that value was FIT at one boundary and then clipped and
     # described at another, three lines apart and with no warning.
     # `scan_padding` is the lever for over/undersizing the window.
-    adapt(detections, img; config = ConstructionBase.setproperties(adapt_config, (; cutoff)), device),
+    adapted_blobs(VgtkCore.solve(EnsembleProblem(BlobBatch(detections, img), length(detections)),
+                                 ConstructionBase.setproperties(blob_adaptation, (; cutoff)), EnsembleKernel(device);
+                                 stops = adaptation_stops)),
     detections;
     cutoff, image = img, max_clip_ratio = 0.0
 )
@@ -1879,7 +1885,9 @@ and determines which path runs.
   (every real set) keep exactly what `detect_blobs(; max_detections=…)` keeps.
 
 # Adaptation (blob fitting)
-- `adapt::AdaptConfig = AdaptConfig()`: Adaptation configuration
+- `blob_adaptation::BlobAdaptation = BlobAdaptation()`: the blob adaptation (`[find_boards.blob_adaptation]`)
+- `blob_adaptation_stops = blob_adaptation_stops()`: its stops (`[find_boards.blob_adaptation.stops]`: `max_iter`,
+  `rtol`), `StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter)`
 
 # Geometry estimator
 - `geometry::GeometryConfig = HomographyGeometry()`: the estimator arm, its
@@ -1937,7 +1945,7 @@ loosening this bar re-admits flipped poses along with good ones.
   slots), so end-to-end reproducibility is "given features".
 
 Every field is CONCRETE by design: this config is read inside the per-board
-fitting loop, so an abstract field (`adapt::AdaptConfig`, `geometry`) would
+fitting loop, so an abstract field (`blob_adaptation`, `geometry`) would
 force boxing and dynamic dispatch on every access. Keep it that way when
 adding fields.
 
@@ -1962,7 +1970,7 @@ This works through ConstructionBase's generic `setproperties`, which is
 correct here only because every one of these structs is a plain `@kwdef`
 with no inner constructor — so its positional constructor matches its field
 order. Adding a validating inner constructor to `FindBoardsConfig`,
-`DetectConfig`, `AdaptConfig` or a `GeometryConfig` silently breaks the
+`DetectConfig`, `BlobAdaptation` or a `GeometryConfig` silently breaks the
 override idiom; `test/test_config_toml.jl` gates that, including the
 type-changing case (`@set cfg.detect.nms = EllipseNms(...)`, which alters a
 type parameter).
@@ -1977,8 +1985,9 @@ Base.@kwdef struct FindBoardsConfig{G <: GeometryConfig, N}
     # BB-side post-detection cap (forwarded to `detect_blobs(; max_detections=…)`
     # via `extract_image_features`). Default `typemax(Int)` ⇒ no cap.
     max_detections::Int = _dflt_max_detections()
-    # Adaptation
-    adapt::AdaptConfig = AdaptConfig()
+    # Adaptation: the algorithm and its stops (`[find_boards.blob_adaptation]`, its `.stops`)
+    blob_adaptation::BlobAdaptation = BlobAdaptation()
+    blob_adaptation_stops::StopWhenAny{Tuple{StopWhenIncrementLess{Float64}, StopAfterIteration}} = blob_adaptation_stops()
     # Geometry estimator — picks homography vs P3P path via dispatch.
     geometry::G = HomographyGeometry()
     # Base seed for the per-fit RANSAC streams: every board's fit draws from
@@ -2182,13 +2191,13 @@ function _describe_for_boards(prep, dets, model, config, shared_cutoff, device::
     # last point at which an unbiased scale still buys anything.
     dets = rescale_detections(dets, shared_cutoff)
     # NB the filter boundary is DEFAULT_CUTOFF BY DESIGN, decoupled from
-    # `config.adapt.cutoff`: the image-side clip test is a shared,
-    # board-agnostic gate, so sweeping adapt.cutoff changes the IRLS
+    # `config.blob_adaptation.cutoff`: the image-side clip test is a shared,
+    # board-agnostic gate, so sweeping its cutoff changes the IRLS
     # window but NOT the border filter. Both are 2.0 at defaults.
     frames = adapt_detections(
         dets, prep.adapt_img;
         cutoff = DEFAULT_CUTOFF,
-        adapt_config = config.adapt, device
+        blob_adaptation = config.blob_adaptation, adaptation_stops = config.blob_adaptation_stops, device
     )
     # ONE describe at the shared extent — per-cutoff description removed
     # (see the design note above _bundle_polarity).

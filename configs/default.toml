@@ -61,9 +61,10 @@
 # WHERE the data lives is per-machine, WHICH network to use is not.
 
 # The version of this file's layout (`BB_CONFIG_VERSIONS`): version 1 (0.7 and earlier, no key) kept the arm's
-# RANSAC configuration in `[find_boards.ransac]` and its half-width and strategy in `[find_boards.geometry]`; a stored
-# file of it is read through VisualGeometryToolkitCore's `migrate_config`.
-config_version = 2
+# RANSAC configuration in `[find_boards.ransac]` and its half-width and strategy in `[find_boards.geometry]`; version 2
+# kept the adaptation in `[find_boards.adapt]`, its `max_irls_iter` and `rtol` beside its settings. A stored file of
+# either is read through VisualGeometryToolkitCore's `migrate_config`.
+config_version = 3
 
 [descriptor]
 # RealFourthIteration log-polar s96 network (exported 2026-08-10 from
@@ -144,16 +145,14 @@ tilts = []   # empty = the IMAS-25 schedule
 # tilted warps' merged-blob streaks erased the small blobs inside them.
 nms = { type = "ellipse", cutoff = 2.0, band_octaves = 1.0, band_reach = 1 }
 
-[find_boards.adapt]
+[find_boards.blob_adaptation]
 # NB no `cutoff` here: it is the printed board's, supplied from the gallery
 # (`_shared_image_cutoff`) so the scan window, the clip test and the
 # canonicalization extent cannot disagree. Use `scan_padding` to over- or
 # undersize the window.
 min_intensity = 1.0e-6
 scan_padding = 1.0
-max_irls_iter = 100                    # quality knob, not just a convergence cap
 spatial_weighting = true
-rtol = 1.0e-6
 # sigma cap as a FRACTION of the image's sqrt(area): sigma > f*sqrt(W*H) is
 # skipped. A resource guard - a blob's fitted support is ~(2*cutoff*sigma)^2,
 # so an unbounded sigma is an OOM - expressed relatively because the same
@@ -163,6 +162,11 @@ max_scale_fraction = 0.1
 max_scale_ratio = 4.0                  # dimensionless
 max_clip_ratio = 0.2                   # dimensionless
 max_aspect_ratio = 10.0                # dimensionless
+
+[find_boards.blob_adaptation.stops]
+# The solve's stops: StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter).
+max_iter = 100                         # quality knob, not just a convergence cap
+rtol = 1.0e-6                          # the step relative to the new parameters
 
 [find_boards.track]
 # Board tracking across frames (`track_boards`) — every keyword of that

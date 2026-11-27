@@ -18,7 +18,7 @@
 #   Float64 on CUDA/CPU (arithmetic identical to the legacy kernels),
 #   Float32 on Metal (which has no Float64 at all — a DISTINCT numeric
 #   regime, never claimed as parity). Per-pixel storage stays
-#   Float32 staging (the deleted `AdaptConfig.store`'s only value) exactly as before.
+#   Float32 staging (the deleted config field `store`'s only value) exactly as before.
 #
 # - ONE lgamma on every backend: Core's `lgamma_lanczos` (device-safe; the
 #   owner's ruling of 2026-11-11 retired SpecialFunctions' `loggamma` on the CPU
@@ -588,47 +588,48 @@ end
     end
 end
 
-# A blob's IRLS state in `d_converged` (Int32): 0 live, `_ADAPT_CONVERGED`
-# when Core's `StopWhenIncrementLess(rtol)` stopped it (the relative step below `rtol`), `_ADAPT_NOT_PEAK` /
-# `_ADAPT_ASPECT_RATIO` when the shape gate refused the step (the blob keeps
-# its previous iterate). Every kernel reads "live" as `== 0`, so each stop ends
-# the blob's iterations. A blob still live after `max_irls_iter` was capped.
+# A blob's IRLS state in `d_converged` (Int32): 0 live, `_ADAPT_STOPPED`
+# when the solve's `stops` ended it (its record in `d_code`/`d_rule`: Core's
+# `StopWhenIncrementLess(rtol)` converged it, or its `StopAfterIteration`
+# budget capped it), `_ADAPT_NOT_PEAK` / `_ADAPT_ASPECT_RATIO` when the shape
+# gate refused the step (the blob keeps its previous iterate). Every kernel
+# reads "live" as `== 0`, so each stop ends the blob's iterations. A blob
+# still live when no iteration ran (a budget of 0) was capped.
 # The owner's §14 rulings for BlobBoards (2026-11-11): every returned frame
 # records its outcome (`_blob_outcome`); a capped blob is UNCONVERGED, a
 # refused one REJECTED, and neither is silently valid.
-const _ADAPT_CONVERGED = Int32(1)
+const _ADAPT_STOPPED = Int32(1)
 const _ADAPT_NOT_PEAK = Int32(2)
 const _ADAPT_ASPECT_RATIO = Int32(3)
 const _REJECTION = Dict(Int32(0) => :none, _ADAPT_NOT_PEAK => :not_peak, _ADAPT_ASPECT_RATIO => :aspect_ratio)
 
-# The outcome record of one blob, in VisualGeometryToolkitCore's termination
-# vocabulary (§14). Converged (rtol on the relative parameter step) and capped
-# are the reweighted fits' one record, VisualGeometryToolkitEstimation's
-# `irls_retcode` and `irls_stop_rule`: Success / IncrementSize and MaxIters / IterationCap. A
-# singular solve only invalidates its blob (no frame), so its record is not used.
-# Refused by the shape gate is BlobBoards' own (no stack form): Failure /
-# ShapeGate, or InitialFailure when the very first step from the seed was
-# refused; `rejection` names the gate that refused.
-function _blob_outcome(state::Int32, initial::Bool)
+# The outcome record of one fitted blob, in VisualGeometryToolkitCore's
+# termination vocabulary (§14): the record the solve's `stops` gave it
+# (`(Success, IncrementSize)` converged, `(MaxIters, IterationCap)` capped), the
+# budget's when no iteration ran. A singular solve only invalidates its blob
+# (no frame). Refused by the shape gate is BlobBoards' own (no stack form):
+# Failure / ShapeGate, or InitialFailure when the very first step from the seed
+# was refused; `rejection` names the gate that refused.
+function _blob_outcome(state::Int32, code::VgtkCore.ReturnCode.T, rule::VgtkCore.StopRule, initial::Bool)
     RC = VgtkCore.ReturnCode
-    if state == _ADAPT_CONVERGED || state == Int32(0)    # converged, or capped at max_irls_iter
-        converged = state == _ADAPT_CONVERGED
-        return (; retcode = VgtkEstimation.irls_retcode(converged, false), stop_rule = VgtkEstimation.irls_stop_rule(converged, false),
-                  rejection = :none)
-    end
+    state == _ADAPT_STOPPED && return (; retcode = code, stop_rule = rule, rejection = :none)
+    state == Int32(0) && return (; retcode = RC.MaxIters, stop_rule = VgtkCore.IterationCap, rejection = :none)
     return (; retcode = initial ? RC.InitialFailure : RC.Failure, stop_rule = VgtkCore.ShapeGate, rejection = _REJECTION[state])
 end
 
 # Apply solution + convergence/validity check — one thread per blob.
 # Mirrors legacy: LU failure invalidates; !is_peak or aspect violation
-# reverts to θ_old and stops; otherwise apply + the convergence check, Core's
-# `StopWhenIncrementLess(rtol)` (`increment`, isbits, `rtol` at the accumulation precision).
+# reverts to θ_old and stops; otherwise apply + the solve's `stops` (isbits,
+# its tolerances at the accumulation precision) on the blob's model parameters
+# after iteration `iter`, its record in `code`/`rule`. `nsteps` counts the
+# blob's iterations.
 @kernel inbounds = true unsafe_indices = true function _apply_check_ka!(
-        theta, @Const(theta_old), @Const(AtWz), @Const(info), valid, converged,
-        @Const(np), increment, max_aspect_ratio
+        theta, @Const(theta_old), @Const(AtWz), @Const(info), valid, converged, code, rule, nsteps,
+        @Const(np), stops, iter, max_aspect_ratio
     )
     blob = @index(Global, Linear)
     if blob <= size(theta, 2) && valid[blob] && converged[blob] == Int32(0)
+        nsteps[blob] += Int32(1)
         if info[blob] != Int32(0)
             valid[blob] = false
         else
@@ -645,10 +646,13 @@ end
                 for j in 1:6
                     theta[j, blob] = θ[j]
                 end
-                # Core's increment test on the blob's m model parameters (no state, method or problem read)
-                VgtkCore.stop_reason(increment, nothing, nothing, nothing, view(theta, 1:Int(m), blob),
-                                     view(theta_old, 1:Int(m), blob), 0) === VgtkCore.CONTINUE ||
-                    (converged[blob] = _ADAPT_CONVERGED)
+                # Core's criteria on the blob's m model parameters (no state, method or problem read)
+                rr = VgtkCore.stop_reason(stops, nothing, nothing, nothing, view(theta, 1:Int(m), blob),
+                                          view(theta_old, 1:Int(m), blob), iter)
+                if rr !== VgtkCore.CONTINUE
+                    converged[blob] = _ADAPT_STOPPED
+                    code[blob], rule[blob] = rr
+                end
             end
         end
     end
@@ -768,11 +772,12 @@ end
 # =============================================================================
 
 function _adapt_ka(
-        img, sites::AbstractVector{S}, cfg::AdaptConfig,
+        img, sites::AbstractVector{S}, cfg::BlobAdaptation, stops::VgtkCore.StoppingCriterion,
         device::KA.Backend
     ) where {S <: Union{Disc, EllipticFrame}}
     N = length(sites)
-    N == 0 && return BlobDetection{Float64}[]
+    max_iter = _stops_budget(stops)
+    N == 0 && return _unfitted(N)
 
     # Accumulation/solve precision by backend capability: Float64 on
     # CUDA/CPU (identical to the legacy kernels), Float32 on Metal.
@@ -782,7 +787,6 @@ function _adapt_ka(
     gs = exec.workgroupsize
 
     cutoff = cfg.cutoff
-    max_irls_iter = cfg.max_irls_iter
     spatial_weighting = cfg.spatial_weighting
 
     # The kernels promote per-pixel loads to Ta. The image is on `device`
@@ -828,7 +832,7 @@ function _adapt_ka(
         offsets[i + 1] = offsets[i] + n_alloc[i]
     end
     total_pixels = Int(offsets[N + 1])
-    total_pixels == 0 && return BlobDetection{Float64}[]
+    total_pixels == 0 && return _unfitted(N)
 
 
     d_cx = ka_upload(Ta, device, cx_vec)
@@ -838,7 +842,7 @@ function _adapt_ka(
     d_valid = ka_upload(Bool, device, collect(valid))
     d_offsets = ka_upload(Int32, device, offsets)
 
-    # Per-pixel staging at Float32 — the only value AdaptConfig.store ever
+    # Per-pixel staging at Float32 — the only value the config field `store` ever
     # took before its 2026-09 deletion; kernels promote to Ta on every read.
     d_A = KA.zeros(device, Float32, total_pixels, 6)
     d_v = KA.zeros(device, Float32, total_pixels)
@@ -901,6 +905,10 @@ function _adapt_ka(
     d_info = KA.zeros(device, Int32, N)
     d_theta_old = KA.zeros(device, Ta, 6, N)
     d_converged = KA.zeros(device, Int32, N)
+    d_code = KA.allocate(device, VgtkCore.ReturnCode.T, N); fill!(d_code, VgtkCore.ReturnCode.Default)
+    d_rule = KA.allocate(device, VgtkCore.StopRule, N); fill!(d_rule, VgtkCore.NoRule)
+    d_iterations = KA.zeros(device, Int32, N)
+    kernel_stops = _stops_at(Ta, stops)
     KA.synchronize(device)
 
     # --- Initial residuals + fused sort/median/sweep + initial weights ---
@@ -921,7 +929,7 @@ function _adapt_ka(
 
     # --- IRLS loop ---
     initial = falses(N)    # refused at the first step from the seed (InitialFailure)
-    for iter in 1:max_irls_iter
+    for iter in 1:max_iter
         copyto!(d_theta_old, d_theta)
 
         d_AtWA .= zero(Ta)
@@ -938,8 +946,8 @@ function _adapt_ka(
         )
 
         _apply_check_ka!(device, 256)(
-            d_theta, d_theta_old, d_AtWz, d_info, d_valid_live, d_converged,
-            d_np, VgtkCore.StopWhenIncrementLess(Ta(cfg.rtol)), Ta(cfg.max_aspect_ratio);
+            d_theta, d_theta_old, d_AtWz, d_info, d_valid_live, d_converged, d_code, d_rule, d_iterations,
+            d_np, kernel_stops, iter, Ta(cfg.max_aspect_ratio);
             ndrange = 256 * cld(N, 256)
         )
 
@@ -962,24 +970,36 @@ function _adapt_ka(
 
     # --- Download + convert ---
     valid_live = Array(d_valid_live)
-    for i in 1:N
-        valid[i] = valid[i] && valid_live[i]
-    end
     theta_out = Array(d_theta)
     state = Array(d_converged)
-    outcomes = [_blob_outcome(state[i], initial[i]) for i in 1:N]
-    frames = _finalize_frames(sites, valid, outcomes, theta_out, σ_vec, cfg)
-    n_capped = count(i -> valid[i] && state[i] == Int32(0), 1:N)
-    n_not_peak = count(i -> valid[i] && state[i] == _ADAPT_NOT_PEAK, 1:N)
-    n_aspect_ratio = count(i -> valid[i] && state[i] == _ADAPT_ASPECT_RATIO, 1:N)
-    n_initial = count(i -> valid[i] && initial[i], 1:N)
-    @debug "adapt: blob IRLS outcomes (before the frame gates)" n_blobs = N n_frames = length(frames) n_capped n_not_peak n_aspect_ratio n_initial max_irls_iter
-    return frames
+    codes = Array(d_code); rules = Array(d_rule); nsteps = Int.(Array(d_iterations))
+    code_out = fill(VgtkCore.ReturnCode.InitialFailure, N)    # never fitted: oversize, clipped, too few samples
+    rule_out = fill(VgtkCore.NoRule, N)
+    for i in 1:N
+        valid[i] || continue
+        if valid_live[i]
+            o = _blob_outcome(state[i], codes[i], rules[i], initial[i])
+            code_out[i], rule_out[i] = o.retcode, o.stop_rule
+        else                                                  # a singular solve
+            valid[i] = false
+            code_out[i], rule_out[i] = VgtkCore.ReturnCode.Failure, VgtkCore.NonFinite
+        end
+    end
+    u = _finalize_frames(sites, valid, state, codes, rules, initial, theta_out, σ_vec, cfg)
+    for i in 1:N   # the frame gates dropped a fitted blob
+        valid[i] && u[i] === nothing && ((code_out[i], rule_out[i]) = (VgtkCore.ReturnCode.Failure, VgtkCore.ShapeGate))
+    end
+    @debug "adapt: blob IRLS outcomes" n_blobs = N n_frames = count(!isnothing, u) n_capped = count(i -> valid[i] && code_out[i] == VgtkCore.ReturnCode.MaxIters, 1:N) n_not_peak = count(i -> valid[i] && state[i] == _ADAPT_NOT_PEAK, 1:N) n_aspect_ratio = count(i -> valid[i] && state[i] == _ADAPT_ASPECT_RATIO, 1:N) n_initial = count(i -> valid[i] && initial[i], 1:N) max_iter
+    return EnsembleResult(u, code_out, rule_out, nsteps, fill(NaN, N))
 end
 
-# Shared finalize: θ → Paraboloid3D → EllipticFrame with the legacy gates.
-function _finalize_frames(sites, valid, outcomes, theta_out::AbstractMatrix, σ_vec, cfg::AdaptConfig)
-    frames = BlobDetection{Float64}[]
+# The result of an ensemble no blob of which was fitted (no detection, or no pixel to scan).
+_unfitted(N) = EnsembleResult(Union{Nothing, BlobDetection{Float64}}[nothing for _ in 1:N], fill(VgtkCore.ReturnCode.InitialFailure, N),
+                              fill(VgtkCore.NoRule, N), zeros(Int, N), fill(NaN, N))
+
+# Shared finalize: θ → Paraboloid3D → EllipticFrame with the legacy gates, one entry per blob (`nothing`: dropped).
+function _finalize_frames(sites, valid, state, codes, rules, initial, theta_out::AbstractMatrix, σ_vec, cfg::BlobAdaptation)
+    frames = Vector{Union{Nothing, BlobDetection{Float64}}}(nothing, length(sites))
     for i in eachindex(sites)
         valid[i] || continue
         θ = SVector{6, Float64}(Float64(theta_out[j, i]) for j in 1:6)
@@ -993,7 +1013,7 @@ function _finalize_frames(sites, valid, outcomes, theta_out::AbstractMatrix, σ_
         frame = EllipticFrame(Point2(cx, cy), p)
         sr = characteristic_scale(frame) / σ
         (sr > cfg.max_scale_ratio || sr < 1 / cfg.max_scale_ratio) && continue
-        push!(frames, Detection(frame, (; id = i, outcomes[i]...)))
+        frames[i] = Detection(frame, (; id = i, _blob_outcome(state[i], codes[i], rules[i], initial[i])...))
     end
     return frames
 end

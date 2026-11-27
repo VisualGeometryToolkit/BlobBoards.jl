@@ -456,11 +456,16 @@ const PINNED_PATTERN_V3_JSON = """
     # `Ransac` under `[find_boards.geometry.ransac]` (its scorer written with both priors), so the run-config tree moves;
     # the values are unchanged. The annotation hash does NOT move: it hashes the arm's RANSAC budget under the key it
     # always did (`config_hash`).
+    # Re-pinned 2026-11-27 (0.8.0) for a LAYOUT change, the run configuration's version 3: the adaptation's table is
+    # `[find_boards.blob_adaptation]` (`BlobAdaptation`), its `max_irls_iter` and `rtol` the stops' `max_iter` and
+    # `rtol` under `[find_boards.blob_adaptation.stops]` (ba8e5b8a… → 63d0cd75…). The values are unchanged: version 2's
+    # default tree migrated by BB_CONFIG_VERSIONS is this tree. The annotation hash does NOT move: it hashes the
+    # adaptation as version 2's `[find_boards.adapt]` (`config_hash`).
     @testset "annotation and run-config hashes" begin
         @test BlobBoards.config_hash(;
             config = BlobBoards.FindBoardsConfig(), cutoff = 2.0, patch_size = 64, outer_extent = 1.5, min_iou = 0.5
         ) == "fbd5d8ccf864b904584b0578e69f59fd9e169ca6637c2a459df4a40e58d9158b"
         @test _sha(BlobBoards.canonical_config_json(BlobBoards.config_dict(BlobBoards.FindBoardsConfig()))) ==
-            "ba8e5b8a0003b1e601da2834c0daebfadaf2ddbe910e24543adce826e7019562"
+            "63d0cd7596aefb3698837fa1c64d434bfb720c3a48408538dc08dd7e02b63f6d"
     end
 end

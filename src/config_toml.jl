@@ -102,17 +102,17 @@ end
 # Retirement is (section, key)-scoped: `patch_size` is retired from
 # [descriptor], not from every table — `[find_boards.detect] patch_size`
 # is a typo and must still fail loudly.
-#   ("find_boards.adapt", "init") — AdaptConfig.init (:disc/:ls); no reader
+#   ("find_boards.blob_adaptation", "init") — the adaptation's init (:disc/:ls); no reader
 #                  ever existed (package-cleanup audit 2026-08-31).
 #   ("descriptor", "patch_size") — removed when the patch size became the
 #                  ONNX graph's declaration (src/descriptor.jl); recorded
 #                  sidecars still carry it (package-cleanup audit 2026-08-31).
-#   ("find_boards.adapt", "store") — per-pixel storage precision; inert since
+#   ("find_boards.blob_adaptation", "store") — per-pixel storage precision; inert since
 #                  the KA port (598f535 dropped the reader), deleted 2026-09.
 const _RETIRED_RUN_KEYS = Set(
     [
-        ("find_boards.adapt", "init"), ("descriptor", "patch_size"),
-        ("find_boards.adapt", "store"),
+        ("find_boards.blob_adaptation", "init"), ("descriptor", "patch_size"),
+        ("find_boards.blob_adaptation", "store"),
     ]
 )
 
@@ -154,13 +154,13 @@ function _detect_from_toml(d)
     return DetectConfig(; kw...)
 end
 
-function _adapt_from_toml(d)
+function _blob_adaptation_from_toml(d)
     # NO `cutoff` KEY. It belongs to the BOARD, like polarity: it is the printed
     # blob's boundary, and it is simultaneously the adaptation scan window, the
     # clip test's extent and the canonicalization inner extent. A configured
     # value can disagree with the gallery's and make the two sides' descriptors
     # incomparable — SILENTLY, which is what happened while this key existed
-    # (the example board set spans 1.75..1.995, so adapt scanned at 2.0 while
+    # (the example board set spans 1.75..1.995, so the adaptation scanned at 2.0 while
     # filter_blobs and describe used the 1.8725 mean).
     #
     # This key was dropped ONCE BEFORE and that removal WAS a bug: nothing fed
@@ -169,15 +169,13 @@ function _adapt_from_toml(d)
     # (`_shared_image_cutoff`). Do not restore the key — oversize or undersize
     # the window with `scan_padding`, which is the lever for exactly that and
     # keeps the extent anchored to the print.
-    _check_run_keys(d, _allowed_keys(AdaptConfig), "find_boards.adapt")
-    return AdaptConfig(;
+    _check_run_keys(d, _allowed_keys(BlobAdaptation, :stops), "find_boards.blob_adaptation")
+    return BlobAdaptation(;
         present_kwargs(
             d,
             "min_intensity" => Float64,
             "scan_padding" => Float64,
-            "max_irls_iter" => Int,
             "spatial_weighting" => Bool,
-            "rtol" => Float64,
             "max_scale_fraction" => Float64,
             "max_scale_ratio" => Float64,
             "max_clip_ratio" => Float64,
@@ -185,6 +183,18 @@ function _adapt_from_toml(d)
         )...
     )
 end
+
+# `[find_boards.blob_adaptation.stops]`: `max_iter` and `rtol` (absent: configs/default.toml's), the solve's
+# `StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter)`.
+function _blob_adaptation_stops_from_toml(d)
+    _check_run_keys(d, ["max_iter", "rtol"], "find_boards.blob_adaptation.stops")
+    return blob_adaptation_stops(; present_kwargs(d, "max_iter" => Int, "rtol" => Float64)...)
+end
+# Its inverse: the one stops form a run config holds.
+_blob_adaptation_stops_toml(s::StopWhenAny{Tuple{StopWhenIncrementLess{Float64}, StopAfterIteration}}) =
+    Dict{String, Any}("max_iter" => s.criteria[2].n, "rtol" => s.criteria[1].rtol)
+
+
 
 # The camera is DATA, not configuration — it is calibrated, not chosen — so it
 # arrives as a keyword rather than a path in the file. `type = "pose"` without
@@ -385,7 +395,7 @@ Unknown keys in any section are an error. A typo'd knob that silently runs at
 its default is the failure mode this loader exists to prevent.
 
 ```toml
-config_version = 2
+config_version = 3
 
 [find_boards]
 min_similarity = 0.6
@@ -458,7 +468,9 @@ function _find_boards_from_toml(fb::AbstractDict; camera = nothing, image_size =
     _check_run_keys(fb, _allowed_keys(FindBoardsConfig), "find_boards")
     return FindBoardsConfig(;
         detect = _detect_from_toml(get(fb, "detect", Dict{String, Any}())),
-        adapt = _adapt_from_toml(get(fb, "adapt", Dict{String, Any}())),
+        blob_adaptation = _blob_adaptation_from_toml(get(fb, "blob_adaptation", Dict{String, Any}())),
+        blob_adaptation_stops = _blob_adaptation_stops_from_toml(
+            get(get(fb, "blob_adaptation", Dict{String, Any}()), "stops", Dict{String, Any}())),
         track = _track_from_toml(get(fb, "track", Dict{String, Any}())),
         # The arm and its find (`[find_boards.geometry.ransac]`): absent keys inherit configs/default.toml (the ONE
         # default authority, as the arms' own constructors do).
@@ -487,7 +499,7 @@ end
 # --- the inverse: ONE source of truth ------------------------------------------
 #
 # `config_dict` is DERIVED from the structs, not hand-listed. It used to be a
-# literal naming every field, and nothing kept it exhaustive: AdaptConfig's
+# literal naming every field, and nothing kept it exhaustive: the adaptation's
 # cutoff/min_intensity/scan_padding and DetectConfig's tilts
 # were consumed by the pipeline (the CUDA kernel reads `cfg.cutoff`) and
 # emitted by nothing, so `write_config` produced sidecars that reloaded to
@@ -507,12 +519,14 @@ end
 toml_skip_fields(::Type{<:PoseGeometry}) = (:camera,)    # data, supplied at load
 toml_skip_fields(::Type{<:RadialHomographyGeometry}) = (:image_size,)  # data, supplied at load
 toml_skip_fields(::Type{<:DetectConfig}) = (:polarity,)  # derived from the bundles
-toml_skip_fields(::Type{<:AdaptConfig}) = (:cutoff,)     # data, from the gallery
+toml_skip_fields(::Type{<:BlobAdaptation}) = (:cutoff,)  # data, from the gallery
+toml_skip_fields(::Type{<:FindBoardsConfig}) = (:blob_adaptation_stops,)   # written inside [find_boards.blob_adaptation]
 
 # Per-field overrides for the four non-mechanical cases.
 toml_field(c::FindBoardsConfig, ::Val{:max_detections}) = toml_unbounded(c.max_detections)
 toml_field(c::FindBoardsConfig, ::Val{:detect}) = toml_table(c.detect)
-toml_field(c::FindBoardsConfig, ::Val{:adapt}) = toml_table(c.adapt)
+toml_field(c::FindBoardsConfig, ::Val{:blob_adaptation}) =
+    merge(toml_table(c.blob_adaptation), Dict{String, Any}("stops" => _blob_adaptation_stops_toml(c.blob_adaptation_stops)))
 toml_field(c::FindBoardsConfig, ::Val{:geometry}) = _geometry_toml(c.geometry)
 toml_field(c::FindBoardsConfig, ::Val{:track}) = toml_table(c.track)
 toml_field(c::DetectConfig, ::Val{:nms}) = _nms_toml(c.nms)

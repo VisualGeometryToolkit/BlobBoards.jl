@@ -192,7 +192,7 @@ Student-t + uniform mixture at the arm's outlier half-width, then a local optimi
 `[find_boards.geometry.ransac]`, its scorer and strategy tagged tables:
 
 ```toml
-config_version = 2
+config_version = 3
 
 [find_boards.geometry]
 type = "homography"
@@ -214,16 +214,16 @@ bounds in `[find_boards.ransac]`) still loads: `read_run_config` migrates it
 
 ## Blob outcomes
 
-[`adapt`](@ref BlobBoards.adapt) fits each detected blob's elliptical frame with an IRLS, and
-records how each fit ended in the blob's metadata (see [`BlobDetection`](@ref)). A blob
-of 20 or more samples fits an anisotropic paraboloid; one of 10 to 19 samples
-(a small, faint or edge-clipped blob) a round one, and is judged on that fit;
-one of fewer than 10 is dropped.
+[`BlobAdaptation`](@ref BlobBoards.BlobAdaptation) fits each detected blob's elliptical frame with an IRLS, every
+blob one item of a VisualGeometryToolkitCore `EnsembleProblem` solved in one KernelAbstractions launch per iteration,
+and records how each fit ended (the result's `retcode` and `stop_rule` per blob, and the blob's metadata: see
+[`BlobDetection`](@ref)). A blob of 20 or more samples fits an anisotropic paraboloid; one of 10 to 19 samples (a
+small, faint or edge-clipped blob) a round one, and is judged on that fit; one of fewer than 10 is dropped.
 
 | `retcode` | `stop_rule` | The blob |
 |---|---|---|
 | `:Success` | `:IncrementSize` | converged: the step fell below `rtol` |
-| `:MaxIters` | `:IterationCap` | unconverged: capped at `max_irls_iter` (default 100) |
+| `:MaxIters` | `:IterationCap` | unconverged: capped at `max_iter` (default 100) |
 | `:Failure` | `:ShapeGate` | rejected: the shape gate refused a step, and the blob keeps its previous iterate |
 | `:InitialFailure` | `:ShapeGate` | rejected at the first step from its seed |
 
@@ -234,15 +234,21 @@ with [`count_unconverged`](@ref BlobBoards.count_unconverged) and
 [`count_rejected`](@ref BlobBoards.count_rejected):
 
 ```julia
+using VisualGeometryToolkitCore: solve, EnsembleProblem, EnsembleKernel
 detections = BlobBoards.detect_blobs(img)
-frames = BlobBoards.adapt(detections, img)
-BlobBoards.count_unconverged(frames)              # capped at max_irls_iter
+res = solve(EnsembleProblem(BlobBoards.BlobBatch(detections, img), length(detections)), BlobBoards.BlobAdaptation(),
+            EnsembleKernel(BlobBoards.default_device()); stops = BlobBoards.blob_adaptation_stops())
+frames = BlobBoards.adapted_blobs(res)            # the kept blobs; res.u[i] is detection i's (or nothing)
+BlobBoards.count_unconverged(frames)              # capped at max_iter
 BlobBoards.count_rejected(frames)                 # refused by the shape gate
 BlobBoards.count_rejected(frames, :aspect_ratio)  # refused for one reason
 ```
 
-The iteration cap and `rtol` are the `[find_boards.adapt]` keys of
-`configs/default.toml` ([`AdaptConfig`](@ref BlobBoards.AdaptConfig)'s `max_irls_iter` and `rtol`).
+The iteration cap and `rtol` are the solve's `stops`, the `[find_boards.blob_adaptation.stops]` keys of
+`configs/default.toml` ([`blob_adaptation_stops`](@ref BlobBoards.blob_adaptation_stops)`(; max_iter, rtol)`:
+`StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter)`); the adaptation's other settings are
+`[find_boards.blob_adaptation]`. A configuration of `config_version = 2` (its `[find_boards.adapt]` table with
+`max_irls_iter` and `rtol`) still loads through [`BlobBoards.BB_CONFIG_VERSIONS`](@ref).
 
 ## Video: `track_boards`
 

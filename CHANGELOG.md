@@ -5,7 +5,7 @@
 A breaking release on VisualGeometryToolkitCore 0.14 (`[compat]` VisualGeometryToolkitCore `"0.14"`,
 VisualGeometryToolkitEstimation `"0.13"`, VisualGeometryToolkitFeatures `"0.10"`, VisualGeometryToolkitIO `"0.12"`,
 LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algorithm)`. The task verbs `find_boards`,
-`track_boards`, `find_board` and `adapt` are unchanged.
+`track_boards` and `find_board` are unchanged.
 
 ### Changed (breaking)
 
@@ -56,6 +56,29 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   The run-config hash (`canonical_config_json(config_dict(FindBoardsConfig()))`) is re-pinned: a layout-only
   identity move (759414ed… → ba8e5b8a…), the values unchanged. The annotation `config_hash` does not move (it hashes
   the arm's RANSAC budget under the key it always did; pinned in the suite).
+- **The blob adaptation is an ensemble solve.** `adapt(detections, img; config = AdaptConfig(), device)` →
+  `solve(EnsembleProblem(BlobBatch(detections, img), length(detections)), BlobAdaptation(; …), EnsembleKernel(device);
+  stops = blob_adaptation_stops(; max_iter, rtol))` (VisualGeometryToolkitCore 0.14's `EnsembleProblem` batch form, one
+  item per detection, a `FitKind`), and `adapted_blobs(result)` the kept blobs (`adapt`'s return value, the same
+  `BlobDetection`s in the same order). `adapt` and `AdaptConfig` are gone: `AdaptConfig`'s settings are
+  `BlobAdaptation`'s fields, its `max_irls_iter` and `rtol` the solve's `stops`, Core's criteria
+  `StopWhenIncrementLess(rtol) | StopAfterIteration(max_iter)` evaluated per blob in the kernel (a `stops` with no
+  `StopAfterIteration` is refused: the budget). The result is an `EnsembleResult`, one entry per detection: `u[i]` its
+  `BlobDetection` or `nothing` where a gate dropped it, `retcode[i]`/`stop_rule[i]` its termination record (a dropped
+  blob's too: `(InitialFailure, NoRule)` never fitted, `(Failure, NonFinite)` a singular solve, `(Failure, ShapeGate)`
+  the frame gates), `nsteps[i]` its iterations (new), `rms` NaN. `FindBoardsConfig`'s field `adapt` is
+  `blob_adaptation::BlobAdaptation` and `blob_adaptation_stops`; the keyword `adapt_config` of
+  `extract_image_features`, `describe_detections` and `adapt_detections` is `blob_adaptation` and `adaptation_stops`;
+  `trace_pipeline`'s `adapt_arms` are `BlobAdaptation`s, solved with its `adaptation_stops`. Same frames, bit for bit
+  on the CPU and the GPU.
+- **Run configuration version 3** (`config_version = 3`, decision 11): `[find_boards.adapt]` is
+  `[find_boards.blob_adaptation]`, its `max_irls_iter` and `rtol` `[find_boards.blob_adaptation.stops]` `max_iter` and
+  `rtol`. `read_run_config` migrates a version-2 file (and a version-1 one through both steps) value for value; a
+  version-2 name in a version-3 file is refused, naming the current one; the retired keys `init` and `store` move with
+  the table and still warn. The configs of record (bmvc2026's, CaliBlobs' and icra2026's, read in place) load to the
+  same values. The run-config hash is re-pinned for the layout (ba8e5b8a… → 63d0cd75…): version 2's default tree
+  migrated is version 3's. The annotation `config_hash` does not move (it hashes the adaptation as version 2's
+  `[find_boards.adapt]`).
 - `track_boards` keeps one find cache per track: `init(EstimationProblem(f, (; extent)), ransac; rng)` on its first
   warm frame, then `solve!(reinit!(cache; f, p, rng = board_rng(seed, uid)))` per frame (was a fresh solve per frame):
   the same draws, the same bits, the workspace kept.
@@ -82,11 +105,12 @@ LocalOptimizationDoneRight `"0.8"`), whose estimators are `solve(problem, algori
   `r.metadata.quality`) and `weights(r)`.
 - No exception to the duplication gate: DUPLICATION.toml is deleted. The defaults are read by Core's `toml_default`
   directly (`toml_default(_TOML_DEFAULTS, table, key)`; the package's `_dflt` and its `_board_dflt`,
-  `_pattern_dflt` and `_raster_dflt` siblings are gone); `adapt`'s launch policy is Core's `OnBackend(backend;
+  `_pattern_dflt` and `_raster_dflt` siblings are gone); the adaptation's launch policy is Core's `OnBackend(backend;
   workgroupsize = 256, host_workgroupsize = 1)` (was `_adapt_groupsize`); the training gallery's ONNX provider is
-  `KernelAbstractions.isgpu(device) ? :cuda : :cpu` (was `_execution_provider`). `adapt`'s per-blob record is
-  Estimation's `irls_retcode` and `irls_stop_rule` (was `irls_termination`). Same values, bit for bit on the CPU.
-- `adapt`'s per-blob convergence test is VisualGeometryToolkitCore's `StopWhenIncrementLess(rtol)` (Core 0.14, set 3),
+  `KernelAbstractions.isgpu(device) ? :cuda : :cpu` (was `_execution_provider`). The adaptation's per-blob record is
+  the record its stops return, Core's `(Success, IncrementSize)` and `(MaxIters, IterationCap)` (was
+  `irls_termination`). Same values, bit for bit on the CPU.
+- The adaptation's per-blob convergence test is VisualGeometryToolkitCore's `StopWhenIncrementLess(rtol)` (Core 0.14, set 3),
   evaluated in the apply kernel on the blob's model parameters (`rtol` at the accumulation precision); the kernel's own
   copy of the increment rule is gone. Same values, bit for bit on the CPU and the GPU.
 - `max_detections`' uncapped count is read and written by VisualGeometryToolkitCore's one TOML encoding,

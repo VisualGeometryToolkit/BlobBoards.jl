@@ -8,7 +8,7 @@
 #   DETECTION:   find_boards               →  per-board `uid => FoundBoard` (the board's
 #                                              FitResult and its correspondences)  # weights in correspondences.weights
 #
-# Everything else — the pipeline stages (detect_blobs, adapt, canonicalize,
+# Everything else — the pipeline stages (detect_blobs, BlobAdaptation, canonicalize,
 # describe), verification internals, annotation/training tooling, and ruler
 # plumbing — is intentionally NOT exported. It remains accessible as
 # `BlobBoards.name` and is declared `public` below where it forms a
@@ -126,8 +126,9 @@ function replay end
 # 4. ADVANCED / SUPPORTED-UNEXPORTED — use as `BlobBoards.name`
 # -----------------------------------------------------------------------------
 # Pipeline stages (find_boards composes these; useful standalone for research)
-public detect_blobs, adapt, count_unconverged, count_rejected, filter_blobs, canonicalize, describe
-public AdaptConfig, TrackConfig
+public detect_blobs, BlobAdaptation, BlobBatch, blob_adaptation_stops, adapted_blobs, count_unconverged, count_rejected,
+    filter_blobs, canonicalize, describe
+public TrackConfig
 public Telemetry, with_tag           # experiment instrumentation sinks for find_boards (pipeline.jl)
 public prepare_image_features       # detect-once seam (sweeps, annotate, track)
 public find_board                          # single-board match+estimate

@@ -1751,12 +1751,11 @@ function build_absolute_tracks(
     # detect + adapt + filter, once per frame and shared by every board in it.
     function detect_frame(img; H_aug = nothing)
         detections = detect_blobs(img; max_detections, device = backend)
-        frames = adapt(
-            detections, img;
-            config = AdaptConfig(; cutoff = detect_cutoff, max_scale_fraction = 0.3), device = backend
-        )
+        res = VgtkCore.solve(EnsembleProblem(BlobBatch(detections, img), length(detections)),
+                             BlobAdaptation(; cutoff = detect_cutoff, max_scale_fraction = 0.3), EnsembleKernel(backend);
+                             stops = blob_adaptation_stops())
         frames = filter_blobs(
-            frames, detections;
+            adapted_blobs(res), detections;
             cutoff = detect_cutoff, image = img
         )
         # Perspective-augmentation clip filter: `filter_blobs` above checks the
@@ -1826,7 +1825,7 @@ function build_absolute_tracks(
         board_bundles, device = backend,
         config = FindBoardsConfig(
             max_detections = max_detections,
-            adapt = AdaptConfig(; cutoff = detect_cutoff)
+            blob_adaptation = BlobAdaptation(; cutoff = detect_cutoff)
         )
     )
 

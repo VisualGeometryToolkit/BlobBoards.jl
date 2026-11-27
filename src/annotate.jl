@@ -84,6 +84,11 @@ function config_hash(; config::FindBoardsConfig, cutoff, patch_size, outer_exten
     # the key it was hashed under before it moved into the arm (`[find_boards.geometry.ransac]`, version 2), so an
     # annotation directory's identity does not move with the table's.
     fb["ransac"] = VgtkEstimation.config_dict(config.geometry.ransac.config)
+    # Likewise the adaptation, hashed as version 2's `[find_boards.adapt]` (its stops' `max_iter` and `rtol` beside its
+    # settings, as `max_irls_iter` and `rtol`), so the identity does not move with version 3's table.
+    ad = pop!(fb, "blob_adaptation")
+    st = pop!(ad, "stops")
+    fb["adapt"] = merge(ad, Dict{String, Any}("max_irls_iter" => st["max_iter"], "rtol" => st["rtol"]))
     tree = Dict{String, Any}(
         "find_boards" => fb,
         "cutoff" => Float64(cutoff), "patch_size" => Int(patch_size),

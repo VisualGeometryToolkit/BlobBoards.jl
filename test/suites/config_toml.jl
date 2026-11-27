@@ -7,7 +7,7 @@ using TOML
 using Accessors: @set
 using BlobBoards: FindBoardsConfig, write_config, read_run_config, config_dict,
     DetectConfig, EllipseNms, MxmNms, PoseGeometry, HomographyGeometry,
-    AdaptConfig, DetectConfig, PlanarPoseDisambiguation, GlobalUndistortion, board_ransac_from_toml
+    BlobAdaptation, DetectConfig, PlanarPoseDisambiguation, GlobalUndistortion, board_ransac_from_toml
 using VisualGeometryToolkitEstimation: RansacConfig
 import VisualGeometryToolkitEstimation as VgtkEstimation
 using VisualGeometryToolkitCore: StudentTUniformScoring
@@ -82,7 +82,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
 
                 cfg = FindBoardsConfig(
                     geometry = geom, detect = DetectConfig(nms = nms),
-                    adapt = AdaptConfig(), min_similarity = 0.55
+                    blob_adaptation = BlobAdaptation(; scan_padding = 1.25), blob_adaptation_stops = BlobBoards.blob_adaptation_stops(; max_iter = 30, rtol = 1.0e-5), min_similarity = 0.55
                 )
                 p = joinpath(dir, "rt.toml")
                 write_config(p, cfg)
@@ -101,7 +101,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
             cfg = FindBoardsConfig(p)
             @test isconcretetype(typeof(cfg))
             @test isconcretetype(typeof(cfg.detect))
-            @test isconcretetype(typeof(cfg.adapt))
+            @test isconcretetype(typeof(cfg.blob_adaptation)) && isconcretetype(typeof(cfg.blob_adaptation_stops))
             @test isconcretetype(typeof(cfg.geometry))
         end
     end
@@ -192,10 +192,10 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
             )
             # `solve` is gone entirely: the Student-t/uniform mixture is the
             # solver, not a choice. Two of the three former options never reached
-            # a kernel (the CUDA _adapt dispatches on AdaptConfig{T} alone) and the
+            # a kernel (the CUDA _adapt dispatched on its config type alone) and the
             # third measured worse. A config naming one is now refused.
             @test_throws ArgumentError FindBoardsConfig(
-                _write(dir, "solve.toml", "[find_boards.adapt]\nsolve = { type = \"whitened_linear\" }\n"); camera = _CAM
+                _write(dir, "solve.toml", "config_version = 3\n[find_boards.blob_adaptation]\nsolve = { type = \"whitened_linear\" }\n"); camera = _CAM
             )
             @test_throws ArgumentError FindBoardsConfig(
                 _write(dir, "geom.toml", "[find_boards.geometry]\ntype = \"p3p\"\n"); camera = _CAM
@@ -218,13 +218,13 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
             @test_throws ArgumentError FindBoardsConfig(
                 _write(dir, "pol.toml", "[find_boards.detect]\npolarity = \"dark\"\n")
             )
-            # `adapt.cutoff` is refused for the SAME reason, and the argument
+            # `blob_adaptation.cutoff` is refused for the SAME reason, and the argument
             # that once made it a run knob has been answered. It is not merely
             # the paraboloid scan window: it is simultaneously the clip test's
             # extent and the canonicalization inner extent, and those are the
             # board's own printed boundary. A configured value that disagrees
             # with the gallery's makes the two sides' descriptors incomparable
-            # SILENTLY (the example set spans 1.75..1.995, so adapt scanned at
+            # SILENTLY (the example set spans 1.75..1.995, so the adaptation scanned at
             # 2.0 while filter_blobs and describe used the 1.8725 mean).
             #
             # This key was dropped once before and that removal WAS a bug —
@@ -233,8 +233,9 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
             # gallery (`_shared_image_cutoff`). To widen or narrow the window,
             # use `scan_padding`, which keeps the extent anchored to the print.
             @test_throws ArgumentError FindBoardsConfig(
-                _write(dir, "cut.toml", "[find_boards.adapt]\ncutoff = 2.5\n")
+                _write(dir, "cut.toml", "config_version = 3\n[find_boards.blob_adaptation]\ncutoff = 2.5\n")
             )
+            @test_throws ArgumentError FindBoardsConfig(_write(dir, "cut2.toml", "[find_boards.adapt]\ncutoff = 2.5\n"))   # a version-1 file too
 
             # The pose disambiguation is calibrated-only: the two-fold ambiguity is
             # a property of decomposing H into (R, t, n) given K, so the
@@ -316,8 +317,10 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
         @test cfg.min_appearance_support == toml["min_appearance_support"]
         @test cfg.detect.peak_threshold == toml["detect"]["peak_threshold"]
         @test cfg.detect.edge_threshold == toml["detect"]["edge_threshold"]
-        @test cfg.adapt.max_scale_fraction == toml["adapt"]["max_scale_fraction"]
-        @test cfg.adapt.max_scale_ratio == toml["adapt"]["max_scale_ratio"]
+        @test cfg.blob_adaptation.max_scale_fraction == toml["blob_adaptation"]["max_scale_fraction"]
+        @test cfg.blob_adaptation.max_scale_ratio == toml["blob_adaptation"]["max_scale_ratio"]
+        @test cfg.blob_adaptation_stops.criteria[2].n == toml["blob_adaptation"]["stops"]["max_iter"]
+        @test cfg.blob_adaptation_stops.criteria[1].rtol == toml["blob_adaptation"]["stops"]["rtol"]
         @test cfg.geometry.min_inliers == toml["geometry"]["min_inliers"]
         @test VgtkCore.outlier_halfwidth(cfg.geometry.ransac.scoring) == toml["geometry"]["ransac"]["scoring"]["outlier_halfwidth"]
         @test cfg.geometry.ransac.config.max_trials == toml["geometry"]["ransac"]["max_trials"]
@@ -326,7 +329,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
         one_off = FindBoardsConfig(min_similarity = 0.71)
         @test one_off.min_similarity == 0.71
         @test one_off.verify_similarity == toml["verify_similarity"]
-        @test one_off.adapt.max_scale_fraction == toml["adapt"]["max_scale_fraction"]
+        @test one_off.blob_adaptation.max_scale_fraction == toml["blob_adaptation"]["max_scale_fraction"]
         @test DetectConfig(polarity = :light).peak_threshold ==
             toml["detect"]["peak_threshold"]
         # The deliberate non-default keeps a Julia literal: `detect.polarity`
@@ -337,7 +340,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
     @testset "config_dict covers every field of every config struct" begin
         # The file-vs-config_dict test below is anchored on `config_dict`, so it is
         # structurally blind to a field `config_dict` itself forgets. That blind
-        # spot was real: AdaptConfig's cutoff/min_intensity/scan_padding/store and
+        # spot was real: the adaptation's cutoff/min_intensity/scan_padding/store and
         # DetectConfig's fill_value/tilts were consumed by the pipeline (the CUDA
         # kernel reads cfg.cutoff) yet emitted by nothing, so write_config produced
         # sidecars that reloaded to different values. Anchor on the STRUCTS.
@@ -349,8 +352,9 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
         # `cutoff` went the other way since that history was written: it is now
         # DATA from the gallery, so the writer skips it and the reader refuses
         # it (both halves pinned above). Exclude it here so the check stays
-        # honest about every OTHER AdaptConfig field.
-        @test setdiff(Set(fieldnames(AdaptConfig)), sub("adapt"), Set([:cutoff])) == Set{Symbol}()
+        # honest about every OTHER BlobAdaptation field; its stops are the `stops` subtable.
+        @test setdiff(Set(fieldnames(BlobAdaptation)), sub("blob_adaptation"), Set([:cutoff])) == Set{Symbol}()
+        @test cd_["blob_adaptation"]["stops"] == Dict{String, Any}("max_iter" => 100, "rtol" => 1.0e-6)
         @test setdiff(
             Set(fieldnames(PoseGeometry)), sub("geometry"),
             Set([:camera, :type])
@@ -358,7 +362,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
         @test setdiff(Set(fieldnames(RansacConfig)), Set(Symbol.(keys(cd_["geometry"]["ransac"])))) == Set{Symbol}()
         @test setdiff(
             Set(fieldnames(FindBoardsConfig)), Set(Symbol.(keys(cd_))),
-            Set([:detect, :adapt, :geometry])
+            Set([:detect, :blob_adaptation, :blob_adaptation_stops, :geometry])
         ) == Set{Symbol}()
     end
 
@@ -370,7 +374,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
         # produce it. `config_dict` is the authority on what a run consists of,
         # so every key it emits must be named in the file.
         #
-        # `polarity`, `adapt.cutoff` and `patch_size` are absent BY DESIGN, not by
+        # `polarity`, `blob_adaptation.cutoff` and `patch_size` are absent BY DESIGN, not by
         # default -- they come from the board bundles and the ONNX graph, which
         # are themselves recorded artifacts. config_dict does not emit them.
         for (f, kw) in (
@@ -558,7 +562,7 @@ _disambiguation(r) = PlanarPoseDisambiguation(VgtkEstimation.LocalOptimization(r
             # the camera must survive an override of a sibling geometry knob --
             # losing it downgrades a metric-pose run to the uncalibrated path
             @test (@set base.geometry.min_inliers = 12).geometry.camera === _CAM
-            @test (@set base.adapt.cutoff = 2.5).adapt.cutoff == 2.5
+            @test (@set base.blob_adaptation.cutoff = 2.5).blob_adaptation.cutoff == 2.5
         end
 
         @testset "a type-changing override re-specializes the struct" begin
@@ -644,18 +648,21 @@ end
 end
 
 @testset "retired config keys: warn, never resurrect" begin
-    # A RECORDED sidecar may carry a retired knob (`adapt.init` was settable,
+    # A RECORDED sidecar may carry a retired knob (`init` was settable,
     # serialized, and read by nothing). It must reload with a warning — the
     # record is immutable — while a typo'd key still fails loudly.
     mktempdir() do dir
         base = read(BlobBoards.run_config_path(), String)
         p1 = joinpath(dir, "retired.toml")
-        write(p1, replace(base, "[find_boards.adapt]" => "[find_boards.adapt]\ninit = \"disc\""))
+        write(p1, replace(base, "[find_boards.blob_adaptation]\n" => "[find_boards.blob_adaptation]\ninit = \"disc\"\n"))
         cfg = @test_logs (:warn, r"retired") match_mode = :any FindBoardsConfig(p1)
         @test cfg isa FindBoardsConfig
         p2 = joinpath(dir, "typo.toml")
-        write(p2, replace(base, "[find_boards.adapt]" => "[find_boards.adapt]\ninitt = \"disc\""))
+        write(p2, replace(base, "[find_boards.blob_adaptation]\n" => "[find_boards.blob_adaptation]\ninitt = \"disc\"\n"))
         @test_throws ArgumentError FindBoardsConfig(p2)
+        # a version-2 sidecar's retired knob moves with its table, and still warns
+        p3 = _write(dir, "retired2.toml", "config_version = 2\n[find_boards.adapt]\ninit = \"disc\"\n")
+        @test (@test_logs (:warn, r"retired") match_mode = :any FindBoardsConfig(p3)) isa FindBoardsConfig
     end
 end
 
@@ -716,8 +723,11 @@ end
     for f in fieldnames(FindBoardsConfig)
         f === :geometry && continue
         d = config_dict(FindBoardsConfig())
-        @test haskey(d, String(f))
+        @test f === :blob_adaptation_stops ? haskey(d["blob_adaptation"], "stops") : haskey(d, String(f))
     end
+    # the adaptation's stops count too
+    @test h(FindBoardsConfig(blob_adaptation_stops = BlobBoards.blob_adaptation_stops(; max_iter = 50))) != base
+    @test h(FindBoardsConfig(blob_adaptation = BlobAdaptation(; scan_padding = 1.5))) != base
     @test h(FindBoardsConfig(verify_similarity = 0.71)) != base
     @test h(FindBoardsConfig(min_appearance_support = 0.31)) != base
     @test h(FindBoardsConfig(ransac_seed = 12345)) != base
@@ -881,8 +891,8 @@ end
 # The versioned converter (decision 11): the configs of record of the paper (bmvc2026, version 1, no
 # `config_version`) read through BB_CONFIG_VERSIONS to the same settings, now as the arm's algorithms.
 @testset "BB_CONFIG_VERSIONS: the configs of record keep loading (2026-11)" begin
-    @test VgtkCore.current_config_version(BlobBoards.BB_CONFIG_VERSIONS) == 2
-    @test TOML.parsefile(BlobBoards.run_config_path())["config_version"] == 2
+    @test VgtkCore.current_config_version(BlobBoards.BB_CONFIG_VERSIONS) == 3
+    @test TOML.parsefile(BlobBoards.run_config_path())["config_version"] == 3
     root = joinpath(pkgdir(BlobBoards), "bmvc2026", "configs")
     for (name, disambiguated) in (("bmvc2026_260527.toml", true), ("bmvc2026_260527_noflip.toml", false))
         f = joinpath(root, name)
@@ -899,19 +909,31 @@ end
             @test g.pose_disambiguation.refine.strategy == g.ransac.local_optimization_strategy
             @test g.pose_disambiguation.refine.scoring == g.ransac.scoring
         end
-        # the migrated config is written at version 2 and reads back the same
+        # the adaptation (v1 → v3): its table and its stops
+        a = FindBoardsConfig(f; camera = _CAM)
+        @test a.blob_adaptation_stops === BlobBoards.blob_adaptation_stops(; max_iter = v1["adapt"]["max_irls_iter"], rtol = v1["adapt"]["rtol"])
+        @test all(k -> getfield(a.blob_adaptation, Symbol(k)) == v1["adapt"][k], setdiff(keys(v1["adapt"]), ["max_irls_iter", "rtol"]))
+        # the migrated config is written at version 3 and reads back the same
         mktempdir() do dir
-            p = write_config(joinpath(dir, "v2.toml"), FindBoardsConfig(f; camera = _CAM))
-            @test TOML.parsefile(p)["config_version"] == 2
+            p = write_config(joinpath(dir, "v3.toml"), FindBoardsConfig(f; camera = _CAM))
+            @test TOML.parsefile(p)["config_version"] == 3
             @test config_dict(FindBoardsConfig(p; camera = _CAM)) == config_dict(FindBoardsConfig(f; camera = _CAM))
         end
     end
     # version 1's tables in a version-2 file are refused, naming the current one
     dir = mktempdir()
+    # version 2 → 3: `[find_boards.adapt]` is `[find_boards.blob_adaptation]`, its cap and tolerance the stops
+    v2 = FindBoardsConfig(_write(dir, "a2.toml", "config_version = 2\n[find_boards.adapt]\nmax_irls_iter = 40\nrtol = 1.0e-5\nscan_padding = 1.5\n"))
+    @test v2.blob_adaptation_stops === BlobBoards.blob_adaptation_stops(; max_iter = 40, rtol = 1.0e-5)
+    @test v2.blob_adaptation.scan_padding === 1.5
+    @test config_dict(v2) == config_dict(FindBoardsConfig(_write(dir, "a3.toml",
+        "config_version = 3\n[find_boards.blob_adaptation]\nscan_padding = 1.5\n[find_boards.blob_adaptation.stops]\nmax_iter = 40\nrtol = 1.0e-5\n")))
+    @test_throws r"find_boards.adapt.*blob_adaptation" FindBoardsConfig(_write(dir, "a4.toml", "config_version = 3\n[find_boards.adapt]\nrtol = 1.0e-5\n"))
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "a5.toml", "config_version = 3\n[find_boards.blob_adaptation]\nrtol = 1.0e-5\n"))
     @test_throws ArgumentError FindBoardsConfig(_write(dir, "r.toml", "config_version = 2\n[find_boards.ransac]\nmax_trials = 9\n"))
     @test_throws ArgumentError FindBoardsConfig(_write(dir, "p.toml",
         "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\nresolve_pose_ambiguity = true\n"); camera = _CAM)
-    @test_throws ArgumentError FindBoardsConfig(_write(dir, "f.toml", "config_version = 3\n"))   # newer than the package
+    @test_throws ArgumentError FindBoardsConfig(_write(dir, "f.toml", "config_version = 4\n"))   # newer than the package
     # a pose disambiguation's gates are radians, and round-trip
     t = "config_version = 2\n[find_boards.geometry]\ntype = \"pose\"\npose_disambiguation = { type = \"planar_pose_disambiguation\", min_separation = 0.1, same_basin = 0.01 }\n"
     g = FindBoardsConfig(_write(dir, "d.toml", t); camera = _CAM).geometry

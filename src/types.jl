@@ -24,9 +24,9 @@ Type alias for a `Detection` with an `EllipticFrame` and metadata containing:
 - the blob's adaptation outcome (VisualGeometryToolkitCore's termination record):
   - `retcode::ReturnCode.T` — `Success` (converged at `rtol`: the blob's
     convergence is `successful_retcode(det.retcode)`, §14, not a field of its own), `MaxIters` (capped at
-    `max_irls_iter`: unconverged), `Failure` (the shape gate refused a step:
+    the stops' `max_iter`: unconverged), `Failure` (the shape gate refused a step:
     rejected), `InitialFailure` (it refused the first step from the seed);
-  - `stop_rule::StopRule` — `IncrementSize` (the IRLS step below `rtol`, Estimation's `irls_stop_rule`), `IterationCap` or `ShapeGate`;
+  - `stop_rule::StopRule` — `IncrementSize` (the IRLS step below `rtol`: Core's `StopWhenIncrementLess`), `IterationCap` or `ShapeGate`;
   - `rejection::Symbol` — why the shape gate refused: `:not_peak` (the fitted
     paraboloid is not concave) or `:aspect_ratio` (beyond `max_aspect_ratio`);
     `:none` otherwise.
