@@ -120,7 +120,7 @@ function trace_pipeline(
     # The recorded config holds the stops in their TOML form; refuse any other before the work, not after it.
     find_config === nothing && !(adaptation_stops isa fieldtype(FindBoardsConfig, :blob_adaptation_stops)) &&
         throw(ArgumentError("trace_pipeline records `adaptation_stops` in its FindBoardsConfig, which holds stops of the " *
-                            "form `blob_adaptation_stops(; max_iter, rtol)`; got $adaptation_stops (pass `find_config` " *
+                            "form `blob_adaptation_stops(; max_iter, rtol)`; got $adaptation_stops (give `find_config` " *
                             "to record another config)"))
     u8, adapt_img = _undistorted_pair(img, cam, device)   # the pipeline's one undistort-for-detect/adapt helper
     detections = detect_blobs(u8; config = detect_config, device)
