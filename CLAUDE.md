@@ -176,7 +176,8 @@ authoritative.
 
 ### Adaptation Strategies
 
-`adapt(detections, img; config=AdaptConfig(), device=CUDABackend())` fits
+`solve(EnsembleProblem(BlobBatch(detections, img), n), BlobAdaptation(; …), EnsembleKernel(device); stops)` fits
+(`adapted_blobs(res)` gives the kept detections)
 elliptical frames to raw blob detections. **Adaptation is backend-generic**
 (src/adapt_ka.jl, KernelAbstractions): ONE set of KA kernels runs on every
 backend, a blob one workgroup — 256 work items on a GPU, ONE on `KA.CPU()`,
@@ -193,16 +194,16 @@ is frame-level with tolerances, never bitwise.
 
 The per-blob solver is FIXED: the Student-t / uniform mixture IRLS with the
 sort-and-sweep posterior partition, whitened normal equations. It used to be
-selectable via `AdaptConfig.solve` (whitened_linear / linear / hq); that field
+selectable by a `solve` field of the old adaptation config (whitened_linear / linear / hq); that field
 is gone. Two of the three were inert — `_adapt` dispatched on
-`AdaptConfig{T}` alone, so `linear` never reached a kernel — and the
+the config's float type alone, so `linear` never reached a kernel — and the
 HQ-Welsch arm (`src/adapt_hq.jl`, since deleted) measured worse than the
 mixture.
 
 Adaptation precision: accumulation and the 6×6 solve are `Float64` wherever
 the backend supports it (`KA.supports_float64`), `Float32` on Metal — a
 distinct numeric regime; per-pixel staging is pinned Float32.
-(`AdaptConfig.store` was DELETED 2026-09 — inert since the KA port.)
+(The old config's `store` field was DELETED 2026-09 — inert since the KA port.)
 
 Seeding uses `Paraboloid3D(disc, z_max)` + `coeffs(p)`.
 
@@ -241,7 +242,8 @@ device-callable) at the Jeffreys prior, the one per-partition formula of every
 sweep in the stack; the kernel supplies the backend's lgamma(j/2).
 
 The CPU `posterior_adapt.jl` implementation that extended RVG's `irls!` hooks
-was removed: that driver is now VGC's `block_coordinate_descent!`.
+was removed: that driver is now Core's `BlockCoordinateDescent` (solved through
+`solve` on a `RefineProblem`).
 The CPU runs the same kernels (one work item per blob: its bitonic sort and
 sweep run sequentially in that item).
 
@@ -433,7 +435,8 @@ Consequences:
   `conventions/signatures.md`: the model or shape first, then the data it
   acts on or is measured against, then parameters):
   - a given model, in task verbs too:
-    `find_board(camera, board_features, image_features)`,
+    `find_board(geometry, board_features, image_features)` (the geometry arm leads;
+    it returns `nothing` or a `FoundBoard`),
     `board_quad(camera, model, bundle)`, `symmetric_iou_match(H_ij, frames_i,
     frames_j)`, `trace_pipeline(cam, img)`;
   - a required tool; a defaulted policy stays last: the gallery and the network
@@ -445,7 +448,7 @@ Consequences:
     `build_tracks_for_sequences(board_dir, descriptor_model_path, video_dir)`.
     Several leading tools keep their relative order (gallery, then network);
   - shapes lead the image they are sampled from — and the image a plot draws
-    on comes last: `adapt(detections, img)`, `canonicalize(frames, img)`,
+    on comes last: `BlobBatch(detections, img)`, `canonicalize(frames, img)`,
     `plot_boards(camera, results, board_bundles, img)`,
     `plot_board_poses(camera, poses, board_bundles, img)`.
 - A method on a function owned elsewhere keeps the owner's order
